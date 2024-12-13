@@ -5,8 +5,8 @@ import React, { useState, useEffect } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import ProgressBar from '@/components/msme-forms/progress-bar';
 import Navbar from '@/components/custom/navbar';
-import ProcessInformation from '@/components/msme-forms/utilization-info';
-import ReviewSubmit from '@/components/msme-forms/review-submit';
+import ProcessInformation from '@/components/student-forms/utilization-info';
+import ReviewSubmit from '@/components/student-forms/review-submit';
 import { toast } from "@/components/ui/use-toast"
 
 
@@ -173,7 +173,7 @@ const isDateBlocked = (date: Date) => {
       <div className="space-y-6">
         <div className="grid grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium mb-1">Level/Section</label>
+            <label className="block text-sm font-medium mb-1">Grade Level/Section</label>
             <input
               type="text"
               className="w-full border rounded-md p-2"

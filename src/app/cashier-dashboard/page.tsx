@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import RoleGuard from '@/components/auth/role-guard';
 
 interface UserService {
   id: string;
@@ -131,6 +132,7 @@ const DashboardCashier = () => {
   };
 
   return (
+    <RoleGuard allowedRoles={['CASHIER']}>
     <div className="flex h-screen overflow-hidden bg-[#f1f5f9]">
       {/* Sidebar */}
       <aside className={`absolute left-0 top-0 z-50 flex h-screen w-72 flex-col overflow-y-hidden bg-white duration-300 ease-linear lg:static lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
@@ -376,6 +378,7 @@ const DashboardCashier = () => {
         </main>
       </div>
     </div>
+    </RoleGuard>
   );
 };
 
