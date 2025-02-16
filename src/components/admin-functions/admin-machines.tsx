@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 interface Service {
   id?: string;
   Service: string;
-  Costs: number | string;
+  Costs: number;
   machineId?: string;
 }
 
@@ -14,6 +14,7 @@ interface Machine {
   Machine: string;
   Image: string;
   Desc: string;
+  Instructions?: string;
   Link?: string;
   isAvailable: boolean;
   Services: Service[];
@@ -24,6 +25,11 @@ export default function AdminServices() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
   const [formData, setFormData] = useState<Partial<Machine>>({
+    Machine: '',
+    Image: '',
+    Desc: '',
+    Instructions: '',
+    Link: '',
     isAvailable: true,
     Services: [{ Service: '', Costs: 0 }]
   });
@@ -37,45 +43,29 @@ export default function AdminServices() {
   const fetchMachines = async () => {
     try {
       const response = await fetch('/api/machines?includeServices=true');
-      if (response.ok) {
-        const data = await response.json();
-        setMachines(data);
-      } else {
-        console.error('Failed to fetch machines');
-        alert('Failed to load machines. Please refresh or contact support.');
-      }
+      if (!response.ok) throw new Error('Failed to fetch machines');
+      const data = await response.json();
+      setMachines(data);
     } catch (error) {
       console.error('Error fetching machines:', error);
-      alert('An error occurred while fetching machines. Please try again later.');
+      alert('Failed to load machines. Please try again later.');
     }
   };
 
 
   const toggleAvailability = async (id: string, currentStatus: boolean) => {
     try {
-      console.log('Sending request:', { id, newStatus: !currentStatus });
- 
       const response = await fetch(`/api/machines/${id}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          isAvailable: !currentStatus
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isAvailable: !currentStatus })
       });
- 
-      console.log('Response status:', response.status);
- 
-      const text = await response.text();
-      console.log('Response text:', text);
- 
-      const data = text ? JSON.parse(text) : null;
- 
+
       if (!response.ok) {
-        throw new Error(data?.error || 'Failed to update availability');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update availability');
       }
- 
+
       setMachines(prevMachines =>
         prevMachines.map(machine =>
           machine.id === id
@@ -83,32 +73,32 @@ export default function AdminServices() {
             : machine
         )
       );
- 
     } catch (error) {
       console.error('Toggle error:', error);
+      alert('Failed to update machine availability.');
     }
   };
 
 
+
   const deleteMachine = async (id: string) => {
-    // Show confirmation dialog
-    const isConfirmed = window.confirm('Are you sure you want to delete this machine? This action cannot be undone.');
-    
-    // Only proceed if user confirms
-    if (!isConfirmed) return;
-  
+    if (!window.confirm('Are you sure you want to delete this machine? This action cannot be undone.')) {
+      return;
+    }
+
     try {
       const response = await fetch(`/api/machines/${id}`, {
         method: 'DELETE',
       });
-      if (response.ok) {
-        setMachines(machines.filter((machine) => machine.id !== id));
-        console.log('Machine deleted successfully');
-      } else {
-        console.error('Failed to delete machine:', await response.text());
+
+      if (!response.ok) {
+        throw new Error(await response.text());
       }
+
+      setMachines(prevMachines => prevMachines.filter(machine => machine.id !== id));
     } catch (error) {
       console.error('Error deleting machine:', error);
+      alert('Failed to delete machine. Please try again.');
     }
   };
 
@@ -116,29 +106,30 @@ export default function AdminServices() {
     setEditingMachine(machine);
     if (machine) {
       setFormData({
-        name: machine.Machine || '',
-        image: machine.Image || '',
-        description: machine.Desc || '',
-        videoUrl: machine.Link || '',
+        Machine: machine.Machine || '',
+        Image: machine.Image || '',
+        Desc: machine.Desc || '',
+        Instructions: machine.Instructions || '',
+        Link: machine.Link || '',
         isAvailable: machine.isAvailable,
         Services: machine.Services?.length 
           ? machine.Services 
           : [{ Service: '', Costs: 0 }]
       });
       setImagePreview(machine.Image || null);
-      setImageFile(null);
     } else {
       setFormData({
-        name: '',
-        image: '',
-        description: '',
-        videoUrl: '',
+        Machine: '',
+        Image: '',
+        Desc: '',
+        Instructions: '',
+        Link: '',
         isAvailable: true,
         Services: [{ Service: '', Costs: 0 }]
       });
       setImagePreview(null);
-      setImageFile(null);
     }
+    setImageFile(null);
     setIsModalOpen(true);
   };
 
@@ -146,6 +137,11 @@ export default function AdminServices() {
     setIsModalOpen(false);
     setEditingMachine(null);
     setFormData({
+      Machine: '',
+      Image: '',
+      Desc: '',
+      Instructions: '',
+      Link: '',
       isAvailable: true,
       Services: [{ Service: '', Costs: 0 }]
     });
@@ -153,25 +149,26 @@ export default function AdminServices() {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleServiceChange = (index: number, field: 'Service' | 'Costs', value: string | number) => {
-    const updatedServices = [...(formData.Services || [])];
-    if (field === 'Costs') {
-      // Handle decimal input properly
-      const numValue = value === '' ? 0 : parseFloat(value as string);
-      updatedServices[index] = {
-        ...updatedServices[index],
-        [field]: !isNaN(numValue) ? numValue : 0
-      };
-    } else {
-      updatedServices[index] = {
-        ...updatedServices[index],
-        [field]: value
-      };
-    }
-    setFormData({ ...formData, Services: updatedServices });
+    setFormData(prev => {
+      const updatedServices = [...(prev.Services || [])];
+      if (field === 'Costs') {
+        const numValue = value === '' ? 0 : parseFloat(value as string);
+        updatedServices[index] = {
+          ...updatedServices[index],
+          [field]: !isNaN(numValue) ? numValue : 0
+        };
+      } else {
+        updatedServices[index] = {
+          ...updatedServices[index],
+          [field]: value
+        };
+      }
+      return { ...prev, Services: updatedServices };
+    });
   };
 
   const addServiceField = () => {
@@ -182,8 +179,10 @@ export default function AdminServices() {
   };
 
   const removeServiceField = (index: number) => {
-    const updatedServices = formData.Services?.filter((_, i) => i !== index) || [];
-    setFormData({ ...formData, Services: updatedServices });
+    setFormData(prev => ({
+      ...prev,
+      Services: prev.Services?.filter((_, i) => i !== index) || []
+    }));
   };
 
   const handleImageUpload = async () => {
@@ -198,36 +197,16 @@ export default function AdminServices() {
         body: formData
       });
   
-      // Log the entire response for debugging
-      console.log('Full response:', response);
-      console.log('Response status:', response.status);
-      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-  
-      // Try to parse the response text
-      const responseText = await response.text();
-      console.log('Raw response text:', responseText);
-  
-      // Try to parse the response as JSON
-      let parsedData;
-      try {
-        parsedData = JSON.parse(responseText);
-      } catch (parseError) {
-        console.error('JSON parsing error:', parseError);
-        throw new Error(`Invalid server response: ${responseText}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
       }
   
-      // Check if the response was successful
-      if (response.ok) {
-        if (parsedData.path) {
-          return parsedData.path;
-        }
-        throw new Error(parsedData.error || 'Upload failed');
-      } else {
-        throw new Error(parsedData.error || 'Upload unsuccessful');
-      }
+      const data = await response.json();
+      return data.path;
     } catch (error) {
-      console.error('Complete upload error:', error);
-      alert(`Failed to upload image: ${error.message}`);
+      console.error('Upload error:', error);
+      alert(`Failed to upload image: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return null;
     }
   };
@@ -239,11 +218,7 @@ export default function AdminServices() {
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
-        // Update formData with the file name or temporary path
-        setFormData(prev => ({
-          ...prev, 
-          image: file.name // or you could use a temporary path
-        }));
+        setFormData(prev => ({ ...prev, Image: file.name }));
       };
       reader.readAsDataURL(file);
     }
@@ -253,34 +228,28 @@ export default function AdminServices() {
     e.preventDefault();
   
     try {
-      // Handle image upload (keep existing code)
-      let imageUrl = formData.image;
+      let imageUrl = formData.Image;
       if (imageFile) {
         const uploadedImageUrl = await handleImageUpload();
-        if (!uploadedImageUrl) {
-          alert('Image upload failed. Please try again.');
-          return;
-        }
+        if (!uploadedImageUrl) return;
         imageUrl = uploadedImageUrl;
       }
   
-      // Prepare machine data
       const machinePayload = {
-        Machine: formData.name,
-        Image: imageUrl || '',
-        Desc: formData.description,
-        Link: formData.videoUrl || null,
+        Machine: formData.Machine?.trim(),
+        Image: imageUrl,
+        Desc: formData.Desc?.trim(),
+        Instructions: formData.Instructions?.trim() || null,
+        Link: formData.Link?.trim() || null,
         isAvailable: formData.isAvailable ?? true,
-        Services: (formData.Services || [])
-          .filter(service => service.Service && service.Service.trim() !== '')
-          .map(service => ({
-            ...service,
-            Costs: parseFloat(service.Costs as string) || 0,
-            Service: service.Service.trim()
-          }))
+        Services: formData.Services?.filter(service => 
+          service.Service && service.Service.trim() !== ''
+        ).map(service => ({
+          Service: service.Service.trim(),
+          Costs: parseFloat(service.Costs.toString()) || 0
+        }))
       };
   
-      // Save machine data
       const response = await fetch(
         editingMachine 
           ? `/api/machines/${editingMachine.id}`
@@ -293,40 +262,29 @@ export default function AdminServices() {
       );
   
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Save failed: ${errorText}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save machine');
       }
   
-      const savedMachine = await response.json();
+      const responseText = await response.text();
+      if (!responseText) {
+        throw new Error('Empty response received from server');
+      }
   
-      // Update UI state
+      const savedMachine = JSON.parse(responseText);
+      
       setMachines(prevMachines => {
         if (editingMachine) {
-          return prevMachines.map(m => 
-            m.id === savedMachine.id ? savedMachine : m
-          );
-        } else {
-          return [...prevMachines, savedMachine];
+          return prevMachines.map(m => m.id === savedMachine.id ? savedMachine : m);
         }
+        return [...prevMachines, savedMachine];
       });
   
       closeModal();
-  
     } catch (error) {
       console.error('Save error:', error);
-      alert(error.message || 'Failed to save machine. Please try again.');
+      alert(error instanceof Error ? error.message : 'Failed to save machine');
     }
-  };
-
-  // Updated service display in the machine card
-  const formatCost = (cost: number | string) => {
-    const numCost = typeof cost === 'string' ? parseFloat(cost) : cost;
-    return numCost.toLocaleString('en-US', {
-      style: 'currency',
-      currency: 'PHP',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
   };
 
   return (
@@ -370,20 +328,20 @@ export default function AdminServices() {
               
               {/* Services with Costs Display */}
               {machine.Services && machine.Services.length > 0 && (
-                <div className="mb-4">
-                  <strong className="text-gray-700 block mb-2">Services:</strong>
-                  <ul className="space-y-2">
-                    {machine.Services.map((service, index) => (
-                      <li key={service.id || index} className="flex justify-between items-center py-1 border-b border-gray-100">
-                        <span className="text-gray-800">{service.Service}</span>
-                        <span className="text-green-600 font-medium">
-                          {formatCost(service.Costs)}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
+  <div className="mb-4">
+    <strong className="text-gray-700 block mb-2">Services:</strong>
+    <ul className="space-y-2">
+      {machine.Services.map((service, index) => (
+        <li key={service.id || index} className="flex justify-between items-center py-1 border-b border-gray-100">
+          <span className="text-gray-800">{service.Service}</span>
+          <span className="text-green-600 font-medium">
+            {service.Costs || 0}
+          </span>
+        </li>
+      ))}
+    </ul>
+  </div>
+)}
               
               {machine.Link && (
                 <a 
@@ -435,14 +393,14 @@ export default function AdminServices() {
             Name
           </label>
           <input
-            type="text"
-            id="name"
-            name="name"
-            value={formData.name || ''}
-            onChange={handleInputChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-            required
-          />
+  type="text"
+  id="Machine"  // Changed from "name"
+  name="Machine"  // Changed from "name"
+  value={formData.Machine || ''}  // Changed from formData.name
+  onChange={handleInputChange}
+  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+  required
+/>
         </div>
 
         {/* Description Input */}
@@ -451,14 +409,14 @@ export default function AdminServices() {
             Description
           </label>
           <textarea
-            id="description"
-            name="description"
-            value={formData.description || ''}
-            onChange={handleInputChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-            rows={3}
-            required
-          />
+  id="Desc"  // Changed from "description"
+  name="Desc"  // Changed from "description"
+  value={formData.Desc || ''}  // Changed from formData.description
+  onChange={handleInputChange}
+  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+  rows={3}
+  required
+/>
         </div>
 
         {/* Image Upload */}
@@ -545,14 +503,14 @@ export default function AdminServices() {
             YouTube Video URL
           </label>
           <input
-            type="url"
-            id="videoUrl"
-            name="videoUrl"
-            value={formData.videoUrl || ''}
-            onChange={handleInputChange}
-            placeholder="https://youtube.com/..."
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-          />
+  type="url"
+  id="Link"  // Changed from "videoUrl"
+  name="Link"  // Changed from "videoUrl"
+  value={formData.Link || ''}  // Changed from formData.videoUrl
+  onChange={handleInputChange}
+  placeholder="https://youtube.com/..."
+  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+/>
         </div>
 
         {/* Submit Button */}

@@ -23,12 +23,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (body.Instructions && !body.Instructions.trim()) {
+      return NextResponse.json(
+        { error: 'Instructions cannot be empty if provided' }, 
+        { status: 400 }
+      );
+    }
+
     // Create the machine first
     const newMachine = await prisma.machine.create({
       data: {
         Machine: body.Machine.trim(),
         Image: body.Image || '',
         Desc: body.Desc.trim(),
+        Instructions: body.Instructions?.trim() || null,
         Link: body.Link?.trim() || null,
         isAvailable: body.isAvailable ?? true,
       },

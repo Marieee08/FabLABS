@@ -7,53 +7,166 @@ import { promises as fs } from 'fs';
 import path from 'path';
 
 export async function PUT(request: Request, { params }: { params: { id: string } }) {
+  if (!params.id) {
+    console.error('No machine ID provided');
+    return NextResponse.json({ error: 'Machine ID is required' }, { status: 400 });
+  }
+
   try {
     const body = await request.json();
-    
-    console.log('Received PUT request body:', JSON.stringify(body, null, 2));
+    console.log(`Updating machine ${params.id} with body:`, JSON.stringify(body, null, 2));
 
-    if (!body.Machine || !body.Image || !body.Desc) {
-      return NextResponse.json(
-        { error: 'Missing required fields' }, 
-        { status: 400 }
-      );
+    // Validate input
+    if (!body.Machine?.trim() || !body.Desc?.trim()) {
+      console.error('Validation failed:', { Machine: body.Machine, Desc: body.Desc });
+      return NextResponse.json({ error: 'Machine name and description are required' }, { status: 400 });
     }
 
-    // Old image deletion logic remains the same...
+    // Check if machine exists first
+    const existingMachine = await prisma.machine.findUnique({
+      where: { id: params.id }
+    });
 
-    const updatedMachine = await prisma.machine.update({
-      where: { id: params.id },
-      data: {
-        Machine: body.Machine,
-        Image: body.Image,
-        Desc: body.Desc,
-        Link: body.Link || null,
-        isAvailable: body.isAvailable ?? true,
-        // Explicitly handle Costs, converting to Prisma.Decimal
-        Costs: body.Costs !== undefined && body.Costs !== null 
-          ? new Prisma.Decimal(body.Costs) 
-          : null
+    if (!existingMachine) {
+      console.error(`Machine ${params.id} not found`);
+      return NextResponse.json({ error: 'Machine not found' }, { status: 404 });
+    }
+
+    try {
+      // Update machine without transaction first
+      const updatedMachine = await prisma.machine.update({
+        where: { id: params.id },
+        data: {
+          Machine: body.Machine.trim(),
+          Image: body.Image || '',
+          Desc: body.Desc.trim(),
+          Link: body.Link || null,
+          isAvailable: body.isAvailable ?? true,
+        },
+      });
+
+      console.log('Machine updated successfully:', updatedMachine);
+
+      // Delete existing services
+      await prisma.service.deleteMany({
+        where: { machineId: params.id }
+      });
+
+      console.log('Existing services deleted');
+
+      // Add new services
+      if (body.Services?.length > 0) {
+        const newServices = await prisma.service.createMany({
+          data: body.Services
+            .filter((service: any) => service.Service?.trim() && service.Costs != null)
+            .map((service: any) => ({
+              Service: service.Service.trim(),
+              Costs: new Prisma.Decimal(service.Costs),
+              machineId: params.id
+            }))
+        });
+        console.log('New services created:', newServices);
       }
-    });
 
-    console.log('Updated machine:', JSON.stringify(updatedMachine, null, 2));
+      // Fetch final result
+      const finalMachine = await prisma.machine.findUnique({
+        where: { id: params.id },
+        include: { Services: true }
+      });
 
-    return NextResponse.json(updatedMachine, { 
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
+      console.log('Final machine state:', finalMachine);
+
+      return NextResponse.json(finalMachine);
+
+    } catch (dbError) {
+      console.error('Database operation failed:', dbError);
+      throw dbError; // Re-throw to be caught by outer try-catch
+    }
+
   } catch (error) {
     console.error('Machine Update Error:', error);
-    
-    return NextResponse.json(
-      { 
-        error: 'Failed to update machine',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      }, 
-      { status: 500 }
-    );
+    // Ensure we always return a valid JSON response
+    return NextResponse.json({
+      error: 'Failed to update machine',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }
+
+// In your AdminServices.tsx component, update the handleSubmit function:
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  try {
+    let imageUrl = formData.Image;
+    if (imageFile) {
+      const uploadedImageUrl = await handleImageUpload();
+      if (!uploadedImageUrl) {
+        throw new Error('Failed to upload image');
+      }
+      imageUrl = uploadedImageUrl;
+    }
+
+    const machinePayload = {
+      Machine: formData.Machine?.trim(),
+      Image: imageUrl,
+      Desc: formData.Desc?.trim(),
+      Instructions: formData.Instructions?.trim() || null,
+      Link: formData.Link?.trim() || null,
+      isAvailable: formData.isAvailable ?? true,
+      Services: formData.Services?.filter(service => 
+        service.Service && service.Service.trim() !== ''
+      ).map(service => ({
+        Service: service.Service.trim(),
+        Costs: parseFloat(service.Costs.toString()) || 0
+      }))
+    };
+
+    console.log('Sending payload:', machinePayload);
+
+    const response = await fetch(
+      editingMachine 
+        ? `/api/machines/${editingMachine.id}`
+        : '/api/machines',
+      {
+        method: editingMachine ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(machinePayload)
+      }
+    );
+
+    const responseText = await response.text();
+    console.log('Raw response:', responseText);
+
+    if (!responseText) {
+      throw new Error('Empty response received from server');
+    }
+
+    let savedMachine;
+    try {
+      savedMachine = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('Failed to parse response:', responseText);
+      throw new Error('Invalid response format from server');
+    }
+
+    if (!response.ok) {
+      throw new Error(savedMachine.error || 'Failed to save machine');
+    }
+
+    setMachines(prevMachines => {
+      if (editingMachine) {
+        return prevMachines.map(m => m.id === savedMachine.id ? savedMachine : m);
+      }
+      return [...prevMachines, savedMachine];
+    });
+
+    closeModal();
+  } catch (error) {
+    console.error('Save error:', error);
+    alert(error instanceof Error ? error.message : 'Failed to save machine');
+  }
+};
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
