@@ -29,75 +29,74 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 }
 
 // UPDATE a service
-async function updateService(req: NextApiRequest, res: NextApiResponse, id: string) {
-  const { Service, machineId } = req.body;
-
+export async function PUT(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    // Validate input
-    if (!Service) {
-      return res.status(400).json({ error: 'Service name is required' });
+    const body = await req.json();
+    
+    // Validate request body
+    const validationErrors = validateServiceData(body);
+    if (validationErrors.length > 0) {
+      return NextResponse.json(
+        { errors: validationErrors },
+        { status: 400 }
+      );
     }
-
-    // Optional: Check if machine exists if machineId is provided
-    if (machineId) {
-      const machine = await prisma.machine.findUnique({
-        where: { id: machineId }
-      });
-
-      if (!machine) {
-        return res.status(404).json({ error: 'Machine not found' });
-      }
-    }
-
-    const updatedService = await prisma.service.update({
-      where: { id },
+    
+    const service = await prisma.service.update({
+      where: { id: params.id },
       data: {
-        Service,
-        machineId: machineId || null
+        Service: body.Service,
+        Icon: body.Icon || null,
+        Info: body.Info || null,
+        Costs: body.Costs ? Number(body.Costs) : null,
+        Per: body.Per || null
+      },
+      include: {
+        Machines: {
+          include: {
+            machine: true
+          }
+        }
       }
     });
-
-    return res.status(200).json(updatedService);
+    
+    return NextResponse.json(service);
   } catch (error) {
     console.error('Error updating service:', error);
-    
-    // Check for "Record not found" error
-    if (error.code === 'P2025') {
-      return res.status(404).json({ 
-        error: 'Service not found', 
-        details: error.message 
-      });
-    }
-
-    return res.status(500).json({ 
-      error: 'Unable to update service', 
-      details: error.message 
-    });
+    return NextResponse.json(
+      { error: 'Failed to update service' },
+      { status: 500 }
+    );
   }
 }
 
 // DELETE a service
-async function deleteService(req: NextApiRequest, res: NextApiResponse, id: string) {
+export async function DELETE(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    await prisma.service.delete({
-      where: { id }
+    // First delete all related MachineService records
+    await prisma.machineService.deleteMany({
+      where: { serviceId: params.id }
     });
-
-    return res.status(200).json({ message: 'Service deleted successfully' });
+    
+    // Then delete the service
+    await prisma.service.delete({
+      where: { id: params.id }
+    });
+    
+    return NextResponse.json(
+      { message: 'Service deleted successfully' }
+    );
   } catch (error) {
     console.error('Error deleting service:', error);
-    
-    // Check for "Record not found" error
-    if (error.code === 'P2025') {
-      return res.status(404).json({ 
-        error: 'Service not found', 
-        details: error.message 
-      });
-    }
-
-    return res.status(500).json({ 
-      error: 'Unable to delete service', 
-      details: error.message 
-    });
+    return NextResponse.json(
+      { error: 'Failed to delete service' },
+      { status: 500 }
+    );
   }
 }

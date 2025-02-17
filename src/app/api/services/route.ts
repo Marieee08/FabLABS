@@ -3,60 +3,89 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const machineId = searchParams.get('machineId');
+function validateServiceData(data: any) {
+  const errors = [];
+  
+  if (!data.Service || typeof data.Service !== 'string') {
+    errors.push('Service name is required and must be a string');
+  }
+  
+  if (data.Icon !== null && data.Icon !== undefined && typeof data.Icon !== 'string') {
+    errors.push('Icon must be a string if provided');
+  }
+  
+  if (data.Info !== null && data.Info !== undefined && typeof data.Info !== 'string') {
+    errors.push('Info must be a string if provided');
+  }
+  
+  if (data.Costs !== null && data.Costs !== undefined && typeof Number(data.Costs) !== 'number') {
+    errors.push('Costs must be a number if provided');
+  }
+  
+  if (data.Per !== null && data.Per !== undefined && typeof data.Per !== 'string') {
+    errors.push('Per must be a string if provided');
+  }
+  
+  return errors;
+}
 
+export async function GET() {
   try {
-    const services = machineId 
-      ? await prisma.service.findMany({
-          where: { machineId }
-        })
-      : await prisma.service.findMany();
-
-    return NextResponse.json(services, { status: 200 });
+    const services = await prisma.service.findMany({
+      include: {
+        Machines: {
+          include: {
+            machine: true
+          }
+        }
+      }
+    });
+    
+    return NextResponse.json(services);
   } catch (error) {
+    console.error('Error fetching services:', error);
     return NextResponse.json(
-      { error: 'Unable to fetch services', details: error.message }, 
+      { error: 'Failed to fetch services' },
       { status: 500 }
     );
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(req: Request) {
   try {
-    const body = await request.json();
+    const body = await req.json();
     
-    console.log('Received service POST request:', body);
-
-    // Validate required fields
-    if (!body.Service || !body.machineId) {
+    // Validate request body
+    const validationErrors = validateServiceData(body);
+    if (validationErrors.length > 0) {
       return NextResponse.json(
-        { error: 'Service name and machineId are required' }, 
+        { errors: validationErrors },
         { status: 400 }
       );
     }
-
-    const newService = await prisma.service.create({
+    
+    const service = await prisma.service.create({
       data: {
-        Service: body.Service.trim(),
-        machineId: body.machineId
+        Service: body.Service,
+        Icon: body.Icon || null,
+        Info: body.Info || null,
+        Costs: body.Costs ? Number(body.Costs) : null,
+        Per: body.Per || null
+      },
+      include: {
+        Machines: {
+          include: {
+            machine: true
+          }
+        }
       }
     });
-
-    console.log('Created service:', newService);
-
-    return NextResponse.json(newService, { 
-      status: 201,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    
+    return NextResponse.json(service);
   } catch (error) {
-    console.error('Service Creation Error:', error);
+    console.error('Error creating service:', error);
     return NextResponse.json(
-      { 
-        error: 'Failed to create service',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      }, 
+      { error: 'Failed to create service' },
       { status: 500 }
     );
   }
