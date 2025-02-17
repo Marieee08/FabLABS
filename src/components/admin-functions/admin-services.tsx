@@ -62,6 +62,8 @@ const AdminServices = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchServices();
@@ -70,15 +72,20 @@ const AdminServices = () => {
   const fetchServices = async () => {
     try {
       const response = await fetch('/api/services');
+      if (!response.ok) {
+        throw new Error('Failed to fetch services');
+      }
       const data = await response.json();
       setServices(data);
     } catch (error) {
       console.error('Error fetching services:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch services');
     }
   };
 
   const handleSubmit = async (formData: ServiceFormData) => {
     setIsLoading(true);
+    setError(null);
     try {
       const payload = {
         Service: formData.Service,
@@ -87,8 +94,6 @@ const AdminServices = () => {
         Costs: formData.Costs ? parseFloat(formData.Costs) : null,
         Per: formData.Per,
       };
-
-      console.log('Submitting data:', payload); // Debug log
 
       const endpoint = editingService ? `/api/services/${editingService.id}` : '/api/services';
       const method = editingService ? 'PUT' : 'POST';
@@ -104,8 +109,10 @@ const AdminServices = () => {
       const responseData = await response.json();
       
       if (!response.ok) {
-        console.error('Server response:', responseData); // Debug log
-        throw new Error(responseData.message || 'Failed to save service');
+        if (responseData.errors) {
+          throw new Error(responseData.errors.join(', '));
+        }
+        throw new Error(responseData.error || 'Failed to save service');
       }
       
       await fetchServices();
@@ -113,8 +120,7 @@ const AdminServices = () => {
       setEditingService(null);
     } catch (error) {
       console.error('Error saving service:', error);
-      // You might want to show this error to the user via a toast notification
-      alert(error instanceof Error ? error.message : 'Failed to save service');
+      setError(error instanceof Error ? error.message : 'Failed to save service');
     } finally {
       setIsLoading(false);
     }
@@ -128,11 +134,16 @@ const AdminServices = () => {
         method: 'DELETE',
       });
 
-      if (!response.ok) throw new Error('Failed to delete service');
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete service');
+      }
       
       await fetchServices();
+      setOpenMenuId(null); // Close the dropdown after deletion
     } catch (error) {
       console.error('Error deleting service:', error);
+      setError(error instanceof Error ? error.message : 'Failed to delete service');
     }
   };
 
@@ -157,6 +168,12 @@ const AdminServices = () => {
 
     return (
       <form onSubmit={handleFormSubmit} className="space-y-4">
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+            {error}
+          </div>
+        )}
+        
         <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="Service">Service Name *</Label>
@@ -225,6 +242,7 @@ const AdminServices = () => {
               onClick={() => {
                 setIsDialogOpen(false);
                 setEditingService(null);
+                setError(null);
               }}
             >
               Cancel
@@ -241,8 +259,6 @@ const AdminServices = () => {
   const DynamicIcon = ({ iconName }: { iconName: string | null }) => {
     if (!iconName) return null;
     
-    // Convert icon name to match Lucide's naming convention
-    // e.g., "wrench" becomes "Wrench"
     const formattedIconName = iconName.charAt(0).toUpperCase() + iconName.slice(1);
     const IconComponent = (LucideIcons as any)[formattedIconName];
     
@@ -261,6 +277,7 @@ const AdminServices = () => {
         <Button 
           onClick={() => {
             setEditingService(null);
+            setError(null);
             setIsDialogOpen(true);
           }}
           className="bg-[#143370] hover:bg-[#0d2451] text-white"
@@ -268,6 +285,12 @@ const AdminServices = () => {
           Add New Service
         </Button>
       </div>
+
+      {error && (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+          {error}
+        </div>
+      )}
 
       <Table>
         <TableHeader>
@@ -305,7 +328,12 @@ const AdminServices = () => {
                 {service.Machines?.map(m => m.machine.Machine).join(', ') || '-'}
               </TableCell>
               <TableCell className="text-right">
-                <DropdownMenu>
+                <DropdownMenu
+                  open={openMenuId === service.id}
+                  onOpenChange={(open) => {
+                    setOpenMenuId(open ? service.id : null);
+                  }}
+                >
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="h-8 w-8 p-0">
                       <MoreVertical className="h-4 w-4" />
@@ -315,7 +343,9 @@ const AdminServices = () => {
                     <DropdownMenuItem
                       onClick={() => {
                         setEditingService(service);
+                        setError(null);
                         setIsDialogOpen(true);
+                        setOpenMenuId(null); // Close the dropdown after clicking
                       }}
                       className="cursor-pointer"
                     >

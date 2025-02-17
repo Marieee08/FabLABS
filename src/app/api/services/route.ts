@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
+// app/api/services/route.ts
+import { NextResponse } from 'next/server';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+// Validation function
 function validateServiceData(data: any) {
   const errors = [];
   
@@ -18,8 +20,11 @@ function validateServiceData(data: any) {
     errors.push('Info must be a string if provided');
   }
   
-  if (data.Costs !== null && data.Costs !== undefined && typeof Number(data.Costs) !== 'number') {
-    errors.push('Costs must be a number if provided');
+  if (data.Costs !== null && data.Costs !== undefined) {
+    const cost = Number(data.Costs);
+    if (isNaN(cost)) {
+      errors.push('Costs must be a valid number if provided');
+    }
   }
   
   if (data.Per !== null && data.Per !== undefined && typeof data.Per !== 'string') {
@@ -29,6 +34,7 @@ function validateServiceData(data: any) {
   return errors;
 }
 
+// GET handler
 export async function GET() {
   try {
     const services = await prisma.service.findMany({
@@ -51,11 +57,13 @@ export async function GET() {
   }
 }
 
+// POST handler
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     
-    // Validate request body
+    console.log('Received body:', body);
+    
     const validationErrors = validateServiceData(body);
     if (validationErrors.length > 0) {
       return NextResponse.json(
@@ -63,15 +71,32 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
+
+    // Handle Costs conversion
+    let costsValue = null;
+    if (body.Costs !== null && body.Costs !== undefined && body.Costs !== '') {
+      try {
+        costsValue = new Prisma.Decimal(body.Costs);
+      } catch (error) {
+        return NextResponse.json(
+          { error: 'Invalid cost value' },
+          { status: 400 }
+        );
+      }
+    }
+    
+    const serviceData = {
+      Service: body.Service,
+      Icon: body.Icon || null,
+      Info: body.Info || null,
+      Costs: costsValue,
+      Per: body.Per || null
+    };
+
+    console.log('Creating service with data:', serviceData);
     
     const service = await prisma.service.create({
-      data: {
-        Service: body.Service,
-        Icon: body.Icon || null,
-        Info: body.Info || null,
-        Costs: body.Costs ? Number(body.Costs) : null,
-        Per: body.Per || null
-      },
+      data: serviceData,
       include: {
         Machines: {
           include: {
@@ -83,43 +108,12 @@ export async function POST(req: Request) {
     
     return NextResponse.json(service);
   } catch (error) {
-    console.error('Error creating service:', error);
-    return NextResponse.json(
-      { error: 'Failed to create service' },
-      { status: 500 }
-    );
-  }
-}
-
-export async function DELETE(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const machineId = searchParams.get('machineId');
-
-    if (!machineId) {
-      return NextResponse.json(
-        { error: 'Machine ID is required' }, 
-        { status: 400 }
-      );
-    }
-
-    const deleteResult = await prisma.service.deleteMany({
-      where: { machineId: machineId }
-    });
-
-    console.log('Deleted services:', deleteResult);
-
-    return NextResponse.json(deleteResult, { 
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
-  } catch (error) {
-    console.error('Service Deletion Error:', error);
+    console.error('Server error creating service:', error);
     return NextResponse.json(
       { 
-        error: 'Failed to delete services',
+        error: 'Failed to create service',
         details: error instanceof Error ? error.message : 'Unknown error'
-      }, 
+      },
       { status: 500 }
     );
   }

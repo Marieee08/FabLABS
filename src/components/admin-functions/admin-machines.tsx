@@ -1,12 +1,15 @@
 import { Plus, Edit, Trash2, X } from 'lucide-react';
 import { Switch } from "@/components/ui/switch";
 import React, { useState, useEffect } from 'react';
+import { MultiSelect } from "@/components/ui/multi-select";
 
 interface Service {
-  id?: string;
+  id: string;
   Service: string;
-  Costs: number;
-  machineId?: string;
+  Costs?: number;
+  Icon?: string;
+  Info?: string;
+  Per?: string;
 }
 
 interface Machine {
@@ -22,6 +25,7 @@ interface Machine {
 
 export default function AdminServices() {
   const [machines, setMachines] = useState<Machine[]>([]);
+  const [allServices, setAllServices] = useState<Service[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
   const [formData, setFormData] = useState<Partial<Machine>>({
@@ -31,13 +35,15 @@ export default function AdminServices() {
     Instructions: '',
     Link: '',
     isAvailable: true,
-    Services: [{ Service: '', Costs: 0 }]
+    Services: []
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
 
   useEffect(() => {
     fetchMachines();
+    fetchServices();
   }, []);
 
   const fetchMachines = async () => {
@@ -49,6 +55,18 @@ export default function AdminServices() {
     } catch (error) {
       console.error('Error fetching machines:', error);
       alert('Failed to load machines. Please try again later.');
+    }
+  };
+
+  const fetchServices = async () => {
+    try {
+      const response = await fetch('/api/services');
+      if (!response.ok) throw new Error('Failed to fetch services');
+      const data = await response.json();
+      setAllServices(data);
+    } catch (error) {
+      console.error('Error fetching services:', error);
+      alert('Failed to load services. Please try again later.');
     }
   };
 
@@ -112,10 +130,9 @@ export default function AdminServices() {
         Instructions: machine.Instructions || '',
         Link: machine.Link || '',
         isAvailable: machine.isAvailable,
-        Services: machine.Services?.length 
-          ? machine.Services 
-          : [{ Service: '', Costs: 0 }]
+        Services: machine.Services || []
       });
+      setSelectedServices(machine.Services.map(service => service.id));
       setImagePreview(machine.Image || null);
     } else {
       setFormData({
@@ -125,8 +142,9 @@ export default function AdminServices() {
         Instructions: '',
         Link: '',
         isAvailable: true,
-        Services: [{ Service: '', Costs: 0 }]
+        Services: []
       });
+      setSelectedServices([]);
       setImagePreview(null);
     }
     setImageFile(null);
@@ -171,20 +189,6 @@ export default function AdminServices() {
     });
   };
 
-  const addServiceField = () => {
-    setFormData(prev => ({
-      ...prev, 
-      Services: [...(prev.Services || []), { Service: '', Costs: 0 }]
-    }));
-  };
-
-  const removeServiceField = (index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      Services: prev.Services?.filter((_, i) => i !== index) || []
-    }));
-  };
-
   const handleImageUpload = async () => {
     if (!imageFile) return null;
   
@@ -224,6 +228,7 @@ export default function AdminServices() {
     }
   };
 
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
   
@@ -231,7 +236,9 @@ export default function AdminServices() {
       let imageUrl = formData.Image;
       if (imageFile) {
         const uploadedImageUrl = await handleImageUpload();
-        if (!uploadedImageUrl) return;
+        if (!uploadedImageUrl) {
+          throw new Error('Failed to upload image');
+        }
         imageUrl = uploadedImageUrl;
       }
   
@@ -242,12 +249,7 @@ export default function AdminServices() {
         Instructions: formData.Instructions?.trim() || null,
         Link: formData.Link?.trim() || null,
         isAvailable: formData.isAvailable ?? true,
-        Services: formData.Services?.filter(service => 
-          service.Service && service.Service.trim() !== ''
-        ).map(service => ({
-          Service: service.Service.trim(),
-          Costs: parseFloat(service.Costs.toString()) || 0
-        }))
+        serviceIds: selectedServices
       };
   
       const response = await fetch(
@@ -261,23 +263,24 @@ export default function AdminServices() {
         }
       );
   
+      // Try to parse the response as JSON regardless of content-type
+      let data;
+      try {
+        data = await response.json();
+      } catch (error) {
+        console.error('Response parsing error:', error);
+        throw new Error('Failed to parse server response');
+      }
+  
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to save machine');
+        throw new Error(data.error || data.details || 'Failed to save machine');
       }
   
-      const responseText = await response.text();
-      if (!responseText) {
-        throw new Error('Empty response received from server');
-      }
-  
-      const savedMachine = JSON.parse(responseText);
-      
       setMachines(prevMachines => {
         if (editingMachine) {
-          return prevMachines.map(m => m.id === savedMachine.id ? savedMachine : m);
+          return prevMachines.map(m => m.id === data.id ? data : m);
         }
-        return [...prevMachines, savedMachine];
+        return [...prevMachines, data];
       });
   
       closeModal();
@@ -448,54 +451,20 @@ export default function AdminServices() {
 
         {/* Services Input */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Services
-          </label>
-          {formData.Services?.map((service, index) => (
-            <div key={index} className="mb-4 p-4 bg-gray-50 rounded-lg">
-              <div className="flex justify-between items-start mb-2">
-                <span className="text-sm font-medium text-gray-700">Service {index + 1}</span>
-                {index > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => removeServiceField(index)}
-                    className="text-red-500 hover:text-red-700"
-                  >
-                    <X size={16} />
-                  </button>
-                )}
-              </div>
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  value={service.Service}
-                  onChange={(e) => handleServiceChange(index, 'Service', e.target.value)}
-                  placeholder="Service name"
-                  className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                />
-                <div className="flex items-center">
-                  <span className="text-gray-500 mr-2">PHP</span>
-                  <input
-                    type="number"
-                    value={service.Costs || ''}
-                    onChange={(e) => handleServiceChange(index, 'Costs', e.target.value)}
-                    placeholder="0.00"
-                    step="0.01"
-                    min="0"
-                    className="flex-1 rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                  />
-                </div>
-              </div>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={addServiceField}
-            className="mt-2 text-blue-500 hover:text-blue-700 flex items-center text-sm font-medium"
-          >
-            <Plus size={16} className="mr-1" /> Add Another Service
-          </button>
-        </div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        Services
+      </label>
+      <MultiSelect
+  options={allServices.map(service => ({
+    value: service.id,
+    label: `${service.Service} ${service.Costs ? `- ${service.Costs} PHP` : ''}`
+  }))}
+  selected={selectedServices}  // Changed from value to selected
+  onChange={setSelectedServices}
+  className="w-full"
+  placeholder="Select services..."
+/>
+    </div>
 
         {/* Video URL Input */}
         <div>

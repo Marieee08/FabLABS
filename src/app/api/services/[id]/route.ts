@@ -1,42 +1,47 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient } from '@prisma/client';
+import { NextResponse } from 'next/server';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Extract the service ID from the query
-  const { id } = req.query;
-
-  // Ensure id is a string
-  if (!id || typeof id !== 'string') {
-    return res.status(400).json({ error: 'Invalid service ID' });
+// Validation function
+function validateServiceData(data: any) {
+  const errors = [];
+  
+  if (!data.Service || typeof data.Service !== 'string') {
+    errors.push('Service name is required and must be a string');
   }
-
-  // Handle different HTTP methods
-  switch (req.method) {
-    case 'PUT':
-      return await updateService(req, res, id);
-    case 'DELETE':
-      return await deleteService(req, res, id);
-    default:
-      // Explicitly set allowed methods
-      res.setHeader('Allow', ['PUT', 'DELETE']);
-      return res.status(405).json({ 
-        error: `Method ${req.method} Not Allowed`,
-        allowedMethods: ['PUT', 'DELETE']
-      });
+  
+  if (data.Icon !== null && data.Icon !== undefined && typeof data.Icon !== 'string') {
+    errors.push('Icon must be a string if provided');
   }
+  
+  if (!data.Info || typeof data.Info !== 'string') {
+    errors.push('Info is required and must be a string');
+  }
+  
+  if (data.Costs !== null && data.Costs !== undefined) {
+    const cost = Number(data.Costs);
+    if (isNaN(cost)) {
+      errors.push('Costs must be a valid number if provided');
+    }
+  }
+  
+  if (!data.Per || typeof data.Per !== 'string') {
+    errors.push('Per is required and must be a string');
+  }
+  
+  return errors;
 }
 
-// UPDATE a service
 export async function PUT(
   req: Request,
   { params }: { params: { id: string } }
 ) {
   try {
     const body = await req.json();
+    console.log('Update request body:', body);
+    console.log('Service ID:', params.id);
     
-    // Validate request body
     const validationErrors = validateServiceData(body);
     if (validationErrors.length > 0) {
       return NextResponse.json(
@@ -44,16 +49,32 @@ export async function PUT(
         { status: 400 }
       );
     }
+
+    let costsValue = null;
+    if (body.Costs !== null && body.Costs !== undefined && body.Costs !== '') {
+      try {
+        costsValue = new Prisma.Decimal(body.Costs);
+      } catch (error) {
+        return NextResponse.json(
+          { error: 'Invalid cost value' },
+          { status: 400 }
+        );
+      }
+    }
+    
+    const serviceData = {
+      Service: body.Service,
+      Icon: body.Icon || null,
+      Info: body.Info || null,
+      Costs: costsValue,
+      Per: body.Per || null
+    };
+
+    console.log('Updating service with data:', serviceData);
     
     const service = await prisma.service.update({
       where: { id: params.id },
-      data: {
-        Service: body.Service,
-        Icon: body.Icon || null,
-        Info: body.Info || null,
-        Costs: body.Costs ? Number(body.Costs) : null,
-        Per: body.Per || null
-      },
+      data: serviceData,
       include: {
         Machines: {
           include: {
@@ -66,14 +87,24 @@ export async function PUT(
     return NextResponse.json(service);
   } catch (error) {
     console.error('Error updating service:', error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2025') {
+        return NextResponse.json(
+          { error: 'Service not found' },
+          { status: 404 }
+        );
+      }
+    }
     return NextResponse.json(
-      { error: 'Failed to update service' },
+      { 
+        error: 'Failed to update service',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }
 }
 
-// DELETE a service
 export async function DELETE(
   req: Request,
   { params }: { params: { id: string } }
@@ -85,15 +116,21 @@ export async function DELETE(
     });
     
     // Then delete the service
-    await prisma.service.delete({
+    const service = await prisma.service.delete({
       where: { id: params.id }
     });
     
-    return NextResponse.json(
-      { message: 'Service deleted successfully' }
-    );
+    return NextResponse.json(service);
   } catch (error) {
     console.error('Error deleting service:', error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2025') {
+        return NextResponse.json(
+          { error: 'Service not found' },
+          { status: 404 }
+        );
+      }
+    }
     return NextResponse.json(
       { error: 'Failed to delete service' },
       { status: 500 }

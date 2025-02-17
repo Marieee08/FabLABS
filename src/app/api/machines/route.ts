@@ -6,83 +6,69 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    console.log('Raw request body:', JSON.stringify(body, null, 2));
-
     // Validate required fields
-    if (!body.Machine?.trim()) {
+    if (!body.Machine?.trim() || !body.Desc?.trim()) {
       return NextResponse.json(
-        { error: 'Machine name is required' }, 
+        { error: 'Machine name and description are required' },
         { status: 400 }
       );
     }
 
-    if (!body.Desc?.trim()) {
-      return NextResponse.json(
-        { error: 'Machine description is required' }, 
-        { status: 400 }
-      );
-    }
+    // Create the machine and its service relationships in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Create the machine
+      const machine = await tx.machine.create({
+        data: {
+          Machine: body.Machine.trim(),
+          Image: body.Image || '',
+          Desc: body.Desc.trim(),
+          Instructions: body.Instructions?.trim() || null,
+          Link: body.Link?.trim() || null,
+          isAvailable: body.isAvailable ?? true,
+        },
+      });
 
-    if (body.Instructions && !body.Instructions.trim()) {
-      return NextResponse.json(
-        { error: 'Instructions cannot be empty if provided' }, 
-        { status: 400 }
-      );
-    }
+      // Create service relationships if serviceIds are provided
+      if (body.serviceIds?.length > 0) {
+        await tx.machineService.createMany({
+          data: body.serviceIds.map((serviceId: string) => ({
+            machineId: machine.id,
+            serviceId: serviceId
+          }))
+        });
+      }
 
-    // Create the machine first
-    const newMachine = await prisma.machine.create({
-      data: {
-        Machine: body.Machine.trim(),
-        Image: body.Image || '',
-        Desc: body.Desc.trim(),
-        Instructions: body.Instructions?.trim() || null,
-        Link: body.Link?.trim() || null,
-        isAvailable: body.isAvailable ?? true,
-      },
-    });
-
-    // Then create services if they exist
-    if (body.Services && body.Services.length > 0) {
-      const servicesPromises = body.Services
-        .filter((service: any) => service.Service?.trim() && service.Costs != null)
-        .map((service: any) => 
-          prisma.service.create({
-            data: {
-              Service: service.Service.trim(),
-              Costs: new Prisma.Decimal(service.Costs),
-              machineId: newMachine.id
+      // Return the complete machine with services
+      return tx.machine.findUnique({
+        where: { id: machine.id },
+        include: {
+          Services: {
+            include: {
+              service: true
             }
-          })
-        );
-
-      await Promise.all(servicesPromises);
-    }
-
-    // Fetch the complete machine with services
-    const completeNewMachine = await prisma.machine.findUnique({
-      where: { id: newMachine.id },
-      include: { Services: true }
+          }
+        }
+      });
     });
 
-    return NextResponse.json(completeNewMachine, { 
-      status: 201,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    // Transform the response
+    const transformedMachine = result ? {
+      ...result,
+      Services: result.Services.map(ms => ({
+        id: ms.service.id,
+        Service: ms.service.Service,
+        Costs: ms.service.Costs,
+        Icon: ms.service.Icon,
+        Info: ms.service.Info,
+        Per: ms.service.Per
+      }))
+    } : null;
+
+    return NextResponse.json(transformedMachine, { status: 201 });
   } catch (error) {
     console.error('Machine Creation Error:', error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      console.error('Prisma Error Details:', {
-        code: error.code,
-        message: error.message,
-        meta: error.meta
-      });
-    }
     return NextResponse.json(
-      { 
-        error: 'Failed to create machine',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      }, 
+      { error: 'Failed to create machine' },
       { status: 500 }
     );
   }
@@ -95,21 +81,35 @@ export async function GET(request: NextRequest) {
   try {
     const machines = await prisma.machine.findMany({
       include: {
-        Services: includeServices
+        Services: {
+          include: {
+            service: true
+          }
+        }
       },
       orderBy: {
         createdAt: 'desc'
       }
     });
 
-    return NextResponse.json(machines, { 
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    // Transform the response to match the expected format
+    const transformedMachines = machines.map(machine => ({
+      ...machine,
+      Services: machine.Services.map(ms => ({
+        id: ms.service.id,
+        Service: ms.service.Service,
+        Costs: ms.service.Costs,
+        Icon: ms.service.Icon,
+        Info: ms.service.Info,
+        Per: ms.service.Per
+      }))
+    }));
+
+    return NextResponse.json(transformedMachines);
   } catch (error) {
     console.error('Machines Fetch Error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch machines' }, 
+      { error: 'Failed to fetch machines' },
       { status: 500 }
     );
   }
