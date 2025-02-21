@@ -1,7 +1,7 @@
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { useUser } from "@clerk/nextjs";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import Link from 'next/link';
@@ -63,7 +63,7 @@ interface ReviewSubmitProps {
 
 interface ServiceCost {
   Service: string;
-  Costs: number | string;  // Updated to handle both number and string
+  Costs: number | string;
   Per: string;
 }
 
@@ -74,7 +74,7 @@ interface CostReviewProps {
     startTime: string | null;
     endTime: string | null;
   }[];
-  onCostCalculated?: (cost: number) => void;  // Make callback optional
+  onCostCalculated?: (cost: number) => void;
 }
 
 const parseToolString = (toolString: string): { Tool: string; Quantity: number }[] => {
@@ -98,38 +98,20 @@ const formatDate = (date: Date): string => {
 const CostReviewSection: React.FC<CostReviewProps> = ({ 
   selectedServices, 
   days, 
-  onCostCalculated = () => {} // Provide default empty function
+  onCostCalculated = () => {} 
 }) => {
   const [serviceCosts, setServiceCosts] = useState<ServiceCost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchServiceCosts = async () => {
-      try {
-        const response = await fetch('/api/services');
-        if (!response.ok) throw new Error('Failed to fetch service costs');
-        const data = await response.json();
-        setServiceCosts(data);
-      } catch (err) {
-        setError('Failed to load service costs');
-        console.error('Error fetching service costs:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchServiceCosts();
-  }, []);
-
-  const getNumericCost = (cost: number | string): number => {
+  const getNumericCost = useCallback((cost: number | string): number => {
     if (typeof cost === 'number') return cost;
     const cleanedCost = cost.replace(/[₱,]/g, '');
     const parsedCost = parseFloat(cleanedCost);
     return isNaN(parsedCost) ? 0 : parsedCost;
-  };
+  }, []);
 
-  const calculateDuration = (startTime: string | null, endTime: string | null): number => {
+  const calculateDuration = useCallback((startTime: string | null, endTime: string | null): number => {
     if (!startTime || !endTime) return 0;
     
     try {
@@ -164,9 +146,9 @@ const CostReviewSection: React.FC<CostReviewProps> = ({
     } catch {
       return 0;
     }
-  };
+  }, []);
 
-  const calculateTotalCost = () => {
+  const calculateTotalCost = useCallback(() => {
     if (!serviceCosts.length || !selectedServices.length || !days.length) return 0;
     
     let total = 0;
@@ -190,13 +172,30 @@ const CostReviewSection: React.FC<CostReviewProps> = ({
     });
   
     return total;
-  };
+  }, [serviceCosts, selectedServices, days, getNumericCost, calculateDuration]);
 
-  // Update cost whenever relevant data changes
+  useEffect(() => {
+    const fetchServiceCosts = async () => {
+      try {
+        const response = await fetch('/api/services');
+        if (!response.ok) throw new Error('Failed to fetch service costs');
+        const data = await response.json();
+        setServiceCosts(data);
+      } catch (err) {
+        setError('Failed to load service costs');
+        console.error('Error fetching service costs:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchServiceCosts();
+  }, []);
+
   useEffect(() => {
     const total = calculateTotalCost();
     onCostCalculated(total);
-  }, [serviceCosts, selectedServices, days, onCostCalculated]);
+  }, [calculateTotalCost, onCostCalculated]);
 
   if (isLoading) {
     return (

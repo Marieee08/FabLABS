@@ -350,6 +350,17 @@ export default function AdminServices() {
               <p className="text-gray-600 mb-4">
                 {machine.Desc.length > 100 ? `${machine.Desc.substring(0, 100)}...` : machine.Desc}
               </p>
+
+              {machine.Instructions && (
+                <div className="mb-4">
+                  <strong className="text-gray-700 block mb-2">Instructions:</strong>
+                  <p className="text-gray-600">
+                    {machine.Instructions.length > 100 
+                      ? `${machine.Instructions.substring(0, 100)}...` 
+                      : machine.Instructions}
+                  </p>
+                </div>
+              )}
               
               {/* Services with Costs Display */}
               {machine.Services && machine.Services.length > 0 && (
@@ -450,6 +461,21 @@ export default function AdminServices() {
   required
 />
         </div>
+
+        {/* Instructions Input */}
+        <div>
+                  <label htmlFor="Instructions" className="block text-sm font-medium text-gray-700">
+                    Instructions
+                  </label>
+                  <textarea
+                    id="Instructions"
+                    name="Instructions"
+                    value={formData.Instructions || ''}
+                    onChange={handleInputChange}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                    rows={4}
+                  />
+                </div>
 
         {/* Image Upload */}
         <div>

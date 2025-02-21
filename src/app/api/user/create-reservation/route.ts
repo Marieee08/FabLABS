@@ -32,11 +32,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Calculate total amount due from the services data
-    let totalAmountDue = 0;
-    if (data.totalCost) {
-      totalAmountDue = parseFloat(data.totalCost);
-    }
+    // Parse the total cost from the request data
+    const totalAmountDue = parseFloat(data.totalCost) || 0;
 
     // Create the reservation with all related records
     const utilReq = await prisma.utilReq.create({
@@ -45,7 +42,7 @@ export async function POST(request: Request) {
         RequestDate: new Date(),
         BulkofCommodity: data.BulkofCommodity,
         accInfoId: userAccount.id,
-        TotalAmntDue: totalAmountDue, // Add the total amount due
+        TotalAmntDue: totalAmountDue,
         
         // Create UserTools entries
         UserTools: {
@@ -61,8 +58,8 @@ export async function POST(request: Request) {
             ? data.ProductsManufactured.map((service: any) => ({
                 ServiceAvail: service,
                 EquipmentAvail: data.Equipment || 'Not Specified',
-                CostsAvail: totalAmountDue / (Array.isArray(data.ProductsManufactured) ? data.ProductsManufactured.length : 1), // Distribute cost across services
-                MinsAvail: calculateTotalMinutes(data.days) // Calculate total minutes for the service
+                CostsAvail: totalAmountDue / data.ProductsManufactured.length, // Distribute cost evenly
+                MinsAvail: calculateTotalMinutes(data.days)
               }))
             : [{
                 ServiceAvail: data.ProductsManufactured,
