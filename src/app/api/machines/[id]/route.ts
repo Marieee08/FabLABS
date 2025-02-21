@@ -1,47 +1,71 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+function validateMachineData(data: any) {
+  const errors = [];
+  
+  if (!data.Machine || typeof data.Machine !== 'string') {
+    errors.push('Machine name is required and must be a string');
+  }
+  
+  if (!data.Desc || typeof data.Desc !== 'string') {
+    errors.push('Description is required and must be a string');
+  }
+  
+  if (!data.Image || typeof data.Image !== 'string') {
+    errors.push('Image URL is required and must be a string');
+  }
+
+  if (data.Link !== null && data.Link !== undefined && typeof data.Link !== 'string') {
+    errors.push('Link must be a string if provided');
+  }
+
+  if (data.Instructions !== null && data.Instructions !== undefined && typeof data.Instructions !== 'string') {
+    errors.push('Instructions must be a string if provided');
+  }
+
+  if (!Array.isArray(data.serviceIds)) {
+    errors.push('serviceIds must be an array');
+  }
+  
+  return errors;
+}
 
 export async function PUT(
-  request: Request,
+  req: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    if (!params.id) {
-      return new NextResponse(
-        JSON.stringify({ error: 'Machine ID is required' }), 
-        { 
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        }
+    const body = await req.json();
+    console.log('Update request body:', body);
+    console.log('Machine ID:', params.id);
+    
+    const validationErrors = validateMachineData(body);
+    if (validationErrors.length > 0) {
+      return NextResponse.json(
+        { errors: validationErrors },
+        { status: 400 }
       );
     }
 
-    const body = await request.json();
+    // First, update the machine details
+    const machineData = {
+      Machine: body.Machine,
+      Image: body.Image,
+      Desc: body.Desc,
+      Instructions: body.Instructions || null,
+      Link: body.Link || null,
+      isAvailable: body.isAvailable ?? true,
+    };
 
-    // Validate required fields
-    if (!body.Machine?.trim() || !body.Desc?.trim()) {
-      return new NextResponse(
-        JSON.stringify({ error: 'Machine name and description are required' }), 
-        { 
-          status: 400,
-          headers: { 'Content-Type': 'application/json' }
-        }
-      );
-    }
-
-    // Update machine and its service relationships in a transaction
-    const result = await prisma.$transaction(async (tx) => {
+    // Start a transaction to handle both machine update and services update
+    const updatedMachine = await prisma.$transaction(async (tx) => {
       // Update the machine
-      const updatedMachine = await tx.machine.update({
+      const machine = await tx.machine.update({
         where: { id: params.id },
-        data: {
-          Machine: body.Machine.trim(),
-          Image: body.Image || '',
-          Desc: body.Desc.trim(),
-          Instructions: body.Instructions?.trim() || null,
-          Link: body.Link?.trim() || null,
-          isAvailable: body.isAvailable ?? true,
-        },
+        data: machineData,
       });
 
       // Delete existing service relationships
@@ -50,18 +74,18 @@ export async function PUT(
       });
 
       // Create new service relationships
-      if (body.serviceIds?.length > 0) {
+      if (body.serviceIds && body.serviceIds.length > 0) {
         await tx.machineService.createMany({
           data: body.serviceIds.map((serviceId: string) => ({
-            machineId: updatedMachine.id,
+            machineId: params.id,
             serviceId: serviceId
           }))
         });
       }
 
       // Fetch the updated machine with services
-      const machineWithServices = await tx.machine.findUnique({
-        where: { id: updatedMachine.id },
+      return await tx.machine.findUnique({
+        where: { id: params.id },
         include: {
           Services: {
             include: {
@@ -70,45 +94,50 @@ export async function PUT(
           }
         }
       });
-
-      if (!machineWithServices) {
-        throw new Error('Failed to fetch updated machine');
-      }
-
-      return {
-        ...machineWithServices,
-        Services: machineWithServices.Services.map(ms => ({
-          id: ms.service.id,
-          Service: ms.service.Service,
-          Costs: ms.service.Costs,
-          Icon: ms.service.Icon,
-          Info: ms.service.Info,
-          Per: ms.service.Per
-        }))
-      };
     });
 
-    return new NextResponse(
-      JSON.stringify(result),
-      { 
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      }
-    );
+    if (!updatedMachine) {
+      return NextResponse.json(
+        { error: 'Machine not found' },
+        { status: 404 }
+      );
+    }
+
+    // Transform the response to match the expected format
+    const transformedMachine = {
+      ...updatedMachine,
+      Services: updatedMachine.Services.map(ms => ({
+        id: ms.service.id,
+        Service: ms.service.Service,
+        Costs: ms.service.Costs,
+        Icon: ms.service.Icon,
+        Info: ms.service.Info,
+        Per: ms.service.Per
+      }))
+    };
+
+    return NextResponse.json(transformedMachine);
+    
   } catch (error) {
-    console.error('Machine Update Error:', error);
-    return new NextResponse(
-      JSON.stringify({ 
+    console.error('Error updating machine:', error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2025') {
+        return NextResponse.json(
+          { error: 'Machine not found' },
+          { status: 404 }
+        );
+      }
+    }
+    return NextResponse.json(
+      { 
         error: 'Failed to update machine',
         details: error instanceof Error ? error.message : 'Unknown error'
-      }),
-      { 
-        status: 500,
-        headers: { 'Content-Type': 'application/json' }
-      }
+      },
+      { status: 500 }
     );
   }
 }
+
 export async function PATCH(
   request: Request,
   { params }: { params: { id: string } }
@@ -152,33 +181,31 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  request: Request,
+  req: Request,
   { params }: { params: { id: string } }
 ) {
   try {
-    // Delete in a transaction to ensure all related records are removed
-    const result = await prisma.$transaction(async (tx) => {
-      // Delete machine-service relationships first
-      await tx.machineService.deleteMany({
-        where: { machineId: params.id }
-      });
-
-      // Then delete the machine
-      return tx.machine.delete({
-        where: { id: params.id },
-        include: {
-          Services: {
-            include: {
-              service: true
-            }
-          }
-        }
-      });
+    // First, delete all related machine services
+    await prisma.machineService.deleteMany({
+      where: { machineId: params.id }
     });
-
-    return NextResponse.json(result);
+    
+    // Then delete the machine
+    const machine = await prisma.machine.delete({
+      where: { id: params.id }
+    });
+    
+    return NextResponse.json(machine);
   } catch (error) {
-    console.error('Machine Deletion Error:', error);
+    console.error('Error deleting machine:', error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2025') {
+        return NextResponse.json(
+          { error: 'Machine not found' },
+          { status: 404 }
+        );
+      }
+    }
     return NextResponse.json(
       { error: 'Failed to delete machine' },
       { status: 500 }

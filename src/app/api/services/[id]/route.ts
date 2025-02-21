@@ -3,7 +3,6 @@ import { PrismaClient, Prisma } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// Validation function
 function validateServiceData(data: any) {
   const errors = [];
   
