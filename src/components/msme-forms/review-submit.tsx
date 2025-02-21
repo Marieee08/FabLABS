@@ -61,6 +61,22 @@ interface ReviewSubmitProps {
   updateFormData: (field: keyof FormData, value: FormData[keyof FormData]) => void;
 }
 
+interface ServiceCost {
+  Service: string;
+  Costs: number | string;  // Updated to handle both number and string
+  Per: string;
+}
+
+interface CostReviewProps {
+  selectedServices: string[];
+  days: {
+    date: Date;
+    startTime: string | null;
+    endTime: string | null;
+  }[];
+  onCostCalculated?: (cost: number) => void;  // Make callback optional
+}
+
 const parseToolString = (toolString: string): { Tool: string; Quantity: number }[] => {
   if (!toolString || toolString === 'NOT APPLICABLE') return [];
   try {
@@ -79,6 +95,177 @@ const formatDate = (date: Date): string => {
   });
 };
 
+const CostReviewSection: React.FC<CostReviewProps> = ({ 
+  selectedServices, 
+  days, 
+  onCostCalculated = () => {} // Provide default empty function
+}) => {
+  const [serviceCosts, setServiceCosts] = useState<ServiceCost[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchServiceCosts = async () => {
+      try {
+        const response = await fetch('/api/services');
+        if (!response.ok) throw new Error('Failed to fetch service costs');
+        const data = await response.json();
+        setServiceCosts(data);
+      } catch (err) {
+        setError('Failed to load service costs');
+        console.error('Error fetching service costs:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchServiceCosts();
+  }, []);
+
+  const getNumericCost = (cost: number | string): number => {
+    if (typeof cost === 'number') return cost;
+    const cleanedCost = cost.replace(/[₱,]/g, '');
+    const parsedCost = parseFloat(cleanedCost);
+    return isNaN(parsedCost) ? 0 : parsedCost;
+  };
+
+  const calculateDuration = (startTime: string | null, endTime: string | null): number => {
+    if (!startTime || !endTime) return 0;
+    
+    try {
+      const convertTo24Hour = (time: string): string => {
+        const [timePart, meridiem] = time.split(' ');
+        let [hours, minutes] = timePart.split(':').map(Number);
+        
+        if (meridiem?.toLowerCase() === 'pm' && hours !== 12) {
+          hours += 12;
+        } else if (meridiem?.toLowerCase() === 'am' && hours === 12) {
+          hours = 0;
+        }
+        
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+      };
+
+      const start24 = startTime.toLowerCase().includes('m') ? convertTo24Hour(startTime) : startTime;
+      const end24 = endTime.toLowerCase().includes('m') ? convertTo24Hour(endTime) : endTime;
+      
+      const [startHour, startMinute] = start24.split(':').map(Number);
+      const [endHour, endMinute] = end24.split(':').map(Number);
+      
+      if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) {
+        return 0;
+      }
+      
+      const startTotalMinutes = startHour * 60 + startMinute;
+      const endTotalMinutes = endHour * 60 + endMinute;
+      
+      const durationInHours = (endTotalMinutes - startTotalMinutes) / 60;
+      return durationInHours > 0 ? durationInHours : 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  const calculateTotalCost = () => {
+    if (!serviceCosts.length || !selectedServices.length || !days.length) return 0;
+    
+    let total = 0;
+    
+    selectedServices.forEach(serviceName => {
+      const service = serviceCosts.find(s => s.Service === serviceName);
+      if (!service || !service.Costs) return;
+      
+      const numericCost = getNumericCost(service.Costs);
+      if (numericCost === 0) return;
+
+      days.forEach(day => {
+        const duration = calculateDuration(day.startTime, day.endTime);
+        if (duration > 0) {
+          const cost = duration * numericCost;
+          if (isFinite(cost)) {
+            total += cost;
+          }
+        }
+      });
+    });
+  
+    return total;
+  };
+
+  // Update cost whenever relevant data changes
+  useEffect(() => {
+    const total = calculateTotalCost();
+    onCostCalculated(total);
+  }, [serviceCosts, selectedServices, days, onCostCalculated]);
+
+  if (isLoading) {
+    return (
+      <div className="mt-4">
+        <div className="flex items-center justify-center p-4">
+          <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="mt-4 text-red-500 text-sm">
+        {error}
+      </div>
+    );
+  }
+
+  const totalCost = calculateTotalCost();
+
+  return (
+    <div className="mt-4">
+      <h3 className="text-lg font-medium mb-3">Cost Breakdown</h3>
+      <div className="border border-gray-300 rounded-md p-4 space-y-4">
+        {selectedServices.map(serviceName => {
+          const service = serviceCosts.find(s => s.Service === serviceName);
+          if (!service || !service.Costs) return null;
+
+          const numericCost = getNumericCost(service.Costs);
+
+          return (
+            <div key={serviceName} className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="font-medium">{serviceName}</span>
+                <span className="text-gray-600">
+                  ₱{numericCost.toFixed(2)} per {service.Per}
+                </span>
+              </div>
+              {days.map((day, index) => {
+                const duration = calculateDuration(day.startTime, day.endTime);
+                const cost = duration * numericCost;
+
+                return (
+                  <div key={index} className="ml-4 text-sm text-gray-600">
+                    <div className="flex justify-between">
+                      <span>
+                        Day {index + 1}: {duration.toFixed(2)} hours
+                        {duration === 0 && " (Invalid time range)"}
+                      </span>
+                      <span>₱{cost.toFixed(2)}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+        <div className="pt-4 border-t border-gray-200">
+          <div className="flex justify-between items-center font-semibold">
+            <span>Total Estimated Cost</span>
+            <span>₱{totalCost.toFixed(2)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function ReviewSubmit({ formData, prevStep, updateFormData }: ReviewSubmitProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -87,6 +274,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData }: Rev
   const { getToken } = useAuth();
   const [accInfo, setAccInfo] = useState<AccInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [totalCost, setTotalCost] = useState(0);
 
   useEffect(() => {
     const fetchUserInfo = async () => {
@@ -109,6 +297,10 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData }: Rev
     }
   }, [user, isLoaded]);
 
+  const handleCostCalculated = useCallback((cost: number) => {
+    setTotalCost(cost);
+  }, []);
+
   const handleSubmit = async () => {
     try {
       setIsSubmitting(true);
@@ -118,6 +310,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData }: Rev
       
       const submissionData = {
         ...formData,
+        totalCost,
         days: formData.days.map(day => ({
           ...day,
           date: new Date(day.date)
@@ -294,6 +487,19 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData }: Rev
           </div>
         )}
 
+        {renderSection('Cost Information',
+          <CostReviewSection
+            selectedServices={Array.isArray(formData.ProductsManufactured) ? formData.ProductsManufactured : []}
+            days={formData.days}
+            onCostCalculated={handleCostCalculated}
+          />
+        )}
+
+        {error && (
+          <Alert variant="destructive" className="mt-4">
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
         {error && (
           <Alert variant="destructive" className="mt-4">
             <AlertDescription>{error}</AlertDescription>
