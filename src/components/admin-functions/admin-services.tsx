@@ -14,6 +14,7 @@ import {
   Edit,
   Trash2,
   CircleDollarSign,
+  Info,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -42,7 +43,7 @@ interface Service {
   Service: string;
   Icon: string | null;
   Info: string;
-  Costs: number | null;
+  Costs: number;
   Per: string;
   Machines: {
     machine: Machine;
@@ -88,12 +89,18 @@ const AdminServices = () => {
     setError(null);
     try {
       const payload = {
-        Service: formData.Service,
-        Icon: formData.Icon || null,
-        Info: formData.Info,
-        Costs: formData.Costs ? parseFloat(formData.Costs) : null,
-        Per: formData.Per,
+        Service: formData.Service.trim(),
+        Icon: formData.Icon.trim() || 'info', // Set default icon to 'info' if empty
+        Info: formData.Info.trim(),
+        Costs: parseFloat(formData.Costs) || 0, // Convert empty string to 0
+        Per: formData.Per.trim(),
       };
+
+      // Validation
+      if (!payload.Service) throw new Error('Service name is required');
+      if (!payload.Info) throw new Error('Information is required');
+      if (payload.Costs < 0) throw new Error('Cost cannot be negative');
+      if (!payload.Per) throw new Error('Per (Unit) is required');
 
       const endpoint = editingService ? `/api/services/${editingService.id}` : '/api/services';
       const method = editingService ? 'PUT' : 'POST';
@@ -140,7 +147,7 @@ const AdminServices = () => {
       }
       
       await fetchServices();
-      setOpenMenuId(null); // Close the dropdown after deletion
+      setOpenMenuId(null);
     } catch (error) {
       console.error('Error deleting service:', error);
       setError(error instanceof Error ? error.message : 'Failed to delete service');
@@ -152,7 +159,7 @@ const AdminServices = () => {
       Service: editingService?.Service || '',
       Icon: editingService?.Icon || '',
       Info: editingService?.Info || '',
-      Costs: editingService?.Costs?.toString() || '',
+      Costs: editingService?.Costs?.toString() || '0',
       Per: editingService?.Per || '',
     });
 
@@ -188,13 +195,13 @@ const AdminServices = () => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="Icon">Icon Name</Label>
+            <Label htmlFor="Icon">Icon Name (optional)</Label>
             <Input
               id="Icon"
               name="Icon"
               value={formData.Icon}
               onChange={handleChange}
-              placeholder="Enter icon name from Lucide (e.g., 'wrench')"
+              placeholder="Enter icon name from Lucide (defaults to 'info')"
             />
           </div>
 
@@ -211,7 +218,7 @@ const AdminServices = () => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="Costs">Cost</Label>
+            <Label htmlFor="Costs">Cost *</Label>
             <Input
               id="Costs"
               name="Costs"
@@ -220,6 +227,8 @@ const AdminServices = () => {
               onChange={handleChange}
               placeholder="Enter cost"
               step="0.01"
+              min="0"
+              required
             />
           </div>
 
@@ -257,14 +266,14 @@ const AdminServices = () => {
   };
 
   const DynamicIcon = ({ iconName }: { iconName: string | null }) => {
-    if (!iconName) return null;
+    if (!iconName) return <Info className="h-4 w-4" />;
     
     const formattedIconName = iconName.charAt(0).toUpperCase() + iconName.slice(1);
     const IconComponent = (LucideIcons as any)[formattedIconName];
     
     if (!IconComponent) {
       console.warn(`Icon "${iconName}" not found`);
-      return null;
+      return <Info className="h-4 w-4" />;
     }
     
     return <IconComponent className="h-4 w-4" />;
@@ -315,12 +324,12 @@ const AdminServices = () => {
               <TableCell>
                 <div className="flex items-center gap-2">
                   <CircleDollarSign className="h-4 w-4" />
-                  {service.Costs ? (
-                    <span>
-                      ₱{service.Costs.toLocaleString()} / {service.Per}
-                    </span>
+                  {(!service.Costs || service.Costs === 0) ? (
+                    <span>Free</span>
                   ) : (
-                    '-'
+                    <span>
+                      ₱{Number(service.Costs).toLocaleString()} / {service.Per}
+                    </span>
                   )}
                 </div>
               </TableCell>
@@ -345,7 +354,7 @@ const AdminServices = () => {
                         setEditingService(service);
                         setError(null);
                         setIsDialogOpen(true);
-                        setOpenMenuId(null); // Close the dropdown after clicking
+                        setOpenMenuId(null);
                       }}
                       className="cursor-pointer"
                     >
