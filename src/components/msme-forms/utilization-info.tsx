@@ -1,20 +1,5 @@
-//UtilizationInfo
-
-import React, { useState, ChangeEvent, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Minus, X } from 'lucide-react';
-
-interface FormData {
-  ProductsManufactured: string[];
-  BulkofCommodity: string;
-  Tools: string;
-}
-
-interface StepProps {
-  formData: FormData;
-  updateFormData: (field: keyof FormData, value: FormData[keyof FormData]) => void;
-  nextStep: () => void;
-  prevStep: () => void;
-}
 
 interface Tool {
   id: string;
@@ -56,7 +41,6 @@ const ToolsSelector: React.FC<ToolsSelectorProps> = ({
 
   useEffect(() => {
     const fetchTools = async () => {
-      // Skip fetching if disabled
       if (disabled) {
         setAvailableTools([]);
         return;
@@ -113,16 +97,10 @@ const ToolsSelector: React.FC<ToolsSelectorProps> = ({
   const updateQuantity = (toolId: string, delta: number) => {
     const updatedTools = selectedTools.map(tool => {
       if (tool.id === toolId) {
-        // Find the corresponding available tool to get its max quantity
         const availableTool = availableTools.find(t => t.id === toolId);
         const maxQuantity = availableTool ? availableTool.Quantity : 1;
         
-        // Calculate new quantity, ensuring it's between 1 and maxQuantity
-        const newQuantity = Math.max(
-          1, 
-          Math.min(tool.Quantity + delta, maxQuantity)
-        );
-
+        const newQuantity = Math.max(1, Math.min(tool.Quantity + delta, maxQuantity));
         return { ...tool, Quantity: newQuantity };
       }
       return tool;
@@ -134,11 +112,9 @@ const ToolsSelector: React.FC<ToolsSelectorProps> = ({
 
   return (
     <div className="relative">
-    <div 
-      className={`min-h-[120px] p-4 border rounded-md ${
+      <div className={`min-h-[120px] p-4 border rounded-md ${
         disabled ? 'bg-gray-100' : 'bg-white'
-      } ${className}`}
-    >
+      } ${className}`}>
         {selectedTools.length === 0 ? (
           <div className="text-gray-500 text-sm">
             {isLoading ? 'Loading tools...' : 'No tools selected'}
@@ -146,9 +122,10 @@ const ToolsSelector: React.FC<ToolsSelectorProps> = ({
         ) : (
           <div className="space-y-2">
             {selectedTools.map(tool => {
-              // Find the corresponding available tool to get its max quantity
               const availableTool = availableTools.find(t => t.id === tool.id);
               const maxQuantity = availableTool ? availableTool.Quantity : 1;
+              const isAtMaxQuantity = tool.Quantity >= maxQuantity;
+              const isAtMinQuantity = tool.Quantity <= 1;
 
               return (
                 <div key={tool.id} className="flex items-center justify-between bg-gray-50 p-2 rounded">
@@ -157,8 +134,8 @@ const ToolsSelector: React.FC<ToolsSelectorProps> = ({
                     <button
                       type="button"
                       onClick={() => updateQuantity(tool.id, -1)}
-                      className="p-1 hover:bg-gray-200 rounded"
-                      disabled={disabled}
+                      className={`p-1 hover:bg-gray-200 rounded transition-opacity ${isAtMinQuantity ? 'opacity-25 cursor-not-allowed' : 'opacity-100'}`}
+                      disabled={disabled || isAtMinQuantity}
                     >
                       <Minus size={16} />
                     </button>
@@ -168,8 +145,8 @@ const ToolsSelector: React.FC<ToolsSelectorProps> = ({
                     <button
                       type="button"
                       onClick={() => updateQuantity(tool.id, 1)}
-                      className="p-1 hover:bg-gray-200 rounded"
-                      disabled={disabled || tool.Quantity >= maxQuantity}
+                      className={`p-1 hover:bg-gray-200 rounded transition-opacity ${isAtMaxQuantity ? 'opacity-25 cursor-not-allowed' : 'opacity-100'}`}
+                      disabled={disabled || isAtMaxQuantity}
                     >
                       <Plus size={16} />
                     </button>

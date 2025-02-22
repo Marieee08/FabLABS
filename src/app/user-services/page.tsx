@@ -11,7 +11,8 @@ interface Machine {
   Machine: string;
   Image: string;
   Desc: string;
-  Link: string;
+  Instructions?: string;
+  Link?: string;
   isAvailable: boolean;
   createdAt: string;
 }
@@ -204,46 +205,75 @@ export default function Services() {
         </section>
 
         {selectedMachine && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50" onClick={closeModal}>
-            <div 
-              className="bg-white rounded-lg shadow-lg w-full max-w-4xl relative flex overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Left column - Image */}
-              <div className="w-1/2 p-8 flex items-center justify-center bg-gray-50">
-                <img 
-                  src={selectedMachine.Image} 
-                  alt={selectedMachine.Machine} 
-                  className="h-80 w-full object-cover rounded-lg"
-                />
-              </div>
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50" onClick={closeModal}>
+      <div 
+        className="bg-white rounded-lg shadow-lg w-full max-w-4xl relative flex flex-col md:flex-row overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Left column - Image */}
+        <div className="w-full md:w-1/2 p-8 flex items-center justify-center bg-gray-50">
+          <img 
+            src={selectedMachine.Image} 
+            alt={selectedMachine.Machine} 
+            className="h-80 w-full object-cover rounded-lg"
+          />
+        </div>
 
-              {/* Right column - Content */}
-              <div className="w-1/2 p-8 flex flex-col">
-              <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-bold mr-4 font-qanelas2">{selectedMachine.Machine}</h2>
-                  <button
-                    onClick={closeModal}
-                    className="text-gray-500 hover:text-gray-700 transition duration-300"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
-                </div>
-                <a
-                    href={selectedMachine.Link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-500 hover:underline block mb-4"
-                  >
-                    Watch Video
-                  </a>
-                <p className="text-gray-700 mb-4 flex-grow font-poppins1">{selectedMachine.Desc}</p>
-                <div className="space-y-4">
-                </div>
+        {/* Right column - Content */}
+        <div className="w-full md:w-1/2 p-8 flex flex-col">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold font-qanelas2">{selectedMachine.Machine}</h2>
+            <button
+              onClick={closeModal}
+              className="text-gray-500 hover:text-gray-700 transition duration-300"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          <div className="space-y-6">
+            {/* Description */}
+            <div>
+              <h3 className="text-lg font-semibold mb-2 font-qanelas2">Description</h3>
+              <p className="text-gray-700 font-poppins1">{selectedMachine.Desc}</p>
+            </div>
+
+            {/* Instructions */}
+            {selectedMachine.Instructions && (
+              <div>
+                <h3 className="text-lg font-semibold mb-2 font-qanelas2">Instructions</h3>
+                <p className="text-gray-700 font-poppins1">{selectedMachine.Instructions}</p>
               </div>
+            )}
+
+            {/* Video Link */}
+            {selectedMachine.Link && (
+              <div className="mt-4">
+                <a
+                  href={selectedMachine.Link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#1c62b5] hover:text-[#154c8f] font-poppins1 hover:underline"
+                >
+                  Watch Tutorial Video
+                </a>
+              </div>
+            )}
+
+            {/* Schedule Button */}
+            <div className="mt-6">
+              <Link 
+                href="/user-services/msme-schedule"
+                className="w-full bg-[#1c62b5] text-white py-3 px-6 rounded-full transition duration-300 hover:bg-[#154c8f] flex items-center justify-center font-poppins1"
+              >
+                Schedule Now
+              </Link>
             </div>
           </div>
-        )}
+        </div>
+      </div>
+    </div>
+  )}
       </div>
     </main>
   );

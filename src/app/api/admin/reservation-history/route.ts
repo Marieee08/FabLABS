@@ -11,11 +11,17 @@ export async function GET() {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    // Fetch all reservations with related account info
+    // Fetch all reservations with related account info and services
     const reservations = await prisma.utilReq.findMany({
       include: {
         accInfo: true,
-        UserServices: true,
+        UserServices: {
+          select: {
+            ServiceAvail: true,
+            CostsAvail: true,
+            MinsAvail: true
+          }
+        },
         UtilTimes: true,
       },
       orderBy: {
@@ -23,17 +29,20 @@ export async function GET() {
       },
     });
 
-    // Transform the data to match your frontend requirements
-    const formattedReservations = reservations.map((reservation) => ({
-      id: reservation.id.toString(),
-      date: reservation.RequestDate?.toISOString() || '',
-      name: reservation.accInfo?.Name || '',
-      email: reservation.accInfo?.email || '',
-      status: reservation.Status,
-      role: reservation.accInfo?.Role || '',
-      service: reservation.UserServices[0]?.ServiceAvail || '',
-      totalAmount: reservation.TotalAmntDue || 0,
-    }));
+    // Transform the data and use the stored TotalAmntDue
+    const formattedReservations = reservations.map((reservation) => {
+      return {
+        id: reservation.id.toString(),
+        date: reservation.RequestDate?.toISOString() || '',
+        name: reservation.accInfo?.Name || '',
+        email: reservation.accInfo?.email || '',
+        status: reservation.Status,
+        role: reservation.accInfo?.Role || '',
+        service: reservation.UserServices.map(s => s.ServiceAvail).join(', ') || '',
+        // Use the stored TotalAmntDue directly
+        totalAmount: Number(reservation.TotalAmntDue) || 0,
+      };
+    });
 
     return NextResponse.json(formattedReservations);
   } catch (error) {

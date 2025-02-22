@@ -32,6 +32,9 @@ export async function POST(request: Request) {
       );
     }
 
+    // Parse the total cost from the request data
+    const totalAmountDue = parseFloat(data.totalCost) || 0;
+
     // Create the reservation with all related records
     const utilReq = await prisma.utilReq.create({
       data: {
@@ -39,6 +42,7 @@ export async function POST(request: Request) {
         RequestDate: new Date(),
         BulkofCommodity: data.BulkofCommodity,
         accInfoId: userAccount.id,
+        TotalAmntDue: totalAmountDue,
         
         // Create UserTools entries
         UserTools: {
@@ -54,14 +58,14 @@ export async function POST(request: Request) {
             ? data.ProductsManufactured.map((service: any) => ({
                 ServiceAvail: service,
                 EquipmentAvail: data.Equipment || 'Not Specified',
-                CostsAvail: null,
-                MinsAvail: null
+                CostsAvail: totalAmountDue / data.ProductsManufactured.length, // Distribute cost evenly
+                MinsAvail: calculateTotalMinutes(data.days)
               }))
             : [{
                 ServiceAvail: data.ProductsManufactured,
                 EquipmentAvail: data.Equipment || 'Not Specified',
-                CostsAvail: null,
-                MinsAvail: null
+                CostsAvail: totalAmountDue,
+                MinsAvail: calculateTotalMinutes(data.days)
               }]
         },
 
@@ -117,5 +121,42 @@ function parseToolString(toolString: string): Array<{ Tool: string; Quantity: nu
     return JSON.parse(toolString);
   } catch {
     return [];
+  }
+}
+
+function calculateTotalMinutes(days: Array<{ startTime: string | null; endTime: string | null }>): number {
+  let totalMinutes = 0;
+  
+  days.forEach(day => {
+    if (!day.startTime || !day.endTime) return;
+    
+    const start = parseTimeString(day.startTime);
+    const end = parseTimeString(day.endTime);
+    
+    if (start && end) {
+      const diffInMinutes = (end.getTime() - start.getTime()) / 1000 / 60;
+      if (diffInMinutes > 0) {
+        totalMinutes += diffInMinutes;
+      }
+    }
+  });
+  
+  return totalMinutes;
+}
+
+function parseTimeString(timeStr: string): Date | null {
+  try {
+    const [time, period] = timeStr.split(' ');
+    const [hours, minutes] = time.split(':').map(Number);
+    const date = new Date();
+    
+    let hour = hours;
+    if (period === 'PM' && hour !== 12) hour += 12;
+    if (period === 'AM' && hour === 12) hour = 0;
+    
+    date.setHours(hour, minutes, 0, 0);
+    return date;
+  } catch {
+    return null;
   }
 }

@@ -1,103 +1,138 @@
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient } from '@prisma/client';
+import { NextResponse } from 'next/server';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  // Extract the service ID from the query
-  const { id } = req.query;
-
-  // Ensure id is a string
-  if (!id || typeof id !== 'string') {
-    return res.status(400).json({ error: 'Invalid service ID' });
+function validateServiceData(data: any) {
+  const errors = [];
+  
+  if (!data.Service || typeof data.Service !== 'string') {
+    errors.push('Service name is required and must be a string');
   }
-
-  // Handle different HTTP methods
-  switch (req.method) {
-    case 'PUT':
-      return await updateService(req, res, id);
-    case 'DELETE':
-      return await deleteService(req, res, id);
-    default:
-      // Explicitly set allowed methods
-      res.setHeader('Allow', ['PUT', 'DELETE']);
-      return res.status(405).json({ 
-        error: `Method ${req.method} Not Allowed`,
-        allowedMethods: ['PUT', 'DELETE']
-      });
+  
+  if (data.Icon !== null && data.Icon !== undefined && typeof data.Icon !== 'string') {
+    errors.push('Icon must be a string if provided');
   }
+  
+  if (!data.Info || typeof data.Info !== 'string') {
+    errors.push('Info is required and must be a string');
+  }
+  
+  if (data.Costs !== null && data.Costs !== undefined) {
+    const cost = Number(data.Costs);
+    if (isNaN(cost)) {
+      errors.push('Costs must be a valid number if provided');
+    }
+  }
+  
+  if (!data.Per || typeof data.Per !== 'string') {
+    errors.push('Per is required and must be a string');
+  }
+  
+  return errors;
 }
 
-// UPDATE a service
-async function updateService(req: NextApiRequest, res: NextApiResponse, id: string) {
-  const { Service, machineId } = req.body;
-
+export async function PUT(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    // Validate input
-    if (!Service) {
-      return res.status(400).json({ error: 'Service name is required' });
+    const body = await req.json();
+    console.log('Update request body:', body);
+    console.log('Service ID:', params.id);
+    
+    const validationErrors = validateServiceData(body);
+    if (validationErrors.length > 0) {
+      return NextResponse.json(
+        { errors: validationErrors },
+        { status: 400 }
+      );
     }
 
-    // Optional: Check if machine exists if machineId is provided
-    if (machineId) {
-      const machine = await prisma.machine.findUnique({
-        where: { id: machineId }
-      });
-
-      if (!machine) {
-        return res.status(404).json({ error: 'Machine not found' });
+    let costsValue = null;
+    if (body.Costs !== null && body.Costs !== undefined && body.Costs !== '') {
+      try {
+        costsValue = new Prisma.Decimal(body.Costs);
+      } catch (error) {
+        return NextResponse.json(
+          { error: 'Invalid cost value' },
+          { status: 400 }
+        );
       }
     }
+    
+    const serviceData = {
+      Service: body.Service,
+      Icon: body.Icon || null,
+      Info: body.Info || null,
+      Costs: costsValue,
+      Per: body.Per || null
+    };
 
-    const updatedService = await prisma.service.update({
-      where: { id },
-      data: {
-        Service,
-        machineId: machineId || null
+    console.log('Updating service with data:', serviceData);
+    
+    const service = await prisma.service.update({
+      where: { id: params.id },
+      data: serviceData,
+      include: {
+        Machines: {
+          include: {
+            machine: true
+          }
+        }
       }
     });
-
-    return res.status(200).json(updatedService);
+    
+    return NextResponse.json(service);
   } catch (error) {
     console.error('Error updating service:', error);
-    
-    // Check for "Record not found" error
-    if (error.code === 'P2025') {
-      return res.status(404).json({ 
-        error: 'Service not found', 
-        details: error.message 
-      });
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2025') {
+        return NextResponse.json(
+          { error: 'Service not found' },
+          { status: 404 }
+        );
+      }
     }
-
-    return res.status(500).json({ 
-      error: 'Unable to update service', 
-      details: error.message 
-    });
+    return NextResponse.json(
+      { 
+        error: 'Failed to update service',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
+      { status: 500 }
+    );
   }
 }
 
-// DELETE a service
-async function deleteService(req: NextApiRequest, res: NextApiResponse, id: string) {
+export async function DELETE(
+  req: Request,
+  { params }: { params: { id: string } }
+) {
   try {
-    await prisma.service.delete({
-      where: { id }
+    // First delete all related MachineService records
+    await prisma.machineService.deleteMany({
+      where: { serviceId: params.id }
     });
-
-    return res.status(200).json({ message: 'Service deleted successfully' });
+    
+    // Then delete the service
+    const service = await prisma.service.delete({
+      where: { id: params.id }
+    });
+    
+    return NextResponse.json(service);
   } catch (error) {
     console.error('Error deleting service:', error);
-    
-    // Check for "Record not found" error
-    if (error.code === 'P2025') {
-      return res.status(404).json({ 
-        error: 'Service not found', 
-        details: error.message 
-      });
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === 'P2025') {
+        return NextResponse.json(
+          { error: 'Service not found' },
+          { status: 404 }
+        );
+      }
     }
-
-    return res.status(500).json({ 
-      error: 'Unable to delete service', 
-      details: error.message 
-    });
+    return NextResponse.json(
+      { error: 'Failed to delete service' },
+      { status: 500 }
+    );
   }
 }

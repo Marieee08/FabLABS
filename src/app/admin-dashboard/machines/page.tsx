@@ -2,6 +2,7 @@
   import React, { useState, useEffect } from 'react';
   import Link from 'next/link';
   import AdminMachines from '@/components/admin-functions/admin-machines';
+  import AdminServices from '@/components/admin-functions/admin-services';
   import AdminTools from '@/components/admin-functions/admin-tools';
   import { format } from 'date-fns';
   import { useUser } from "@clerk/nextjs";
@@ -259,11 +260,15 @@ import RoleGuard from '@/components/auth/role-guard';
           <Tabs defaultValue="machines" className="w-full">
             <TabsList className="mb-4">
               <TabsTrigger value="machines">Machines</TabsTrigger>
+              <TabsTrigger value="services">Services</TabsTrigger>
               <TabsTrigger value="tools">Tools</TabsTrigger>
             </TabsList>
 
             <TabsContent value="machines">
               <AdminMachines/>
+            </TabsContent>
+            <TabsContent value="services">
+              <AdminServices/>
             </TabsContent>
             <TabsContent value="tools">
               <AdminTools/>

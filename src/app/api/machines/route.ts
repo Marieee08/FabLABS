@@ -1,4 +1,3 @@
-// app/api/machines/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
@@ -7,56 +6,69 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    console.log('Received machine POST request:', body);
-
-    // Validate required fields with more robust checks
-    if (!body.Machine || body.Machine.trim() === '') {
+    // Validate required fields
+    if (!body.Machine?.trim() || !body.Desc?.trim()) {
       return NextResponse.json(
-        { error: 'Machine name is required and cannot be empty' }, 
+        { error: 'Machine name and description are required' },
         { status: 400 }
       );
     }
 
-    if (!body.Desc || body.Desc.trim() === '') {
-      return NextResponse.json(
-        { error: 'Machine description is required and cannot be empty' }, 
-        { status: 400 }
-      );
-    }
+    // Create the machine and its service relationships in a transaction
+    const result = await prisma.$transaction(async (tx) => {
+      // Create the machine
+      const machine = await tx.machine.create({
+        data: {
+          Machine: body.Machine.trim(),
+          Image: body.Image || '',
+          Desc: body.Desc.trim(),
+          Instructions: body.Instructions?.trim() || null,
+          Link: body.Link?.trim() || null,
+          isAvailable: body.isAvailable ?? true,
+        },
+      });
 
-    const newMachine = await prisma.machine.create({
-      data: {
-        Machine: body.Machine.trim(),
-        Image: body.Image || '',
-        Desc: body.Desc.trim(),
-        Link: body.Link ? body.Link.trim() : null,
-        isAvailable: body.isAvailable ?? true,
-        Costs: body.Costs !== undefined && body.Costs !== null 
-          ? new Prisma.Decimal(body.Costs) 
-          : null,
-        Services: body.Services ? {
-          create: body.Services
-            .filter((service: any) => service.Service && service.Service.trim() !== '')
-            .map((service: any) => ({
-              Service: service.Service.trim()
-            }))
-        } : undefined
+      // Create service relationships if serviceIds are provided
+      if (body.serviceIds?.length > 0) {
+        await tx.machineService.createMany({
+          data: body.serviceIds.map((serviceId: string) => ({
+            machineId: machine.id,
+            serviceId: serviceId
+          }))
+        });
       }
+
+      // Return the complete machine with services
+      return tx.machine.findUnique({
+        where: { id: machine.id },
+        include: {
+          Services: {
+            include: {
+              service: true
+            }
+          }
+        }
+      });
     });
 
-    console.log('Created machine:', newMachine);
+    // Transform the response
+    const transformedMachine = result ? {
+      ...result,
+      Services: result.Services.map(ms => ({
+        id: ms.service.id,
+        Service: ms.service.Service,
+        Costs: ms.service.Costs,
+        Icon: ms.service.Icon,
+        Info: ms.service.Info,
+        Per: ms.service.Per
+      }))
+    } : null;
 
-    return NextResponse.json(newMachine, { 
-      status: 201,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    return NextResponse.json(transformedMachine, { status: 201 });
   } catch (error) {
     console.error('Machine Creation Error:', error);
     return NextResponse.json(
-      { 
-        error: 'Failed to create machine',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      }, 
+      { error: 'Failed to create machine' },
       { status: 500 }
     );
   }
@@ -69,18 +81,35 @@ export async function GET(request: NextRequest) {
   try {
     const machines = await prisma.machine.findMany({
       include: {
-        Services: includeServices
+        Services: {
+          include: {
+            service: true
+          }
+        }
       },
       orderBy: {
-        createdAt: 'desc' // Add this if you have a createdAt field in your schema
+        createdAt: 'desc'
       }
     });
 
-    return NextResponse.json(machines, { status: 200 });
+    // Transform the response to match the expected format
+    const transformedMachines = machines.map(machine => ({
+      ...machine,
+      Services: machine.Services.map(ms => ({
+        id: ms.service.id,
+        Service: ms.service.Service,
+        Costs: ms.service.Costs,
+        Icon: ms.service.Icon,
+        Info: ms.service.Info,
+        Per: ms.service.Per
+      }))
+    }));
+
+    return NextResponse.json(transformedMachines);
   } catch (error) {
     console.error('Machines Fetch Error:', error);
     return NextResponse.json(
-      { error: 'Unable to fetch machines', details: error instanceof Error ? error.message : 'Unknown error' }, 
+      { error: 'Failed to fetch machines' },
       { status: 500 }
     );
   }
@@ -98,32 +127,22 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Use transaction to ensure atomic deletion
-    const result = await prisma.$transaction(async (tx) => {
-      // First delete associated services
-      await tx.service.deleteMany({
-        where: { machineId: machineId }
-      });
-
-      // Then delete the machine
-      const deletedMachine = await tx.machine.delete({
-        where: { id: machineId }
-      });
-
-      return deletedMachine;
+    const deletedMachine = await prisma.machine.delete({
+      where: { id: machineId },
+      include: {
+        Services: true
+      }
     });
 
-    console.log('Deleted machine and its services:', result);
-
-    return NextResponse.json(result, { 
+    return NextResponse.json(deletedMachine, { 
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
-    console.error('Machine and Services Deletion Error:', error);
+    console.error('Machine Deletion Error:', error);
     return NextResponse.json(
       { 
-        error: 'Failed to delete machine and its services',
+        error: 'Failed to delete machine',
         details: error instanceof Error ? error.message : 'Unknown error'
       }, 
       { status: 500 }

@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "Service" ADD COLUMN "Icon" TEXT;
+ALTER TABLE "Service" ADD COLUMN "Info" TEXT;
+ALTER TABLE "Service" ADD COLUMN "Per" TEXT;

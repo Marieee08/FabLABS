@@ -1,10 +1,15 @@
 import { Plus, Edit, Trash2, X } from 'lucide-react';
 import { Switch } from "@/components/ui/switch";
 import React, { useState, useEffect } from 'react';
+import { MultiSelect } from "@/components/ui/multi-select";
 
 interface Service {
-  id?: string;
+  id: string;
   Service: string;
+  Costs?: number;
+  Icon?: string;
+  Info?: string;
+  Per?: string;
 }
 
 interface Machine {
@@ -12,102 +17,109 @@ interface Machine {
   Machine: string;
   Image: string;
   Desc: string;
+  Instructions?: string;
   Link?: string;
   isAvailable: boolean;
-  Costs?: number;
   Services: Service[];
 }
 
 export default function AdminServices() {
   const [machines, setMachines] = useState<Machine[]>([]);
+  const [allServices, setAllServices] = useState<Service[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
+  const [isDeletingMap, setIsDeletingMap] = useState<Record<string, boolean>>({});
   const [formData, setFormData] = useState<Partial<Machine>>({
+    Machine: '',
+    Image: '',
+    Desc: '',
+    Instructions: '',
+    Link: '',
     isAvailable: true,
-    Services: [{ Service: '' }]
+    Services: []
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     fetchMachines();
+    fetchServices();
   }, []);
 
   const fetchMachines = async () => {
     try {
       const response = await fetch('/api/machines?includeServices=true');
-      if (response.ok) {
-        const data = await response.json();
-        setMachines(data);
-      } else {
-        console.error('Failed to fetch machines');
-        alert('Failed to load machines. Please refresh or contact support.');
-      }
+      if (!response.ok) throw new Error('Failed to fetch machines');
+      const data = await response.json();
+      setMachines(data);
     } catch (error) {
       console.error('Error fetching machines:', error);
-      alert('An error occurred while fetching machines. Please try again later.');
+      alert('Failed to load machines. Please try again later.');
+    }
+  };
+
+  const fetchServices = async () => {
+    try {
+      const response = await fetch('/api/services');
+      if (!response.ok) throw new Error('Failed to fetch services');
+      const data = await response.json();
+      setAllServices(data);
+    } catch (error) {
+      console.error('Error fetching services:', error);
+      alert('Failed to load services. Please try again later.');
     }
   };
 
 
   const toggleAvailability = async (id: string, currentStatus: boolean) => {
     try {
-      console.log('Sending request:', { id, newStatus: !currentStatus });
- 
       const response = await fetch(`/api/machines/${id}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          isAvailable: !currentStatus
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isAvailable: !currentStatus })
       });
- 
-      console.log('Response status:', response.status);
- 
-      const text = await response.text();
-      console.log('Response text:', text);
- 
-      const data = text ? JSON.parse(text) : null;
- 
+
       if (!response.ok) {
-        throw new Error(data?.error || 'Failed to update availability');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update availability');
       }
- 
+
+      const updatedMachine = await response.json();
       setMachines(prevMachines =>
         prevMachines.map(machine =>
-          machine.id === id
-            ? { ...machine, isAvailable: !currentStatus }
-            : machine
+          machine.id === id ? updatedMachine : machine
         )
       );
- 
     } catch (error) {
       console.error('Toggle error:', error);
+      alert('Failed to update machine availability.');
     }
   };
-
-
-  const deleteMachine = async (id: string) => {
-    // Show confirmation dialog
-    const isConfirmed = window.confirm('Are you sure you want to delete this machine? This action cannot be undone.');
-    
-    // Only proceed if user confirms
-    if (!isConfirmed) return;
   
+  const deleteMachine = async (id: string) => {
+    if (!window.confirm('Are you sure you want to delete this machine? This action cannot be undone.')) return;
+    
+    setIsDeletingMap(prev => ({ ...prev, [id]: true }));
+    
     try {
       const response = await fetch(`/api/machines/${id}`, {
         method: 'DELETE',
       });
-      if (response.ok) {
-        setMachines(machines.filter((machine) => machine.id !== id));
-        console.log('Machine deleted successfully');
-      } else {
-        console.error('Failed to delete machine:', await response.text());
+  
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete machine');
       }
+      
+      setMachines(prevMachines => prevMachines.filter(machine => machine.id !== id));
+      
     } catch (error) {
-      console.error('Error deleting machine:', error);
+      console.error('Delete error:', error);
+      alert(error instanceof Error ? error.message : 'Failed to delete machine');
+    } finally {
+      setIsDeletingMap(prev => ({ ...prev, [id]: false }));
     }
   };
 
@@ -115,37 +127,31 @@ export default function AdminServices() {
     setEditingMachine(machine);
     if (machine) {
       setFormData({
-        name: machine.Machine || '',
-        image: machine.Image || '',
-        description: machine.Desc || '',
-        videoUrl: machine.Link || '',
+        Machine: machine.Machine,
+        Image: machine.Image,
+        Desc: machine.Desc,
+        Instructions: machine.Instructions || '',
+        Link: machine.Link || '',
         isAvailable: machine.isAvailable,
-        Costs: machine.Costs !== null ? parseFloat(machine.Costs.toString()) : 0,
-        Services: machine.Services?.length 
-          ? machine.Services 
-          : [{ Service: '' }]
+        Services: machine.Services
       });
-      
-      // Set the image preview to the current machine's image
-      setImagePreview(machine.Image || null);
-      
-      // Reset the image file to null since we're using the existing image
-      setImageFile(null);
+      // Update selected services based on the machine's current services
+      setSelectedServices(machine.Services.map(service => service.id));
+      setImagePreview(machine.Image);
     } else {
       setFormData({
-        name: '',
-        image: '',
-        description: '',
-        videoUrl: '',
+        Machine: '',
+        Image: '',
+        Desc: '',
+        Instructions: '',
+        Link: '',
         isAvailable: true,
-        Costs: 0,
-        Services: [{ Service: '' }]
+        Services: []
       });
-      
-      // Reset image preview and file for a new machine
+      setSelectedServices([]);
       setImagePreview(null);
-      setImageFile(null);
     }
+    setImageFile(null);
     setIsModalOpen(true);
   };
 
@@ -153,31 +159,20 @@ export default function AdminServices() {
     setIsModalOpen(false);
     setEditingMachine(null);
     setFormData({
-      isAvailable: true // Reset with default availability
+      Machine: '',
+      Image: '',
+      Desc: '',
+      Instructions: '',
+      Link: '',
+      isAvailable: true,
+      Services: []
     });
+    setSelectedServices([]);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
-  };
-
-  const handleServiceChange = (index: number, value: string) => {
-    const updatedServices = [...(formData.Services || [])];
-    updatedServices[index] = { Service: value.trim() };
-    setFormData({ ...formData, Services: updatedServices });
-  };
-
-  const addServiceField = () => {
-    setFormData(prev => ({
-      ...prev, 
-      Services: [...(prev.Services || []), { Service: '' }]
-    }));
-  };
-
-  const removeServiceField = (index: number) => {
-    const updatedServices = formData.Services?.filter((_, i) => i !== index) || [];
-    setFormData({ ...formData, Services: updatedServices });
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleImageUpload = async () => {
@@ -192,36 +187,16 @@ export default function AdminServices() {
         body: formData
       });
   
-      // Log the entire response for debugging
-      console.log('Full response:', response);
-      console.log('Response status:', response.status);
-      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-  
-      // Try to parse the response text
-      const responseText = await response.text();
-      console.log('Raw response text:', responseText);
-  
-      // Try to parse the response as JSON
-      let parsedData;
-      try {
-        parsedData = JSON.parse(responseText);
-      } catch (parseError) {
-        console.error('JSON parsing error:', parseError);
-        throw new Error(`Invalid server response: ${responseText}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Upload failed');
       }
   
-      // Check if the response was successful
-      if (response.ok) {
-        if (parsedData.path) {
-          return parsedData.path;
-        }
-        throw new Error(parsedData.error || 'Upload failed');
-      } else {
-        throw new Error(parsedData.error || 'Upload unsuccessful');
-      }
+      const data = await response.json();
+      return data.path;
     } catch (error) {
-      console.error('Complete upload error:', error);
-      alert(`Failed to upload image: ${error.message}`);
+      console.error('Upload error:', error);
+      alert(`Failed to upload image: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return null;
     }
   };
@@ -233,144 +208,107 @@ export default function AdminServices() {
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result as string);
-        // Update formData with the file name or temporary path
-        setFormData(prev => ({
-          ...prev, 
-          image: file.name // or you could use a temporary path
-        }));
+        setFormData(prev => ({ ...prev, Image: file.name }));
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setIsLoading(true);
   
     try {
-      // Image upload logic
-      let imageUrl = imagePreview; // Use existing image if no new upload
-      
-      // If a new file is selected, upload it
+      let imageUrl = formData.Image;
       if (imageFile) {
-        imageUrl = await handleImageUpload();
-        
-        // If image upload fails, stop submission
-        if (!imageUrl) {
-          alert('Image upload failed. Please try again.');
-          return;
+        const uploadedImagePath = await handleImageUpload();
+        if (!uploadedImagePath) {
+          throw new Error('Failed to upload image');
         }
+        imageUrl = uploadedImagePath;
       }
   
-      // If editing an existing machine and the image has changed
-      if (editingMachine && editingMachine.Image !== imageUrl) {
-        try {
-          // Delete the old image
-          await fetch(`/api/machines/upload?imagePath=${encodeURIComponent(editingMachine.Image)}`, {
-            method: 'DELETE'
-          });
-        } catch (deleteError) {
-          console.warn('Failed to delete old image:', deleteError);
-        }
-      }
-  
-      const machinePayload = {
-        Machine: formData.name,
-        Image: imageUrl || '', 
-        Desc: formData.description,
-        Link: formData.videoUrl || null,
+      const payload = {
+        Machine: formData.Machine,
+        Image: imageUrl,
+        Desc: formData.Desc,
+        Instructions: formData.Instructions || null,
+        Link: formData.Link || null,
         isAvailable: formData.isAvailable ?? true,
-        Costs: formData.Costs ? parseFloat(formData.Costs.toString()) : null,
+        serviceIds: selectedServices
       };
   
-      console.log('Machine Payload:', machinePayload);
+      const endpoint = editingMachine 
+        ? `/api/machines/${editingMachine.id}` 
+        : '/api/machines';
+      
+      const method = editingMachine ? 'PUT' : 'POST';
   
-      let response;
+      // Detailed logging of the request
+      console.log('Making request:', {
+        endpoint,
+        method,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        payload: JSON.stringify(payload, null, 2)
+      });
+
+      const response = await fetch(endpoint, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+  
+      // Log the response details
+      console.log('Response status:', response.status);
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+      const responseText = await response.text();
+      console.log('Raw response:', responseText);
+
+      let responseData;
       try {
-        if (editingMachine) {
-          response = await fetch(`/api/machines/${editingMachine.id}`, {
-            method: 'PUT',
-            headers: { 
-              'Content-Type': 'application/json' 
-            },
-            body: JSON.stringify({
-              ...machinePayload,
-              id: editingMachine.id
-            })
-          });
-        } else {
-          response = await fetch('/api/machines', {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json' 
-            },
-            body: JSON.stringify(machinePayload)
-          });
-        }
-  
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Failed to save machine: ${errorText}`);
-        }
-  
-        const result = await response.json();
-        const machineId = result.id;
-  
-        // Only create services if there are any
-        const filteredServices = formData.Services?.filter(
-          service => service.Service && service.Service.trim() !== ''
-        ) || [];
-  
-        // Delete existing services first
-        await fetch(`/api/services?machineId=${machineId}`, {
-          method: 'DELETE'
-        });
-  
-        // Create new services
-        for (const service of filteredServices) {
-          const serviceResponse = await fetch('/api/services', {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json' 
-            },
-            body: JSON.stringify({
-              Service: service.Service.trim(),
-              machineId: machineId
-            })
-          });
-  
-          if (!serviceResponse.ok) {
-            const serviceErrorText = await serviceResponse.text();
-            throw new Error(`Failed to save service: ${serviceErrorText}`);
-          }
-        }
-  
-        // Update local state
-        setMachines(prevMachines => {
-          if (editingMachine) {
-            return prevMachines.map(m => 
-              m.id === result.id 
-                ? { 
-                    ...result, 
-                    Services: filteredServices.map(s => ({ Service: s.Service })) 
-                  } 
-                : m
-            );
-          } else {
-            return [...prevMachines, {
-              ...result,
-              Services: filteredServices.map(s => ({ Service: s.Service }))
-            }];
-          }
-        });
-  
-        closeModal();
-      } catch (saveError) {
-        console.error('Machine save process error:', saveError);
-        alert(`Error saving machine: ${saveError.message}`);
+        responseData = responseText ? JSON.parse(responseText) : null;
+        console.log('Parsed response data:', responseData);
+      } catch (parseError) {
+        console.error('JSON Parse Error:', parseError);
+        throw new Error(`Failed to parse response: ${responseText}`);
       }
-    } catch (mainError) {
-      console.error('Main submission error:', mainError);
-      alert(`An unexpected error occurred: ${mainError.message}`);
+
+      if (!response.ok) {
+        // Log more details about the error
+        console.error('Response not OK:', {
+          status: response.status,
+          statusText: response.statusText,
+          data: responseData
+        });
+
+        throw new Error(
+          responseData?.error || 
+          (responseData?.errors && Array.isArray(responseData.errors) 
+            ? responseData.errors.join(', ') 
+            : responseData?.errors) || 
+          'Failed to save machine'
+        );
+      }
+
+      console.log('Successfully saved machine:', responseData);
+      await fetchMachines();
+      closeModal();
+      
+    } catch (error) {
+      console.error('Detailed error information:', {
+        error,
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : null
+      });
+      
+      alert(error instanceof Error ? error.message : 'Failed to save machine');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -402,35 +340,40 @@ export default function AdminServices() {
                   />
                 </div>
               </div>
+              
               <img 
                 src={machine.Image} 
                 alt={machine.Machine} 
                 className="w-full h-48 object-cover rounded-md mb-4" 
               />
+              
               <p className="text-gray-600 mb-4">
                 {machine.Desc.length > 100 ? `${machine.Desc.substring(0, 100)}...` : machine.Desc}
               </p>
+
+              {machine.Instructions && (
+                <div className="mb-4">
+                  <strong className="text-gray-700 block mb-2">Instructions:</strong>
+                  <p className="text-gray-600">
+                    {machine.Instructions.length > 100 
+                      ? `${machine.Instructions.substring(0, 100)}...` 
+                      : machine.Instructions}
+                  </p>
+                </div>
+              )}
               
-              {/* Display Costs */}
-              {machine.Costs !== null && machine.Costs !== undefined && (
-  <div className="mb-4">
-    <strong className="text-gray-700">Cost: </strong>
-    <span className="text-green-600">
-      PHP {Number(machine.Costs).toLocaleString('en-US', {
-        minimumFractionDigits: 2, 
-        maximumFractionDigits: 2
-      })}
-    </span>
-  </div>
-)}
-              
-              {/* Display Services */}
+              {/* Services with Costs Display */}
               {machine.Services && machine.Services.length > 0 && (
   <div className="mb-4">
     <strong className="text-gray-700 block mb-2">Services:</strong>
-    <ul className="list-disc list-inside text-gray-600">
+    <ul className="space-y-2">
       {machine.Services.map((service, index) => (
-        <li key={index}>{service.Service}</li>
+        <li key={service.id || index} className="flex justify-between items-center py-1 border-b border-gray-100">
+          <span className="text-gray-800">{service.Service}</span>
+          <span className="text-green-600 font-medium">
+            {service.Costs || 0}
+          </span>
+        </li>
       ))}
     </ul>
   </div>
@@ -456,9 +399,16 @@ export default function AdminServices() {
                 </button>
                 <button
                   onClick={() => deleteMachine(machine.id)}
-                  className="bg-red-500 text-white p-2 rounded-full"
+                  disabled={isDeletingMap[machine.id]}
+                  className={`${
+                    isDeletingMap[machine.id] ? 'bg-gray-400' : 'bg-red-500 hover:bg-red-600'
+                  } text-white p-2 rounded-full transition-colors`}
                 >
-                  <Trash2 size={20} />
+                  {isDeletingMap[machine.id] ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Trash2 size={20} />
+                  )}
                 </button>
               </div>
             </div>
@@ -473,7 +423,7 @@ export default function AdminServices() {
         <h2 className="text-2xl font-bold">{editingMachine ? 'Edit' : 'Add'} Machine</h2>
         <button 
           onClick={closeModal} 
-          className="text-gray-500 hover:text-gray-700 absolute top-0 right-0"
+          className="text-gray-500 hover:text-gray-700"
         >
           <X size={24} />
         </button>
@@ -486,14 +436,14 @@ export default function AdminServices() {
             Name
           </label>
           <input
-            type="text"
-            id="name"
-            name="name"
-            value={formData.name || ''}
-            onChange={handleInputChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-            required
-          />
+  type="text"
+  id="Machine"  // Changed from "name"
+  name="Machine"  // Changed from "name"
+  value={formData.Machine || ''}  // Changed from formData.name
+  onChange={handleInputChange}
+  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+  required
+/>
         </div>
 
         {/* Description Input */}
@@ -502,15 +452,30 @@ export default function AdminServices() {
             Description
           </label>
           <textarea
-            id="description"
-            name="description"
-            value={formData.description || ''}
-            onChange={handleInputChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-            rows={3}
-            required
-          ></textarea>
+  id="Desc"  // Changed from "description"
+  name="Desc"  // Changed from "description"
+  value={formData.Desc || ''}  // Changed from formData.description
+  onChange={handleInputChange}
+  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+  rows={3}
+  required
+/>
         </div>
+
+        {/* Instructions Input */}
+        <div>
+                  <label htmlFor="Instructions" className="block text-sm font-medium text-gray-700">
+                    Instructions
+                  </label>
+                  <textarea
+                    id="Instructions"
+                    name="Instructions"
+                    value={formData.Instructions || ''}
+                    onChange={handleInputChange}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+                    rows={4}
+                  />
+                </div>
 
         {/* Image Upload */}
         <div>
@@ -523,7 +488,12 @@ export default function AdminServices() {
             name="image"
             accept="image/*"
             onChange={handleImageChange}
-            className="mt-1 block w-full"
+            className="mt-1 block w-full text-sm text-gray-500
+              file:mr-4 file:py-2 file:px-4
+              file:rounded-full file:border-0
+              file:text-sm file:font-semibold
+              file:bg-blue-50 file:text-blue-700
+              hover:file:bg-blue-100"
           />
           {imagePreview && (
             <img 
@@ -534,57 +504,22 @@ export default function AdminServices() {
           )}
         </div>
 
-        {/* Costs Input */}
-        <div>
-        <label htmlFor="Costs" className="block text-sm font-medium text-gray-700">
-          Cost (PHP)
-        </label>
-        <input
-          type="number"
-          id="Costs"
-          name="Costs"
-          step="0.01"
-          min="0"
-          value={formData.Costs || ''} // Changed to empty string when undefined
-          onChange={handleInputChange}
-          placeholder="Enter cost"
-          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-        />
-      </div>
-
         {/* Services Input */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Services
-          </label>
-          {formData.Services?.map((service, index) => (
-            <div key={index} className="flex items-center space-x-2 mb-2">
-              <input
-                type="text"
-                value={service.Service}
-                onChange={(e) => handleServiceChange(index, e.target.value)}
-                placeholder="Enter service"
-                className="flex-grow rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-              />
-              {index > 0 && (
-                <button
-                  type="button"
-                  onClick={() => removeServiceField(index)}
-                  className="bg-red-500 text-white p-2 rounded-full"
-                >
-                  <X size={16} />
-                </button>
-              )}
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={addServiceField}
-            className="mt-2 bg-green-500 text-white px-4 py-2 rounded-md flex items-center"
-          >
-            <Plus size={16} className="mr-2" /> Add Service
-          </button>
-        </div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        Services
+      </label>
+      <MultiSelect
+  options={allServices.map(service => ({
+    value: service.id,
+    label: `${service.Service} ${service.Costs ? `- ${service.Costs} PHP` : ''}`
+  }))}
+  selected={selectedServices}  // Changed from value to selected
+  onChange={setSelectedServices}
+  className="w-full"
+  placeholder="Select services..."
+/>
+    </div>
 
         {/* Video URL Input */}
         <div>
@@ -592,23 +527,32 @@ export default function AdminServices() {
             YouTube Video URL
           </label>
           <input
-            type="text"
-            id="videoUrl"
-            name="videoUrl"
-            value={formData.videoUrl || ''}
-            onChange={handleInputChange}
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-          />
+  type="url"
+  id="Link"  // Changed from "videoUrl"
+  name="Link"  // Changed from "videoUrl"
+  value={formData.Link || ''}  // Changed from formData.videoUrl
+  onChange={handleInputChange}
+  placeholder="https://youtube.com/..."
+  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+/>
         </div>
 
         {/* Submit Button */}
-        <div className="flex justify-end mt-4">
+        <div className="flex justify-end pt-4 border-t">
           <button
-            type="submit"
-            className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+            type="button"
+            onClick={closeModal}
+            className="mr-4 px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
           >
-            {editingMachine ? 'Update' : 'Add'} Machine
+            Cancel
           </button>
+          <button
+  type="submit"
+  disabled={isLoading}
+  className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 text-sm font-medium disabled:bg-gray-400"
+>
+  {isLoading ? 'Saving...' : (editingMachine ? 'Update' : 'Add')} Machine
+</button>
         </div>
       </form>
     </div>

@@ -30,7 +30,7 @@ interface UserService {
   id: string;
   ServiceAvail: string;
   EquipmentAvail: string;
-  CostsAvail: number | null;
+  CostsAvail: number | string | null; // Updated to handle Prisma decimal
   MinsAvail: number | null;
 }
 
@@ -51,7 +51,7 @@ interface DetailedReservation {
   id: number;
   Status: string;
   RequestDate: string;
-  TotalAmntDue: number | null;
+  TotalAmntDue: number | string | null; // Updated to handle Prisma decimal
   BulkofCommodity: string | null;
   UserServices: UserService[];
   UserTools: UserTool[];
@@ -97,7 +97,7 @@ type Reservation = {
   status: string;
   role: string;
   service: string;
-  totalAmount: number;
+  totalAmount: number | null | undefined;
 };
 
 const ReservationHistory = () => {
@@ -227,6 +227,12 @@ const ReservationHistory = () => {
     }
   };
 
+  const formatCurrency = (amount: number | string | null): string => {
+    if (amount === null || amount === undefined) return '0.00';
+    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+    return Number(numAmount).toFixed(2);
+  };
+
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-sm">
@@ -335,7 +341,9 @@ const ReservationHistory = () => {
               </TableCell>
               <TableCell>{reservation.role}</TableCell>
               <TableCell>{reservation.service}</TableCell>
-              <TableCell>₱{reservation.totalAmount.toFixed(2)}</TableCell>
+              <TableCell>
+                ₱{formatCurrency(reservation.totalAmount)}
+              </TableCell>
               <TableCell>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -395,12 +403,12 @@ const ReservationHistory = () => {
                   <h3 className="font-medium text-gray-900 mb-2">Services Information</h3>
                   <div className="space-y-2">
                     {selectedReservation.UserServices.map((service, index) => (
-                      <div key={index} className="bg-gray-50 p-3 rounded-lg">
-                        <p><span className="text-gray-600">Service:</span> {service.ServiceAvail}</p>
-                        <p><span className="text-gray-600">Equipment:</span> {service.EquipmentAvail}</p>
-                        <p><span className="text-gray-600">Duration:</span> {service.MinsAvail} minutes</p>
-                        <p><span className="text-gray-600">Cost:</span> ₱{service.CostsAvail?.toFixed(2) || '0.00'}</p>
-                      </div>
+                    <div key={index} className="bg-gray-50 p-3 rounded-lg">
+                      <p><span className="text-gray-600">Service:</span> {service.ServiceAvail}</p>
+                      <p><span className="text-gray-600">Equipment:</span> {service.EquipmentAvail}</p>
+                      <p><span className="text-gray-600">Duration:</span> {service.MinsAvail || 0} minutes</p>
+                      <p><span className="text-gray-600">Cost:</span> ₱{service.CostsAvail ? Number(service.CostsAvail).toFixed(2) : '0.00'}</p>
+                    </div>
                     ))}
                   </div>
                 </div>
