@@ -4,6 +4,7 @@ CREATE TABLE "Machine" (
     "Machine" TEXT NOT NULL,
     "Image" TEXT NOT NULL,
     "Desc" TEXT NOT NULL,
+    "Instructions" TEXT,
     "Link" TEXT,
     "isAvailable" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -32,7 +33,7 @@ CREATE TABLE "AccInfo" (
     "clerkId" TEXT NOT NULL,
     "Name" TEXT NOT NULL,
     "email" TEXT NOT NULL,
-    "Role" TEXT NOT NULL DEFAULT 'USER'
+    "Role" TEXT NOT NULL DEFAULT 'MSME'
 );
 
 -- CreateTable
@@ -50,6 +51,7 @@ CREATE TABLE "ClientInfo" (
 -- CreateTable
 CREATE TABLE "BusinessInfo" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "isNotBusinessOwner" BOOLEAN NOT NULL DEFAULT false,
     "CompanyName" TEXT,
     "BusinessOwner" TEXT,
     "BusinessPermitNum" TEXT,
@@ -75,34 +77,35 @@ CREATE TABLE "BusinessInfo" (
 CREATE TABLE "UtilReq" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "Status" TEXT NOT NULL DEFAULT 'Pending',
-    "ProductsManufactured" TEXT,
-    "BulkofCommodity" TEXT,
     "RequestDate" DATETIME DEFAULT CURRENT_TIMESTAMP,
-    "EndDate" DATETIME,
+    "TotalAmntDue" DECIMAL,
+    "BulkofCommodity" TEXT,
     "DateofProcessing" DATETIME,
     "Processedby" TEXT,
-    "UtilReqApproval" BOOLEAN,
     "accInfoId" INTEGER,
+    "ReceiptNumber" TEXT,
+    "PaymentDate" DATETIME,
     CONSTRAINT "UtilReq_accInfoId_fkey" FOREIGN KEY ("accInfoId") REFERENCES "AccInfo" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
-CREATE TABLE "ProcessInfo" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    "Tools" TEXT,
-    "ToolsQty" INTEGER,
+CREATE TABLE "UserTool" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "ToolUser" TEXT NOT NULL,
+    "ToolQuantity" INTEGER NOT NULL,
     "utilReqId" INTEGER,
-    CONSTRAINT "ProcessInfo_utilReqId_fkey" FOREIGN KEY ("utilReqId") REFERENCES "UtilReq" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    CONSTRAINT "UserTool_utilReqId_fkey" FOREIGN KEY ("utilReqId") REFERENCES "UtilReq" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
-CREATE TABLE "AvailedService" (
+CREATE TABLE "UserService" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "ServiceAvail" TEXT NOT NULL,
     "EquipmentAvail" TEXT NOT NULL,
     "CostsAvail" DECIMAL,
-    "processInfoId" INTEGER,
-    CONSTRAINT "AvailedService_processInfoId_fkey" FOREIGN KEY ("processInfoId") REFERENCES "ProcessInfo" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+    "MinsAvail" DECIMAL,
+    "utilReqId" INTEGER,
+    CONSTRAINT "UserService_utilReqId_fkey" FOREIGN KEY ("utilReqId") REFERENCES "UtilReq" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -126,24 +129,40 @@ CREATE TABLE "BlockedDate" (
 -- CreateTable
 CREATE TABLE "EVCReservation" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "EVCStatus" TEXT NOT NULL DEFAULT 'Pending',
     "ControlNo" INTEGER,
     "LvlSec" TEXT,
     "NoofStudents" INTEGER,
     "Subject" TEXT,
-    "Topic" TEXT,
     "Teacher" TEXT,
-    "EVCLabDate" DATETIME,
-    "EVCTimeofUse" DATETIME,
+    "Topic" TEXT,
+    "DateRequested" DATETIME DEFAULT CURRENT_TIMESTAMP,
+    "ApprovedBy" TEXT,
+    "SchoolYear" INTEGER,
     "ReceivedBy" TEXT,
     "ReceivedDate" DATETIME,
     "InspectedBy" TEXT,
     "InspectedDate" DATETIME,
-    "StudentSig" BLOB,
-    "DateRequested" DATETIME,
-    "TeacherSig" BLOB,
-    "EVCApproval" BOOLEAN,
     "accInfoId" INTEGER,
     CONSTRAINT "EVCReservation_accInfoId_fkey" FOREIGN KEY ("accInfoId") REFERENCES "AccInfo" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "LabDate" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "LabDay" INTEGER,
+    "LabStart" DATETIME,
+    "LabEnd" DATETIME,
+    "evcId" INTEGER,
+    CONSTRAINT "LabDate_evcId_fkey" FOREIGN KEY ("evcId") REFERENCES "EVCReservation" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "EVCStudent" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "Students" TEXT,
+    "evcId" INTEGER,
+    CONSTRAINT "EVCStudent_evcId_fkey" FOREIGN KEY ("evcId") REFERENCES "EVCReservation" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -156,14 +175,6 @@ CREATE TABLE "NeededMaterial" (
     "Returned" TEXT,
     "evcId" INTEGER,
     CONSTRAINT "NeededMaterial_evcId_fkey" FOREIGN KEY ("evcId") REFERENCES "EVCReservation" ("id") ON DELETE SET NULL ON UPDATE CASCADE
-);
-
--- CreateTable
-CREATE TABLE "EVCStudent" (
-    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    "Students" TEXT,
-    "evcId" INTEGER,
-    CONSTRAINT "EVCStudent_evcId_fkey" FOREIGN KEY ("evcId") REFERENCES "EVCReservation" ("id") ON DELETE SET NULL ON UPDATE CASCADE
 );
 
 -- CreateTable
@@ -293,11 +304,6 @@ CREATE TABLE "JobandPayment" (
     "Date" DATETIME,
     "ClientProfile" TEXT,
     "ProjDesc" TEXT,
-    "Services" TEXT,
-    "Minutes" DECIMAL,
-    "Costpermin" DECIMAL,
-    "TotalCost" DECIMAL,
-    "TotalAmntDue" DECIMAL,
     "CompletionDate" DATETIME DEFAULT CURRENT_TIMESTAMP,
     "utilReqId" INTEGER,
     CONSTRAINT "JobandPayment_utilReqId_fkey" FOREIGN KEY ("utilReqId") REFERENCES "UtilReq" ("id") ON DELETE SET NULL ON UPDATE CASCADE
