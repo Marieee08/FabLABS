@@ -64,7 +64,7 @@ const DashboardUser = () => {
     }
   };
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [orderDropdownOpen, setOrderDropdownOpen] = useState(false);
+  const [orderDropdownOpen, setOrderDropdownOpen] = useState(true); // Set to true by default to show the dropdown
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -166,7 +166,7 @@ const handleReviewClick = (reservation: Reservation) => {
               <li>
                 <button
                   onClick={() => setOrderDropdownOpen(!orderDropdownOpen)}
-                  className="group relative flex w-full items-center justify-between gap-2.5 rounded-full py-2 px-4 font-medium text-[#0d172c] text-blue-800 bg-blue-100 border border-[#5e86ca]"
+                  className="group relative flex w-full items-center justify-between gap-2.5 rounded-full py-2 px-4 font-medium text-blue-800 bg-blue-100 border border-[#5e86ca]"
                 >
                   <span>Orders</span>
                   <svg
@@ -184,11 +184,18 @@ const handleReviewClick = (reservation: Reservation) => {
                 </button>
               </li>
               {orderDropdownOpen && (
-                <li className="ml-6">
-                  <Link href="/user-dashboard/history" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]">
-                    History
-                  </Link>
-                </li>
+                <>
+                  <li className="ml-6">
+                    <Link href="/user-dashboard" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-blue-800 bg-blue-100 hover:text-[#0d172c]">
+                      General
+                    </Link>
+                  </li>
+                  <li className="ml-6">
+                    <Link href="/user-dashboard/history" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]">
+                      History
+                    </Link>
+                  </li>
+                </>
               )}
               <li>
                 <Link href="/user-dashboard/information" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-[#0d172c] border border-transparent hover:text-blue-800 hover:bg-blue-100 hover:border-[#5e86ca]">

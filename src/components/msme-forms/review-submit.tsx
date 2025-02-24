@@ -95,7 +95,7 @@ const formatDate = (date: Date): string => {
   });
 };
 
-const CostReviewSection: React.FC<CostReviewProps> = ({ 
+const CostReviewTable = ({ 
   selectedServices, 
   days, 
   onCostCalculated = () => {} 
@@ -114,65 +114,35 @@ const CostReviewSection: React.FC<CostReviewProps> = ({
   const calculateDuration = useCallback((startTime: string | null, endTime: string | null): number => {
     if (!startTime || !endTime) return 0;
     
-    try {
-      const convertTo24Hour = (time: string): string => {
-        const [timePart, meridiem] = time.split(' ');
-        let [hours, minutes] = timePart.split(':').map(Number);
-        
-        if (meridiem?.toLowerCase() === 'pm' && hours !== 12) {
-          hours += 12;
-        } else if (meridiem?.toLowerCase() === 'am' && hours === 12) {
-          hours = 0;
-        }
-        
-        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-      };
-
-      const start24 = startTime.toLowerCase().includes('m') ? convertTo24Hour(startTime) : startTime;
-      const end24 = endTime.toLowerCase().includes('m') ? convertTo24Hour(endTime) : endTime;
+    const convertTo24Hour = (time: string): string => {
+      const [timePart, meridiem] = time.split(' ');
+      let [hours, minutes] = timePart.split(':').map(Number);
       
-      const [startHour, startMinute] = start24.split(':').map(Number);
-      const [endHour, endMinute] = end24.split(':').map(Number);
-      
-      if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) {
-        return 0;
+      if (meridiem?.toLowerCase() === 'pm' && hours !== 12) {
+        hours += 12;
+      } else if (meridiem?.toLowerCase() === 'am' && hours === 12) {
+        hours = 0;
       }
       
-      const startTotalMinutes = startHour * 60 + startMinute;
-      const endTotalMinutes = endHour * 60 + endMinute;
-      
-      const durationInHours = (endTotalMinutes - startTotalMinutes) / 60;
-      return durationInHours > 0 ? durationInHours : 0;
-    } catch {
-      return 0;
-    }
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    };
+
+    const start24 = startTime.toLowerCase().includes('m') ? convertTo24Hour(startTime) : startTime;
+    const end24 = endTime.toLowerCase().includes('m') ? convertTo24Hour(endTime) : endTime;
+    
+    const [startHour, startMinute] = start24.split(':').map(Number);
+    const [endHour, endMinute] = end24.split(':').map(Number);
+    
+    const startTotalMinutes = startHour * 60 + startMinute;
+    const endTotalMinutes = endHour * 60 + endMinute;
+    
+    const durationInHours = (endTotalMinutes - startTotalMinutes) / 60;
+    return durationInHours > 0 ? durationInHours : 0;
   }, []);
 
-  const calculateTotalCost = useCallback(() => {
-    if (!serviceCosts.length || !selectedServices.length || !days.length) return 0;
-    
-    let total = 0;
-    
-    selectedServices.forEach(serviceName => {
-      const service = serviceCosts.find(s => s.Service === serviceName);
-      if (!service || !service.Costs) return;
-      
-      const numericCost = getNumericCost(service.Costs);
-      if (numericCost === 0) return;
-
-      days.forEach(day => {
-        const duration = calculateDuration(day.startTime, day.endTime);
-        if (duration > 0) {
-          const cost = duration * numericCost;
-          if (isFinite(cost)) {
-            total += cost;
-          }
-        }
-      });
-    });
-  
-    return total;
-  }, [serviceCosts, selectedServices, days, getNumericCost, calculateDuration]);
+  const calculateBillableHours = useCallback((duration: number): number => {
+    return Math.ceil(duration);
+  }, []);
 
   useEffect(() => {
     const fetchServiceCosts = async () => {
@@ -183,7 +153,6 @@ const CostReviewSection: React.FC<CostReviewProps> = ({
         setServiceCosts(data);
       } catch (err) {
         setError('Failed to load service costs');
-        console.error('Error fetching service costs:', err);
       } finally {
         setIsLoading(false);
       }
@@ -192,6 +161,24 @@ const CostReviewSection: React.FC<CostReviewProps> = ({
     fetchServiceCosts();
   }, []);
 
+  const calculateTotalCost = useCallback(() => {
+    if (!serviceCosts.length || !selectedServices.length || !days.length) return 0;
+    
+    let total = 0;
+    selectedServices.forEach(serviceName => {
+      const service = serviceCosts.find(s => s.Service === serviceName);
+      if (!service || !service.Costs) return;
+      
+      const numericCost = getNumericCost(service.Costs);
+      days.forEach(day => {
+        const duration = calculateDuration(day.startTime, day.endTime);
+        const billableHours = calculateBillableHours(duration);
+        total += billableHours * numericCost;
+      });
+    });
+    return total;
+  }, [serviceCosts, selectedServices, days, getNumericCost, calculateDuration, calculateBillableHours]);
+
   useEffect(() => {
     const total = calculateTotalCost();
     onCostCalculated(total);
@@ -199,71 +186,74 @@ const CostReviewSection: React.FC<CostReviewProps> = ({
 
   if (isLoading) {
     return (
-      <div className="mt-4">
-        <div className="flex items-center justify-center p-4">
-          <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-        </div>
+      <div className="flex items-center justify-center p-4">
+        <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   if (error) {
-    return (
-      <div className="mt-4 text-red-500 text-sm">
-        {error}
-      </div>
-    );
+    return <div className="text-red-500 text-sm">{error}</div>;
   }
 
-  const totalCost = calculateTotalCost();
-
   return (
-    <div className="mt-4">
-      <h3 className="text-lg font-medium mb-3">Cost Breakdown</h3>
-      <div className="border border-gray-300 rounded-md p-4 space-y-4">
-        {selectedServices.map(serviceName => {
-          const service = serviceCosts.find(s => s.Service === serviceName);
-          if (!service || !service.Costs) return null;
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse">
+        <thead>
+          <tr className="bg-gray-50">
+            <th className="p-3 text-left border">Service</th>
+            <th className="p-3 text-left border">Date</th>
+            <th className="p-3 text-left border">Duration</th>
+            <th className="p-3 text-left border">Rate</th>
+            <th className="p-3 text-left border">Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          {selectedServices.map(serviceName => {
+            const service = serviceCosts.find(s => s.Service === serviceName);
+            if (!service || !service.Costs) return null;
+            const numericCost = getNumericCost(service.Costs);
 
-          const numericCost = getNumericCost(service.Costs);
-
-          return (
-            <div key={serviceName} className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="font-medium">{serviceName}</span>
-                <span className="text-gray-600">
-                  ₱{numericCost.toFixed(2)} per {service.Per}
-                </span>
-              </div>
-              {days.map((day, index) => {
-                const duration = calculateDuration(day.startTime, day.endTime);
-                const cost = duration * numericCost;
-
-                return (
-                  <div key={index} className="ml-4 text-sm text-gray-600">
-                    <div className="flex justify-between">
-                      <span>
-                        Day {index + 1}: {duration.toFixed(2)} hours
-                        {duration === 0 && " (Invalid time range)"}
-                      </span>
-                      <span>₱{cost.toFixed(2)}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
-        <div className="pt-4 border-t border-gray-200">
-          <div className="flex justify-between items-center font-semibold">
-            <span>Total Estimated Cost</span>
-            <span>₱{totalCost.toFixed(2)}</span>
-          </div>
-        </div>
-      </div>
+            return days.map((day, dayIndex) => {
+              const duration = calculateDuration(day.startTime, day.endTime);
+              const billableHours = calculateBillableHours(duration);
+              const cost = billableHours * numericCost;
+              
+              return (
+                <tr key={`${serviceName}-${dayIndex}`} className="border-b hover:bg-gray-50">
+                  <td className="p-3 border">{serviceName}</td>
+                  <td className="p-3 border">
+                    {new Date(day.date).toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </td>
+                  <td className="p-3 border">
+                    {duration.toFixed(2)} hours
+                    {duration !== billableHours && (
+                      <div className="text-xs text-gray-500">
+                        (Billed as {billableHours} {billableHours === 1 ? 'hour' : 'hours'})
+                      </div>
+                    )}
+                  </td>
+                  <td className="p-3 border">₱{numericCost.toFixed(2)} per {service.Per}</td>
+                  <td className="p-3 border">₱{cost.toFixed(2)}</td>
+                </tr>
+              );
+            });
+          })}
+          <tr className="bg-gray-50 font-semibold">
+            <td colSpan={4} className="p-3 border text-right">Total Cost</td>
+            <td className="p-3 border">₱{calculateTotalCost().toFixed(2)}</td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   );
 };
+
 
 export default function ReviewSubmit({ formData, prevStep, updateFormData }: ReviewSubmitProps) {
   const router = useRouter();
@@ -486,13 +476,13 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData }: Rev
           </div>
         )}
 
-        {renderSection('Cost Information',
-          <CostReviewSection
-            selectedServices={Array.isArray(formData.ProductsManufactured) ? formData.ProductsManufactured : []}
-            days={formData.days}
-            onCostCalculated={handleCostCalculated}
-          />
-        )}
+{renderSection('Cost Breakdown',
+  <CostReviewTable
+    selectedServices={Array.isArray(formData.ProductsManufactured) ? formData.ProductsManufactured : []}
+    days={formData.days}
+    onCostCalculated={handleCostCalculated}
+  />
+)}
 
         {error && (
           <Alert variant="destructive" className="mt-4">
