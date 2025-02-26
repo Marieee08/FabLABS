@@ -223,9 +223,10 @@ const DashboardAdmin = () => {
           <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
           <h2 className="text-[#143370] text-3xl font-bold font-qanelas3">Dashboard</h2>
           <p className="text-sm text-[#143370] mb-4 font-poppins1">{formattedDate}</p>
-          <TestCalendar />
-          <ReservationHistory/>
-            
+          <div className="flex flex-col gap-6">
+            <TestCalendar />
+            <ReservationHistory />
+          </div>
           </div>
         </main>
       </div>
