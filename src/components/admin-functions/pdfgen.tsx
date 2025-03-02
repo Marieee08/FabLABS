@@ -261,14 +261,27 @@ const generatePDF = async (reservation: DetailedReservation) => {
 };
 
 // Function to download the PDF
-export const downloadPDF = async (reservation: DetailedReservation) => {
+// Replace your downloadPDF function with this:
+export const downloadPDF = async (reservation: any) => {
   try {
-    const pdfBuffer = await generatePDF(reservation);
+    // Create a form data object
+    const response = await fetch('/api/generate-pdf', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(reservation),
+    });
     
-    // Create a blob and download
-    const blob = new Blob([pdfBuffer], { type: 'application/pdf' });
+    if (!response.ok) {
+      throw new Error('Failed to generate PDF');
+    }
+    
+    // Get the PDF as a blob
+    const blob = await response.blob();
+    
+    // Create a download link
     const url = URL.createObjectURL(blob);
-    
     const a = document.createElement('a');
     a.href = url;
     a.download = `Reservation-${reservation.id}.pdf`;

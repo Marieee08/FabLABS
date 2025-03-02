@@ -356,8 +356,20 @@ const ReservationHistory = () => {
                     <DropdownMenuItem onSelect={() => handleReviewClick(reservation)}>
                       Review
                     </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => downloadPDF(detailedReservation)}>
-                    Generate PDF
+                    <DropdownMenuItem onSelect={async () => {
+                      try {
+                        // First fetch the detailed reservation data if not already available
+                        const response = await fetch(`/api/admin/reservation-review/${reservation.id}`);
+                        if (!response.ok) throw new Error('Failed to fetch details');
+                        const detailedData = await response.json();
+                        
+                        // Then download the PDF with the detailed data
+                        downloadPDF(detailedData);
+                      } catch (error) {
+                        console.error('Error generating PDF:', error);
+                      }
+                    }}>
+                      Generate PDF
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
