@@ -175,6 +175,21 @@ const ReservationHistory = () => {
     }
   };
 
+  const handleGeneratePDF = async (reservationId: string) => {
+    try {
+      // Fetch detailed reservation data
+      const response = await fetch(`/api/admin/reservation-review/${reservationId}`);
+      if (!response.ok) throw new Error('Failed to fetch details');
+      const detailedData = await response.json();
+
+      // Call the downloadPDF function with the detailed data
+      await downloadPDF(detailedData);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF. Please try again.');
+    }
+  };
+
   const filteredReservations = reservations.filter(reservation => {
     const matchesTab = activeTab === 'all' || reservation.role.toLowerCase() === activeTab.toLowerCase();
     
@@ -193,7 +208,6 @@ const ReservationHistory = () => {
   if (isLoading) {
     return <div className="flex items-center justify-center p-12">Loading...</div>;
   }
-
 
   const handleStatusUpdate = async (reservationId: number, newStatus: 'Approved' | 'Cancelled') => {
     try {
@@ -233,7 +247,6 @@ const ReservationHistory = () => {
     const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
     return Number(numAmount).toFixed(2);
   };
-
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-sm">
@@ -356,19 +369,7 @@ const ReservationHistory = () => {
                     <DropdownMenuItem onSelect={() => handleReviewClick(reservation)}>
                       Review
                     </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={async () => {
-                      try {
-                        // First fetch the detailed reservation data if not already available
-                        const response = await fetch(`/api/admin/reservation-review/${reservation.id}`);
-                        if (!response.ok) throw new Error('Failed to fetch details');
-                        const detailedData = await response.json();
-                        
-                        // Then download the PDF with the detailed data
-                        downloadPDF(detailedData);
-                      } catch (error) {
-                        console.error('Error generating PDF:', error);
-                      }
-                    }}>
+                    <DropdownMenuItem onSelect={() => handleGeneratePDF(reservation.id)}>
                       Generate PDF
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -379,6 +380,7 @@ const ReservationHistory = () => {
         </TableBody>
       </Table>
 
+      {/* Modal for detailed reservation view */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
