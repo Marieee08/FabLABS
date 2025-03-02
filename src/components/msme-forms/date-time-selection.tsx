@@ -216,11 +216,11 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
   };
 
   return (
-    <div className="max-w-6xl mx-auto pt-1">
+    <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 pt-1">
       {/* Calendar and Error Section */}
-      <div className="grid md:grid-cols-2 gap-8 mt-6">
-        <div className="space-y-6">
-          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-10 mt-6">
+        <div className="space-y-4 md:space-y-6">
+        <div className="bg-white p-3 sm:p-6 rounded-lg shadow-sm border border-gray-200">
             <h3 className="text-xl font-medium text-gray-800 mb-3 flex items-center">
               <CheckCircle className="h-5 w-5 text-blue-600 mr-2" /> Select Available Dates
             </h3>
@@ -242,19 +242,26 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
               </div>
             )}
             
-            <div className="border rounded-lg overflow-hidden p-2">
-              <Calendar
-                mode="multiple"
-                selected={formData.days.map(day => new Date(day.date))}
-                onSelect={(_, selectedDay) => {
-                  if (selectedDay) {
-                    addNewDay(selectedDay);
-                  }
-                }}
-                disabled={(date) => isDateDisabled(date) || isDateBlocked(date)}
-                className="w-full"
-              />
-            </div>
+            <div className="border rounded-lg overflow-hidden p-2 sm:p-4">
+  <Calendar
+    mode="multiple"
+    selected={formData.days.map(day => new Date(day.date))}
+    onSelect={(_, selectedDay) => {
+      if (selectedDay) {
+        addNewDay(selectedDay);
+      }
+    }}
+    disabled={(date) => isDateDisabled(date) || isDateBlocked(date)}
+    className="w-full"
+    styles={{
+      day: { width: 'auto', height: 'auto', minWidth: '2rem', minHeight: '2rem' },
+      head_cell: { width: 'auto', paddingBottom: '0.5rem' },
+      table: { width: '100%', tableLayout: 'fixed', borderSpacing: '0.25rem', borderCollapse: 'separate' },
+      cell: { padding: '0.1rem' },
+      nav_button: { width: 'auto', height: 'auto', padding: '0.25rem' }
+    }}
+  />
+</div>
             
             <div className="mt-4 text-sm text-gray-500 flex items-center">
               <div className="w-4 h-4 rounded-full bg-blue-100 border-2 border-blue-500 mr-2"></div>
@@ -304,7 +311,7 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
                   <Clock className="h-5 w-5 text-blue-600 mr-2" />
                   <h3 className="text-lg font-medium text-gray-800">Set Time for All Dates</h3>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-6">
                   <TimePicker
                     required
                     label="Start Time"
@@ -424,16 +431,16 @@ function TimePicker({
 
   // Listen for validation attempts from parent
   React.useEffect(() => {
-    const handleNextClick = () => {
-      setHasAttemptedSubmit(true);
+    const handleNextClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target && (
+          target.textContent?.includes('Next') || 
+          target.textContent?.includes('Continue'))) {
+        setHasAttemptedSubmit(true);
+      }
     };
 
-    document.addEventListener('click', (e) => {
-      if ((e.target as HTMLElement).textContent?.includes('Next') || 
-          (e.target as HTMLElement).textContent?.includes('Continue')) {
-        handleNextClick();
-      }
-    });
+    document.addEventListener('click', handleNextClick);
 
     return () => {
       document.removeEventListener('click', handleNextClick);
@@ -571,9 +578,9 @@ function TimePicker({
         {required && <span className="text-red-500 ml-1">*</span>}
       </label>
 
-      <div className="flex space-x-2">
+      <div className="flex space-x-3">
         <select
-          className={selectClassName}
+          className={`${selectClassName} flex-1`}
           value={localHour}
           onChange={handleHourChange}
           required={required}
@@ -584,7 +591,7 @@ function TimePicker({
         </select>
 
         <select
-          className={selectClassName}
+          className={`${selectClassName} flex-1`}
           value={localMinute}
           onChange={handleMinuteChange}
           required={required}
@@ -593,10 +600,10 @@ function TimePicker({
             <option key={minuteValue} value={minuteValue}>{minuteValue}</option>
           ))}
         </select>
-      </div>
+      </div>  
 
       <div className="mt-1 min-h-4">
-      {isInvalid && (
+        {isInvalid && (
           <span className="text-red-500 text-xs block">
             End time must be after start time
           </span>

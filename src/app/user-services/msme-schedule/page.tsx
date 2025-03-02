@@ -150,10 +150,10 @@ export default function Schedule() {
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
       <Navbar />
       
-      <div className="container mx-auto py-10 px-4 mt-16 max-w-5xl">
+      <div className="container mx-auto py-10 px-4 mt-16 max-w-7xl">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold text-gray-800">Schedule a Service</h1>
-          <p className="text-gray-600 mt-2 max-w-2xl mx-auto">Complete the form below to schedule your service appointment</p>
+          <p className="text-gray-600 mt-2 max-w-3xl mx-auto">Complete the form below to schedule your service appointment</p>
         </div>
         
         <Card className="shadow-lg border border-gray-200">
@@ -164,10 +164,10 @@ export default function Schedule() {
             </div>
           </CardHeader>
           
-          <CardContent className="pt-8 pb-6 px-6">
+          <CardContent className="pt-8 pb-6 px-8">
             <ProgressBar currentStep={step} totalSteps={3} />
             
-            <div className="mt-8">
+            <div className="mt-8 w-full">
               {isLoading ? (
                 <div className="flex flex-col items-center justify-center py-12">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
