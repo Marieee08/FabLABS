@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
+import { downloadPDF } from "@/components/admin-functions/pdfgen";
 
 interface UserService {
   id: string;
@@ -355,8 +356,8 @@ const ReservationHistory = () => {
                     <DropdownMenuItem onSelect={() => handleReviewClick(reservation)}>
                       Review
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
-                      Generate PDF
+                    <DropdownMenuItem onSelect={() => downloadPDF(detailedReservation)}>
+                    Generate PDF
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
