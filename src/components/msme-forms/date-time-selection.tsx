@@ -219,8 +219,8 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
     <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 pt-1">
       {/* Calendar and Error Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-10 mt-6">
-        <div className="space-y-4 md:space-y-6">
-        <div className="bg-white p-3 sm:p-6 rounded-lg shadow-sm border border-gray-200">
+        <div className="space-y-4 md:space-y-6 h-full">
+        <div className="bg-white p-3 sm:p-6 rounded-lg shadow-sm border border-gray-200 h-[630px]">
             <h3 className="text-xl font-medium text-gray-800 mb-3 flex items-center">
               <CheckCircle className="h-5 w-5 text-blue-600 mr-2" /> Select Available Dates
             </h3>
@@ -332,17 +332,19 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
           )}
          
           {/* Selected dates */}
-          {formData.days.length > 0 ? (
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium text-gray-800 flex items-center">
-                <Clock className="h-5 w-5 text-blue-600 mr-2" /> Selected Dates & Times
-              </h3>
+          <div className="space-y-4 h-full">
+{formData.days.length > 0 ? (
+  <div className="space-y-4 h-full">
+    <h3 className="text-lg font-medium text-gray-800 flex items-center">
+      <Clock className="h-5 w-5 text-blue-600 mr-2" /> Selected Dates & Times
+    </h3>
               
-              <div className="max-h-96 overflow-y-auto pr-2 space-y-3">
-                {[...formData.days]
-                  .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                  .map((day, index) => (
-                    <Card key={new Date(day.date).toISOString()} className="bg-white border-gray-200">
+    <div className="h-[330px]"> {/* Add fixed height */}
+    <div className="max-h-full overflow-y-auto pr-2 space-y-3">
+                  {[...formData.days]
+                    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                    .map((day, index) => (
+                      <Card key={new Date(day.date).toISOString()} className="bg-white border-gray-200">
                       <CardContent className="p-4">
                         <h4 className="text-md font-semibold text-blue-800 mb-3">
                           {new Date(day.date).toLocaleDateString('en-US', { 
@@ -370,28 +372,30 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
                             />
                           </div>
                         ) : (
-                          <div className="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-md">
-                            <div>
+                          <div className="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-md h-full items-center">
+                            <div className="pb-1.5 pt-1.5">
                               <p className="text-sm font-medium text-gray-700">Start Time</p>
                               <p className="mt-1 text-blue-700">{day.startTime || 'Not set'}</p>
                             </div>
-                            <div>
+                            <div className="pb-1.5 pt-1.5">
                               <p className="text-sm font-medium text-gray-700">End Time</p>
                               <p className="mt-1 text-blue-700">{day.endTime || 'Not set'}</p>
                             </div>
                           </div>
                         )}
                       </CardContent>
-                    </Card>
-                  ))}
-              </div>
-            </div>
-          ) : (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
-              <p className="text-gray-500">No dates selected yet</p>
-              <p className="text-sm text-gray-400 mt-2">Click on available dates in the calendar</p>
-            </div>
-          )}
+                      </Card>
+                    ))}
+                </div>
+    </div>
+  </div>
+) : (
+  <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200 text-center h-[352px] flex flex-col justify-center">
+    <p className="text-gray-500">No dates selected yet</p>
+    <p className="text-sm text-gray-400 mt-2">Click on available dates in the calendar</p>
+  </div>
+)}
+</div>
         </div>
       </div>
       
@@ -579,28 +583,28 @@ function TimePicker({
       </label>
 
       <div className="flex space-x-3">
-        <select
-          className={`${selectClassName} flex-1`}
-          value={localHour}
-          onChange={handleHourChange}
-          required={required}
-        >
-          {hours.map(hourValue => (
-            <option key={hourValue} value={hourValue}>{hourValue}</option>
-          ))}
-        </select>
+  <select
+    className={`${selectClassName} flex-1 h-10`}
+    value={localHour}
+    onChange={handleHourChange}
+    required={required}
+  >
+    {hours.map(hourValue => (
+      <option key={hourValue} value={hourValue}>{hourValue}</option>
+    ))}
+  </select>
 
-        <select
-          className={`${selectClassName} flex-1`}
-          value={localMinute}
-          onChange={handleMinuteChange}
-          required={required}
-        >
-          {minutes.map(minuteValue => (
-            <option key={minuteValue} value={minuteValue}>{minuteValue}</option>
-          ))}
-        </select>
-      </div>  
+  <select
+    className={`${selectClassName} flex-1 h-10`}
+    value={localMinute}
+    onChange={handleMinuteChange}
+    required={required}
+  >
+    {minutes.map(minuteValue => (
+      <option key={minuteValue} value={minuteValue}>{minuteValue}</option>
+    ))}
+  </select>
+</div> 
 
       <div className="mt-1 min-h-4">
         {isInvalid && (
