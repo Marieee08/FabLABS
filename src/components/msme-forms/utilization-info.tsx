@@ -1,5 +1,6 @@
 import React, { useState, useEffect, ChangeEvent } from 'react';
 import { Plus, Minus, X, ChevronDown, ChevronUp, Check } from 'lucide-react';
+import { CheckCircle } from 'lucide-react';
 
 interface Tool {
   id: string;
@@ -136,7 +137,7 @@ const ToolsSelector: React.FC<ToolsSelectorProps> = ({
         disabled ? 'bg-gray-100' : 'bg-white'
       } ${className}`}>
         {selectedTools.length === 0 ? (
-          <div className="text-gray-500 text-sm flex items-center justify-center h-24">
+          <div className="text-gray-500 text-sm flex items-center justify-center h-10">
             {isLoading ? 'Loading tools...' : 'No tools selected'}
           </div>
         ) : (
@@ -301,7 +302,7 @@ export default function ProcessInformation({ formData, updateFormData, nextStep,
     const baseClasses = "mt-1 block w-full border rounded-md shadow-sm p-3";
     const errorClasses = touchedFields.has(fieldName) && errors[fieldName] 
       ? "border-red-500 focus:ring-red-500 focus:border-red-500" 
-      : "border-gray-300 focus:ring-blue-500 focus:border-blue-500";
+      : "border-gray=-300 focus:ring-blue-500 focus:border-blue-500";
     const disabledClasses = isFieldDisabled(fieldName) ? "bg-gray-100 cursor-not-allowed" : "";
     return `${baseClasses} ${errorClasses} ${disabledClasses}`;
   };
@@ -354,11 +355,6 @@ export default function ProcessInformation({ formData, updateFormData, nextStep,
             error = 'This field is required';
           }
           break;
-        case 'Tools':
-          if (!value) {
-            error = 'Please select at least one tool';
-          }
-          break;
       }
     }
 
@@ -386,10 +382,6 @@ export default function ProcessInformation({ formData, updateFormData, nextStep,
         newErrors.BulkofCommodity = 'This field is required';
         isValid = false;
       }
-      if (!formData.Tools) {
-        newErrors.Tools = 'Please select at least one tool';
-        isValid = false;
-      }
     }
 
     setErrors(newErrors);
@@ -399,14 +391,20 @@ export default function ProcessInformation({ formData, updateFormData, nextStep,
   };
 
   return (
-    <div className="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-sm">
-      <h2 className="text-2xl font-semibold mb-8 text-gray-800 border-b pb-4">Utilization Information</h2>
+      <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 pt-1">
+        <div className="grid grid-cols-1 md:grid-cols-1 gap-4 md:gap-10 mt-6">
+          <div className="space-y-4 md:space-y-6 h-full">
+            <div className="bg-white p-3 sm:p-6 rounded-lg shadow-sm border border-gray-200">
+              <h2 className="text-xl font-medium text-gray-800 mb-3 flex items-center">
+                <CheckCircle className="h-5 w-5 text-blue-600 mr-2" /> Utilization Information
+              </h2>
       
       <div className="space-y-8">
+        {/* Services Selection */}
         <div className="relative">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Services to be availed<span className="text-red-500 ml-1">*</span>
-          </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Services to be availed<span className="text-red-500 ml-1">*</span>
+              </label>
           
           {isLoadingServices ? (
             <div className="block w-full border rounded-md shadow-sm p-3 bg-gray-50 text-gray-500">
@@ -479,62 +477,72 @@ export default function ProcessInformation({ formData, updateFormData, nextStep,
           )}
         </div>
 
-        <div className={`transition-opacity duration-300 ${isFieldDisabled('BulkofCommodity') ? 'opacity-50' : 'opacity-100'}`}>
-          <label htmlFor="BulkofCommodity" className="block text-sm font-medium text-gray-700 mb-2">
-            Bulk of Commodity per Production (in volume or weight)
-            {!isFieldDisabled('BulkofCommodity') && <span className="text-red-500 ml-1">*</span>}
-          </label>
-          <input
-            type="text"
-            id="BulkofCommodity"
-            name="BulkofCommodity"
-            value={formData.BulkofCommodity}
-            onChange={handleInputChange}
-            onBlur={() => handleBlur('BulkofCommodity')}
-            className={getInputClassName('BulkofCommodity')}
-            disabled={isFieldDisabled('BulkofCommodity')}
-            placeholder="e.g. 500 kg, 200 liters"
-            required={!isFieldDisabled('BulkofCommodity')}
-          />
-          {!isFieldDisabled('BulkofCommodity') && touchedFields.has('BulkofCommodity') && errors.BulkofCommodity && (
-            <p className="mt-1 text-sm text-red-500">{errors.BulkofCommodity}</p>
-          )}
-        </div>
+         {/* Bulk of Commodity */}
+         <div className={`transition-opacity duration-300 ${isFieldDisabled('BulkofCommodity') ? 'opacity-50' : 'opacity-100'}`}>
+              <label htmlFor="BulkofCommodity" className="block text-sm font-medium text-gray-700 mb-2">
+                Bulk of Commodity per Production (in volume or weight)
+                {!isFieldDisabled('BulkofCommodity') && <span className="text-red-500 ml-1">*</span>}
+              </label>
+              <input
+                type="text"
+                id="BulkofCommodity"
+                name="BulkofCommodity"
+                value={formData.BulkofCommodity}
+                onChange={handleInputChange}
+                onBlur={() => handleBlur('BulkofCommodity')}
+                className={getInputClassName('BulkofCommodity')}
+                disabled={isFieldDisabled('BulkofCommodity')}
+                placeholder="e.g. 500 kg, 200 liters"
+                required={!isFieldDisabled('BulkofCommodity')}
+              />
+              {!isFieldDisabled('BulkofCommodity') && touchedFields.has('BulkofCommodity') && errors.BulkofCommodity && (
+                <p className="mt-1 text-sm text-red-500">{errors.BulkofCommodity}</p>
+              )}
+            </div>
 
-        <div className={`transition-opacity duration-300 ${isFieldDisabled('Tools') ? 'opacity-50' : 'opacity-100'}`}>
-          <label htmlFor="Tools" className="block text-sm font-medium text-gray-700 mb-2">
-            Tools Required
-            {!isFieldDisabled('Tools') && <span className="text-red-500 ml-1">*</span>}
-          </label>
-          <ToolsSelector
-            id="Tools"
-            value={formData.Tools}
-            onChange={(value) => updateFormData('Tools', value)}
-            onBlur={() => handleBlur('Tools')}
-            className={getInputClassName('Tools')}
-            disabled={isFieldDisabled('Tools')}
-          />
-          {!isFieldDisabled('Tools') && touchedFields.has('Tools') && errors.Tools && (
-            <p className="mt-1 text-sm text-red-500">{errors.Tools}</p>
-          )}
+         {/* Tools Selection */}
+         <div className={`transition-opacity duration-300 ${isFieldDisabled('Tools') ? 'opacity-50' : 'opacity-100'}`}>
+              <label htmlFor="Tools" className="block text-sm font-medium text-gray-700 mb-2">
+                Tools
+              </label>
+              <ToolsSelector
+  id="Tools"
+  value={formData.Tools}
+  onChange={(value) => updateFormData('Tools', value)}
+  onBlur={() => handleBlur('Tools')}
+  className={getInputClassName('Tools')}
+  disabled={isFieldDisabled('Tools')}
+/>
+              {!isFieldDisabled('Tools') && touchedFields.has('Tools') && errors.Tools && (
+                <p className="mt-1 text-sm text-red-500">{errors.Tools}</p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
-      <div className="mt-10 pt-6 border-t flex justify-between">
-        <button 
-          onClick={prevStep} 
-          className="bg-gray-100 text-gray-800 px-6 py-3 rounded-md hover:bg-gray-200 transition-colors flex items-center"
-        >
-          <ChevronDown className="rotate-90 mr-2" size={18} />
-          Previous
-        </button>
-        <button 
-          onClick={handleNext} 
-          className="bg-blue-500 text-white px-6 py-3 rounded-md hover:bg-blue-600 transition-colors flex items-center"
-        >
-          Next
-          <ChevronDown className="-rotate-90 ml-2" size={18} />
-        </button>
+      {/* Placeholder for second column if needed */}
+      <div className="space-y-4 md:space-y-6 h-full">
+        {/* You can add additional content or leave empty */}
+      </div>
+    </div>
+
+      {/* Navigation buttons */}
+      <div className="mt-8 flex justify-between">
+  <button 
+    onClick={prevStep} 
+    className="bg-gray-100 text-gray-800 px-6 py-3 rounded-md hover:bg-gray-200 transition-colors flex items-center"
+  >
+    <ChevronDown className="rotate-90 mr-2" size={18} />
+    Previous
+  </button>
+  <button 
+    onClick={handleNext} 
+    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-md font-medium flex items-center"
+  >
+    Continue to Next Step
+    <ChevronDown className="-rotate-90 ml-2" size={18} />
+  </button>
       </div>
     </div>
   );

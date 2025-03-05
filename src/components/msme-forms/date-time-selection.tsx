@@ -216,31 +216,15 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
   };
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 pt-1">
+    <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 pt-0 flex flex-col">
       {/* Calendar and Error Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-10 mt-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-10 mt-6 flex-grow"> 
         <div className="space-y-4 md:space-y-6 h-full">
-        <div className="bg-white p-3 sm:p-6 rounded-lg shadow-sm border border-gray-200 h-[630px]">
+        <div className="bg-white p-3 sm:p-6 rounded-lg shadow-sm border border-gray-200 h-[632px]">
             <h3 className="text-xl font-medium text-gray-800 mb-3 flex items-center">
               <CheckCircle className="h-5 w-5 text-blue-600 mr-2" /> Select Available Dates
             </h3>
             <p className="text-sm text-gray-600 mb-4">Click on a date to select it. You can choose up to {MAX_DATES} dates.</p>
-            
-            {errors.length > 0 && (
-              <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4 rounded">
-                <div className="flex">
-                  <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
-                  <div>
-                    <h3 className="text-sm font-medium text-red-800">Please correct the following:</h3>
-                    <ul className="mt-1 text-sm text-red-700 list-disc list-inside">
-                      {errors.map((error, index) => (
-                        <li key={index}>{error}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            )}
             
             <div className="border rounded-lg overflow-hidden p-2 sm:p-4">
   <Calendar
@@ -276,7 +260,7 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
         </div>
         
         {/* Time Selection Section */}
-        <div className="space-y-4">
+        <div className="space-y-4 h-full overflow-hidden">
           {/* Sync times toggle */}
           {formData.days.length >= 2 && (
             <Card className="bg-blue-50 border-blue-200">
@@ -332,14 +316,14 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
           )}
          
           {/* Selected dates */}
-          <div className="space-y-4 h-full">
+          <div className="space-y-4 h-full overflow-hidden">
 {formData.days.length > 0 ? (
-  <div className="space-y-4 h-full">
+  <div className="space-y-4 h-full overflow-hidden">
     <h3 className="text-lg font-medium text-gray-800 flex items-center">
       <Clock className="h-5 w-5 text-blue-600 mr-2" /> Selected Dates & Times
     </h3>
               
-    <div className="h-[330px]"> {/* Add fixed height */}
+    <div className="max-h-[330px] overflow-y-auto">
     <div className="max-h-full overflow-y-auto pr-2 space-y-3">
                   {[...formData.days]
                     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
@@ -400,15 +384,15 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
       </div>
       
       {/* Navigation buttons */}
-      <div className="mt-8 flex justify-end">
-        <Button
+      <div className="mt-4 flex justify-end">  {/* Reduced margin */}
+      <Button
           onClick={handleNext}
           className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium"
           disabled={formData.days.length === 0}
         >
           Continue to Next Step
         </Button>
-      </div>
+        </div>
     </div>
   );
 }
