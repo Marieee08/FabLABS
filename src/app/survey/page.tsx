@@ -7,7 +7,29 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+// Type definitions for our form data
+interface StudentDemographicData {
+  age: string;
+  sex: string | undefined;
+  CC1: string | undefined;
+  CC2: string | undefined;
+  CC3: string | undefined;
+}
+
+interface MsmeDemographicData {
+  clientType: string | undefined;
+  sex: string | undefined;
+  age: string;
+  region: string;
+  office: string;
+  serviceAvailed: string[];
+  otherService: string;
+  CC1: string | undefined;
+  CC2: string | undefined;
+  CC3: string | undefined;
+}
+
 
 const SURVEY_QUESTIONS = {
   customer: [
@@ -75,38 +97,38 @@ const CC3_OPTIONS = [
 
 const SurveyForm = () => {
   const [formType, setFormType] = useState('preliminary');
-  const [userRole, setUserRole] = useState(null);
+  const [userRole, setUserRole] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   
   // Student demographic data
-  const [studentDemographicData, setStudentDemographicData] = useState({
+  const [studentDemographicData, setStudentDemographicData] = useState<StudentDemographicData>({
     age: '',
-    sex: null,
-    CC1: null,
-    CC2: null,
-    CC3: null
+    sex: undefined,
+    CC1: undefined,
+    CC2: undefined,
+    CC3: undefined
   });
   
   // MSME demographic data
-  const [msmeDemographicData, setMsmeDemographicData] = useState({
-    clientType: null,
-    sex: null,
+  const [msmeDemographicData, setMsmeDemographicData] = useState<MsmeDemographicData>({
+    clientType: undefined,
+    sex: undefined,
     age: '',
     region: '',
     office: '',
     serviceAvailed: [],
     otherService: '',
-    CC1: null,
-    CC2: null,
-    CC3: null
+    CC1: undefined,
+    CC2: undefined,
+    CC3: undefined
   });
   
   const [customerFormData, setCustomerFormData] = useState(
-    Object.fromEntries(SURVEY_QUESTIONS.customer.map((_, i) => [`Q${i + 1}`, null]))
+    Object.fromEntries(SURVEY_QUESTIONS.customer.map((_, i) => [`Q${i + 1}`, undefined]))
   );
-  
+
   const [employeeFormData, setEmployeeFormData] = useState(
-    Object.fromEntries(SURVEY_QUESTIONS.employee.map((_, i) => [`E${i + 1}`, null]))
+    Object.fromEntries(SURVEY_QUESTIONS.employee.map((_, i) => [`E${i + 1}`, undefined]))
   );
 
   useEffect(() => {
@@ -133,7 +155,7 @@ const SurveyForm = () => {
     setMsmeDemographicData(prev => ({ ...prev, [question]: value }));
   };
 
-  const handleCheckboxChange = (service: string, checked: string | boolean) => {
+  const handleCheckboxChange = (service: string, checked: boolean) => {
     setMsmeDemographicData(prev => {
       if (checked) {
         return { ...prev, serviceAvailed: [...prev.serviceAvailed, service] };
@@ -151,7 +173,7 @@ const SurveyForm = () => {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const demographicData = userRole === 'MSME' ? msmeDemographicData : studentDemographicData;
     
@@ -164,7 +186,7 @@ const SurveyForm = () => {
     });
   };
 
-  const renderRatingScale = (question: string | number | bigint | boolean | React.ReactElement<any, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | Promise<React.AwaitedReactNode> | null | undefined, questionKey: React.Key | null | undefined, value: string | null | undefined) => {
+  const renderRatingScale = (question: React.ReactNode, questionKey: string, value: string | undefined) => {
     const options = formType === 'customer' ? CUSTOMER_RATING_OPTIONS : EMPLOYEE_RATING_OPTIONS;
     return (
       <div key={questionKey} className="mb-8 bg-white p-6 rounded-xl shadow-lg hover:shadow-blue-300/50 transition-all duration-300">
@@ -367,9 +389,10 @@ const SurveyForm = () => {
                   <Checkbox 
                     id={`service-${service}`} 
                     checked={msmeDemographicData.serviceAvailed.includes(service)}
-                    onCheckedChange={(checked) => handleCheckboxChange(service, checked)}
+                    onCheckedChange={(checked) => handleCheckboxChange(service, checked === true)}
                     className="mt-1 text-[#193d83] border-[#5e86ca]"
                   />
+
                   <Label htmlFor={`service-${service}`} className="font-poppins1 text-gray-600">{service}</Label>
                 </div>
               ))}
@@ -378,10 +401,10 @@ const SurveyForm = () => {
                 <Checkbox 
                   id="service-others" 
                   checked={msmeDemographicData.serviceAvailed.includes("Others")}
-                  onCheckedChange={(checked) => handleCheckboxChange("Others", checked)}
+                  onCheckedChange={(checked) => handleCheckboxChange("Others", checked === true)}
                   className="mt-1 text-[#193d83] border-[#5e86ca]"
                 />
-                <div className="flex flex-col">
+              <div className="flex flex-col">
                   <Label htmlFor="service-others" className="font-poppins1 text-gray-600">Others (Please specify):</Label>
                   {msmeDemographicData.serviceAvailed.includes("Others") && (
                     <Input 

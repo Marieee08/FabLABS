@@ -19,6 +19,12 @@ export async function GET() {
   }
 
   try {
+    // Get user's email
+    const email = user.emailAddresses[0].emailAddress;
+    
+    // Check if the email belongs to PSHS domain
+    const isStudentEmail = email.endsWith('@evc.pshs.edu.ph');
+    
     // Try to find existing user
     let dbUser = await prisma.accInfo.findUnique({ 
       where: { clerkId: user.id },
@@ -30,10 +36,13 @@ export async function GET() {
         data: {
           clerkId: user.id,
           Name: `${user.firstName} ${user.lastName}`, 
-          email: user.emailAddresses[0].emailAddress,
+          email: email,
+          // Automatically assign STUDENT role if email matches pattern
+          Role: isStudentEmail ? 'STUDENT' : undefined,
         },
       });
     }
+    
 
     // Redirect to dashboard after successful sync
     return new NextResponse(null, {

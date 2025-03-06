@@ -364,7 +364,7 @@ model EmployeeEvaluation {
 // Unified satisfaction survey model replacing ClientSatisfaction and CitizenSatisfaction
 model SatisfactionSurvey {
   id          Int      @id @default(autoincrement())
-  userRole    String   // "STUDENT", "MSME", "CITIZEN", etc.
+  userRole    String   // "STUDENT", "MSME" etc.
   
   // Demographic data (linked to PreliminarySurvey but can be updated)
   sex         String?
