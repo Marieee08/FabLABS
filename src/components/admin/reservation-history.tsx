@@ -194,7 +194,10 @@ const ReservationHistory = () => {
   }
 
 
-  const handleStatusUpdate = async (reservationId: number, newStatus: 'Approved' | 'Cancelled') => {
+  const handleStatusUpdate = async (
+    reservationId: number, 
+    newStatus: 'Approved' | 'Cancelled' | 'Pending payment' | 'Completed'
+  ) => {
     try {
       const response = await fetch(`/api/admin/reservation-status/${reservationId}`, {
         method: 'PUT',
@@ -342,7 +345,7 @@ const ReservationHistory = () => {
               <TableCell>{reservation.role}</TableCell>
               <TableCell>{reservation.service}</TableCell>
               <TableCell>
-                ₱{formatCurrency(reservation.totalAmount)}
+                  ₱{reservation.totalAmount !== undefined ? formatCurrency(reservation.totalAmount) : '0.00'}
               </TableCell>
               <TableCell>
                 <DropdownMenu>

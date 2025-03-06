@@ -61,6 +61,18 @@ const getStatusColor = (status: string) => {
   }
 };
 
+const formatCurrency = (amount: number | string | null | undefined): string => {
+  if (amount === null || amount === undefined) return '0.00';
+  
+  // Convert to number if it's a string
+  const numericAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+  
+  // Check if it's a valid number after conversion
+  if (typeof numericAmount !== 'number' || isNaN(numericAmount)) return '0.00';
+  
+  return numericAmount.toFixed(2);
+};
+
 const HistoryPage = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [reservations, setReservations] = useState<DetailedReservation[]>([]);
@@ -189,7 +201,7 @@ const HistoryPage = () => {
                         <td className="px-6 py-4">{new Date(reservation.PaymentDate!).toLocaleDateString()}</td>
                         <td className="px-6 py-4">{reservation.accInfo.Name}</td>
                         <td className="px-6 py-4">{reservation.ReceiptNumber}</td>
-                        <td className="px-6 py-4">₱{reservation.TotalAmntDue?.toFixed(2)}</td>
+                        <td className="px-6 py-4">₱{formatCurrency(reservation.TotalAmntDue)}</td>
                         <td className="px-6 py-4">
                           <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(reservation.Status)}`}>
                             {reservation.Status}
@@ -254,7 +266,7 @@ const HistoryPage = () => {
                     <div className="mt-2 bg-gray-50 p-4 rounded-lg">
                       <p className="flex justify-between">
                         <span className="text-gray-600">Total Amount:</span>
-                        <span className="font-medium">₱{selectedReservation.TotalAmntDue?.toFixed(2)}</span>
+                        <span className="font-medium">₱{formatCurrency(selectedReservation.TotalAmntDue)}</span>
                       </p>
                       {selectedReservation.BulkofCommodity && (
                         <p className="flex justify-between mt-2">
@@ -275,7 +287,7 @@ const HistoryPage = () => {
                           <p><span className="text-gray-600">Service:</span> {service.ServiceAvail}</p>
                           <p><span className="text-gray-600">Equipment:</span> {service.EquipmentAvail}</p>
                           <p><span className="text-gray-600">Duration:</span> {service.MinsAvail} minutes</p>
-                          <p><span className="text-gray-600">Cost:</span> ₱{service.CostsAvail?.toFixed(2) || '0.00'}</p>
+                          <p><span className="text-gray-600">Cost:</span>₱{formatCurrency(service.CostsAvail)}</p>
                         </div>
                       ))}
                     </div>
