@@ -1,6 +1,7 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useUser, UserButton } from "@clerk/nextjs";
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import {
   LineChart,
@@ -10,8 +11,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  BarChart,
-  Bar,
   PieChart,
   Pie,
   Cell
@@ -25,7 +24,32 @@ const DashboardAdmin = () => {
   const [orderDropdownOpen, setOrderDropdownOpen] = useState(false);
   const today = new Date();
   const formattedDate = format(today, 'EEEE, dd MMMM yyyy');
+  const { user, isLoaded } = useUser();
+  const [userRole, setUserRole] = useState("Loading...");
 
+  // useEffect to get user role
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      if (!isLoaded || !user) {
+        setUserRole("Not logged in");
+        return;
+      }
+  
+      try {
+        const response = await fetch('/api/auth/check-roles');
+        if (!response.ok) {
+          throw new Error('Failed to fetch role');
+        }
+        const data = await response.json();
+        setUserRole(data.role || "No role assigned");
+      } catch (error) {
+        console.error("Error fetching user role:", error);
+        setUserRole("Error fetching role");
+      }
+    };
+  
+    fetchUserRole();
+  }, [user, isLoaded]);
 
   const reservationTrendsData = [
     { month: 'Jan', reservations: 40 },
@@ -62,9 +86,19 @@ const DashboardAdmin = () => {
           </div>
           <nav className="mt-5 py-4 px-4 lg:mt-9 lg:px-6">
           <div className="flex flex-col items-center py-8">
-          <span className="h-36 w-36 rounded-full bg-gray-300 mb-2"></span>
-            <h2 className="text-white text-xl font-bold">Username</h2>
-            <p className="text-[#5e86ca]">Admin</p>
+              {user?.imageUrl ? (
+                <img 
+                  src={user.imageUrl} 
+                  alt="Profile" 
+                  className="h-36 w-36 rounded-full object-cover mb-2"
+                />
+              ) : (
+                <span className="h-36 w-36 rounded-full bg-gray-600 mb-2"></span>
+              )}
+              <h2 className="text-white text-xl font-bold">
+                {user?.firstName} {user?.lastName}
+              </h2>
+              <p className="text-[#5e86ca]">{userRole}</p>
           </div>
             <div>
               <h3 className="mb-4 ml-4 text-sm font-semibold text-gray-400">MENU</h3>
@@ -103,7 +137,12 @@ const DashboardAdmin = () => {
                       </Link>
                     </li>
                     <li className="ml-6">
-                      <Link href="/admin-dashboard/history" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-400 hover:text-white">
+                      <Link href="/admin-dashboard/machines" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-400 hover:text-white">
+                        Machines
+                      </Link>
+                    </li>
+                    <li className="ml-6">
+                      <Link href="/admin-dashboard/users" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-400 hover:text-white">
                         Users
                       </Link>
                     </li>
@@ -114,24 +153,10 @@ const DashboardAdmin = () => {
                     Reports
                   </Link>
                 </li>
-                <li>
-                  <Link href="/admin-dashboard/profile" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-white border border-transparent hover:bg-[#1c2a52] hover:border-[#5e86ca]">
-                    Profile
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/admin-dashboard" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-white border border-transparent hover:bg-[#1c2a52] hover:border-[#5e86ca]">
-                    Settings
-                  </Link>
-                </li>
               </ul>
             </div>
           </nav>
         </aside>
-
-
-
-
 
 
         {/* Main Content */}
@@ -169,11 +194,7 @@ const DashboardAdmin = () => {
               </div>
               <div className="flex items-center gap-3 2xsm:gap-7">
                 <Link href="#" className="flex items-center gap-4">
-                  <span className="hidden text-right lg:block">
-                    <span className="block text-sm font-medium text-black">Ashkinaz Canonoy</span>
-                    <span className="block text-xs">Student</span>
-                  </span>
-                  <span className="h-12 w-12 rounded-full bg-gray-300"></span>
+                  <UserButton showName> </UserButton>
                 </Link>
               </div>
             </div>
@@ -197,9 +218,6 @@ const DashboardAdmin = () => {
                 </CardContent>
               </Card>
 
-
-
-
               <Card className="bg-white shadow-sm transform hover:scale-105 transition-all duration-300 border border-[#5e86ca]">
                 <CardHeader>
                   <CardTitle>Past Reservations</CardTitle>
@@ -209,9 +227,6 @@ const DashboardAdmin = () => {
                   <p className="text-sm text-[#143370]">Last 30 Days</p>
                 </CardContent>
               </Card>
-
-
-
 
               <Card className="bg-white shadow-sm transform hover:scale-105 transition-all duration-300 border border-[#5e86ca]">
                 <CardHeader>

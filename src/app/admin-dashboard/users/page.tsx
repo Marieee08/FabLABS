@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import UserManagement from '@/components/admin/user-management';
 import { format } from 'date-fns';
-import { useUser } from "@clerk/nextjs";
+import { useUser, UserButton } from "@clerk/nextjs";
 import RoleGuard from '@/components/auth/role-guard';
 
 
@@ -118,16 +118,6 @@ const DashboardAdmin = () => {
                     Reports
                   </Link>
                 </li>
-                <li>
-                  <Link href="/admin-dashboard/profile" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-white border border-transparent hover:bg-[#1c2a52] hover:border-[#5e86ca]">
-                    Profile
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/admin-dashboard" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-white border border-transparent hover:bg-[#1c2a52] hover:border-[#5e86ca]">
-                    Settings
-                  </Link>
-                </li>
               </ul>
             </div>
           </nav>
@@ -173,21 +163,7 @@ const DashboardAdmin = () => {
               </div>
                 <div className="flex items-center gap-3 2xsm:gap-7">
                 <Link href="#" className="flex items-center gap-4">
-                  <span className="hidden text-right lg:block">
-                    <span className="block text-sm font-medium text-black">
-                      {user?.firstName} {user?.lastName || ''}
-                    </span>
-                    <span className="block text-xs">{userRole}</span>
-                  </span>
-                  {user?.imageUrl ? (
-                    <img 
-                      src={user.imageUrl} 
-                      alt="Profile" 
-                      className="h-12 w-12 rounded-full object-cover"
-                    />
-                  ) : (
-                    <span className="h-12 w-12 rounded-full bg-gray-300"></span>
-                  )}
+                <UserButton showName> </UserButton>
                 </Link>
               </div>
             </div>
