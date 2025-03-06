@@ -1,571 +1,293 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
+import { useRouter } from 'next/navigation';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { toast } from '@/components/ui/use-toast';
 
-// Type definitions for our form data
-interface StudentDemographicData {
-  age: string;
-  sex: string | undefined;
-  CC1: string | undefined;
-  CC2: string | undefined;
-  CC3: string | undefined;
+interface UserService {
+  id: string;
+  ServiceAvail: string;
+  EquipmentAvail: string;
 }
 
-interface MsmeDemographicData {
-  clientType: string | undefined;
-  sex: string | undefined;
-  age: string;
-  region: string;
-  office: string;
-  serviceAvailed: string[];
-  otherService: string;
-  CC1: string | undefined;
-  CC2: string | undefined;
-  CC3: string | undefined;
+interface DetailedReservation {
+  id: number;
+  Status: string;
+  RequestDate: string;
+  TotalAmntDue: number | null;
+  UserServices: UserService[];
+  accInfo: {
+    Name: string;
+  };
 }
 
-
-const SURVEY_QUESTIONS = {
-  customer: [
-    "SQD0. I am satisfied with the services that I availed.",
-    "SQD1. I spent reasonable amount of time for my transaction.",
-    "SQD2. The office followed the transaction's requirements and steps based on the information provided.",
-    "SQD3. The steps (including payment) I needed to do for my transaction were easy and simple.",
-    "SQD4. I easily found information about my transaction from the office's website.",
-    "SQD5. I paid a reasonable amount of fees for my transaction. (If service was free, mark the N/A column)",
-    "SQD6. I am confident my transaction was secure.",
-    "SQD7. The office's support was available, and (if asked questions) support was quick to respond.",
-    "SQD8. I got what I needed from the government office, or (if denied) denial of request was sufficiently explained to me."
-  ],
-  employee: [
-    "Technical know-how on the given tasks at hand assigned (technical skills)",
-    "Attitude in working with a team (teamwork)",
-    "Works to full potential",
-    "Quality of work",
-    "Communication",
-    "Independent work",
-    "Takes initiative",
-    "Productivity and creativity",
-    "Honesty and integrity",
-    "Punctuality and attendance",
-    "SSF Personnel management and assistance while you are using the services of the SSF/ Client relations",
-    "SSF personnel's professionalism and aptitude",
-    "The facility's responsiveness in processing your request",
-    "Cleanliness and orderliness of the facility",
-    "Rate (charge) of the services of the SSF",
-    "Performance (efficiency and quality of products produced) of the machineries and equipment",
-    "Quality of the tools used"
-  ]
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case 'Paid':
+      return 'bg-purple-100 text-purple-800';
+    case 'Completed':
+      return 'bg-green-100 text-green-800';
+    default:
+      return 'bg-gray-100 text-gray-800';
+  }
 };
 
-const CUSTOMER_RATING_OPTIONS = ["Strongly Agree", "Agree", "Neutral", "Disagree", "Strongly Disagree", "N/A"];
-const EMPLOYEE_RATING_OPTIONS = ["Excellent", "Good", "Fair", "Poor"];
-const SEX_OPTIONS = ["Male", "Female"];
-const CLIENT_TYPE_OPTIONS = ["Citizen", "Business", "Government (Employee or another agency)"];
-const SERVICE_OPTIONS = [
-  "Application for Incoming Grade 7 Students",
-  "Freshmen Enrollment",
-  "Application for Incoming Grade 8 and Grade 9 Transfer Student",
-  "Processing of request for School credentials (alumni)",
-  "Others"
-];
-const CC1_OPTIONS = [
-  "1. I know what a CC is and I saw this office's CC.",
-  "2. I know what a CC but I did NOT see this office's CC.",
-  "3. I learned of the CC only when I saw this office's CC.",
-  "4. I do not know what a CC is and I did not see one in this office. (Answer 'NA' on CC2 and CC3)"
-];
-const CC2_OPTIONS = [
-  "1. Easy to see", 
-  "2. Somewhat easy to see", 
-  "3. Difficult to see", 
-  "4. Not visible at all",
-  "5. N/A"
-];
-const CC3_OPTIONS = [
-  "1. Helped very much", 
-  "2. Somewhat helped", 
-  "3. Did not help", 
-  "4. N/A"
-];
-
-const SurveyForm = () => {
-  const [formType, setFormType] = useState('preliminary');
-  const [userRole, setUserRole] = useState<string | undefined>(undefined);
+const SimpleSurveyDashboard = () => {
+  const router = useRouter();
+  const [reservations, setReservations] = useState<DetailedReservation[]>([]);
+  const [selectedReservation, setSelectedReservation] = useState<DetailedReservation | null>(null);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  
-  // Student demographic data
-  const [studentDemographicData, setStudentDemographicData] = useState<StudentDemographicData>({
-    age: '',
-    sex: undefined,
-    CC1: undefined,
-    CC2: undefined,
-    CC3: undefined
-  });
-  
-  // MSME demographic data
-  const [msmeDemographicData, setMsmeDemographicData] = useState<MsmeDemographicData>({
-    clientType: undefined,
-    sex: undefined,
-    age: '',
-    region: '',
-    office: '',
-    serviceAvailed: [],
-    otherService: '',
-    CC1: undefined,
-    CC2: undefined,
-    CC3: undefined
-  });
-  
-  const [customerFormData, setCustomerFormData] = useState(
-    Object.fromEntries(SURVEY_QUESTIONS.customer.map((_, i) => [`Q${i + 1}`, undefined]))
-  );
-
-  const [employeeFormData, setEmployeeFormData] = useState(
-    Object.fromEntries(SURVEY_QUESTIONS.employee.map((_, i) => [`E${i + 1}`, undefined]))
-  );
 
   useEffect(() => {
-    const fetchUserRole = async () => {
+    const fetchReservations = async () => {
       try {
-        const response = await fetch('/api/auth/check-roles');
+        // Fetch only paid reservations
+        const response = await fetch('/api/survey/paid-reservations');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch reservations');
+        }
+        
         const data = await response.json();
-        setUserRole(data.role);
+        setReservations(data);
         setIsLoading(false);
       } catch (error) {
-        console.error('Error fetching user role:', error);
+        console.error('Error fetching reservations:', error);
+        // For demo purposes, we'll create some sample data if the API fails
+        setReservations([
+          {
+            id: 1001,
+            Status: 'Paid',
+            RequestDate: '2025-03-01T10:00:00Z',
+            TotalAmntDue: 1500.00,
+            UserServices: [
+              {
+                id: 's1',
+                ServiceAvail: '3D Printing',
+                EquipmentAvail: 'Prusa i3 MK3'
+              }
+            ],
+            accInfo: {
+              Name: 'John Smith'
+            }
+          },
+          {
+            id: 1002,
+            Status: 'Paid',
+            RequestDate: '2025-03-03T15:30:00Z',
+            TotalAmntDue: 2200.00,
+            UserServices: [
+              {
+                id: 's2',
+                ServiceAvail: 'Laser Cutting',
+                EquipmentAvail: 'Epilog Fusion Pro'
+              },
+              {
+                id: 's3',
+                ServiceAvail: 'CNC Milling',
+                EquipmentAvail: 'Shapeoko 4'
+              }
+            ],
+            accInfo: {
+              Name: 'Maria Garcia'
+            }
+          }
+        ]);
         setIsLoading(false);
       }
     };
 
-    fetchUserRole();
+    fetchReservations();
   }, []);
 
-  const handleStudentInputChange = (question: string, value: string) => {
-    setStudentDemographicData(prev => ({ ...prev, [question]: value }));
+  const handleViewDetails = (reservation: DetailedReservation) => {
+    setSelectedReservation(reservation);
+    setIsReviewModalOpen(true);
   };
 
-  const handleMsmeInputChange = (question: string, value: string) => {
-    setMsmeDemographicData(prev => ({ ...prev, [question]: value }));
+  const handleStartSurvey = (reservationId: number) => {
+    // Navigate to the survey questionnaire with the reservation ID
+    router.push(`/survey/questionnaire?reservationId=${reservationId}`);
   };
 
-  const handleCheckboxChange = (service: string, checked: boolean) => {
-    setMsmeDemographicData(prev => {
-      if (checked) {
-        return { ...prev, serviceAvailed: [...prev.serviceAvailed, service] };
-      } else {
-        return { ...prev, serviceAvailed: prev.serviceAvailed.filter(s => s !== service) };
+  // For simpler implementation, you could use this function to immediately mark as completed
+  const handleQuickComplete = async (reservationId: number) => {
+    try {
+      const response = await fetch('/api/survey/complete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          reservationId,
+          // Skip the survey data if you're implementing the simpler approach
+          skipSurvey: true
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to complete survey');
       }
-    });
-  };
-
-  const handleQuestionChange = (question: any, value: string) => {
-    if (formType === 'customer') {
-      setCustomerFormData(prev => ({ ...prev, [question]: value }));
-    } else if (formType === 'employee') {
-      setEmployeeFormData(prev => ({ ...prev, [question]: value }));
+      
+      // Remove this reservation from the local state
+      setReservations(reservations.filter(res => res.id !== reservationId));
+      
+      // Show success message
+      toast({
+        title: "Success",
+        description: "Survey marked as completed.",
+      });
+    } catch (error) {
+      console.error('Error completing survey:', error);
+      toast({
+        title: "Error",
+        description: "Failed to complete the survey.",
+        variant: "destructive",
+      });
     }
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const demographicData = userRole === 'MSME' ? msmeDemographicData : studentDemographicData;
-    
-    console.log('Form submitted:', {
-      type: formType,
-      role: userRole,
-      date: new Date(),
-      demographics: demographicData,
-      data: formType === 'customer' ? customerFormData : employeeFormData
-    });
-  };
-
-  const renderRatingScale = (question: React.ReactNode, questionKey: string, value: string | undefined) => {
-    const options = formType === 'customer' ? CUSTOMER_RATING_OPTIONS : EMPLOYEE_RATING_OPTIONS;
-    return (
-      <div key={questionKey} className="mb-8 bg-white p-6 rounded-xl shadow-lg hover:shadow-blue-300/50 transition-all duration-300">
-        <Label className="block mb-4 font-qanelas2 text-lg text-gray-700">{question}</Label>
-        <RadioGroup className="flex space-x-6" value={value} onValueChange={(val) => handleQuestionChange(questionKey, val)}>
-          {options.map((option) => (
-            <div key={option} className="flex items-center space-x-2">
-              <RadioGroupItem value={option} id={`${questionKey}-${option}`} className="text-[#193d83] border-[#5e86ca]" />
-              <Label htmlFor={`${questionKey}-${option}`} className="font-poppins1 text-gray-600">{option}</Label>
-            </div>
-          ))}
-        </RadioGroup>
-      </div>
-    );
-  };
-
-  const renderStudentPreliminarySection = () => {
-    return (
-      <>
-        <div className="mb-8 bg-white p-6 rounded-xl shadow-lg hover:shadow-blue-300/50 transition-all duration-300">
-          <Label htmlFor="age" className="block mb-4 font-qanelas2 text-lg text-gray-700">Age</Label>
-          <Input 
-            id="age" 
-            type="number" 
-            min="0" 
-            max="120" 
-            placeholder="Enter your age" 
-            value={studentDemographicData.age} 
-            onChange={(e) => handleStudentInputChange('age', e.target.value)}
-            className="w-full max-w-xs border-[#5e86ca] focus:ring-[#193d83]"
-          />
-        </div>
-        
-        <div className="mb-8 bg-white p-6 rounded-xl shadow-lg hover:shadow-blue-300/50 transition-all duration-300">
-          <Label className="block mb-4 font-qanelas2 text-lg text-gray-700">Sex</Label>
-          <RadioGroup 
-            className="flex space-x-6" 
-            value={studentDemographicData.sex} 
-            onValueChange={(val) => handleStudentInputChange('sex', val)}
-          >
-            {SEX_OPTIONS.map((option) => (
-              <div key={option} className="flex items-center space-x-2">
-                <RadioGroupItem value={option} id={`sex-${option}`} className="text-[#193d83] border-[#5e86ca]" />
-                <Label htmlFor={`sex-${option}`} className="font-poppins1 text-gray-600">{option}</Label>
-              </div>
-            ))}
-          </RadioGroup>
-        </div>
-
-        {/* Citizen's Charter Section */}
-        <div className="mb-8 bg-white p-6 rounded-xl shadow-lg hover:shadow-blue-300/50 transition-all duration-300">
-          <div className="mb-4 p-4 bg-gray-50 rounded border border-gray-200">
-            <p className="font-qanelas2 text-sm text-gray-700">
-              <strong>INSTRUCTIONS:</strong> Check mark (✓) your answer to the Citizen's Charter (CC) questions. The Citizen's Charter is an 
-              official document that reflects the services of a government agency/office including its requirements, fees, and processing 
-              times among others.
-            </p>
-          </div>
-          
-          <div className="mb-6">
-            <Label className="block mb-3 font-qanelas2 text-lg text-gray-700">CC1: Which of the following best describes your awareness of a CC?</Label>
-            <RadioGroup 
-              className="space-y-2" 
-              value={studentDemographicData.CC1} 
-              onValueChange={(val) => handleStudentInputChange('CC1', val)}
-            >
-              {CC1_OPTIONS.map((option) => (
-                <div key={option} className="flex items-start space-x-2">
-                  <RadioGroupItem value={option} id={`CC1-${option}`} className="mt-1 text-[#193d83] border-[#5e86ca]" />
-                  <Label htmlFor={`CC1-${option}`} className="font-poppins1 text-gray-600">{option}</Label>
-                </div>
-              ))}
-            </RadioGroup>
-          </div>
-          
-          <div className="mb-6">
-            <Label className="block mb-3 font-qanelas2 text-lg text-gray-700">CC2: If aware of CC (answered 1-3 in CC1), would you say that the CC of this office was...?</Label>
-            <RadioGroup 
-              className="flex flex-wrap gap-4" 
-              value={studentDemographicData.CC2} 
-              onValueChange={(val) => handleStudentInputChange('CC2', val)}
-            >
-              {CC2_OPTIONS.map((option) => (
-                <div key={option} className="flex items-center space-x-2">
-                  <RadioGroupItem value={option} id={`CC2-${option}`} className="text-[#193d83] border-[#5e86ca]" />
-                  <Label htmlFor={`CC2-${option}`} className="font-poppins1 text-gray-600">{option}</Label>
-                </div>
-              ))}
-            </RadioGroup>
-          </div>
-          
-          <div className="mb-2">
-            <Label className="block mb-3 font-qanelas2 text-lg text-gray-700">CC3: If aware of CC (answered codes 1-3 in CC1), how much did the CC help you in your transaction?</Label>
-            <RadioGroup 
-              className="flex flex-wrap gap-4" 
-              value={studentDemographicData.CC3} 
-              onValueChange={(val) => handleStudentInputChange('CC3', val)}
-            >
-              {CC3_OPTIONS.map((option) => (
-                <div key={option} className="flex items-center space-x-2">
-                  <RadioGroupItem value={option} id={`CC3-${option}`} className="text-[#193d83] border-[#5e86ca]" />
-                  <Label htmlFor={`CC3-${option}`} className="font-poppins1 text-gray-600">{option}</Label>
-                </div>
-              ))}
-            </RadioGroup>
-          </div>
-        </div>
-      </>
-    );
-  };
-
-  const renderMsmePreliminarySection = () => {
-    return (
-      <>
-        <div className="mb-8 bg-white p-6 rounded-xl shadow-lg hover:shadow-blue-300/50 transition-all duration-300">
-          <div className="mb-4">
-            <p className="font-qanelas2 text-sm text-gray-700 mb-4">
-              This Client Satisfaction Measurement (CSM) tracks the customer experience of Philippine Science High School. Your
-              feedback on your recently concluded transaction will help us provide better services. Personal information shared will be
-              kept confidential and you always have the option not to answer this form.
-            </p>
-          </div>
-
-          <div className="mb-6">
-            <Label className="block mb-3 font-qanelas2 text-lg text-gray-700">Client type:</Label>
-            <RadioGroup 
-              className="flex flex-wrap gap-4" 
-              value={msmeDemographicData.clientType} 
-              onValueChange={(val) => handleMsmeInputChange('clientType', val)}
-            >
-              {CLIENT_TYPE_OPTIONS.map((option) => (
-                <div key={option} className="flex items-center space-x-2">
-                  <RadioGroupItem value={option} id={`clientType-${option}`} className="text-[#193d83] border-[#5e86ca]" />
-                  <Label htmlFor={`clientType-${option}`} className="font-poppins1 text-gray-600">{option}</Label>
-                </div>
-              ))}
-            </RadioGroup>
-          </div>
-
-          <div className="mb-6">
-            <Label className="block mb-3 font-qanelas2 text-lg text-gray-700">Sex:</Label>
-            <RadioGroup 
-              className="flex space-x-6" 
-              value={msmeDemographicData.sex} 
-              onValueChange={(val) => handleMsmeInputChange('sex', val)}
-            >
-              {SEX_OPTIONS.map((option) => (
-                <div key={option} className="flex items-center space-x-2">
-                  <RadioGroupItem value={option} id={`msme-sex-${option}`} className="text-[#193d83] border-[#5e86ca]" />
-                  <Label htmlFor={`msme-sex-${option}`} className="font-poppins1 text-gray-600">{option}</Label>
-                </div>
-              ))}
-            </RadioGroup>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div>
-              <Label htmlFor="msme-age" className="block mb-3 font-qanelas2 text-lg text-gray-700">Age:</Label>
-              <Input 
-                id="msme-age" 
-                type="number" 
-                min="0" 
-                max="120" 
-                placeholder="Enter your age" 
-                value={msmeDemographicData.age} 
-                onChange={(e) => handleMsmeInputChange('age', e.target.value)}
-                className="w-full border-[#5e86ca] focus:ring-[#193d83]"
-              />
-            </div>
-            <div>
-              <Label htmlFor="region" className="block mb-3 font-qanelas2 text-lg text-gray-700">Region of residence:</Label>
-              <Input 
-                id="region" 
-                type="text"
-                placeholder="Enter your region" 
-                value={msmeDemographicData.region} 
-                onChange={(e) => handleMsmeInputChange('region', e.target.value)}
-                className="w-full border-[#5e86ca] focus:ring-[#193d83]"
-              />
-            </div>
-          </div>
-
-          <div className="mb-6">
-            <Label htmlFor="office" className="block mb-3 font-qanelas2 text-lg text-gray-700">Office where the service was availed:</Label>
-            <Input 
-              id="office" 
-              type="text"
-              placeholder="Enter office name" 
-              value={msmeDemographicData.office} 
-              onChange={(e) => handleMsmeInputChange('office', e.target.value)}
-              className="w-full border-[#5e86ca] focus:ring-[#193d83]"
-            />
-          </div>
-
-          <div className="mb-6">
-            <Label className="block mb-3 font-qanelas2 text-lg text-gray-700">Service Availed (please check):</Label>
-            <div className="space-y-2">
-              {SERVICE_OPTIONS.slice(0, -1).map((service) => (
-                <div key={service} className="flex items-start space-x-2">
-                  <Checkbox 
-                    id={`service-${service}`} 
-                    checked={msmeDemographicData.serviceAvailed.includes(service)}
-                    onCheckedChange={(checked) => handleCheckboxChange(service, checked === true)}
-                    className="mt-1 text-[#193d83] border-[#5e86ca]"
-                  />
-
-                  <Label htmlFor={`service-${service}`} className="font-poppins1 text-gray-600">{service}</Label>
-                </div>
-              ))}
-              
-              <div className="flex items-start space-x-2">
-                <Checkbox 
-                  id="service-others" 
-                  checked={msmeDemographicData.serviceAvailed.includes("Others")}
-                  onCheckedChange={(checked) => handleCheckboxChange("Others", checked === true)}
-                  className="mt-1 text-[#193d83] border-[#5e86ca]"
-                />
-              <div className="flex flex-col">
-                  <Label htmlFor="service-others" className="font-poppins1 text-gray-600">Others (Please specify):</Label>
-                  {msmeDemographicData.serviceAvailed.includes("Others") && (
-                    <Input 
-                      id="otherService" 
-                      type="text" 
-                      placeholder="Specify other service" 
-                      value={msmeDemographicData.otherService} 
-                      onChange={(e) => handleMsmeInputChange('otherService', e.target.value)}
-                      className="mt-2 w-full border-[#5e86ca] focus:ring-[#193d83]"
-                    />
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Citizen's Charter Section */}
-        <div className="mb-8 bg-white p-6 rounded-xl shadow-lg hover:shadow-blue-300/50 transition-all duration-300">
-          <div className="mb-4 p-4 bg-gray-50 rounded border border-gray-200">
-            <p className="font-qanelas2 text-sm text-gray-700">
-              <strong>INSTRUCTIONS:</strong> Check mark (✓) your answer to the Citizen's Charter (CC) questions. The Citizen's Charter is an 
-              official document that reflects the services of a government agency/office including its requirements, fees, and processing 
-              times among others.
-            </p>
-          </div>
-          
-          <div className="mb-6">
-            <Label className="block mb-3 font-qanelas2 text-lg text-gray-700">CC1: Which of the following best describes your awareness of a CC?</Label>
-            <RadioGroup 
-              className="space-y-2" 
-              value={msmeDemographicData.CC1} 
-              onValueChange={(val) => handleMsmeInputChange('CC1', val)}
-            >
-              {CC1_OPTIONS.map((option) => (
-                <div key={option} className="flex items-start space-x-2">
-                  <RadioGroupItem value={option} id={`msme-CC1-${option}`} className="mt-1 text-[#193d83] border-[#5e86ca]" />
-                  <Label htmlFor={`msme-CC1-${option}`} className="font-poppins1 text-gray-600">{option}</Label>
-                </div>
-              ))}
-            </RadioGroup>
-          </div>
-          
-          <div className="mb-6">
-            <Label className="block mb-3 font-qanelas2 text-lg text-gray-700">CC2: If aware of CC (answered 1-3 in CC1), would you say that the CC of this office was...?</Label>
-            <RadioGroup 
-              className="flex flex-wrap gap-4" 
-              value={msmeDemographicData.CC2} 
-              onValueChange={(val) => handleMsmeInputChange('CC2', val)}
-            >
-              {CC2_OPTIONS.map((option) => (
-                <div key={option} className="flex items-center space-x-2">
-                  <RadioGroupItem value={option} id={`msme-CC2-${option}`} className="text-[#193d83] border-[#5e86ca]" />
-                  <Label htmlFor={`msme-CC2-${option}`} className="font-poppins1 text-gray-600">{option}</Label>
-                </div>
-              ))}
-            </RadioGroup>
-          </div>
-          
-          <div className="mb-2">
-            <Label className="block mb-3 font-qanelas2 text-lg text-gray-700">CC3: If aware of CC (answered codes 1-3 in CC1), how much did the CC help you in your transaction?</Label>
-            <RadioGroup 
-              className="flex flex-wrap gap-4" 
-              value={msmeDemographicData.CC3} 
-              onValueChange={(val) => handleMsmeInputChange('CC3', val)}
-            >
-              {CC3_OPTIONS.map((option) => (
-                <div key={option} className="flex items-center space-x-2">
-                  <RadioGroupItem value={option} id={`msme-CC3-${option}`} className="text-[#193d83] border-[#5e86ca]" />
-                  <Label htmlFor={`msme-CC3-${option}`} className="font-poppins1 text-gray-600">{option}</Label>
-                </div>
-              ))}
-            </RadioGroup>
-          </div>
-        </div>
-      </>
-    );
-  };
-
-  const renderCustomerSection = () => {
-    return (
-      <>
-        <div className="mb-6 p-4 bg-gray-50 rounded border border-gray-200">
-          <p className="font-qanelas2 text-sm text-gray-700">
-            <strong>INSTRUCTIONS:</strong> For SQD 0-8, please choose the option that best corresponds to your answer.
-          </p>
-        </div>
-        
-        {SURVEY_QUESTIONS.customer.map((question, index) => (
-          renderRatingScale(question, `Q${index + 1}`, customerFormData[`Q${index + 1}`])
-        ))}
-      </>
-    );
   };
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <p className="text-xl text-gray-600">Loading survey...</p>
+      <div className="flex justify-center items-center min-h-screen bg-gray-50">
+        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"/>
       </div>
     );
   }
 
   return (
-    <Card className="w-full max-w-3xl mx-auto bg-[#f4f8fc] border border-[#5e86ca] rounded-2xl">
-      <CardHeader className="space-y-6">
-        <CardTitle className="text-3xl font-qanelas2 text-[#0e4579]">
-          {formType === 'preliminary' 
-            ? 'Demographic Information' 
-            : formType === 'customer' 
-              ? 'Customer Feedback' 
-              : 'Employee Evaluation'}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {formType === 'preliminary' && userRole === 'STUDENT' && renderStudentPreliminarySection()}
-          
-          {formType === 'preliminary' && userRole === 'MSME' && renderMsmePreliminarySection()}
-          
-          {formType === 'customer' && renderCustomerSection()}
-          
-          {formType === 'employee' && SURVEY_QUESTIONS.employee.map((question, index) => (
-            renderRatingScale(question, `E${index + 1}`, employeeFormData[`E${index + 1}`])
-          ))}
-          
-          <div className="flex justify-between mt-8">
-            {formType === 'customer' && (
-              <Button onClick={() => setFormType('preliminary')} className="bg-white text-[#193d83] border border-[#5e86ca] hover:bg-blue-50 font-qanelas1">Back</Button>
-            )}
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-6xl mx-auto px-4">
+        <Card className="border-none shadow-md">
+          <CardHeader className="bg-[#143370] text-white rounded-t-lg">
+            <CardTitle className="text-2xl font-semibold">Available Surveys</CardTitle>
+          </CardHeader>
+          <CardContent className="p-6">
+            <p className="text-gray-600 mb-6">
+              The following services are ready for your feedback. Please select a service to begin the survey.
+            </p>
             
-            {formType === 'employee' && (
-              <Button onClick={() => setFormType('customer')} className="bg-white text-[#193d83] border border-[#5e86ca] hover:bg-blue-50 font-qanelas1">Back</Button>
+            {reservations.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500 text-lg">No pending surveys available at this time.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {reservations.map((reservation) => (
+                  <div 
+                    key={reservation.id} 
+                    className="bg-white rounded-lg shadow p-4 border border-gray-100 hover:border-blue-200 transition-all"
+                  >
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                      <div>
+                        <h3 className="font-semibold text-lg">{reservation.UserServices.map(s => s.ServiceAvail).join(', ')}</h3>
+                        <div className="flex flex-wrap gap-2 mt-1.5">
+                          <span className="text-gray-600 text-sm">
+                            {new Date(reservation.RequestDate).toLocaleDateString()}
+                          </span>
+                          <span className="text-gray-600 text-sm">•</span>
+                          <span className="text-gray-600 text-sm">{reservation.accInfo.Name}</span>
+                          <span className={`text-sm px-2 py-0.5 rounded-full ${getStatusColor(reservation.Status)}`}>
+                            {reservation.Status}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex gap-3 w-full md:w-auto">
+                        <Button 
+                          variant="outline" 
+                          className="text-blue-600 border-blue-200 hover:bg-blue-50 hover:text-blue-700 flex-1 md:flex-none"
+                          onClick={() => handleViewDetails(reservation)}
+                        >
+                          View Details
+                        </Button>
+                        <Button 
+                          className="bg-blue-600 text-white hover:bg-blue-700 flex-1 md:flex-none"
+                          onClick={() => handleStartSurvey(reservation.id)}
+                        >
+                          Start Survey
+                        </Button>
+                        
+                        {/* Uncomment this if you want the simpler approach */}
+                        {/* 
+                        <Button 
+                          className="bg-green-600 text-white hover:bg-green-700 flex-1 md:flex-none"
+                          onClick={() => handleQuickComplete(reservation.id)}
+                        >
+                          Mark Completed
+                        </Button>
+                        */}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Details Modal */}
+        <Dialog open={isReviewModalOpen} onOpenChange={setIsReviewModalOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-semibold">Reservation Details</DialogTitle>
+            </DialogHeader>
             
-            {formType === 'preliminary' && (
-              <Button 
-                onClick={() => setFormType('customer')} 
-                className="bg-[#193d83] text-white hover:bg-[#2f61c2] font-qanelas1"
-                disabled={
-                  userRole === 'STUDENT' 
-                    ? !studentDemographicData.age || !studentDemographicData.sex 
-                    : !msmeDemographicData.clientType || !msmeDemographicData.sex || !msmeDemographicData.age || msmeDemographicData.serviceAvailed.length === 0
-                }
-              >
-                Next
-              </Button>
+            {selectedReservation && (
+              <div className="space-y-4 mt-2">
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500">Customer</h3>
+                  <p className="mt-1 text-gray-900">{selectedReservation.accInfo.Name}</p>
+                </div>
+                
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500">Date</h3>
+                  <p className="mt-1 text-gray-900">{new Date(selectedReservation.RequestDate).toLocaleDateString()}</p>
+                </div>
+                
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500">Services</h3>
+                  <ul className="mt-1 space-y-1">
+                    {selectedReservation.UserServices.map((service, index) => (
+                      <li key={index} className="text-gray-900">
+                        {service.ServiceAvail} ({service.EquipmentAvail})
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500">Total Amount</h3>
+                  <p className="mt-1 text-gray-900">₱{selectedReservation.TotalAmntDue?.toFixed(2)}</p>
+                </div>
+                
+                <Separator />
+                
+                <div className="flex justify-end">
+                  <Button 
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    onClick={() => {
+                      setIsReviewModalOpen(false);
+                      handleStartSurvey(selectedReservation.id);
+                    }}
+                  >
+                    Proceed to Survey
+                  </Button>
+                </div>
+              </div>
             )}
-            
-            {formType === 'customer' && (
-              <Button onClick={() => setFormType('employee')} className="bg-[#193d83] text-white hover:bg-[#2f61c2] font-qanelas1">Next</Button>
-            )}
-            
-            {formType === 'employee' && (
-              <Button type="submit" className="bg-[#193d83] text-white hover:bg-[#2f61c2] font-qanelas1">Submit</Button>
-            )}
-          </div>
-        </form>
-      </CardContent>
-    </Card>
+          </DialogContent>
+        </Dialog>
+      </div>
+    </div>
   );
 };
 
-export default SurveyForm;
+export default SimpleSurveyDashboard;
