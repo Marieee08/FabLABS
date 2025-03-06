@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
-import { Plus, Minus, X, ChevronDown, ChevronUp, Check, Loader, AlertCircle, Search } from 'lucide-react';
-import { CheckCircle } from 'lucide-react';
+import { Plus, Minus, X, ChevronDown, ChevronUp, Check, AlertCircle, Search } from 'lucide-react';
+import { CheckCircle, Loader } from 'lucide-react';
 
 interface Tool {
   id: string;
@@ -589,13 +589,13 @@ export default function ProcessInformation({ formData, updateFormData, nextStep,
                 Tools
               </label>
               <ToolsSelector
-  id="Tools"
-  value={formData.Tools}
-  onChange={(value) => updateFormData('Tools', value)}
-  onBlur={() => handleBlur('Tools')}
-  className={getInputClassName('Tools')}
-  disabled={isFieldDisabled('Tools')}
-/>
+                id="Tools"
+                value={formData.Tools}
+                onChange={(value) => updateFormData('Tools', value)}
+                onBlur={() => handleBlur('Tools')}
+                className={getInputClassName('Tools')}
+                disabled={isFieldDisabled('Tools')}
+              />
               {!isFieldDisabled('Tools') && touchedFields.has('Tools') && errors.Tools && (
                 <p className="mt-1 text-sm text-red-500">{errors.Tools}</p>
               )}
