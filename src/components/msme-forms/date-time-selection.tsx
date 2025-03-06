@@ -220,7 +220,7 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
       {/* Calendar and Error Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-10 mt-6 flex-grow"> 
         <div className="space-y-4 md:space-y-6 h-full">
-        <div className="bg-white p-3 sm:p-6 rounded-lg shadow-sm border border-gray-200 h-[632px]">
+        <div className="bg-white p-3 sm:p-6 rounded-lg shadow-sm border border-gray-200 h-[645px]">
             <h3 className="text-xl font-medium text-gray-800 mb-3 flex items-center">
               <CheckCircle className="h-5 w-5 text-blue-600 mr-2" /> Select Available Dates
             </h3>
