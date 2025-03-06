@@ -45,22 +45,33 @@ interface AccInfo {
   BusinessInfo: BusinessInfo | null;
 }
 
+// Day interface
+interface Day {
+  date: Date;
+  startTime: string | null;
+  endTime: string | null;
+}
+
 interface FormData {
-  days: {
-    date: Date;
-    startTime: string | null;
-    endTime: string | null;
-  }[];
+  days: Day[];
   ProductsManufactured: string | string[];
   BulkofCommodity: string;
   Equipment: string;
   Tools: string;
+  NeededMaterials?: Array<{
+    Item: string;
+    ItemQty: number;
+    Description: string;
+  }>;
+  // Add other fields as needed
+  [key: string]: any; // Add index signature for dynamic access
 }
 
 interface ReviewSubmitProps {
   formData: FormData;
   prevStep: () => void;
-  updateFormData: (field: keyof FormData, value: FormData[keyof FormData]) => void;
+  nextStep?: () => void;
+  updateFormData: <K extends keyof FormData>(field: K, value: FormData[K]) => void;
 }
 
 interface ServiceCost {
@@ -69,13 +80,24 @@ interface ServiceCost {
   Per: string;
 }
 
+interface DateInfo {
+  day: Day;
+  duration: number;
+  billableHours: number;
+  cost: number;
+}
+
+interface GroupedServiceData {
+  [serviceName: string]: {
+    service: ServiceCost;
+    dates: DateInfo[];
+    totalServiceCost: number;
+  }
+}
+
 interface CostReviewProps {
   selectedServices: string[];
-  days: {
-    date: Date;
-    startTime: string | null;
-    endTime: string | null;
-  }[];
+  days: Day[];
   onCostCalculated?: (cost: number) => void;
 }
 
@@ -199,7 +221,7 @@ const CostReviewTable = ({
   }
 
   // Group data by service for clearer organization
-  const groupedData = selectedServices.reduce((acc, serviceName) => {
+  const groupedData: GroupedServiceData = selectedServices.reduce<GroupedServiceData>((acc, serviceName) => {
     const service = serviceCosts.find(s => s.Service === serviceName);
     if (!service || !service.Costs) return acc;
     
@@ -309,7 +331,7 @@ const CostReviewTable = ({
   );
 };
 
-export default function ReviewSubmit({ formData, prevStep, updateFormData }: ReviewSubmitProps) {
+export default function ReviewSubmit({ formData, prevStep, updateFormData, nextStep }: ReviewSubmitProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -579,7 +601,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData }: Rev
               <CreditCard className="h-5 w-5 text-blue-600 mr-2" /> Cost Breakdown
             </h3>
             <CostReviewTable
-              selectedServices={Array.isArray(formData.ProductsManufactured) ? formData.ProductsManufactured : []}
+              selectedServices={Array.isArray(formData.ProductsManufactured) ? formData.ProductsManufactured : [formData.ProductsManufactured].filter(Boolean) as string[]}
               days={formData.days}
               onCostCalculated={handleCostCalculated}
             />

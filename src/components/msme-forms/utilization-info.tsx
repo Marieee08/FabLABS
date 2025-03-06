@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
-import { Plus, Minus, X, ChevronDown, ChevronUp, Check, Loader } from 'lucide-react';
+import { Plus, Minus, X, ChevronDown, ChevronUp, Check, Loader, AlertCircle, Search } from 'lucide-react';
 import { CheckCircle } from 'lucide-react';
 
 interface Tool {
