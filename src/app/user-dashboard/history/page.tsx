@@ -226,11 +226,6 @@ const HistoryPage = () => {
                     Information
                   </Link>
                 </li>
-                <li>
-                  <Link href="/user-dashboard/settings" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-[#0d172c] border border-transparent hover:text-blue-800 hover:bg-blue-100 hover:border-[#5e86ca]">
-                    Settings
-                  </Link>
-                </li>
               </ul>
             </div>
           </nav>

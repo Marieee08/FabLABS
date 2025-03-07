@@ -33,6 +33,25 @@ interface MsmeDemographicData {
   CC3: string | undefined;
 }
 
+const PHILIPPINE_REGIONS = [
+  "NCR - National Capital Region",
+  "CAR - Cordillera Administrative Region",
+  "Region I - Ilocos Region",
+  "Region II - Cagayan Valley",
+  "Region III - Central Luzon",
+  "Region IV-A - CALABARZON",
+  "Region IV-B - MIMAROPA",
+  "Region V - Bicol Region",
+  "Region VI - Western Visayas",
+  "Region VII - Central Visayas",
+  "Region VIII - Eastern Visayas",
+  "Region IX - Zamboanga Peninsula",
+  "Region X - Northern Mindanao",
+  "Region XI - Davao Region",
+  "Region XII - SOCCSKSARGEN",
+  "Region XIII - Caraga",
+  "BARMM - Bangsamoro Autonomous Region in Muslim Mindanao"
+];
 
 const SURVEY_QUESTIONS = {
   customer: [
@@ -429,14 +448,19 @@ const SurveyForm = () => {
             </div>
             <div>
               <Label htmlFor="region" className="block mb-3 font-qanelas2 text-lg text-gray-700">Region of residence:</Label>
-              <Input 
-                id="region" 
-                type="text"
-                placeholder="Enter your region" 
-                value={msmeDemographicData.region} 
+              <select
+                id="region"
+                value={msmeDemographicData.region}
                 onChange={(e) => handleMsmeInputChange('region', e.target.value)}
-                className="w-full border-[#5e86ca] focus:ring-[#193d83]"
-              />
+                className="w-full h-10 px-3 rounded-md border border-[#5e86ca] focus:outline-none focus:ring-2 focus:ring-[#193d83]"
+              >
+                <option value="" disabled>Select your region</option>
+                {PHILIPPINE_REGIONS.map((region) => (
+                  <option key={region} value={region}>
+                    {region}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 

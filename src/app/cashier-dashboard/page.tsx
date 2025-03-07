@@ -235,7 +235,7 @@ const DashboardCashier = () => {
                             {reservation.Status}
                           </span>
                         </td>
-                        <td className="px-6 py-4">₱{reservation.TotalAmntDue?.toFixed(2)}</td>
+                        <td className="px-6 py-4">₱{reservation.TotalAmntDue ? reservation.TotalAmntDue.toFixed(2) : '0.00'}</td>
                         <td className="px-6 py-4">
                           <button
                             className="text-blue-600 hover:text-blue-900"
@@ -344,7 +344,7 @@ const DashboardCashier = () => {
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Total Amount Due</Label>
                     <Input
-                      value={`₱${selectedReservation?.TotalAmntDue?.toFixed(2)}`}
+                      value={`₱${selectedReservation?.TotalAmntDue ? selectedReservation.TotalAmntDue.toFixed(2) : '0.00'}`}
                       disabled
                       className="bg-gray-50"
                     />
