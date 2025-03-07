@@ -141,10 +141,10 @@ export default function Home() {
               <h3 className="text-2xl font-qanelas3">Laser Cutter</h3>
             <a href="/services" className="text-[#145da0] hover:underline mb-2">Learn More</a>
             </div>
-{/*}
+
             <div className="relative h-[318px]">
-                  <img src="images/machines/trylaser2.png" alt="machine" className="absolute bottom-0" />
-            </div> */}
+                  <img src="images/machines/trylaser.png" alt="machine" className="absolute bottom-0" />
+            </div> 
           </div>
 
           <div className="bg-white overflow-hidden shadow-lg rounded-2xl border border-[#5e86ca] hover:shadow-lg hover:shadow-blue-300/50 transform hover:scale-105 transition-all duration-300">
@@ -156,10 +156,10 @@ export default function Home() {
               <h3 className="text-2xl font-qanelas3">3D Printer</h3>
             <a href="/services" className="text-[#145da0] hover:underline mb-2">Learn More</a>
             </div>
-{/*}
+
             <div className="relative h-[318px]">
                   <img src="images/machines/try3dprint.png" alt="machine" className="absolute bottom-0" />
-            </div> */}
+            </div>
           </div>
 
           <div className="bg-white overflow-hidden shadow-lg rounded-2xl border border-[#5e86ca] hover:shadow-lg hover:shadow-blue-300/50 transform hover:scale-105 transition-all duration-300">
@@ -169,17 +169,17 @@ export default function Home() {
                 <p className="text-ms py-1 px-3 rounded bg-[#fef0db] rounded-full border border-[#f5a237] rounded-full text-[#ee8b1a]">Carve Structures</p>
               </div>
               <h3 className="text-2xl font-qanelas3">CNC Mill</h3>
-            <a href="/services#" className="text-[#145da0] hover:underline mb-2">Learn More</a>
+            <a href="/services" className="text-[#145da0] hover:underline mb-2">Learn More</a>
             </div>
-{/*}
+
             <div className="relative h-[318px]">
                   <img src="images/machines/trycncmill.png" alt="machine" className="absolute bottom-0" />
-            </div> */}
+            </div>
           </div>
 
           <div className=" p-6 rounded-lg text-center align-middle pt-28">
             <p className="inline-block text-[#193d83] font-poppins1 text-md ml-auto mb-2">Don't worry, there's more!</p>
-            <h3 className="text-3xl font-qanelas3 mb-1 text-[#0e4579]">Lorem Ipsum</h3>
+            <h3 className="text-3xl font-qanelas3 mb-1 text-[#0e4579]">Machines and Services</h3>
             <p className="text-lg mb-4 font-figtree4">Visit our Machines and Services Page</p>
             <p className="text-md mb-10 font-poppins1 px-10">Our FabLab is equipped with state-of-the-art tools and resources to support a wide range of projects and initiatives. Whether you are an entrepreneur, student, or hobbyist, we provide the support and expertise to bring your ideas to life.</p>
             <a href="/services#" className="border border-[#5e86ca] bg-[#193d83] text-white font-qanelas1 text-lg py-1 px-6 rounded-md hover:bg-[#2f61c2] transition duration-300 ml-auto">Services</a>
@@ -222,7 +222,7 @@ export default function Home() {
                 </div>
               </div>
 
-              <a href="/about" className="inline-block bg-[#0e4579] text-white font-qanelas1 text-lg py-3 px-8 rounded-full hover:bg-[#1c62b5] transition duration-300">
+              <a href="/services" className="inline-block border border-[#5e86ca] bg-[#193d83] text-white font-qanelas1 text-lg py-1 px-6 rounded-md hover:bg-[#2f61c2] transition duration-300 ml-auto">
                 Learn More About Us
               </a>
             </div>
@@ -234,7 +234,7 @@ export default function Home() {
                 <p className="font-poppins1 text-gray-600">Projects Completed</p>
               </div>
               <div className="bg-white p-8 rounded-xl text-center shadow-lg">
-                <span className="text-4xl font-qanelas3 text-[#0e4579] block mb-2">500+</span>
+                <span className="text-4xl font-qanelas3 text-[#0e4579] block mb-2">100+</span>
                 <p className="font-poppins1 text-gray-600">Students Trained</p>
               </div>
               <div className="bg-white p-8 rounded-xl text-center shadow-lg">
@@ -242,8 +242,8 @@ export default function Home() {
                 <p className="font-poppins1 text-gray-600">Partnered with DTI</p>
               </div>
               <div className="bg-white p-8 rounded-xl text-center shadow-lg">
-                <span className="text-4xl font-qanelas3 text-[#0e4579] block mb-2">24/7</span>
-                <p className="font-poppins1 text-gray-600">Technical Support</p>
+                <span className="text-4xl font-qanelas3 text-[#0e4579] block mb-2">10+</span>
+                <p className="font-poppins1 text-gray-600">Workshops Held</p>
               </div>
             </div>
           </div>
