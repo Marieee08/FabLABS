@@ -26,7 +26,7 @@ const ThankYouPage = () => {
           </p>
           
           <Button 
-            onClick={() => router.push('/survey')} 
+            onClick={() => router.push('/survey/thank-you')} 
             className="bg-[#193d83] text-white hover:bg-[#2f61c2] font-qanelas1 px-6"
           >
             Return to Dashboard

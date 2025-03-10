@@ -604,17 +604,18 @@ const SurveyForm = () => {
   }
 
   return (
-    <Card className="w-full max-w-3xl mx-auto bg-[#f4f8fc] border border-[#5e86ca] rounded-2xl">
-      <CardHeader className="space-y-6">
-        <CardTitle className="text-3xl font-qanelas2 text-[#0e4579]">
-          {formType === 'preliminary' 
-            ? 'Demographic Information' 
-            : formType === 'customer' 
-              ? 'Customer Feedback' 
-              : 'Employee Evaluation'}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
+    <div className="py-8 px-4">
+      <Card className="w-full max-w-3xl mx-auto bg-[#f4f8fc] border border-[#5e86ca] rounded-2xl">
+        <CardHeader className="space-y-6">
+          <CardTitle className="text-3xl font-qanelas2 text-[#0e4579]">
+            {formType === 'preliminary' 
+              ? 'Client Satisfaction Survey' 
+              : formType === 'customer' 
+                ? 'Customer Feedback' 
+                : 'Employee Evaluation'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
           {formType === 'preliminary' && userRole === 'STUDENT' && renderStudentPreliminarySection()}
           
@@ -665,9 +666,10 @@ const SurveyForm = () => {
             )}
           </div>
         </form>
-      </CardContent>
+        </CardContent>
     </Card>
-  );
+  </div>
+);
 };
 
 export default SurveyForm;
