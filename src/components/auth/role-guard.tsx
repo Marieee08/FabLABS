@@ -58,6 +58,9 @@ export default function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
             case 'MSME':
               router.push('/user-dashboard');
               break;
+            case 'SURVEY':
+            router.push('/survey');
+            break;
             case 'STUDENT':
               router.push('/student-dashboard');
               break;
