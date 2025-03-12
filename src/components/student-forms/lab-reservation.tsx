@@ -35,6 +35,7 @@ interface FormData {
   NoofStudents: number;
   Subject: string;
   Teacher: string;
+  TeacherEmail: string; // Added teacher email field
   Topic: string;
   SchoolYear: number;
   
@@ -72,6 +73,36 @@ export function LabReservation({ formData, updateFormData, nextStep, prevStep }:
     updateFormData('NeededMaterials', updatedMaterials);
   };
 
+  // Form validation
+  const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
+
+  const validateForm = () => {
+    const newErrors: Partial<Record<keyof FormData, string>> = {};
+    
+    // Required fields validation
+    if (!formData.LvlSec) newErrors.LvlSec = 'Level/Section is required';
+    if (!formData.NoofStudents) newErrors.NoofStudents = 'Number of students is required';
+    if (!formData.Subject) newErrors.Subject = 'Subject is required';
+    if (!formData.Teacher) newErrors.Teacher = 'Teacher name is required';
+    if (!formData.Topic) newErrors.Topic = 'Topic is required';
+    
+    // Email validation
+    if (!formData.TeacherEmail) {
+      newErrors.TeacherEmail = 'Teacher email is required';
+    } else if (!/^\S+@\S+\.\S+$/.test(formData.TeacherEmail)) {
+      newErrors.TeacherEmail = 'Please enter a valid email address';
+    }
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleNextStep = () => {
+    if (validateForm()) {
+      nextStep();
+    }
+  };
+
   // Form sections
   const renderClassDetails = () => (
     <section className="mb-8">
@@ -81,46 +112,64 @@ export function LabReservation({ formData, updateFormData, nextStep, prevStep }:
           <label className="block text-sm font-medium mb-1">Level/Section</label>
           <input
             type="text"
-            className="w-full border rounded-md p-2"
+            className={`w-full border rounded-md p-2 ${errors.LvlSec ? 'border-red-500' : 'border-gray-300'}`}
             value={formData.LvlSec}
             onChange={(e) => updateFormData('LvlSec', e.target.value)}
           />
+          {errors.LvlSec && <p className="text-red-500 text-xs mt-1">{errors.LvlSec}</p>}
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Number of Students</label>
           <input
             type="number"
-            className="w-full border rounded-md p-2"
+            className={`w-full border rounded-md p-2 ${errors.NoofStudents ? 'border-red-500' : 'border-gray-300'}`}
             value={formData.NoofStudents}
             onChange={(e) => updateFormData('NoofStudents', parseInt(e.target.value) || 0)}
           />
+          {errors.NoofStudents && <p className="text-red-500 text-xs mt-1">{errors.NoofStudents}</p>}
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Subject</label>
           <input
             type="text"
-            className="w-full border rounded-md p-2"
+            className={`w-full border rounded-md p-2 ${errors.Subject ? 'border-red-500' : 'border-gray-300'}`}
             value={formData.Subject}
             onChange={(e) => updateFormData('Subject', e.target.value)}
           />
+          {errors.Subject && <p className="text-red-500 text-xs mt-1">{errors.Subject}</p>}
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Teacher</label>
           <input
             type="text"
-            className="w-full border rounded-md p-2"
+            className={`w-full border rounded-md p-2 ${errors.Teacher ? 'border-red-500' : 'border-gray-300'}`}
             value={formData.Teacher}
             onChange={(e) => updateFormData('Teacher', e.target.value)}
           />
+          {errors.Teacher && <p className="text-red-500 text-xs mt-1">{errors.Teacher}</p>}
+        </div>
+        {/* New teacher email field */}
+        <div>
+          <label className="block text-sm font-medium mb-1">Teacher Email <span className="text-red-500">*</span></label>
+          <input
+            type="email"
+            className={`w-full border rounded-md p-2 ${errors.TeacherEmail ? 'border-red-500' : 'border-gray-300'}`}
+            value={formData.TeacherEmail || ''}
+            onChange={(e) => updateFormData('TeacherEmail', e.target.value)}
+            placeholder="e.g. teacher@school.edu"
+          />
+          {errors.TeacherEmail && <p className="text-red-500 text-xs mt-1">{errors.TeacherEmail}</p>}
+          <p className="text-xs text-gray-500 mt-1">The teacher will receive an email to approve this reservation</p>
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Topic</label>
           <input
             type="text"
-            className="w-full border rounded-md p-2"
+            className={`w-full border rounded-md p-2 ${errors.Topic ? 'border-red-500' : 'border-gray-300'}`}
             value={formData.Topic}
             onChange={(e) => updateFormData('Topic', e.target.value)}
           />
+          {errors.Topic && <p className="text-red-500 text-xs mt-1">{errors.Topic}</p>}
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">School Year</label>
@@ -193,13 +242,15 @@ export function LabReservation({ formData, updateFormData, nextStep, prevStep }:
   const renderNavigationButtons = () => (
     <div className="mt-8 flex justify-between">
       <button
+        type="button"
         onClick={prevStep}
         className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
       >
         Previous
       </button>
       <button
-        onClick={nextStep}
+        type="button"
+        onClick={handleNextStep}
         className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
       >
         Next
