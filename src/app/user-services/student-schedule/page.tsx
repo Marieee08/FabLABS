@@ -95,7 +95,7 @@ interface FormData {
   NoofStudents: number;
   Subject: string;
   Teacher: string;
-  TeacherEmail: string; // New field for teacher's email
+  TeacherEmail: string; // Added teacher email field
   Topic: string;
   SchoolYear: number;
   
@@ -118,6 +118,7 @@ export default function StudentSchedule() {
     NoofStudents: 0,
     Subject: '',
     Teacher: '',
+    TeacherEmail: '',
     Topic: '',
     SchoolYear: new Date().getFullYear(),
     NeededMaterials: []

@@ -178,6 +178,7 @@ model EVCReservation {
   NoofStudents    Int?
   Subject         String?
   Teacher         String?
+  TeacherEmail    String?          // New field for teacher's email
   Topic           String?
   LabDates        LabDate[]        @relation(name: "EVCReservationtoLabDate") //One-to-many
   DateRequested   DateTime?        @default(now())
