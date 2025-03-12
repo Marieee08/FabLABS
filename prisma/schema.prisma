@@ -280,7 +280,7 @@ model RepairCheck {
 // Unified survey model for both student and MSME users
 model PreliminarySurvey {
   id              Int       @id @default(autoincrement())
-  userRole        String    // "STUDENT" or "MSME" - Used to determine how form is displayed
+  userRole        String? // Optional now   // "STUDENT" or "MSME" - Used to determine how form is displayed
   
   // Fields for all users
   age             Int

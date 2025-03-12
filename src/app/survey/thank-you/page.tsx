@@ -1,3 +1,5 @@
+// /survey/thank-you
+
 "use client";
 
 import React from 'react';
@@ -26,7 +28,7 @@ const ThankYouPage = () => {
           </p>
           
           <Button 
-            onClick={() => router.push('/survey/thank-you')} 
+            onClick={() => router.push('/survey')} 
             className="bg-[#193d83] text-white hover:bg-[#2f61c2] font-qanelas1 px-6"
           >
             Return to Dashboard
