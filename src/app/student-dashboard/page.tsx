@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useUser } from "@clerk/nextjs";
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import RoleGuard from '@/components/auth/role-guard';
 
 interface Reservation {
   id: number;
@@ -148,6 +149,7 @@ const DashboardUser = () => {
   };
 
   return (
+    <RoleGuard allowedRoles={['STUDENT']}>
     <div className="flex h-screen overflow-hidden bg-[#f1f5f9]">
       <aside className={`absolute left-0 top-0 z-50 flex h-screen w-72 flex-col overflow-y-hidden bg-white duration-300 ease-linear lg:static lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex items-center justify-between gap-2 px-6 py-5.5 lg:py-6.5">
@@ -481,6 +483,7 @@ const DashboardUser = () => {
         </main>
       </div>
     </div>
+    </RoleGuard>
   );
 };
 
