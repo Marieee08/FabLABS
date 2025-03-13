@@ -1,3 +1,5 @@
+// /cashier-dashboard/page.tsx
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -69,6 +71,18 @@ const getStatusColor = (status: string) => {
   }
 };
 
+// Add this after getStatusColor function, around line 45-55
+const formatCurrency = (amount: number | string | null | undefined): string => {
+  if (amount === null || amount === undefined) return '0.00';
+  
+  // Convert to number if it's a string
+  const numericAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+  
+  // Check if it's a valid number after conversion
+  if (typeof numericAmount !== 'number' || isNaN(numericAmount)) return '0.00';
+  
+  return numericAmount.toFixed(2);
+};
 
 
 const DashboardCashier = () => {
@@ -88,24 +102,39 @@ const DashboardCashier = () => {
     endTimes: {}
   });
 
+  // Around line 108-123 in cashier-dashboard/page.tsx
   useEffect(() => {
     if (selectedReservation) {
       const startTimes = {};
       const endTimes = {};
       
       selectedReservation.UtilTimes.forEach(time => {
-        if (time.StartTime) startTimes[time.id] = new Date(time.StartTime).toLocaleString();
-        if (time.EndTime) endTimes[time.id] = new Date(time.EndTime).toLocaleString();
+        // Add validation before creating Date objects
+        if (time.StartTime) {
+          try {
+            startTimes[time.id] = new Date(time.StartTime).toLocaleString();
+          } catch (e) {
+            startTimes[time.id] = 'Invalid date';
+          }
+        }
+        
+        if (time.EndTime) {
+          try {
+            endTimes[time.id] = new Date(time.EndTime).toLocaleString();
+          } catch (e) {
+            endTimes[time.id] = 'Invalid date';
+          }
+        }
       });
       
       setModalDates({
-        requestDate: new Date(selectedReservation.RequestDate).toLocaleDateString(),
+        requestDate: selectedReservation.RequestDate ? new Date(selectedReservation.RequestDate).toLocaleDateString() : 'N/A',
         startTimes,
         endTimes
       });
     }
   }, [selectedReservation]);
-
+  
   useEffect(() => {
     const fetchReservations = async () => {
       try {
@@ -276,8 +305,8 @@ const DashboardCashier = () => {
                             {reservation.Status}
                           </span>
                         </td>
-                          <td className="px-6 py-4">₱{typeof reservation.TotalAmntDue === 'number' ? reservation.TotalAmntDue.toFixed(2) : '0.00'}</td>
-                        <td className="px-6 py-4">
+                            <td className="px-6 py-4">₱{formatCurrency(reservation.TotalAmntDue)}</td>                        
+                            <td className="px-6 py-4">
                           <button
                             className="text-blue-600 hover:text-blue-900"
                             onClick={() => handleReviewClick(reservation)}
@@ -344,12 +373,12 @@ const DashboardCashier = () => {
                     <div>
                       <h3 className="font-medium text-gray-900 mb-2">Services Information</h3>
                       <div className="space-y-2">
-                        {selectedReservation.UserServices.map((service, index) => (
+                        {selectedReservation?.UserServices?.map((service, index) => (
                           <div key={index} className="bg-gray-50 p-3 rounded-lg">
                             <p><span className="text-gray-600">Service:</span> {service.ServiceAvail}</p>
                             <p><span className="text-gray-600">Equipment:</span> {service.EquipmentAvail}</p>
                             <p><span className="text-gray-600">Duration:</span> {service.MinsAvail} minutes</p>
-                            <p><span className="text-gray-600">Cost:</span> ₱{service.CostsAvail?.toFixed(2) || '0.00'}</p>
+                            <p><span className="text-gray-600">Cost:</span> ₱{formatCurrency(service.CostsAvail)}</p>
                           </div>
                         ))}
                       </div>
@@ -360,7 +389,7 @@ const DashboardCashier = () => {
                     <div>
                       <h3 className="font-medium text-gray-900 mb-2">Schedule</h3>
                       <div className="space-y-2">
-                        {selectedReservation.UtilTimes.map((time, index) => (
+                        {selectedReservation?.UtilTimes?.map((time, index) => (
                           <div key={index} className="bg-gray-50 p-3 rounded-lg">
                             <p><span className="text-gray-600">Day {time.DayNum}:</span></p>
                             <p className="ml-4">Start: {modalDates.startTimes[time.id] || 'Not set'}</p>
@@ -385,7 +414,7 @@ const DashboardCashier = () => {
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Total Amount Due</Label>
                     <Input
-                      value={`₱${typeof selectedReservation?.TotalAmntDue === 'number' ? selectedReservation.TotalAmntDue.toFixed(2) : '0.00'}`}
+                      value={`₱${formatCurrency(selectedReservation?.TotalAmntDue)}`}
                       disabled
                       className="bg-gray-50"
                     />
