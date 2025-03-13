@@ -154,6 +154,10 @@ model UtilTime {
   EndTime   DateTime?
   utilReqId Int?      //Foreign key for one-to-many relationship
   utilReq   UtilReq?  @relation(name: "UtilReqToUtilTime", fields: [utilReqId], references: [id])
+  
+  // New relation for EVCReservation
+  evcId     Int?
+  evc       EVCReservation? @relation(name: "EVCReservationtoUtilTime", fields: [evcId], references: [id])
 }
 
 // For blocking dates
@@ -179,7 +183,7 @@ model EVCReservation {
   Subject         String?
   Teacher         String?
   Topic           String?
-  LabDates        LabDate[]        @relation(name: "EVCReservationtoLabDate") //One-to-many
+  UtilTimes       UtilTime[]       @relation(name: "EVCReservationtoUtilTime") // Changed from LabDates to UtilTimes
   DateRequested   DateTime?        @default(now())
   EVCStudents     EVCStudent[]     @relation(name: "EVCReservationtoEVCStudent") //One-to-many
   // UserSig         Bytes?         // NOT SURE
@@ -196,16 +200,6 @@ model EVCReservation {
   
   accInfoId       Int?             //Foreign key for one-to-many relationship
   accInfo         AccInfo?         @relation(name: "AccInfoToEVCReservation", fields: [accInfoId], references: [id])
-}
-
-// Next 3 are part of EVC Reservation
-model LabDate {
-  id        Int             @id @default(autoincrement())
-  LabDay    Int?
-  LabStart  DateTime?
-  LabEnd    DateTime?
-  evcId     Int?            //Foreign key for one-to-many relationship
-  evc       EVCReservation? @relation(name: "EVCReservationtoLabDate", fields: [evcId], references: [id])
 }
 
 model EVCStudent {
@@ -364,7 +358,7 @@ model EmployeeEvaluation {
 // Unified satisfaction survey model replacing ClientSatisfaction and CitizenSatisfaction
 model SatisfactionSurvey {
   id          Int      @id @default(autoincrement())
-  userRole    String   // "STUDENT", "MSME" etc.
+  userRole    String   // "STUDENT", "MSME", "CITIZEN", etc.
   
   // Demographic data (linked to PreliminarySurvey but can be updated)
   sex         String?
