@@ -1,3 +1,5 @@
+// /survey/questionnaire/page.tsx
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -263,7 +265,7 @@ const SurveyForm = () => {
       });
       
       // Redirect to the survey dashboard
-      router.push('/survey');
+      router.push('/survey/thank-you');
     } catch (error) {
       console.error('Error submitting survey:', error);
       toast({

@@ -1,3 +1,5 @@
+// /survey/page.tsx
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -39,6 +41,19 @@ const getStatusColor = (status: string) => {
     default:
       return 'bg-gray-100 text-gray-800';
   }
+};
+
+// Add this near the getStatusColor function (around line 30)
+const formatCurrency = (amount: number | string | null | undefined): string => {
+  if (amount === null || amount === undefined) return '0.00';
+  
+  // Convert to number if it's a string
+  const numericAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+  
+  // Check if it's a valid number after conversion
+  if (typeof numericAmount !== 'number' || isNaN(numericAmount)) return '0.00';
+  
+  return numericAmount.toFixed(2);
 };
 
 const SimpleSurveyDashboard = () => {
@@ -188,10 +203,10 @@ const SimpleSurveyDashboard = () => {
                   >
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                       <div>
-                        <h3 className="font-semibold text-lg">{reservation.UserServices.map(s => s.ServiceAvail).join(', ')}</h3>
+                        <h3 className="font-semibold text-lg">{reservation.UserServices?.map(s => s.ServiceAvail).join(', ') || 'No services'}</h3>
                         <div className="flex flex-wrap gap-2 mt-1.5">
                           <span className="text-gray-600 text-sm">
-                            {new Date(reservation.RequestDate).toLocaleDateString()}
+                            {reservation.RequestDate ? new Date(reservation.RequestDate).toLocaleDateString() : 'No date'}
                           </span>
                           <span className="text-gray-600 text-sm">•</span>
                           <span className="text-gray-600 text-sm">{reservation.accInfo.Name}</span>
@@ -255,17 +270,17 @@ const SimpleSurveyDashboard = () => {
                 <div>
                   <h3 className="text-sm font-medium text-gray-500">Services</h3>
                   <ul className="mt-1 space-y-1">
-                    {selectedReservation.UserServices.map((service, index) => (
+                    {selectedReservation.UserServices?.map((service, index) => (
                       <li key={index} className="text-gray-900">
                         {service.ServiceAvail} ({service.EquipmentAvail})
                       </li>
-                    ))}
+                    )) || <li className="text-gray-500">No services</li>}
                   </ul>
                 </div>
                 
                 <div>
                   <h3 className="text-sm font-medium text-gray-500">Total Amount</h3>
-                  <p className="mt-1 text-gray-900">₱{selectedReservation.TotalAmntDue?.toFixed(2)}</p>
+                  <p className="mt-1 text-gray-900">₱{formatCurrency(selectedReservation.TotalAmntDue)}</p>
                 </div>
                 
                 <Separator />
