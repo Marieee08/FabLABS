@@ -26,7 +26,7 @@ export async function PUT(
         id: id,
       },
       data: {
-        Status: "Completed",
+        Status: "Paid",
         ReceiptNumber: receiptNumber,
         PaymentDate: new Date(), // Automatically set to current date
       },
