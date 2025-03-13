@@ -1,9 +1,11 @@
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { useUser } from "@clerk/nextjs";
-import { useEffect, useState, useCallback } from "react";
-import { Card } from '@/components/ui/card';
+import React, { useEffect, useState, useCallback } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from "@/components/ui/button";
+import { CheckCircle, Clock, AlertCircle, Briefcase, User, CreditCard } from 'lucide-react';
 import Link from 'next/link';
 
 interface ClientInfo {
@@ -43,22 +45,33 @@ interface AccInfo {
   BusinessInfo: BusinessInfo | null;
 }
 
+// Day interface
+interface Day {
+  date: Date;
+  startTime: string | null;
+  endTime: string | null;
+}
+
 interface FormData {
-  days: {
-    date: Date;
-    startTime: string | null;
-    endTime: string | null;
-  }[];
+  days: Day[];
   ProductsManufactured: string | string[];
   BulkofCommodity: string;
   Equipment: string;
   Tools: string;
+  NeededMaterials?: Array<{
+    Item: string;
+    ItemQty: number;
+    Description: string;
+  }>;
+  // Add other fields as needed
+  [key: string]: any; // Add index signature for dynamic access
 }
 
 interface ReviewSubmitProps {
   formData: FormData;
   prevStep: () => void;
-  updateFormData: (field: keyof FormData, value: FormData[keyof FormData]) => void;
+  nextStep?: () => void;
+  updateFormData: <K extends keyof FormData>(field: K, value: FormData[K]) => void;
 }
 
 interface ServiceCost {
@@ -67,13 +80,24 @@ interface ServiceCost {
   Per: string;
 }
 
+interface DateInfo {
+  day: Day;
+  duration: number;
+  billableHours: number;
+  cost: number;
+}
+
+interface GroupedServiceData {
+  [serviceName: string]: {
+    service: ServiceCost;
+    dates: DateInfo[];
+    totalServiceCost: number;
+  }
+}
+
 interface CostReviewProps {
   selectedServices: string[];
-  days: {
-    date: Date;
-    startTime: string | null;
-    endTime: string | null;
-  }[];
+  days: Day[];
   onCostCalculated?: (cost: number) => void;
 }
 
@@ -95,11 +119,11 @@ const formatDate = (date: Date): string => {
   });
 };
 
-const CostReviewSection: React.FC<CostReviewProps> = ({ 
+const CostReviewTable = ({ 
   selectedServices, 
   days, 
   onCostCalculated = () => {} 
-}) => {
+}: CostReviewProps) => {
   const [serviceCosts, setServiceCosts] = useState<ServiceCost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -114,65 +138,35 @@ const CostReviewSection: React.FC<CostReviewProps> = ({
   const calculateDuration = useCallback((startTime: string | null, endTime: string | null): number => {
     if (!startTime || !endTime) return 0;
     
-    try {
-      const convertTo24Hour = (time: string): string => {
-        const [timePart, meridiem] = time.split(' ');
-        let [hours, minutes] = timePart.split(':').map(Number);
-        
-        if (meridiem?.toLowerCase() === 'pm' && hours !== 12) {
-          hours += 12;
-        } else if (meridiem?.toLowerCase() === 'am' && hours === 12) {
-          hours = 0;
-        }
-        
-        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-      };
-
-      const start24 = startTime.toLowerCase().includes('m') ? convertTo24Hour(startTime) : startTime;
-      const end24 = endTime.toLowerCase().includes('m') ? convertTo24Hour(endTime) : endTime;
+    const convertTo24Hour = (time: string): string => {
+      const [timePart, meridiem] = time.split(' ');
+      let [hours, minutes] = timePart.split(':').map(Number);
       
-      const [startHour, startMinute] = start24.split(':').map(Number);
-      const [endHour, endMinute] = end24.split(':').map(Number);
-      
-      if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) {
-        return 0;
+      if (meridiem?.toLowerCase() === 'pm' && hours !== 12) {
+        hours += 12;
+      } else if (meridiem?.toLowerCase() === 'am' && hours === 12) {
+        hours = 0;
       }
       
-      const startTotalMinutes = startHour * 60 + startMinute;
-      const endTotalMinutes = endHour * 60 + endMinute;
-      
-      const durationInHours = (endTotalMinutes - startTotalMinutes) / 60;
-      return durationInHours > 0 ? durationInHours : 0;
-    } catch {
-      return 0;
-    }
+      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    };
+
+    const start24 = startTime.toLowerCase().includes('m') ? convertTo24Hour(startTime) : startTime;
+    const end24 = endTime.toLowerCase().includes('m') ? convertTo24Hour(endTime) : endTime;
+    
+    const [startHour, startMinute] = start24.split(':').map(Number);
+    const [endHour, endMinute] = end24.split(':').map(Number);
+    
+    const startTotalMinutes = startHour * 60 + startMinute;
+    const endTotalMinutes = endHour * 60 + endMinute;
+    
+    const durationInHours = (endTotalMinutes - startTotalMinutes) / 60;
+    return durationInHours > 0 ? durationInHours : 0;
   }, []);
 
-  const calculateTotalCost = useCallback(() => {
-    if (!serviceCosts.length || !selectedServices.length || !days.length) return 0;
-    
-    let total = 0;
-    
-    selectedServices.forEach(serviceName => {
-      const service = serviceCosts.find(s => s.Service === serviceName);
-      if (!service || !service.Costs) return;
-      
-      const numericCost = getNumericCost(service.Costs);
-      if (numericCost === 0) return;
-
-      days.forEach(day => {
-        const duration = calculateDuration(day.startTime, day.endTime);
-        if (duration > 0) {
-          const cost = duration * numericCost;
-          if (isFinite(cost)) {
-            total += cost;
-          }
-        }
-      });
-    });
-  
-    return total;
-  }, [serviceCosts, selectedServices, days, getNumericCost, calculateDuration]);
+  const calculateBillableHours = useCallback((duration: number): number => {
+    return Math.ceil(duration);
+  }, []);
 
   useEffect(() => {
     const fetchServiceCosts = async () => {
@@ -183,7 +177,6 @@ const CostReviewSection: React.FC<CostReviewProps> = ({
         setServiceCosts(data);
       } catch (err) {
         setError('Failed to load service costs');
-        console.error('Error fetching service costs:', err);
       } finally {
         setIsLoading(false);
       }
@@ -192,6 +185,24 @@ const CostReviewSection: React.FC<CostReviewProps> = ({
     fetchServiceCosts();
   }, []);
 
+  const calculateTotalCost = useCallback(() => {
+    if (!serviceCosts.length || !selectedServices.length || !days.length) return 0;
+    
+    let total = 0;
+    selectedServices.forEach(serviceName => {
+      const service = serviceCosts.find(s => s.Service === serviceName);
+      if (!service || !service.Costs) return;
+      
+      const numericCost = getNumericCost(service.Costs);
+      days.forEach(day => {
+        const duration = calculateDuration(day.startTime, day.endTime);
+        const billableHours = calculateBillableHours(duration);
+        total += billableHours * numericCost;
+      });
+    });
+    return total;
+  }, [serviceCosts, selectedServices, days, getNumericCost, calculateDuration, calculateBillableHours]);
+
   useEffect(() => {
     const total = calculateTotalCost();
     onCostCalculated(total);
@@ -199,73 +210,128 @@ const CostReviewSection: React.FC<CostReviewProps> = ({
 
   if (isLoading) {
     return (
-      <div className="mt-4">
-        <div className="flex items-center justify-center p-4">
-          <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-        </div>
+      <div className="flex items-center justify-center p-4">
+        <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   if (error) {
-    return (
-      <div className="mt-4 text-red-500 text-sm">
-        {error}
-      </div>
-    );
+    return <div className="text-red-500 text-sm">{error}</div>;
   }
 
-  const totalCost = calculateTotalCost();
+  // Group data by service for clearer organization
+  const groupedData: GroupedServiceData = selectedServices.reduce<GroupedServiceData>((acc, serviceName) => {
+    const service = serviceCosts.find(s => s.Service === serviceName);
+    if (!service || !service.Costs) return acc;
+    
+    if (!acc[serviceName]) {
+      acc[serviceName] = { 
+        service, 
+        dates: [], 
+        totalServiceCost: 0 
+      };
+    }
+    
+    return acc;
+  }, {});
+
+  // Fill the grouped data with dates and costs
+  Object.keys(groupedData).forEach(serviceName => {
+    const { service } = groupedData[serviceName];
+    let serviceTotalCost = 0;
+    
+    days.forEach(day => {
+      const duration = calculateDuration(day.startTime, day.endTime);
+      const billableHours = calculateBillableHours(duration);
+      const numericCost = getNumericCost(service.Costs);
+      const cost = billableHours * numericCost;
+      
+      groupedData[serviceName].dates.push({
+        day,
+        duration,
+        billableHours,
+        cost
+      });
+      
+      serviceTotalCost += cost;
+    });
+    
+    groupedData[serviceName].totalServiceCost = serviceTotalCost;
+  });
 
   return (
-    <div className="mt-4">
-      <h3 className="text-lg font-medium mb-3">Cost Breakdown</h3>
-      <div className="border border-gray-300 rounded-md p-4 space-y-4">
-        {selectedServices.map(serviceName => {
-          const service = serviceCosts.find(s => s.Service === serviceName);
-          if (!service || !service.Costs) return null;
-
-          const numericCost = getNumericCost(service.Costs);
-
-          return (
-            <div key={serviceName} className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="font-medium">{serviceName}</span>
-                <span className="text-gray-600">
-                  ₱{numericCost.toFixed(2)} per {service.Per}
-                </span>
-              </div>
-              {days.map((day, index) => {
-                const duration = calculateDuration(day.startTime, day.endTime);
-                const cost = duration * numericCost;
-
-                return (
-                  <div key={index} className="ml-4 text-sm text-gray-600">
-                    <div className="flex justify-between">
-                      <span>
-                        Day {index + 1}: {duration.toFixed(2)} hours
-                        {duration === 0 && " (Invalid time range)"}
-                      </span>
-                      <span>₱{cost.toFixed(2)}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
-        <div className="pt-4 border-t border-gray-200">
-          <div className="flex justify-between items-center font-semibold">
-            <span>Total Estimated Cost</span>
-            <span>₱{totalCost.toFixed(2)}</span>
-          </div>
-        </div>
-      </div>
+    <div className="overflow-x-auto border rounded-lg">
+      <table className="w-full border-collapse">
+        <thead>
+          <tr className="bg-gray-50 border-b-2 border-gray-200">
+            <th className="p-3 text-left border text-gray-700 font-semibold">Service</th>
+            <th className="p-3 text-left border text-gray-700 font-semibold">Date</th>
+            <th className="p-3 text-left border text-gray-700 font-semibold">Duration</th>
+            <th className="p-3 text-left border text-gray-700 font-semibold">Rate</th>
+            <th className="p-3 text-left border text-gray-700 font-semibold">Cost</th>
+          </tr>
+        </thead>
+        <tbody>
+          {Object.entries(groupedData).map(([serviceName, data], serviceIndex) => (
+            <React.Fragment key={serviceName}>
+              {data.dates.map((dateInfo, dateIndex) => (
+                <tr 
+                  key={`${serviceName}-${dateIndex}`} 
+                  className={`
+                    ${dateIndex === data.dates.length - 1 && serviceIndex !== Object.keys(groupedData).length - 1 ? 'border-b-2 border-gray-200' : 'border-b'} 
+                    hover:bg-gray-50
+                  `}
+                >
+                  {dateIndex === 0 ? (
+                    <td className="p-3 border font-medium" rowSpan={data.dates.length}>
+                      {serviceName}
+                    </td>
+                  ) : null}
+                  <td className="p-3 border">
+                    {new Date(dateInfo.day.date).toLocaleDateString('en-US', {
+                      weekday: 'short', 
+                      month: 'short', 
+                      day: 'numeric'
+                    })}
+                  </td>
+                  <td className="p-3 border">
+                    {dateInfo.duration.toFixed(2)} hours
+                    {dateInfo.duration !== dateInfo.billableHours && (
+                      <div className="text-xs text-gray-500">
+                        (Billed as {dateInfo.billableHours} {dateInfo.billableHours === 1 ? 'hour' : 'hours'})
+                      </div>
+                    )}
+                  </td>
+                  <td className="p-3 border">
+                    ₱{getNumericCost(data.service.Costs).toFixed(2)} per {data.service.Per}
+                  </td>
+                  <td className="p-3 border">₱{dateInfo.cost.toFixed(2)}</td>
+                </tr>
+              ))}
+              <tr className="bg-blue-50 border-b hover:bg-blue-100">
+                <td colSpan={4} className="p-3 border text-right font-medium">
+                  Subtotal for {serviceName}
+                </td>
+                <td className="p-3 border text-blue-700 font-medium">
+                  ₱{data.totalServiceCost.toFixed(2)}
+                </td>
+              </tr>
+            </React.Fragment>
+          ))}
+          <tr className="bg-blue-100 font-bold border-t-2 border-blue-300">
+            <td colSpan={4} className="p-3 border text-right">Total Cost</td>
+            <td className="p-3 border text-blue-800">
+              ₱{calculateTotalCost().toFixed(2)}
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   );
 };
 
-export default function ReviewSubmit({ formData, prevStep, updateFormData }: ReviewSubmitProps) {
+export default function ReviewSubmit({ formData, prevStep, updateFormData, nextStep }: ReviewSubmitProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -348,179 +414,224 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData }: Rev
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto mt-11">
-        <Card className="p-6">
-          <div className="flex items-center justify-center">
-            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"/>
-          </div>
+      <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 pt-0 flex flex-col">
+        <Card className="p-6 mt-6 bg-white shadow-sm border border-gray-200">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-center p-8">
+              <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"/>
+            </div>
+          </CardContent>
         </Card>
       </div>
     );
   }
 
-  const renderSection = (title: string, content: JSX.Element) => (
-    <div className="mb-6">
-      <h3 className="text-lg font-medium mb-3">{title}</h3>
-      {content}
-    </div>
-  );
-
   return (
-    <div className="max-w-4xl mx-auto">
-      <Card className="p-6 mt-11">
-        <h2 className="text-2xl font-semibold mb-6">Review Your Information</h2>
-
-        {renderSection('Selected Dates and Times',
-          <div className="grid grid-cols-2 gap-6 border border-gray-300 rounded-md p-4">
-            {formData.days.length > 0 ? (
-              [...formData.days]
-                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                .map((day, index) => (
-                  <div key={index} className="mb-4">
-                    <h4 className="font-medium">Day {index + 1}</h4>
-                    <p>Date: {formatDate(day.date)}</p>
-                    <p>Start Time: {day.startTime}</p>
-                    <p>End Time: {day.endTime}</p>
-                  </div>
-                ))
-            ) : (
-              <p>No dates selected</p>
-            )}
-          </div>
-        )}
-
-        {renderSection('Personal Information',
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-gray-600">Name</p>
-              <p className="mt-1">{user?.firstName} {user?.lastName}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Contact Number</p>
-              <p className="mt-1">{accInfo?.ClientInfo?.ContactNum || 'Not provided'}</p>
-            </div>
-            <div className="col-span-2">
-              <p className="text-sm text-gray-600">Complete Address</p>
-              <p className="mt-1">
-                {accInfo?.ClientInfo ? 
-                  `${accInfo.ClientInfo.Address || ''}, ${accInfo.ClientInfo.City || ''}, ${accInfo.ClientInfo.Province || ''} ${accInfo.ClientInfo.Zipcode || ''}`.replace(/^[,\s]+|[,\s]+$/g, '') 
-                  : 'Not provided'}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {renderSection('Business Information',
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <p className="text-sm text-gray-600">Company Name</p>
-              <p className="mt-1">{accInfo?.BusinessInfo?.CompanyName || 'Not provided'}</p>
-            </div>
-            {[
-              { label: 'Business Owner', value: accInfo?.BusinessInfo?.BusinessOwner },
-              { label: 'Email', value: accInfo?.BusinessInfo?.CompanyEmail },
-              { label: 'Business Permit Number', value: accInfo?.BusinessInfo?.BusinessPermitNum },
-              { label: 'TIN Number', value: accInfo?.BusinessInfo?.TINNum },
-              { label: 'Contact Person', value: accInfo?.BusinessInfo?.ContactPerson },
-              { label: 'Position/Designation', value: accInfo?.BusinessInfo?.Designation }
-            ].map(({ label, value }) => (
-              <div key={label}>
-                <p className="text-sm text-gray-600">{label}</p>
-                <p className="mt-1">{value || 'Not provided'}</p>
-              </div>
-            ))}
-            <div className="col-span-2">
-              <p className="text-sm text-gray-600">Company Address</p>
-              <p className="mt-1">
-                {accInfo?.BusinessInfo ? 
-                  `${accInfo.BusinessInfo.CompanyAddress || ''}, ${accInfo.BusinessInfo.CompanyCity || ''}, ${accInfo.BusinessInfo.CompanyProvince || ''} ${accInfo.BusinessInfo.CompanyZipcode || ''}`.replace(/^[,\s]+|[,\s]+$/g, '')
-                  : 'Not provided'}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {renderSection('Utilization Information',
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <p className="text-sm text-gray-600">Services Availed</p>
-              {Array.isArray(formData.ProductsManufactured) ? (
-                <div className="mt-1 flex flex-wrap gap-2">
-                  {formData.ProductsManufactured.map((service, index) => (
-                    <span 
-                      key={index} 
-                      className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm"
-                    >
-                      {service}
-                    </span>
-                  ))}
-                </div>
+    <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 pt-0 flex flex-col">
+      <Card className="bg-white shadow-sm border border-gray-200 mt-6">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-xl font-medium text-gray-800 flex items-center">
+            <CheckCircle className="h-5 w-5 text-blue-600 mr-2" /> Review Your Information
+          </CardTitle>
+        </CardHeader>
+        
+        <CardContent className="pt-0">
+          {/* Dates and Times */}
+          <div className="mb-6">
+            <h3 className="text-lg font-medium mb-3 flex items-center">
+              <Clock className="h-5 w-5 text-blue-600 mr-2" /> Selected Dates and Times
+            </h3>
+            <div className="grid md:grid-cols-2 gap-4 border rounded-lg p-4 bg-gray-50">
+              {formData.days.length > 0 ? (
+                [...formData.days]
+                  .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                  .map((day, index) => (
+                    <Card key={index} className="bg-white border-gray-200 shadow-none">
+                      <CardContent className="p-4">
+                        <h4 className="text-md font-semibold text-blue-800 mb-3">
+                          {new Date(day.date).toLocaleDateString('en-US', { 
+                            weekday: 'short', 
+                            month: 'short', 
+                            day: 'numeric'
+                          })}
+                        </h4>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm font-medium text-gray-700">Start Time</p>
+                            <p className="mt-1 text-blue-700">{day.startTime || 'Not set'}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-700">End Time</p>
+                            <p className="mt-1 text-blue-700">{day.endTime || 'Not set'}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
               ) : (
-                <p className="mt-1">{formData.ProductsManufactured || 'Not provided'}</p>
+                <p className="text-gray-500 text-center p-4">No dates selected</p>
               )}
             </div>
-            <div className="col-span-2">
-              <p className="text-sm text-gray-600">Bulk of Commodity</p>
-              <p className="mt-1">{formData.BulkofCommodity || 'Not provided'}</p>
-            </div>
-            <div className="col-span-2">
-              <p className="text-sm text-gray-600">Tools</p>
-              {parseToolString(formData.Tools).length > 0 ? (
-                <div className="mt-2 space-y-2">
-                  {parseToolString(formData.Tools).map((tool, index) => (
-                    <div 
-                      key={index} 
-                      className="flex items-center justify-between bg-gray-50 p-2 rounded"
-                    >
-                      <span className="flex-grow">{tool.Tool}</span>
-                      <span className="text-gray-600">
-                        Quantity: {tool.Quantity}
-                      </span>
+          </div>
+
+          {/* Personal Information */}
+          <div className="mb-6">
+            <h3 className="text-lg font-medium mb-3 flex items-center">
+              <User className="h-5 w-5 text-blue-600 mr-2" /> Personal Information
+            </h3>
+            <Card className="border-gray-200 shadow-none">
+              <CardContent className="p-4">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Name</p>
+                    <p className="mt-1 text-gray-800">{user?.firstName} {user?.lastName}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Contact Number</p>
+                    <p className="mt-1 text-gray-800">{accInfo?.ClientInfo?.ContactNum || 'Not provided'}</p>
+                  </div>
+                  <div className="md:col-span-2">
+                    <p className="text-sm font-medium text-gray-700">Complete Address</p>
+                    <p className="mt-1 text-gray-800">
+                      {accInfo?.ClientInfo ? 
+                        `${accInfo.ClientInfo.Address || ''}, ${accInfo.ClientInfo.City || ''}, ${accInfo.ClientInfo.Province || ''} ${accInfo.ClientInfo.Zipcode || ''}`.replace(/^[,\s]+|[,\s]+$/g, '') 
+                        : 'Not provided'}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Business Information */}
+          <div className="mb-6">
+            <h3 className="text-lg font-medium mb-3 flex items-center">
+              <Briefcase className="h-5 w-5 text-blue-600 mr-2" /> Business Information
+            </h3>
+            <Card className="border-gray-200 shadow-none">
+              <CardContent className="p-4">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <p className="text-sm font-medium text-gray-700">Company Name</p>
+                    <p className="mt-1 text-gray-800">{accInfo?.BusinessInfo?.CompanyName || 'Not provided'}</p>
+                  </div>
+                  {[
+                    { label: 'Business Owner', value: accInfo?.BusinessInfo?.BusinessOwner },
+                    { label: 'Email', value: accInfo?.BusinessInfo?.CompanyEmail },
+                    { label: 'Business Permit Number', value: accInfo?.BusinessInfo?.BusinessPermitNum },
+                    { label: 'TIN Number', value: accInfo?.BusinessInfo?.TINNum },
+                    { label: 'Contact Person', value: accInfo?.BusinessInfo?.ContactPerson },
+                    { label: 'Position/Designation', value: accInfo?.BusinessInfo?.Designation }
+                  ].map(({ label, value }) => (
+                    <div key={label}>
+                      <p className="text-sm font-medium text-gray-700">{label}</p>
+                      <p className="mt-1 text-gray-800">{value || 'Not provided'}</p>
                     </div>
                   ))}
+                  <div className="md:col-span-2">
+                    <p className="text-sm font-medium text-gray-700">Company Address</p>
+                    <p className="mt-1 text-gray-800">
+                      {accInfo?.BusinessInfo ? 
+                        `${accInfo.BusinessInfo.CompanyAddress || ''}, ${accInfo.BusinessInfo.CompanyCity || ''}, ${accInfo.BusinessInfo.CompanyProvince || ''} ${accInfo.BusinessInfo.CompanyZipcode || ''}`.replace(/^[,\s]+|[,\s]+$/g, '')
+                        : 'Not provided'}
+                    </p>
+                  </div>
                 </div>
-              ) : (
-                <p className="mt-1">No tools selected</p>
-              )}
-            </div>
+              </CardContent>
+            </Card>
           </div>
-        )}
 
-        {renderSection('Cost Information',
-          <CostReviewSection
-            selectedServices={Array.isArray(formData.ProductsManufactured) ? formData.ProductsManufactured : []}
-            days={formData.days}
-            onCostCalculated={handleCostCalculated}
-          />
-        )}
+          {/* Utilization Information */}
+          <div className="mb-6">
+            <h3 className="text-lg font-medium mb-3 flex items-center">
+              <AlertCircle className="h-5 w-5 text-blue-600 mr-2" /> Utilization Information
+            </h3>
+            <Card className="border-gray-200 shadow-none">
+              <CardContent className="p-4">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div className="md:col-span-2">
+                    <p className="text-sm font-medium text-gray-700">Services Availed</p>
+                    {Array.isArray(formData.ProductsManufactured) ? (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {formData.ProductsManufactured.map((service, index) => (
+                          <span 
+                            key={index} 
+                            className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm"
+                          >
+                            {service}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-gray-800">{formData.ProductsManufactured || 'Not provided'}</p>
+                    )}
+                  </div>
+                  <div className="md:col-span-2">
+                    <p className="text-sm font-medium text-gray-700">Bulk of Commodity</p>
+                    <p className="mt-1 text-gray-800">{formData.BulkofCommodity || 'Not provided'}</p>
+                  </div>
+                  <div className="md:col-span-2">
+                    <p className="text-sm font-medium text-gray-700">Tools</p>
+                    {parseToolString(formData.Tools).length > 0 ? (
+                      <div className="mt-2 space-y-2">
+                        {parseToolString(formData.Tools).map((tool, index) => (
+                          <div 
+                            key={index} 
+                            className="flex items-center justify-between bg-gray-50 p-2 rounded"
+                          >
+                            <span className="flex-grow text-gray-800">{tool.Tool}</span>
+                            <span className="text-gray-600">
+                              Quantity: {tool.Quantity}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-gray-800">No tools selected</p>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
-        {error && (
-          <Alert variant="destructive" className="mt-4">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-        {error && (
-          <Alert variant="destructive" className="mt-4">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+          {/* Cost Breakdown */}
+          <div className="mb-6">
+            <h3 className="text-lg font-medium mb-3 flex items-center">
+              <CreditCard className="h-5 w-5 text-blue-600 mr-2" /> Cost Breakdown
+            </h3>
+            <CostReviewTable
+              selectedServices={Array.isArray(formData.ProductsManufactured) ? formData.ProductsManufactured : [formData.ProductsManufactured].filter(Boolean) as string[]}
+              days={formData.days}
+              onCostCalculated={handleCostCalculated}
+            />
+          </div>
 
-        <div className="mt-6 flex justify-between">
-          <button 
-            onClick={prevStep}
-            disabled={isSubmitting}
-            className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition-colors disabled:opacity-50"
-          >
-            Previous
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting || loading}
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors disabled:opacity-50"
-          >
-            {isSubmitting ? 'Submitting...' : 'Submit Request'}
-          </button>
-        </div>
+          {/* Error messages */}
+          {error && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {/* Navigation buttons */}
+          <div className="mt-6 flex justify-between">
+            <Button
+              onClick={prevStep}
+              disabled={isSubmitting}
+              className="bg-gray-500 text-white hover:bg-gray-600 transition-colors disabled:opacity-50"
+            >
+              Previous Step
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={isSubmitting || loading}
+              className="bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50"
+            >
+              {isSubmitting ? 'Submitting...' : 'Submit Request'}
+            </Button>
+          </div>
+        </CardContent>
       </Card>
     </div>
   );

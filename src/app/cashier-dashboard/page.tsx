@@ -70,6 +70,8 @@ const getStatusColor = (status: string) => {
   }
 };
 
+
+
 const DashboardCashier = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [reservations, setReservations] = useState<DetailedReservation[]>([]);
@@ -77,6 +79,33 @@ const DashboardCashier = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
   const [receiptNumber, setReceiptNumber] = useState('');
+  const [modalDates, setModalDates] = useState<{
+    requestDate: string;
+    startTimes: Record<number, string>;
+    endTimes: Record<number, string>;
+  }>({
+    requestDate: '',
+    startTimes: {},
+    endTimes: {}
+  });
+
+  useEffect(() => {
+    if (selectedReservation) {
+      const startTimes = {};
+      const endTimes = {};
+      
+      selectedReservation.UtilTimes.forEach(time => {
+        if (time.StartTime) startTimes[time.id] = new Date(time.StartTime).toLocaleString();
+        if (time.EndTime) endTimes[time.id] = new Date(time.EndTime).toLocaleString();
+      });
+      
+      setModalDates({
+        requestDate: new Date(selectedReservation.RequestDate).toLocaleDateString(),
+        startTimes,
+        endTimes
+      });
+    }
+  }, [selectedReservation]);
 
   useEffect(() => {
     const fetchReservations = async () => {
@@ -102,6 +131,18 @@ const DashboardCashier = () => {
     setSelectedReservation(reservation);
     setIsReviewModalOpen(true);
   };
+
+  const [formattedDates, setFormattedDates] = useState<Record<number, string>>({});
+
+  useEffect(() => {
+    if (reservations.length > 0) {
+      const dates = {};
+      reservations.forEach(reservation => {
+        dates[reservation.id] = new Date(reservation.RequestDate).toLocaleDateString();
+      });
+      setFormattedDates(dates);
+    }
+  }, [reservations]);
 
   const handlePaymentConfirm = async () => {
     if (!selectedReservation || !receiptNumber) return;
@@ -230,14 +271,14 @@ const DashboardCashier = () => {
                   <tbody className="divide-y divide-gray-200">
                     {reservations.map(reservation => (
                       <tr key={reservation.id}>
-                        <td className="px-6 py-4">{new Date(reservation.RequestDate).toLocaleDateString()}</td>
+                        <td className="px-6 py-4">{formattedDates[reservation.id] || ''}</td>
                         <td className="px-6 py-4">{reservation.accInfo.Name}</td>
                         <td className="px-6 py-4">
                           <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(reservation.Status)}`}>
                             {reservation.Status}
                           </span>
                         </td>
-                        <td className="px-6 py-4">₱{reservation.TotalAmntDue?.toFixed(2)}</td>
+                          <td className="px-6 py-4">₱{typeof reservation.TotalAmntDue === 'number' ? reservation.TotalAmntDue.toFixed(2) : '0.00'}</td>
                         <td className="px-6 py-4">
                           <button
                             className="text-blue-600 hover:text-blue-900"
@@ -280,7 +321,7 @@ const DashboardCashier = () => {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <h3 className="font-medium text-gray-900">Request Date</h3>
-                        <p>{new Date(selectedReservation.RequestDate).toLocaleDateString()}</p>
+                        <p>{modalDates.requestDate}</p>
                       </div>
                       <div>
                         <h3 className="font-medium text-gray-900">Status</h3>
@@ -324,8 +365,8 @@ const DashboardCashier = () => {
                         {selectedReservation.UtilTimes.map((time, index) => (
                           <div key={index} className="bg-gray-50 p-3 rounded-lg">
                             <p><span className="text-gray-600">Day {time.DayNum}:</span></p>
-                            <p className="ml-4">Start: {time.StartTime ? new Date(time.StartTime).toLocaleString() : 'Not set'}</p>
-                            <p className="ml-4">End: {time.EndTime ? new Date(time.EndTime).toLocaleString() : 'Not set'}</p>
+                            <p className="ml-4">Start: {modalDates.startTimes[time.id] || 'Not set'}</p>
+                            <p className="ml-4">End: {modalDates.endTimes[time.id] || 'Not set'}</p>
                           </div>
                         ))}
                       </div>
@@ -346,7 +387,7 @@ const DashboardCashier = () => {
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Total Amount Due</Label>
                     <Input
-                      value={`₱${selectedReservation?.TotalAmntDue?.toFixed(2)}`}
+                      value={`₱${typeof selectedReservation?.TotalAmntDue === 'number' ? selectedReservation.TotalAmntDue.toFixed(2) : '0.00'}`}
                       disabled
                       className="bg-gray-50"
                     />

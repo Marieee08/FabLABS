@@ -25,8 +25,10 @@ export async function PUT(
     // Validate status transitions
     const validTransitions = {
       'Pending': ['Approved', 'Cancelled'],
-      'Approved': ['Pending payment', 'Cancelled'],
-      'Pending payment': ['Cancelled', 'Completed']
+      'Approved': ['Ongoing', 'Cancelled'],
+      'Ongoing': ['Pending payment', 'Cancelled'],
+      'Pending payment': ['Cancelled', 'Paid'],
+      'Paid': ["Completed"]
     };
 
     const allowedStatuses = validTransitions[currentReservation.Status as keyof typeof validTransitions];

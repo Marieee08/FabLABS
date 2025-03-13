@@ -194,7 +194,10 @@ const ReservationHistory = () => {
   }
 
 
-  const handleStatusUpdate = async (reservationId: number, newStatus: 'Approved' | 'Cancelled') => {
+  const handleStatusUpdate = async (
+    reservationId: number, 
+    newStatus: 'Approved' | 'Ongoing' | 'Pending payment' | 'Paid' |  'Completed' | 'Cancelled'
+  ) => {
     try {
       const response = await fetch(`/api/admin/reservation-status/${reservationId}`, {
         method: 'PUT',
@@ -342,7 +345,7 @@ const ReservationHistory = () => {
               <TableCell>{reservation.role}</TableCell>
               <TableCell>{reservation.service}</TableCell>
               <TableCell>
-                ₱{formatCurrency(reservation.totalAmount)}
+                  ₱{reservation.totalAmount !== undefined ? formatCurrency(reservation.totalAmount) : '0.00'}
               </TableCell>
               <TableCell>
                 <DropdownMenu>
@@ -536,14 +539,15 @@ const ReservationHistory = () => {
                     </Button>
                     <Button
                       variant="default"
-                      onClick={() => handleStatusUpdate(selectedReservation.id, 'Pending payment')}
+                      onClick={() => handleStatusUpdate(selectedReservation.id, 'Ongoing')}
                     >
-                      Mark as To Pay
+                      Mark as Ongoing
                     </Button>
                   </>
                 )}
 
-                {selectedReservation.Status === 'Pending payment' && (
+
+                {selectedReservation.Status === 'Ongoing' && (
                   <>
                     <Button
                       variant="destructive"
@@ -553,12 +557,14 @@ const ReservationHistory = () => {
                     </Button>
                     <Button
                       variant="default"
-                      onClick={() => handleStatusUpdate(selectedReservation.id, 'Completed')}
+                      onClick={() => handleStatusUpdate(selectedReservation.id, 'Pending payment')}
                     >
-                      Mark as Completed
+                      Mark as To Pay
                     </Button>
                   </>
                 )}
+
+
               </div>
             </DialogFooter>
             </div>

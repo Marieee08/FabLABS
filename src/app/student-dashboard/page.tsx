@@ -10,94 +10,143 @@ import RoleGuard from '@/components/auth/role-guard';
 
 interface Reservation {
   id: number;
+  Status: string;
   RequestDate: Date;
-  UtilReqApproval: boolean | null;
-  ProductsManufactured: string;
-  BulkofCommodity: string;
+  TotalAmntDue: number | null;
+  BulkofCommodity: string | null;
+  DateofProcessing: Date | null;
+  ProductsManufactured?: string;
   accInfo: {
-    name: string;
+    Name: string;
     email: string;
+    Role: string;
   };
-  ProcessInfos: Array<{
-    Equipment: string;
-    Tools: string;
-    ToolsQty: number;
+  UserServices: Array<{
+    id: string;
+    ServiceAvail: string;
+    EquipmentAvail: string;
+    CostsAvail: number | null;
+    MinsAvail: number | null;
+  }>;
+  UserTools: Array<{
+    id: string;
+    ToolUser: string;
+    ToolQuantity: number;
   }>;
   UtilTimes: Array<{
-    StartTime: Date;
-    EndTime: Date;
+    id: number;
+    DayNum: number | null;
+    StartTime: Date | null;
+    EndTime: Date | null;
   }>;
 }
 
 const DashboardUser = () => {
   const { user, isLoaded } = useUser();
   const [userRole, setUserRole] = useState<string>("Loading...");
-
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [orderDropdownOpen, setOrderDropdownOpen] = useState(false);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const today = new Date();
   const formattedDate = format(today, 'EEEE, dd MMMM yyyy');
 
- // useEffect to fetch reservations
- useEffect(() => {
-  const fetchReservations = async () => {
-    try {
-      const response = await fetch('/api/fetchReservations');
-      if (response.ok) {
+  // useEffect to fetch reservations for the current user
+  useEffect(() => {
+    const fetchUserReservations = async () => {
+      if (!isLoaded || !user) return;
+      
+      setIsLoading(true);
+      try {
+        // Call the API route we just created
+        const response = await fetch('/api/user/fetch-reservations');
+        
+        if (!response.ok) {
+          throw new Error(`Error: ${response.status} - ${await response.text()}`);
+        }
+        
         const data = await response.json();
         setReservations(data);
+      } catch (error) {
+        console.error('Error fetching user reservations:', error);
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error('Failed to fetch reservations:', error);
+    };
+  
+    if (isLoaded && user) {
+      fetchUserReservations();
+    }
+  }, [user, isLoaded]);
+
+  // useEffect to get user role
+  useEffect(() => {
+    const checkUserRole = async () => {
+      if (!user) {
+        setUserRole("Not logged in");
+        return;
+      }
+      try {
+        const publicMetadata = user.publicMetadata;
+        const role = publicMetadata.role;
+        setUserRole(role as string || "User");
+      } catch (error) {
+        console.error("Error fetching user role:", error);
+        setUserRole("Error fetching role");
+      }
+    };
+
+    if (isLoaded) {
+      checkUserRole();
+    }
+  }, [user, isLoaded]);
+
+  const handleReviewClick = (reservation: Reservation) => {
+    setSelectedReservation(reservation);
+    setIsModalOpen(true);
+  };
+
+  // Format the date for display
+  const formatDate = (dateString: string | Date | null) => {
+    if (!dateString) return "N/A";
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  // Get status badge color based on status
+  const getStatusBadgeClass = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'approved':
+        return 'bg-green-100 text-green-800';
+      case 'rejected':
+        return 'bg-red-100 text-red-800';
+      case 'completed':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
-  fetchReservations();
-}, []);
-
- // useEffect to user role
-useEffect(() => {
-  const checkUserRole = async () => {
-    if (!user) {
-      setUserRole("Not logged in");
-      return;
+  // Format currency with null check
+  const formatCurrency = (amount: number | null) => {
+    // Check for null first
+    if (amount === null) return 'Pending';
+    
+    // Convert to number explicitly to handle potential string values or other types
+    const numericAmount = Number(amount);
+    
+    // Check if conversion resulted in a valid number
+    if (isNaN(numericAmount)) {
+      console.error('Invalid amount value:', amount);
+      return 'Error';
     }
-    try {
-      const publicMetadata = user.publicMetadata;
-      const role = publicMetadata.role;
-      setUserRole(role as string);
-    } catch (error) {
-      console.error("Error fetching user role:", error);
-      setUserRole("Error fetching role");
-    }
+    
+    // Format the valid number
+    return `₱${numericAmount.toFixed(2)}`;
   };
-
-  if (isLoaded) {
-    checkUserRole();
-  }
-}, [user, isLoaded]);
-
-const handleReviewClick = (reservation: Reservation) => {
-  setSelectedReservation(reservation);
-  setIsModalOpen(true);
-};
-
-const renderSection = (title: string, fields: { label: string, value: any }[]) => (
-  <div className="mb-6">
-    <h3 className="text-lg font-medium text-gray-900 mb-3">{title}</h3>
-    <div className="grid grid-cols-2 gap-4">
-      {fields.map(({ label, value }) => (
-        <div key={label} className={`${label.toLowerCase().includes('address') ? 'col-span-2' : ''}`}>
-          <p className="text-sm text-gray-600">{label}</p>
-          <p className="mt-1">{value?.toString() || 'Not provided'}</p>
-        </div>
-      ))}
-    </div>
-  </div>
-);
 
   return (
     <RoleGuard allowedRoles={['STUDENT']}>
@@ -138,11 +187,6 @@ const renderSection = (title: string, fields: { label: string, value: any }[]) =
               <li>
                 <Link href="/student-dashboard/information" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-[#0d172c] border border-transparent hover:text-blue-800 hover:bg-blue-100 hover:border-[#5e86ca]">
                   Information
-                </Link>
-              </li>
-              <li>
-                <Link href="/student-dashboard/settings" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-[#0d172c] border border-transparent hover:text-blue-800 hover:bg-blue-100 hover:border-[#5e86ca]">
-                  Settings
                 </Link>
               </li>
             </ul>
@@ -187,7 +231,7 @@ const renderSection = (title: string, fields: { label: string, value: any }[]) =
                   <span className="block text-sm font-medium text-black">
                     {user?.firstName} {user?.lastName || ''}
                   </span>
-                  <span className="block text-xs">Student</span>
+                  <span className="block text-xs">{userRole}</span>
                 </span>
                 {user?.imageUrl ? (
                   <img 
@@ -211,148 +255,229 @@ const renderSection = (title: string, fields: { label: string, value: any }[]) =
             <div className="bg-white rounded-lg text-blue-800 px-4 py-4 shadow-md border border-[#5e86ca]">
               <p className="text-xl font-bold text-[#143370]">Pending Orders</p>
               <p className="text-sm text-[#143370] mb-4">Here are your pending orders!</p>
-              <div className="overflow-x-auto rounded-lg bg-blue-100 shadow-ld">
-              <table className="min-w-full divide-y divide-gray-200 rounded-xl">
-      <thead className="bg-gray-50">
-        <tr>
-          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
-          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Service</th>
-          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-        </tr>
-      </thead>
-      <tbody className="bg-white divide-y divide-gray-200">
-
-        {reservations.map((reservation) => (
-          <tr key={reservation.id}>
-            {/*Date*/}
-            <td className="px-6 py-4 whitespace-nowrap">
-              <div className="flex items-center">
-                <div>
-                  <div className="text-sm font-medium text-gray-500">
-                    {new Date(reservation.RequestDate).toLocaleDateString()}
-                  </div>
+              
+              {isLoading ? (
+                <div className="flex justify-center items-center h-32">
+                  <p>Loading your orders...</p>
                 </div>
-              </div>
-            </td>
+              ) : reservations.length === 0 ? (
+                <div className="bg-blue-50 p-6 rounded-lg text-center">
+                  <p className="text-blue-800">You don't have any pending orders at the moment.</p>
+                  <Link href="/user-services" className="mt-4 inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                    Create a New Order
+                  </Link>
+                </div>
+              ) : (
+                <div className="overflow-x-auto rounded-lg bg-blue-50 shadow-md">
+                  <table className="min-w-full divide-y divide-gray-200 rounded-lg">
+                    <thead className="bg-blue-100">
+                      <tr>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Date</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Product</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Services</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Total</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {reservations.map((reservation) => (
+                        <tr key={reservation.id} className="hover:bg-blue-50 transition-colors">
+                          {/* Date */}
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {formatDate(reservation.RequestDate)}
+                            </div>
+                          </td>
 
-            {/*Status*/}
-            <td className="px-4 py-4 whitespace-nowrap">
-              <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                Pending
-              </span>
-            </td>
+                          {/* Status */}
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeClass(reservation.Status)}`}>
+                              {reservation.Status}
+                            </span>
+                          </td>
 
-            {/*Product*/}
-            <td className="px-4 py-4 whitespace-nowrap">
-              <div className="text-sm text-gray-900">
-                {reservation.ProductsManufactured}
-              </div>
-            </td>
+                          {/* Product */}
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {reservation.BulkofCommodity || 'Not specified'}
+                            </div>
+                          </td>
 
-            
-            {/*Service*/}
-            <td className="px-6 py-4 whitespace-nowrap">
-                <div className="text-sm font-medium text-gray-900">
-                  Machine
-              </div>
-            </td>
+                          {/* Services */}
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {reservation.UserServices && reservation.UserServices.length > 0 
+                                ? reservation.UserServices.map(s => s.ServiceAvail).join(', ')
+                                : 'None'}
+                            </div>
+                          </td>
 
+                          {/* Total Amount */}
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {formatCurrency(reservation.TotalAmntDue)}
+                            </div>
+                          </td>
 
-            {/*Email*/}
-            <div className="px-6 py-4 whitespace-nowrap font-medium text-sm text-gray-500">
-                {reservation.accInfo.email}
+                          {/* Actions */}
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+  <button
+    onClick={() => handleReviewClick(reservation)}
+    className="text-blue-600 hover:text-blue-900 transition"
+  >
+    Review
+  </button>
+</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
 
-            {/*Review*/}
-
-            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-              <a href="#" 
-                onClick={(e) => {
-                  e.preventDefault();
-                  handleReviewClick(reservation);
-                }} 
-                className="ml-2 text-red-600 hover:text-red-900"
-              >
-                Review
-              </a>
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-            </div>
-            </div>
-
-       {/* Review Modal */}
-      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-semibold">Review Reservation</DialogTitle>
-        </DialogHeader>
-          
-          {selectedReservation && (
-            <div className="mt-4 space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h3 className="font-medium text-gray-900">Request Date</h3>
-                  <p>{new Date(selectedReservation.RequestDate).toLocaleDateString()}</p>
-                </div>
-                <div>
-                  <h3 className="font-medium text-gray-900">Status</h3>
-                  <p>{selectedReservation.UtilReqApproval === true
-                      ? 'Approved'
-                      : selectedReservation.UtilReqApproval === false
-                      ? 'Rejected'
-                      : 'Pending'}</p>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="font-medium text-gray-900">Products Information</h3>
-                <div className="mt-2">
-                  <p><span className="text-gray-600">Products Manufactured:</span> {selectedReservation.ProductsManufactured}</p>
-                  <p><span className="text-gray-600">Bulk of Commodity:</span> {selectedReservation.BulkofCommodity}</p>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="font-medium text-gray-900">Schedule</h3>
-                <div className="mt-2">
-                  {selectedReservation.UtilTimes.map((time, index) => (
-                    <div key={index}>
-                      <p><span className="text-gray-600">Start:</span> {new Date(time.StartTime).toLocaleString()}</p>
-                      <p><span className="text-gray-600">End:</span> {new Date(time.EndTime).toLocaleString()}</p>
+            {/* Review Modal */}
+            <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+              <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-semibold text-[#143370]">Order Details</DialogTitle>
+                </DialogHeader>
+                
+                {selectedReservation && (
+                  <div className="mt-4 space-y-6">
+                    {/* Order Info Section */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-b pb-4">
+                      <div>
+                        <h3 className="font-medium text-gray-900">Order ID</h3>
+                        <p className="text-gray-700">#{selectedReservation.id}</p>
+                      </div>
+                      <div>
+                        <h3 className="font-medium text-gray-900">Request Date</h3>
+                        <p className="text-gray-700">{formatDate(selectedReservation.RequestDate)}</p>
+                      </div>
+                      <div>
+                        <h3 className="font-medium text-gray-900">Status</h3>
+                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeClass(selectedReservation.Status)}`}>
+                          {selectedReservation.Status}
+                        </span>
+                      </div>
+                      <div>
+                        <h3 className="font-medium text-gray-900">Processing Date</h3>
+                        <p className="text-gray-700">{formatDate(selectedReservation.DateofProcessing) || 'Not scheduled'}</p>
+                      </div>
                     </div>
-                  ))}
-                </div>
-              </div>
 
-              <div>
-                <h3 className="font-medium text-gray-900">Process Information</h3>
-                {selectedReservation.ProcessInfos.map((process, index) => (
-                  <div key={index} className="mt-2 space-y-2">
+                    {/* Product Information */}
+                    <div className="border-b pb-4">
+                      <h3 className="font-medium text-gray-900 mb-2">Product Information</h3>
+                      <div className="bg-gray-50 p-3 rounded">
+                        <p className="text-gray-700"><span className="font-medium">Bulk of Commodity:</span> {selectedReservation.BulkofCommodity || 'Not specified'}</p>
+                      </div>
+                    </div>
+
+                    {/* Schedule Information */}
+                    <div className="border-b pb-4">
+                      <h3 className="font-medium text-gray-900 mb-2">Schedule Information</h3>
+                      <div className="bg-gray-50 p-3 rounded space-y-2">
+                        {selectedReservation.UtilTimes && selectedReservation.UtilTimes.length > 0 ? (
+                          selectedReservation.UtilTimes.map((time, index) => (
+                            <div key={index} className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              <div>
+                                <span className="font-medium">Day:</span> {time.DayNum || 'N/A'}
+                              </div>
+                              <div>
+                                <span className="font-medium">Time:</span> {time.StartTime ? new Date(time.StartTime).toLocaleTimeString() : 'N/A'} 
+                                - {time.EndTime ? new Date(time.EndTime).toLocaleTimeString() : 'N/A'}
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-gray-500">No schedule information available</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Services Information */}
+                    <div className="border-b pb-4">
+                      <h3 className="font-medium text-gray-900 mb-2">Services Requested</h3>
+                      {selectedReservation.UserServices && selectedReservation.UserServices.length > 0 ? (
+                        <div className="space-y-3">
+                          {selectedReservation.UserServices.map((service, index) => (
+                            <div key={index} className="bg-gray-50 p-3 rounded">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                <div>
+                                  <p className="font-medium">Service:</p> 
+                                  <p className="text-gray-700">{service.ServiceAvail}</p>
+                                </div>
+                                <div>
+                                  <p className="font-medium">Equipment:</p> 
+                                  <p className="text-gray-700">{service.EquipmentAvail}</p>
+                                </div>
+                                <div>
+                                  <p className="font-medium">Cost:</p> 
+                                  <p className="text-gray-700">{service.CostsAvail ? `₱${service.CostsAvail}` : 'TBD'}</p>
+                                </div>
+                                <div>
+                                  <p className="font-medium">Minutes:</p> 
+                                  <p className="text-gray-700">{service.MinsAvail || 'N/A'}</p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 bg-gray-50 p-3 rounded">No services requested</p>
+                      )}
+                    </div>
+
+                    {/* Tools Information */}
                     <div>
-                      <p className="text-gray-600">Equipment</p>
-                      <p>{process.Equipment}</p>
+                      <h3 className="font-medium text-gray-900 mb-2">Tools Requested</h3>
+                      {selectedReservation.UserTools && selectedReservation.UserTools.length > 0 ? (
+                        <div className="bg-gray-50 p-3 rounded">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead>
+                              <tr>
+                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Tool</th>
+                                <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Quantity</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                              {selectedReservation.UserTools.map((tool, index) => (
+                                <tr key={index}>
+                                  <td className="px-3 py-2 text-sm text-gray-700">{tool.ToolUser}</td>
+                                  <td className="px-3 py-2 text-sm text-gray-700">{tool.ToolQuantity}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <p className="text-gray-500 bg-gray-50 p-3 rounded">No tools requested</p>
+                      )}
                     </div>
-                    <div>
-                      <p className="text-gray-600">Tools</p>
-                      <p>{process.Tools}</p>
+
+                    {/* Total Amount */}
+                    <div className="border-t pt-4 flex justify-between items-center">
+                      <span className="font-semibold text-xl text-gray-900">Total Amount Due:</span>
+                      <span className="font-bold text-xl text-blue-800">
+                        {formatCurrency(selectedReservation.TotalAmntDue)}
+                      </span>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+                )}
+              </DialogContent>
+            </Dialog>
 
-            <div className="bg-white rounded-lg text-blue-800 pl-4 py-4 mt-4 shadow-md border border-[#5e86ca]">
+            <div className="bg-white rounded-lg text-blue-800 px-4 py-4 mt-4 shadow-md border border-[#5e86ca]">
               <p className="text-xl font-bold text-[#143370]">History</p>
               <p className="text-sm text-[#143370] mb-4">Here's a summary of your previous transactions!</p>
+              
+              {/* We can add the completed orders table here using similar structure as the pending orders table */}
+              <div className="bg-blue-50 p-6 rounded-lg text-center">
+                <p className="text-blue-800">History feature coming soon!</p>
+              </div>
             </div>
           </div>
         </main>
@@ -363,4 +488,3 @@ const renderSection = (title: string, fields: { label: string, value: any }[]) =
 };
 
 export default DashboardUser;
-
