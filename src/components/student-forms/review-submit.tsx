@@ -25,25 +25,37 @@ interface AccInfo {
   ClientInfo: ClientInfo | null;
 }
 
-// Updated to match UtilTime model
+// Updated Day interface to match your input schema
 interface Day {
   date: Date;
   startTime: string | null;
   endTime: string | null;
 }
 
-interface NeededMaterial {
+// Updated Material interface to match your input schema
+interface Material {
+  id: string; 
   Item: string;
   ItemQty: number;
   Description: string;
 }
 
-interface EVCStudent {
-  Students: string;
+// Updated Student interface to match your input schema
+interface Student {
+  id: number;
+  name: string;
 }
 
 interface FormData {
   days: Day[];
+  syncTimes?: boolean;
+  unifiedStartTime?: string | null;
+  unifiedEndTime?: string | null;
+  ProductsManufactured?: string;
+  BulkofCommodity?: string;
+  Equipment?: string;
+  Tools?: string;
+  ToolsQty?: number;
   ControlNo?: number;
   LvlSec?: string;
   NoofStudents?: number;
@@ -51,8 +63,8 @@ interface FormData {
   Teacher?: string;
   Topic?: string;
   SchoolYear?: number;
-  NeededMaterials?: NeededMaterial[];
-  EVCStudents?: EVCStudent[];
+  NeededMaterials?: Material[];
+  Students?: Student[];
   [key: string]: any; // Add index signature for dynamic access
 }
 
@@ -61,19 +73,6 @@ interface ReviewSubmitProps {
   prevStep: () => void;
   nextStep?: () => void;
   updateFormData: <K extends keyof FormData>(field: K, value: FormData[K]) => void;
-}
-
-interface ServiceCost {
-  Service: string;
-  Costs: number | string;
-  Per: string;
-}
-
-interface DateInfo {
-  day: Day;
-  duration: number;
-  billableHours: number;
-  cost: number;
 }
 
 const formatDate = (date: Date): string => {
@@ -145,13 +144,6 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
           endTimeISO = endTimeDate.toISOString();
         }
         
-        // For debugging
-        console.log(`Processing day ${index}:`, {
-          date: dateObj.toISOString(),
-          startTime: startTimeISO,
-          endTime: endTimeISO
-        });
-        
         return {
           DayNum: index + 1,
           StartTime: startTimeISO,
@@ -162,13 +154,13 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
       // Format needed materials to match the model
       const neededMaterials = formData.NeededMaterials?.map(material => ({
         Item: material.Item,
-        ItemQty: Number(material.ItemQty), // Ensure this is a number
+        ItemQty: Number(material.ItemQty),
         Description: material.Description,
       })) || [];
   
-      // Format EVC students to match the model
-      const evcStudents = formData.EVCStudents?.map(student => ({
-        Students: student.Students
+      // Format students to match the API expectations
+      const evcStudents = formData.Students?.map(student => ({
+        Students: student.name
       })) || [];
   
       // Prepare submission data in the format expected by the API
@@ -176,7 +168,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
         // EVCReservation base fields
         ControlNo: formData.ControlNo ? Number(formData.ControlNo) : undefined,
         LvlSec: formData.LvlSec || undefined,
-        NoofStudents: formData.NoofStudents ? Number(formData.NoofStudents) : undefined,
+        NoofStudents: formData.Students?.length || 0,
         Subject: formData.Subject || undefined,
         Teacher: formData.Teacher || undefined,
         Topic: formData.Topic || undefined,
@@ -307,7 +299,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-700">Number of Students</p>
-                    <p className="mt-1 text-gray-800">{formData.NoofStudents || 'Not provided'}</p>
+                    <p className="mt-1 text-gray-800">{formData.Students?.length || 'Not provided'}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-700">Subject</p>
@@ -327,7 +319,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
           </div>
 
           {/* Students List */}
-          {formData.EVCStudents && formData.EVCStudents.length > 0 && (
+          {formData.Students && formData.Students.length > 0 && (
             <div className="mb-6">
               <h3 className="text-lg font-medium mb-3 flex items-center">
                 <User className="h-5 w-5 text-blue-600 mr-2" /> Students
@@ -335,9 +327,9 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
               <Card className="border-gray-200 shadow-none">
                 <CardContent className="p-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                    {formData.EVCStudents.map((student, index) => (
-                      <div key={index} className="bg-gray-50 p-2 rounded">
-                        <p className="text-gray-800">{student.Students}</p>
+                    {formData.Students.map((student) => (
+                      <div key={student.id} className="bg-gray-50 p-2 rounded">
+                        <p className="text-gray-800">{student.name}</p>
                       </div>
                     ))}
                   </div>
@@ -364,8 +356,8 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
                         </tr>
                       </thead>
                       <tbody>
-                        {formData.NeededMaterials.map((material, index) => (
-                          <tr key={index} className="border-b hover:bg-gray-50">
+                        {formData.NeededMaterials.map((material) => (
+                          <tr key={material.id} className="border-b hover:bg-gray-50">
                             <td className="p-2 border">{material.Item}</td>
                             <td className="p-2 border text-center">{material.ItemQty}</td>
                             <td className="p-2 border">{material.Description}</td>
