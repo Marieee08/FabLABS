@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, MoreHorizontal as MoreHorizontalIcon } from 'lucide-react';
+import { Calendar, MoreHorizontal as MoreHorizontalIcon, FileText } from 'lucide-react';
 import {
   Table,
   TableBody,
@@ -25,7 +25,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { downloadPDF } from "@/components/admin-functions/pdfgen";
+import { downloadPDF } from "@/components/admin-functions/utilreqpdf";
+import { downloadMachineUtilizationPDF } from "@/components/admin-functions/machutilpdf";
+import { downloadJobPaymentOrderPDF } from "@/components/admin-functions/jobpaymentpdf";
 
 interface UserService {
   id: string;
@@ -110,7 +112,9 @@ const ReservationHistory = () => {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
   const [selectedReservation, setSelectedReservation] = useState<DetailedReservation | null>(null);
+  const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null);
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 21 }, (_, i) => currentYear - 10 + i);
   
@@ -175,20 +179,87 @@ const ReservationHistory = () => {
     }
   };
 
-  const handleGeneratePDF = async (reservationId: string) => {
-    try {
-      // Fetch detailed reservation data
-      const response = await fetch(`/api/admin/reservation-review/${reservationId}`);
-      if (!response.ok) throw new Error('Failed to fetch details');
-      const detailedData = await response.json();
-
-      // Call the downloadPDF function with the detailed data
-      await downloadPDF(detailedData);
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      alert('Failed to generate PDF. Please try again.');
-    }
+  const handleGeneratePDFClick = (reservationId: string) => {
+    setSelectedReservationId(reservationId);
+    setIsPdfModalOpen(true);
   };
+
+// PDF Generation Modal
+const handleGeneratePDF = async (reservationId: string, formType: string) => {
+  try {
+    // Fetch detailed reservation data
+    const response = await fetch(`/api/admin/reservation-review/${reservationId}`);
+    if (!response.ok) throw new Error('Failed to fetch details');
+    const detailedData = await response.json();
+
+    // Call different PDF functions based on form type
+    switch (formType) {
+      case 'utilization-request':
+        await downloadPDF(detailedData);
+        break;
+      case 'machine-utilization':
+        // Create sample machine utilization data from reservation data
+        const machineUtilizationData = {
+          machineType: detailedData.UserServices.length > 0 ? 
+            detailedData.UserServices[0].EquipmentAvail : 'Not specified',
+          operatingTimeEntries: detailedData.UtilTimes.map((time: UtilTime) => ({
+            date: new Date(detailedData.RequestDate).toLocaleDateString(),
+            productType: detailedData.BulkofCommodity || 'Not specified',
+            startTime: time.StartTime ? new Date(time.StartTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '',
+            endTime: time.EndTime ? new Date(time.EndTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '',
+            operatorName: detailedData.accInfo.Name
+          })),
+          downtimeEntries: [],
+          repairEntries: [],
+          reviewedBy: 'Admin',
+          reviewDate: new Date().toLocaleDateString()
+        };
+        await downloadMachineUtilizationPDF(machineUtilizationData);
+        break;
+      case 'job-payment':
+        // Create job payment data from reservation details
+        const jobPaymentData = {
+          orderNumber: `JPO-${detailedData.id}-${new Date().getFullYear()}`,
+          clientName: detailedData.accInfo.Name,
+          clientContact: detailedData.accInfo.ClientInfo?.ContactNum || '',
+          clientAddress: detailedData.accInfo.ClientInfo ? 
+            `${detailedData.accInfo.ClientInfo.Address}, ${detailedData.accInfo.ClientInfo.City}, ${detailedData.accInfo.ClientInfo.Province}` : '',
+          orderDate: new Date(detailedData.RequestDate).toLocaleDateString(),
+          services: detailedData.UserServices.map((service: UserService) => ({
+            name: service.ServiceAvail,
+            equipment: service.EquipmentAvail,
+            quantity: 1,
+            unitPrice: service.CostsAvail || 0,
+            amount: service.CostsAvail || 0
+          })),
+          tools: detailedData.UserTools.map((tool: UserTool) => ({
+            name: tool.ToolUser,
+            quantity: tool.ToolQuantity,
+            unitPrice: 0, // Assuming tool prices are not in the data
+            amount: 0 // Calculate if pricing is available
+          })),
+          totalAmount: detailedData.TotalAmntDue || 0,
+          preparedBy: 'Lab Staff',
+          approvedBy: 'Lab Manager'
+        };
+        await downloadJobPaymentOrderPDF(jobPaymentData);
+        break;
+      case 'registration':
+      case 'lab-request':
+        // For forms that don't have specific functions yet, use the general PDF function
+        await downloadPDF(detailedData, formType);
+        break;
+      default:
+        console.error('Unknown form type:', formType);
+    }
+
+    // Close the modal after generating the PDF
+    setIsPdfModalOpen(false);
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    alert('Failed to generate PDF. Please try again.');
+  }
+};
 
   const filteredReservations = reservations.filter(reservation => {
     const matchesTab = activeTab === 'all' || reservation.role.toLowerCase() === activeTab.toLowerCase();
@@ -369,7 +440,7 @@ const ReservationHistory = () => {
                     <DropdownMenuItem onSelect={() => handleReviewClick(reservation)}>
                       Review
                     </DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => handleGeneratePDF(reservation.id)}>
+                    <DropdownMenuItem onSelect={() => handleGeneratePDFClick(reservation.id)}>
                       Generate PDF
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -578,6 +649,100 @@ const ReservationHistory = () => {
             </DialogFooter>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* PDF Generation Modal */}
+      <Dialog open={isPdfModalOpen} onOpenChange={setIsPdfModalOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold flex items-center">
+              <FileText className="mr-2 h-5 w-5" />
+              Generate PDF Documents
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Document Type</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow>
+                  <TableCell className="font-medium">Registration Form</TableCell>
+                  <TableCell className="text-right">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => selectedReservationId && handleGeneratePDF(selectedReservationId, 'registration')}
+                    >
+                      Generate PDF
+                    </Button>
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">Utilization Request Form</TableCell>
+                  <TableCell className="text-right">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => selectedReservationId && handleGeneratePDF(selectedReservationId, 'utilization-request')}
+                    >
+                      Generate PDF
+                    </Button>
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">Machine Utilization Form</TableCell>
+                  <TableCell className="text-right">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => selectedReservationId && handleGeneratePDF(selectedReservationId, 'machine-utilization')}
+                    >
+                      Generate PDF
+                    </Button>
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">Job and Payment Order</TableCell>
+                  <TableCell className="text-right">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => selectedReservationId && handleGeneratePDF(selectedReservationId, 'job-payment')}
+                    >
+                      Generate PDF
+                    </Button>
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">Laboratory Request Form (Students)</TableCell>
+                  <TableCell className="text-right">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => selectedReservationId && handleGeneratePDF(selectedReservationId, 'lab-request')}
+                    >
+                      Generate PDF
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="secondary" 
+              onClick={() => setIsPdfModalOpen(false)}
+            >
+              Close
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
