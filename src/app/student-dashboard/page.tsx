@@ -1,3 +1,5 @@
+// /student-dashbaord/page.tsx
+
 "use client";
 
 import Link from "next/link";
@@ -86,27 +88,29 @@ const DashboardUser = () => {
     }
   }, [user, isLoaded]);
 
-  // useEffect to get user role
-  useEffect(() => {
-    const checkUserRole = async () => {
-      if (!user) {
-        setUserRole("Not logged in");
-        return;
-      }
-      try {
-        const publicMetadata = user.publicMetadata;
-        const role = publicMetadata.role;
-        setUserRole(role as string || "User");
-      } catch (error) {
-        console.error("Error fetching user role:", error);
-        setUserRole("Error fetching role");
-      }
-    };
-
-    if (isLoaded) {
-      checkUserRole();
+ // useEffect to user role
+ useEffect(() => {
+  const fetchUserRole = async () => {
+    if (!isLoaded || !user) {
+      setUserRole("Not logged in");
+      return;
     }
-  }, [user, isLoaded]);
+
+    try {
+      const response = await fetch('/api/auth/check-roles');
+      if (!response.ok) {
+        throw new Error('Failed to fetch role');
+      }
+      const data = await response.json();
+      setUserRole(data.role || "No role assigned");
+    } catch (error) {
+      console.error("Error fetching user role:", error);
+      setUserRole("Error fetching role");
+    }
+  };
+
+  fetchUserRole();
+}, [user, isLoaded]);
 
   const handleEVCReviewClick = (reservation: EVCReservation) => {
     setSelectedEVCReservation(reservation);
