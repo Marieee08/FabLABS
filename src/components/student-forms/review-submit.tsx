@@ -1,3 +1,5 @@
+// /components/student-forms/review-submit
+
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { useUser } from "@clerk/nextjs";
@@ -61,6 +63,7 @@ interface FormData {
   NoofStudents?: number;
   Subject?: string;
   Teacher?: string;
+  TeacherEmail?: string;
   Topic?: string;
   SchoolYear?: number;
   NeededMaterials?: Material[];
@@ -171,6 +174,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
         NoofStudents: formData.Students?.length || 0,
         Subject: formData.Subject || undefined,
         Teacher: formData.Teacher || undefined,
+        TeacherEmail: formData.TeacherEmail || undefined,
         Topic: formData.Topic || undefined,
         SchoolYear: formData.SchoolYear ? Number(formData.SchoolYear) : undefined,
         
@@ -302,16 +306,20 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
                     <p className="mt-1 text-gray-800">{formData.Students?.length || 'Not provided'}</p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-700">Subject</p>
-                    <p className="mt-1 text-gray-800">{formData.Subject || 'Not provided'}</p>
-                  </div>
-                  <div>
                     <p className="text-sm font-medium text-gray-700">Teacher</p>
                     <p className="mt-1 text-gray-800">{formData.Teacher || 'Not provided'}</p>
                   </div>
-                  <div className="md:col-span-2">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Teacher Email</p>
+                    <p className="mt-1 text-gray-800">{formData.TeacherEmail || 'Not provided'}</p>
+                  </div>                 
+                  <div>
                     <p className="text-sm font-medium text-gray-700">Topic</p>
                     <p className="mt-1 text-gray-800">{formData.Topic || 'Not provided'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Subject</p>
+                    <p className="mt-1 text-gray-800">{formData.Subject || 'Not provided'}</p>
                   </div>
                 </div>
               </CardContent>

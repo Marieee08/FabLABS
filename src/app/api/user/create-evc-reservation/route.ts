@@ -1,3 +1,5 @@
+// /api/user/create-evc-reservation
+
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
@@ -41,6 +43,7 @@ export async function POST(request: Request) {
         NoofStudents: data.NoofStudents || null,
         Subject: data.Subject || null,
         Teacher: data.Teacher || null,
+        TeacherEmail: data.TeacherEmail || null, 
         Topic: data.Topic || null,
         SchoolYear: data.SchoolYear || null,
         EVCStatus: "Pending",

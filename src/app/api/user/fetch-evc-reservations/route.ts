@@ -1,3 +1,5 @@
+// /api/user/fetch-evc-reservations
+
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
