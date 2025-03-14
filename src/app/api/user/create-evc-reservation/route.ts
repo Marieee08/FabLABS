@@ -5,10 +5,10 @@ import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
-
 export async function POST(request: Request) {
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
+    
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
@@ -80,9 +80,7 @@ export async function POST(request: Request) {
             DayNum: time.DayNum || index + 1,
             StartTime: time.StartTime ? new Date(time.StartTime) : null,
             EndTime: time.EndTime ? new Date(time.EndTime) : null,
-            evc: {
-              connect: { id: evcReservation.id }
-            }
+            evcId: evcReservation.id  // Use the direct foreign key field
           }
         });
       }));
@@ -103,9 +101,9 @@ export async function POST(request: Request) {
       message: 'EVC reservation created successfully',
       reservation: completeReservation
     });
-    
   } catch (error: any) {
-    console.error('Error creating EVC reservation:', error);
+    // Safer error logging
+    console.error('Error creating EVC reservation:', error ? error.toString() : 'Unknown error');
     
     // Provide detailed error information for debugging
     const errorMessage = error?.message || 'Unknown error';

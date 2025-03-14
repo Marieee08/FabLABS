@@ -197,14 +197,23 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
         },
         body: JSON.stringify(submissionData),
       });
-  
-      if (!response.ok) {
-        const errorData = await response.json();
-        const errorMessage = typeof errorData.details === 'string' 
-          ? errorData.details 
-          : (errorData.error || 'Failed to submit reservation');
-        throw new Error(errorMessage);
-      }
+      
+      const responseText = await response.text();
+      console.log('Raw response:', responseText);
+
+      let errorData = null;
+        if (responseText) {
+          try {
+            errorData = JSON.parse(responseText);
+          } catch (e) {
+            console.error('Failed to parse response as JSON:', e);
+          }
+        }
+
+        if (!response.ok) {
+          const errorMessage = errorData?.details || errorData?.error || 'Failed to submit reservation';
+          throw new Error(errorMessage);
+        }
   
       // Redirect to dashboard on success
       router.push('/user-dashboard');
@@ -394,18 +403,6 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
                   <div>
                     <p className="text-sm font-medium text-gray-700">Email</p>
                     <p className="mt-1 text-gray-800">{user?.emailAddresses[0]?.emailAddress || accInfo?.email}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Contact Number</p>
-                    <p className="mt-1 text-gray-800">{accInfo?.ClientInfo?.ContactNum || 'Not provided'}</p>
-                  </div>
-                  <div className="md:col-span-2">
-                    <p className="text-sm font-medium text-gray-700">Complete Address</p>
-                    <p className="mt-1 text-gray-800">
-                      {accInfo?.ClientInfo ? 
-                        `${accInfo.ClientInfo.Address || ''}, ${accInfo.ClientInfo.City || ''}, ${accInfo.ClientInfo.Province || ''} ${accInfo.ClientInfo.Zipcode || ''}`.replace(/^[,\s]+|[,\s]+$/g, '') 
-                        : 'Not provided'}
-                    </p>
                   </div>
                 </div>
               </CardContent>
