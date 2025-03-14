@@ -182,6 +182,7 @@ model EVCReservation {
   NoofStudents    Int?
   Subject         String?
   Teacher         String?
+  TeacherEmail    String?        
   Topic           String?
   UtilTimes       UtilTime[]       @relation(name: "EVCReservationtoUtilTime") // Changed from LabDates to UtilTimes
   DateRequested   DateTime?        @default(now())

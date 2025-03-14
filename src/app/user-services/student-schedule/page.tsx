@@ -44,6 +44,7 @@ interface FormData {
   NoofStudents: number;
   Subject: string;
   Teacher: string;
+  TeacherEmail: string; 
   Topic: string;
   SchoolYear: number;
   
@@ -73,6 +74,7 @@ export default function Schedule() {
     NoofStudents: 0,
     Subject: '',
     Teacher: '',
+    TeacherEmail: '',
     Topic: '',
     SchoolYear: new Date().getFullYear(),
     NeededMaterials: []
