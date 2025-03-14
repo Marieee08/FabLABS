@@ -79,45 +79,7 @@ const SimpleSurveyDashboard = () => {
       } catch (error) {
         console.error('Error fetching reservations:', error);
         // For demo purposes, we'll create some sample data if the API fails
-        setReservations([
-          {
-            id: 1001,
-            Status: 'Paid',
-            RequestDate: '2025-03-01T10:00:00Z',
-            TotalAmntDue: 1500.00,
-            UserServices: [
-              {
-                id: 's1',
-                ServiceAvail: '3D Printing',
-                EquipmentAvail: 'Prusa i3 MK3'
-              }
-            ],
-            accInfo: {
-              Name: 'John Smith'
-            }
-          },
-          {
-            id: 1002,
-            Status: 'Paid',
-            RequestDate: '2025-03-03T15:30:00Z',
-            TotalAmntDue: 2200.00,
-            UserServices: [
-              {
-                id: 's2',
-                ServiceAvail: 'Laser Cutting',
-                EquipmentAvail: 'Epilog Fusion Pro'
-              },
-              {
-                id: 's3',
-                ServiceAvail: 'CNC Milling',
-                EquipmentAvail: 'Shapeoko 4'
-              }
-            ],
-            accInfo: {
-              Name: 'Maria Garcia'
-            }
-          }
-        ]);
+        
         setIsLoading(false);
       }
     };
