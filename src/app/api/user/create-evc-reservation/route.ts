@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
+
 export async function POST(request: Request) {
   try {
     const { userId } = await auth();
@@ -14,6 +15,7 @@ export async function POST(request: Request) {
     }
     
     const data = await request.json();
+    console.log('Received data:', data);
     
     // Validate required data
     if (!data.UtilTimes?.length) {
@@ -40,7 +42,7 @@ export async function POST(request: Request) {
       data: {
         ControlNo: data.ControlNo || null,
         LvlSec: data.LvlSec || null,
-        NoofStudents: data.NoofStudents || null,
+        NoofStudents: data.NoofStudents || 0,
         Subject: data.Subject || null,
         Teacher: data.Teacher || null,
         TeacherEmail: data.TeacherEmail || null, 
@@ -52,38 +54,42 @@ export async function POST(request: Request) {
         // Link to the user account
         accInfo: {
           connect: { id: userAccount.id }
-        },
-        
-        // Create EVCStudent entries if provided
-        EVCStudents: data.EVCStudents?.length > 0 ? {
-          create: data.EVCStudents.map((student: any) => ({
-            Students: student.Students || '',
-          }))
-        } : undefined,
-        
-        // Create NeededMaterial entries if provided
-        NeededMaterials: data.NeededMaterials?.length > 0 ? {
-          create: data.NeededMaterials.map((material: any) => ({
-            Item: material.Item || '',
-            ItemQty: material.ItemQty || 0,
-            Description: material.Description || '',
-          }))
-        } : undefined
+        }
       }
     });
 
-    // Now create the UtilTime entries and connect them to the reservation
+    // Create EVCStudent entries if provided
+    if (data.EVCStudents?.length > 0) {
+      await prisma.eVCStudent.createMany({
+        data: data.EVCStudents.map((student: any) => ({
+          Students: student.Students || '',
+          evcId: evcReservation.id
+        }))
+      });
+    }
+    
+    // Create NeededMaterial entries if provided
+    if (data.NeededMaterials?.length > 0) {
+      await prisma.neededMaterial.createMany({
+        data: data.NeededMaterials.map((material: any) => ({
+          Item: material.Item || '',
+          ItemQty: material.ItemQty || 0,
+          Description: material.Description || '',
+          evcId: evcReservation.id
+        }))
+      });
+    }
+
+    // Create the UtilTime entries
     if (data.UtilTimes?.length > 0) {
-      await Promise.all(data.UtilTimes.map(async (time: any, index: number) => {
-        await prisma.utilTime.create({
-          data: {
-            DayNum: time.DayNum || index + 1,
-            StartTime: time.StartTime ? new Date(time.StartTime) : null,
-            EndTime: time.EndTime ? new Date(time.EndTime) : null,
-            evcId: evcReservation.id  // Use the direct foreign key field
-          }
-        });
-      }));
+      await prisma.utilTime.createMany({
+        data: data.UtilTimes.map((time: any, index: number) => ({
+          DayNum: time.DayNum || index + 1,
+          StartTime: time.StartTime ? new Date(time.StartTime) : null,
+          EndTime: time.EndTime ? new Date(time.EndTime) : null,
+          evcId: evcReservation.id
+        }))
+      });
     }
 
     // Fetch the complete reservation with related data
@@ -102,12 +108,17 @@ export async function POST(request: Request) {
       reservation: completeReservation
     });
   } catch (error: any) {
-    // Safer error logging
-    console.error('Error creating EVC reservation:', error ? error.toString() : 'Unknown error');
+    console.error('Error creating EVC reservation:', error);
     
     // Provide detailed error information for debugging
     const errorMessage = error?.message || 'Unknown error';
-    const errorDetails = error?.meta?.cause || errorMessage;
+    let errorDetails = errorMessage;
+    
+    if (error?.meta?.cause) {
+      errorDetails = error.meta.cause;
+    } else if (error?.code) {
+      errorDetails = `Error code: ${error.code}`;
+    }
     
     return NextResponse.json(
       { 

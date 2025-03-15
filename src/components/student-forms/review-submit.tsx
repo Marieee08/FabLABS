@@ -1,5 +1,3 @@
-// /components/student-forms/review-submit
-
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { useUser } from "@clerk/nextjs";
@@ -85,6 +83,12 @@ const formatDate = (date: Date): string => {
     month: 'long',
     day: 'numeric'
   });
+};
+
+// Format school year to show range (e.g., "2024 to 2025")
+const formatSchoolYear = (year: number | undefined): string => {
+  if (!year) return 'Not provided';
+  return `${year} to ${year + 1}`;
 };
 
 export default function ReviewSubmit({ formData, prevStep, updateFormData, nextStep }: ReviewSubmitProps) {
@@ -304,7 +308,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-700">School Year</p>
-                    <p className="mt-1 text-gray-800">{formData.SchoolYear || 'Not provided'}</p>
+                    <p className="mt-1 text-gray-800">{formatSchoolYear(formData.SchoolYear)}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-gray-700">Level/Section</p>
