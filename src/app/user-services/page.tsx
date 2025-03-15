@@ -1,3 +1,5 @@
+// /user-services/page.tsx
+
 "use client";
 
 import React, { useEffect, useState, useRef } from 'react';
@@ -5,7 +7,7 @@ import Link from "next/link";
 import { useRouter } from 'next/navigation';
 import PricingTable from '@/components/admin-functions/price-table';
 import Navbar from '@/components/custom/navbar';
-import { AlertCircle, Clock, BadgeX, X } from 'lucide-react';
+import { AlertCircle, Clock, BadgeX, X, Info } from 'lucide-react';
 
 interface Machine {
   id: string;
@@ -18,6 +20,14 @@ interface Machine {
   createdAt: string;
 }
 
+interface ClientInfo {
+  ContactNum: string;
+  Address: string | null;
+  City: string | null;
+  Province: string | null;
+  Zipcode: number | null;
+}
+
 export default function Services() {
   const router = useRouter();
   const [isAnimating, setIsAnimating] = useState(false);
@@ -25,6 +35,8 @@ export default function Services() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [machines, setMachines] = useState<Machine[]>([]);
   const [userRole, setUserRole] = useState<string>("");
+  const [isBusinessInfoMissing, setIsBusinessInfoMissing] = useState(false);
+  const [isMissingInfoModalOpen, setIsMissingInfoModalOpen] = useState(false);
   const pricingRef = useRef<HTMLElement>(null);
 
   const handleButtonClick = () => {
@@ -33,6 +45,10 @@ export default function Services() {
 
   const handleCloseModal = () => {
     setIsModalOpen(false);
+  };
+
+  const handleCloseMissingInfoModal = () => {
+    setIsMissingInfoModalOpen(false);
   };
 
   useEffect(() => {
@@ -60,13 +76,26 @@ export default function Services() {
       }
     };
   
-    // Fetch user info to get role
-    const fetchUserRole = async () => {
+    // Fetch user info to get role and check business info
+    const fetchUserInfo = async () => {
       try {
         const response = await fetch('/api/user/info');
         const data = await response.json();
+        
         if (data && data.Role) {
           setUserRole(data.Role);
+          
+          // If user is MSME, check if business info is missing
+          if (data.Role === "MSME") {
+            const hasBusinessInfo = 
+              data.ClientInfo && 
+              data.ClientInfo.Address && 
+              data.ClientInfo.City && 
+              data.ClientInfo.Province && 
+              data.ClientInfo.Zipcode;
+            
+            setIsBusinessInfoMissing(!hasBusinessInfo);
+          }
         }
       } catch (error) {
         console.error('Error fetching user info:', error);
@@ -76,15 +105,27 @@ export default function Services() {
     };
 
     fetchMachines();
-    fetchUserRole();
+    fetchUserInfo();
   }, []);
 
   const handleScheduleClick = () => {
+    // Check if user is MSME and business info is missing
+    if (userRole === "MSME" && isBusinessInfoMissing) {
+      setIsMissingInfoModalOpen(true);
+      return;
+    }
+    
+    // If all good, navigate to the appropriate scheduling page
     if (userRole === "STUDENT") {
       router.push('/user-services/student-schedule');
     } else {
       router.push('/user-services/msme-schedule');
     }
+  };
+
+  const redirectToInformation = () => {
+    router.push('/student-dashboard/information');
+    setIsMissingInfoModalOpen(false);
   };
 
   const scrollToPricing = () => {
@@ -282,6 +323,53 @@ export default function Services() {
                     </button>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Missing Business Information Modal */}
+        {isMissingInfoModalOpen && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+            <div 
+              className="bg-white rounded-lg shadow-lg w-full max-w-md p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center">
+                  <Info className="w-6 h-6 text-amber-500 mr-2" />
+                  <h2 className="text-xl font-bold font-qanelas2">Business Information Required</h2>
+                </div>
+                <button
+                  onClick={handleCloseMissingInfoModal}
+                  className="text-gray-500 hover:text-gray-700 transition duration-300"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              
+              <div className="mb-6">
+                <p className="text-gray-700 font-poppins1 mb-4">
+                  To schedule a service, you need to complete your business information first. This helps us better serve your business needs.
+                </p>
+                <div className="bg-amber-50 border-l-4 border-amber-500 p-4 text-amber-700">
+                  <p className="font-poppins1">Please fill out your business details to continue with scheduling.</p>
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={handleCloseMissingInfoModal}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 transition duration-300 font-poppins1"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={redirectToInformation}
+                  className="px-4 py-2 bg-[#1c62b5] text-white rounded-md hover:bg-[#154c8f] transition duration-300 font-poppins1"
+                >
+                  Update Information
+                </button>
               </div>
             </div>
           </div>

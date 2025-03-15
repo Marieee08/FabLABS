@@ -7,26 +7,25 @@ datasource db {
   url      = "file:./dev.db"
 }
 
-//For admin to edit machine catalog
 model Machine {
-  id          String          @id @default(cuid())
-  Machine     String
-  Image       String
-  Desc        String
+  id           String           @id @default(cuid())
+  Machine      String
+  Image        String
+  Desc         String
   Instructions String?
-  Link        String?
-  isAvailable Boolean         @default(true)
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  Services    MachineService[]
+  Link         String?
+  isAvailable  Boolean          @default(true)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  Services     MachineService[]
 }
 
 model Service {
-  id       String          @id @default(cuid())
+  id       String           @id @default(cuid())
   Service  String
+  Costs    Decimal?
   Icon     String?
   Info     String?
-  Costs    Decimal?
   Per      String?
   Machines MachineService[]
 }
@@ -34,13 +33,11 @@ model Service {
 model MachineService {
   machineId String
   serviceId String
-
-  machine   Machine @relation(fields: [machineId], references: [id], onDelete: NoAction)
   service   Service @relation(fields: [serviceId], references: [id], onDelete: NoAction)
+  machine   Machine @relation(fields: [machineId], references: [id], onDelete: NoAction)
 
-  @@id([machineId, serviceId]) // Composite primary key
+  @@id([machineId, serviceId])
 }
-
 
 model Tool {
   id       String @id @default(cuid())
@@ -53,15 +50,14 @@ model AccInfo {
   id              Int              @id @default(autoincrement())
   clerkId         String           @unique
   Name            String
-  email           String           @unique 
+  email           String           @unique
   Role            String           @default("MSME")
-  ClientInfo      ClientInfo?      @relation(name: "AccInfoToClientInfo")
-  BusinessInfo    BusinessInfo?    @relation(name: "AccInfoToBusinessInfo")
-  UtilReqs        UtilReq[]        @relation(name: "AccInfoToUtilReq")
-  EVCReservations EVCReservation[] @relation(name: "AccInfoToEVCReservation")
+  BusinessInfo    BusinessInfo?    @relation("AccInfoToBusinessInfo")
+  ClientInfo      ClientInfo?      @relation("AccInfoToClientInfo")
+  EVCReservations EVCReservation[] @relation("AccInfoToEVCReservation")
+  UtilReqs        UtilReq[]        @relation("AccInfoToUtilReq")
 }
 
-// For Acc Registration (For External Clients)
 model ClientInfo {
   id         Int     @id @default(autoincrement())
   ContactNum String
@@ -69,11 +65,10 @@ model ClientInfo {
   City       String?
   Province   String?
   Zipcode    Int?
-  accInfoId  Int     @unique //Foreign key for one-to-one relationship
-  accInfo    AccInfo @relation(name: "AccInfoToClientInfo", fields: [accInfoId], references: [id])
+  accInfoId  Int     @unique
+  accInfo    AccInfo @relation("AccInfoToClientInfo", fields: [accInfoId], references: [id])
 }
 
-// For Acc Registration (For ext clients with business)
 model BusinessInfo {
   id                  Int     @id @default(autoincrement())
   isNotBusinessOwner  Boolean @default(false)
@@ -94,47 +89,40 @@ model BusinessInfo {
   Manufactured        String?
   ProductionFrequency String?
   Bulk                String?
-  accInfoId           Int     @unique //Foreign key for one-to-one relationship
-  accInfo             AccInfo @relation(name: "AccInfoToBusinessInfo", fields: [accInfoId], references: [id])
+  accInfoId           Int     @unique
+  accInfo             AccInfo @relation("AccInfoToBusinessInfo", fields: [accInfoId], references: [id])
 }
 
-// Utilization request - parent record for surveys
 model UtilReq {
-  id                   Int                   @id @default(autoincrement())
-  Status               String                @default("Pending")
-  RequestDate          DateTime              @default(now())
-  TotalAmntDue         Decimal?
-  BulkofCommodity      String?
-  DateofProcessing     DateTime?
-  Processedby          String?
-  ReceiptNumber        String?
-  PaymentDate          DateTime?
-  
-  // Survey related models
-  PreliminarySurvey    PreliminarySurvey?    @relation(name: "UtilReqToPreliminarySurvey")
-  CustomerFeedback     CustomerFeedback?     @relation(name: "UtilReqToCustomerFeedback")
-  EmployeeEvaluation   EmployeeEvaluation?   @relation(name: "UtilReqToEmployeeEvaluation")
-  SatisfactionSurvey   SatisfactionSurvey?   @relation(name: "UtilReqToSatisfactionSurvey")
-  ServiceAvailed       ServiceAvailed[]      @relation(name: "UtilReqToServiceAvailed")
-  
-  // Other related models from existing schema
-  UtilTimes            UtilTime[]            @relation(name: "UtilReqToUtilTime")
-  UserServices         UserService[]         @relation(name: "UtilReqToUserService")
-  UserTools            UserTool[]            @relation(name: "UtilReqToUserTool")
-  MachineUtilizations  MachineUtilization[]  @relation(name: "UtilReqToMachineUtilization")
-  JobandPayment        JobandPayment?        @relation(name: "UtilReqToJobandPayment")
-  
-  accInfoId            Int?
-  accInfo              AccInfo?              @relation(name: "AccInfoToUtilReq", fields: [accInfoId], references: [id])
+  id                  Int                  @id @default(autoincrement())
+  Status              String               @default("Pending")
+  RequestDate         DateTime             @default(now())
+  TotalAmntDue        Decimal?
+  BulkofCommodity     String?
+  DateofProcessing    DateTime?
+  Processedby         String?
+  ReceiptNumber       String?
+  PaymentDate         DateTime?
+  accInfoId           Int?
+  CustomerFeedback    CustomerFeedback?    @relation("UtilReqToCustomerFeedback")
+  EmployeeEvaluation  EmployeeEvaluation?  @relation("UtilReqToEmployeeEvaluation")
+  JobandPayment       JobandPayment?       @relation("UtilReqToJobandPayment")
+  MachineUtilizations MachineUtilization[] @relation("UtilReqToMachineUtilization")
+  PreliminarySurvey   PreliminarySurvey?   @relation("UtilReqToPreliminarySurvey")
+  SatisfactionSurvey  SatisfactionSurvey?  @relation("UtilReqToSatisfactionSurvey")
+  ServiceAvailed      ServiceAvailed[]     @relation("UtilReqToServiceAvailed")
+  UserServices        UserService[]        @relation("UtilReqToUserService")
+  UserTools           UserTool[]           @relation("UtilReqToUserTool")
+  accInfo             AccInfo?             @relation("AccInfoToUtilReq", fields: [accInfoId], references: [id])
+  UtilTimes           UtilTime[]           @relation("UtilReqToUtilTime")
 }
 
-// 3 models below are part of Utilization Request
 model UserTool {
-  id           String  @id @default(cuid())
+  id           String   @id @default(cuid())
   ToolUser     String
   ToolQuantity Int
-  utilReqId    Int?    //Foreign key for one-to-many relationship
-  utilReq      UtilReq? @relation(name: "UtilReqToUserTool", fields: [utilReqId], references: [id])
+  utilReqId    Int?
+  utilReq      UtilReq? @relation("UtilReqToUserTool", fields: [utilReqId], references: [id])
 }
 
 model UserService {
@@ -142,71 +130,60 @@ model UserService {
   ServiceAvail   String
   EquipmentAvail String
   CostsAvail     Decimal?
-  MinsAvail      Decimal? 
-  utilReqId      Int?     //Foreign key for one-to-many relationship
-  utilReq        UtilReq? @relation(name: "UtilReqToUserService", fields: [utilReqId], references: [id])
+  MinsAvail      Decimal?
+  utilReqId      Int?
+  utilReq        UtilReq? @relation("UtilReqToUserService", fields: [utilReqId], references: [id])
 }
 
 model UtilTime {
-  id        Int       @id @default(autoincrement())
+  id        Int             @id @default(autoincrement())
   DayNum    Int?
   StartTime DateTime?
   EndTime   DateTime?
-  utilReqId Int?      //Foreign key for one-to-many relationship
-  utilReq   UtilReq?  @relation(name: "UtilReqToUtilTime", fields: [utilReqId], references: [id])
-  
-  // New relation for EVCReservation
+  utilReqId Int?
   evcId     Int?
-  evc       EVCReservation? @relation(name: "EVCReservationtoUtilTime", fields: [evcId], references: [id])
+  evc       EVCReservation? @relation("EVCReservationtoUtilTime", fields: [evcId], references: [id])
+  utilReq   UtilReq?        @relation("UtilReqToUtilTime", fields: [utilReqId], references: [id])
 }
 
-// For blocking dates
 model BlockedDate {
   id        String   @id @default(cuid())
-  date      DateTime
+  date      DateTime @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([date])
   @@index([date])
 }
 
-// For Reservations (EVC Accounts)
 model EVCReservation {
   id              Int              @id @default(autoincrement())
   EVCStatus       String           @default("Pending")
-
-  // Lab Reservation
   ControlNo       Int?
   LvlSec          String?
   NoofStudents    Int?
   Subject         String?
   Teacher         String?
   Topic           String?
-  UtilTimes       UtilTime[]       @relation(name: "EVCReservationtoUtilTime") // Changed from LabDates to UtilTimes
   DateRequested   DateTime?        @default(now())
-  EVCStudents     EVCStudent[]     @relation(name: "EVCReservationtoEVCStudent") //One-to-many
-  // UserSig         Bytes?         // NOT SURE
-  // TeacherSig      Bytes?         // NOT SURE
   ApprovedBy      String?
-  
-  // Lab Request
   SchoolYear      Int?
-  NeededMaterials NeededMaterial[] @relation(name: "EVCReservationtoNeededMaterial") //One-to-many
-  ReceivedBy      String?          // Filled by Admin after operations
-  ReceivedDate    DateTime?        // Filled by Admin after operations
-  InspectedBy     String?          // Filled by Admin after operations
-  InspectedDate   DateTime?        // Filled by Admin after operations
-  
-  accInfoId       Int?             //Foreign key for one-to-many relationship
-  accInfo         AccInfo?         @relation(name: "AccInfoToEVCReservation", fields: [accInfoId], references: [id])
+  ReceivedBy      String?
+  ReceivedDate    DateTime?
+  InspectedBy     String?
+  InspectedDate   DateTime?
+  accInfoId       Int?
+  TeacherEmail    String?
+  accInfo         AccInfo?         @relation("AccInfoToEVCReservation", fields: [accInfoId], references: [id])
+  EVCStudents     EVCStudent[]     @relation("EVCReservationtoEVCStudent")
+  NeededMaterials NeededMaterial[] @relation("EVCReservationtoNeededMaterial")
+  UtilTimes       UtilTime[]       @relation("EVCReservationtoUtilTime")
 }
 
 model EVCStudent {
   id       Int             @id @default(autoincrement())
   Students String?
-  evcId    Int?            //Foreign key for one-to-many relationship
-  evc      EVCReservation? @relation(name: "EVCReservationtoEVCStudent", fields: [evcId], references: [id])
+  evcId    Int?
+  evc      EVCReservation? @relation("EVCReservationtoEVCStudent", fields: [evcId], references: [id])
 }
 
 model NeededMaterial {
@@ -214,26 +191,24 @@ model NeededMaterial {
   Item        String?
   ItemQty     Int?
   Description String?
-  Issued      String?         // Filled by Admin after operations
-  Returned    String?         // Filled by Admin after operations
-  evcId       Int?            //Foreign key for one-to-many relationship
-  evc         EVCReservation? @relation(name: "EVCReservationtoNeededMaterial", fields: [evcId], references: [id])
+  Issued      String?
+  Returned    String?
+  evcId       Int?
+  evc         EVCReservation? @relation("EVCReservationtoNeededMaterial", fields: [evcId], references: [id])
 }
 
-// To be filled by Admin per machine used
 model MachineUtilization {
-  id             Int             @id @default(autoincrement())
-  OperatingTimes OperatingTime[] @relation(name: "MachineUtilizationtoOperatingTime") //One-to-many
-  DownTimes      DownTime[]      @relation(name: "MachineUtilizationtoDownTime") //One-to-many
-  RepairChecks   RepairCheck[]   @relation(name: "MachineUtilizationtoRepairCheck") //One-to-many
-  ReviwedBy      String?
+  id              Int             @id @default(autoincrement())
+  ReviwedBy       String?
   MachineApproval Boolean?
-  DateReviewed   DateTime?
-  utilReqId      Int?            //Foreign key for one-to-many relationship
-  utilReq        UtilReq?        @relation(name: "UtilReqToMachineUtilization", fields: [utilReqId], references: [id])
+  DateReviewed    DateTime?
+  utilReqId       Int?
+  DownTimes       DownTime[]      @relation("MachineUtilizationtoDownTime")
+  utilReq         UtilReq?        @relation("UtilReqToMachineUtilization", fields: [utilReqId], references: [id])
+  OperatingTimes  OperatingTime[] @relation("MachineUtilizationtoOperatingTime")
+  RepairChecks    RepairCheck[]   @relation("MachineUtilizationtoRepairCheck")
 }
 
-// Part of Machine Utilization
 model OperatingTime {
   id               Int                 @id @default(autoincrement())
   OTDate           DateTime?
@@ -241,11 +216,10 @@ model OperatingTime {
   OTStartTime      DateTime?
   OTEndTime        DateTime?
   OTMachineOp      String?
-  machineUtilId    Int?                //Foreign key for one-to-many relationship
-  machineUtil      MachineUtilization? @relation(name: "MachineUtilizationtoOperatingTime", fields: [machineUtilId], references: [id])
+  machineUtilId    Int?
+  machineUtil      MachineUtilization? @relation("MachineUtilizationtoOperatingTime", fields: [machineUtilId], references: [id])
 }
 
-// Also part of Machine Utilization
 model DownTime {
   id               Int                 @id @default(autoincrement())
   DTDate           DateTime?
@@ -253,11 +227,10 @@ model DownTime {
   DTTime           Int?
   Cause            String?
   DTMachineOp      String?
-  machineUtilId    Int?                //Foreign key for one-to-many relationship
-  machineUtil      MachineUtilization? @relation(name: "MachineUtilizationtoDownTime", fields: [machineUtilId], references: [id])
+  machineUtilId    Int?
+  machineUtil      MachineUtilization? @relation("MachineUtilizationtoDownTime", fields: [machineUtilId], references: [id])
 }
 
-// Also part of Machine Utilization
 model RepairCheck {
   id            Int                 @id @default(autoincrement())
   RepairDate    DateTime?
@@ -266,111 +239,40 @@ model RepairCheck {
   RepairReason  String?
   PartsReplaced String?
   RPPersonnel   String?
-  machineUtilId Int?                //Foreign key for one-to-many relationship
-  machineUtil   MachineUtilization? @relation(name: "MachineUtilizationtoRepairCheck", fields: [machineUtilId], references: [id])
+  machineUtilId Int?
+  machineUtil   MachineUtilization? @relation("MachineUtilizationtoRepairCheck", fields: [machineUtilId], references: [id])
 }
 
-// Unified survey model for both student and MSME users
 model PreliminarySurvey {
-  id              Int       @id @default(autoincrement())
-  userRole        String    // "STUDENT" or "MSME" - Used to determine how form is displayed
-  
-  // Fields for all users
-  age             Int
-  sex             String    // "Male" or "Female"
-  CC1             String?   // Response to CC1 question
-  CC2             String?   // Response to CC2 question
-  CC3             String?   // Response to CC3 question
-  
-  // Fields that may be auto-filled for students or filled manually by MSME
-  clientType      String?   // "Citizen", "Business", "Government (Employee or another agency)"
-  region          String?   // Region of residence
-  office          String?   // Default to "SRA OFFICE" for students
-  otherService    String?   // Details if "Others" was selected
-  
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  
-  utilReqId       Int       @unique // One-to-one with UtilReq
-  utilReq         UtilReq   @relation(name: "UtilReqToPreliminarySurvey", fields: [utilReqId], references: [id])
+  id           Int      @id @default(autoincrement())
+  userRole     String
+  age          Int
+  sex          String
+  CC1          String?
+  CC2          String?
+  CC3          String?
+  clientType   String?
+  region       String?
+  office       String?
+  otherService String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  utilReqId    Int      @unique
+  utilReq      UtilReq  @relation("UtilReqToPreliminarySurvey", fields: [utilReqId], references: [id])
 }
 
-// Model to replace the string[] array for serviceAvailed
 model ServiceAvailed {
-  id          Int      @id @default(autoincrement())
-  service     String
-  utilReqId   Int
-  utilReq     UtilReq  @relation(name: "UtilReqToServiceAvailed", fields: [utilReqId], references: [id])
+  id        Int     @id @default(autoincrement())
+  service   String
+  utilReqId Int
+  utilReq   UtilReq @relation("UtilReqToServiceAvailed", fields: [utilReqId], references: [id])
 
   @@unique([utilReqId, service])
 }
 
-// Customer feedback section (SQD questions)
 model CustomerFeedback {
-  id           Int       @id @default(autoincrement())
-  submittedAt  DateTime  @default(now())
-  
-  // SQD questions with standardized response values
-  // "Strongly Agree", "Agree", "Neutral", "Disagree", "Strongly Disagree", "N/A"
-  SQD0         String?
-  SQD1         String?
-  SQD2         String?
-  SQD3         String?
-  SQD4         String?
-  SQD5         String?
-  SQD6         String?
-  SQD7         String?
-  SQD8         String?
-  
-  utilReqId    Int       @unique // One-to-one with UtilReq
-  utilReq      UtilReq   @relation(name: "UtilReqToCustomerFeedback", fields: [utilReqId], references: [id])
-}
-
-// Employee evaluation section
-model EmployeeEvaluation {
-  id           Int       @id @default(autoincrement())
-  submittedAt  DateTime  @default(now())
-  
-  // Employee evaluation questions with standardized response values
-  // "Excellent", "Good", "Fair", "Poor"
-  E1           String?   // Technical know-how
-  E2           String?   // Attitude in working with a team
-  E3           String?   // Works to full potential
-  E4           String?   // Quality of work
-  E5           String?   // Communication
-  E6           String?   // Independent work
-  E7           String?   // Takes initiative
-  E8           String?   // Productivity and creativity
-  E9           String?   // Honesty and integrity
-  E10          String?   // Punctuality and attendance
-  E11          String?   // SSF Personnel management
-  E12          String?   // SSF personnel's professionalism
-  E13          String?   // Facility responsiveness
-  E14          String?   // Cleanliness and orderliness
-  E15          String?   // Rate of services
-  E16          String?   // Performance of machineries
-  E17          String?   // Quality of tools
-  
-  utilReqId    Int       @unique // One-to-one with UtilReq
-  utilReq      UtilReq   @relation(name: "UtilReqToEmployeeEvaluation", fields: [utilReqId], references: [id])
-}
-
-// Unified satisfaction survey model replacing ClientSatisfaction and CitizenSatisfaction
-model SatisfactionSurvey {
   id          Int      @id @default(autoincrement())
-  userRole    String   // "STUDENT", "MSME", "CITIZEN", etc.
-  
-  // Demographic data (linked to PreliminarySurvey but can be updated)
-  sex         String?
-  age         Int?
-  
-  // Citizen's Charter responses
-  CC1         String?
-  CC2         String?
-  CC3         String?
-  
-  // SQD responses - using string values for consistency with form
-  // "Strongly Agree", "Agree", "Neutral", "Disagree", "Strongly Disagree", "N/A"
+  submittedAt DateTime @default(now())
   SQD0        String?
   SQD1        String?
   SQD2        String?
@@ -380,24 +282,64 @@ model SatisfactionSurvey {
   SQD6        String?
   SQD7        String?
   SQD8        String?
-  
-  // Additional feedback
-  suggestions String?
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  
   utilReqId   Int      @unique
-  utilReq     UtilReq? @relation(name: "UtilReqToSatisfactionSurvey", fields: [utilReqId], references: [id])
+  utilReq     UtilReq  @relation("UtilReqToCustomerFeedback", fields: [utilReqId], references: [id])
 }
 
-// For after jobs (To be printed)
+model EmployeeEvaluation {
+  id          Int      @id @default(autoincrement())
+  submittedAt DateTime @default(now())
+  E1          String?
+  E2          String?
+  E3          String?
+  E4          String?
+  E5          String?
+  E6          String?
+  E7          String?
+  E8          String?
+  E9          String?
+  E10         String?
+  E11         String?
+  E12         String?
+  E13         String?
+  E14         String?
+  E15         String?
+  E16         String?
+  E17         String?
+  utilReqId   Int      @unique
+  utilReq     UtilReq  @relation("UtilReqToEmployeeEvaluation", fields: [utilReqId], references: [id])
+}
+
+model SatisfactionSurvey {
+  id          Int      @id @default(autoincrement())
+  userRole    String
+  sex         String?
+  age         Int?
+  CC1         String?
+  CC2         String?
+  CC3         String?
+  SQD0        String?
+  SQD1        String?
+  SQD2        String?
+  SQD3        String?
+  SQD4        String?
+  SQD5        String?
+  SQD6        String?
+  SQD7        String?
+  SQD8        String?
+  suggestions String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  utilReqId   Int      @unique
+  utilReq     UtilReq  @relation("UtilReqToSatisfactionSurvey", fields: [utilReqId], references: [id])
+}
+
 model JobandPayment {
   id             Int       @id @default(autoincrement())
   Date           DateTime?
   ClientProfile  String?
   ProjDesc       String?
   CompletionDate DateTime? @default(now())
-  utilReqId      Int?      @unique //Foreign key for one-to-one relationship
-  utilReq        UtilReq?  @relation(name: "UtilReqToJobandPayment", fields: [utilReqId], references: [id])
+  utilReqId      Int?      @unique
+  utilReq        UtilReq?  @relation("UtilReqToJobandPayment", fields: [utilReqId], references: [id])
 }

@@ -1,3 +1,6 @@
+
+// /components/student-forms/lab-reservation
+
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -40,6 +43,7 @@ interface FormData {
   LvlSec: string;
   Subject: string;
   Teacher: string;
+  TeacherEmail: string;
   Topic: string;
   SchoolYear: number;
   
@@ -54,6 +58,7 @@ interface FormErrors {
   LvlSec?: string;
   Subject?: string;
   Teacher?: string;
+  TeacherEmail?: string; 
   Topic?: string;
   SchoolYear?: string;
   Students?: Record<number, string>;
@@ -114,6 +119,13 @@ export function LabReservation({ formData, updateFormData, nextStep, prevStep }:
     
     if (!formData.Teacher.trim()) {
       newErrors.Teacher = "Teacher's name is required";
+    }
+    if (!formData.TeacherEmail.trim()) {
+      newErrors.Teacher = "Teacher's email is required";
+    }
+
+    if (!formData.TeacherEmail.trim()) {
+      newErrors.Teacher = "Teacher's email is required";
     }
     
     if (!formData.Topic.trim()) {
@@ -383,6 +395,23 @@ export function LabReservation({ formData, updateFormData, nextStep, prevStep }:
           )}
         </div>
         <div>
+          <label htmlFor="teacherEmail" className="block text-sm font-medium mb-1">
+            Teacher Email <span className="text-red-500">*</span>
+          </label>
+          <input
+            id="teacherEmail"
+            type="email"
+            className={`w-full border ${errors.TeacherEmail ? 'border-red-500' : 'border-gray-300'} rounded-md p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
+            value={formData.TeacherEmail}
+            onChange={(e) => handleFieldChange('TeacherEmail', e.target.value)}
+            aria-invalid={!!errors.TeacherEmail}
+            aria-describedby={errors.TeacherEmail ? "teacherEmail-error" : undefined}
+          />
+          {errors.TeacherEmail && (
+            <p id="teacherEmail-error" className="mt-1 text-sm text-red-500">{errors.TeacherEmail}</p>
+          )}
+        </div>
+        <div>
           <label htmlFor="topic" className="block text-sm font-medium mb-1">
             Topic <span className="text-red-500">*</span>
           </label>
@@ -617,6 +646,7 @@ export function LabReservation({ formData, updateFormData, nextStep, prevStep }:
                 {errors.LvlSec && <li>Level/Section is required</li>}
                 {errors.Subject && <li>Subject is required</li>}
                 {errors.Teacher && <li>Teacher's name is required</li>}
+                {errors.TeacherEmail && <li>Teacher's email is required</li>}
                 {errors.Topic && <li>Topic is required</li>}
                 {errors.SchoolYear && <li>Valid school year is required</li>}
                 {errors.Students && <li>All student names are required</li>}

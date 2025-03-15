@@ -1,3 +1,5 @@
+// /components/student-forms/review-submit
+
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { useUser } from "@clerk/nextjs";
@@ -61,6 +63,7 @@ interface FormData {
   NoofStudents?: number;
   Subject?: string;
   Teacher?: string;
+  TeacherEmail?: string;
   Topic?: string;
   SchoolYear?: number;
   NeededMaterials?: Material[];
@@ -171,6 +174,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
         NoofStudents: formData.Students?.length || 0,
         Subject: formData.Subject || undefined,
         Teacher: formData.Teacher || undefined,
+        TeacherEmail: formData.TeacherEmail || undefined,
         Topic: formData.Topic || undefined,
         SchoolYear: formData.SchoolYear ? Number(formData.SchoolYear) : undefined,
         
@@ -193,14 +197,23 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
         },
         body: JSON.stringify(submissionData),
       });
-  
-      if (!response.ok) {
-        const errorData = await response.json();
-        const errorMessage = typeof errorData.details === 'string' 
-          ? errorData.details 
-          : (errorData.error || 'Failed to submit reservation');
-        throw new Error(errorMessage);
-      }
+      
+      const responseText = await response.text();
+      console.log('Raw response:', responseText);
+
+      let errorData = null;
+        if (responseText) {
+          try {
+            errorData = JSON.parse(responseText);
+          } catch (e) {
+            console.error('Failed to parse response as JSON:', e);
+          }
+        }
+
+        if (!response.ok) {
+          const errorMessage = errorData?.details || errorData?.error || 'Failed to submit reservation';
+          throw new Error(errorMessage);
+        }
   
       // Redirect to dashboard on success
       router.push('/user-dashboard');
@@ -302,16 +315,20 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
                     <p className="mt-1 text-gray-800">{formData.Students?.length || 'Not provided'}</p>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-gray-700">Subject</p>
-                    <p className="mt-1 text-gray-800">{formData.Subject || 'Not provided'}</p>
-                  </div>
-                  <div>
                     <p className="text-sm font-medium text-gray-700">Teacher</p>
                     <p className="mt-1 text-gray-800">{formData.Teacher || 'Not provided'}</p>
                   </div>
-                  <div className="md:col-span-2">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Teacher Email</p>
+                    <p className="mt-1 text-gray-800">{formData.TeacherEmail || 'Not provided'}</p>
+                  </div>                 
+                  <div>
                     <p className="text-sm font-medium text-gray-700">Topic</p>
                     <p className="mt-1 text-gray-800">{formData.Topic || 'Not provided'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Subject</p>
+                    <p className="mt-1 text-gray-800">{formData.Subject || 'Not provided'}</p>
                   </div>
                 </div>
               </CardContent>
@@ -386,18 +403,6 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
                   <div>
                     <p className="text-sm font-medium text-gray-700">Email</p>
                     <p className="mt-1 text-gray-800">{user?.emailAddresses[0]?.emailAddress || accInfo?.email}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Contact Number</p>
-                    <p className="mt-1 text-gray-800">{accInfo?.ClientInfo?.ContactNum || 'Not provided'}</p>
-                  </div>
-                  <div className="md:col-span-2">
-                    <p className="text-sm font-medium text-gray-700">Complete Address</p>
-                    <p className="mt-1 text-gray-800">
-                      {accInfo?.ClientInfo ? 
-                        `${accInfo.ClientInfo.Address || ''}, ${accInfo.ClientInfo.City || ''}, ${accInfo.ClientInfo.Province || ''} ${accInfo.ClientInfo.Zipcode || ''}`.replace(/^[,\s]+|[,\s]+$/g, '') 
-                        : 'Not provided'}
-                    </p>
                   </div>
                 </div>
               </CardContent>

@@ -15,7 +15,7 @@ export async function GET() {
     // Fetch completed reservations
     const reservations = await prisma.utilReq.findMany({
       where: {
-        Status: 'Completed'
+        Status: { in: ['Completed', 'Paid'] }
       },
       include: {
         accInfo: {
