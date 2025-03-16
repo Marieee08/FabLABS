@@ -41,7 +41,7 @@
     ".next/types/**/*.ts",
     "src/app/api/auth/register/route.ts",
     "src/middleware.ts"
-  ],
+, "src/app/api/admin/evc-reservation-review/[id].js"  ],
   "exclude": [
     "node_modules"
   ]
