@@ -1,3 +1,4 @@
+// /app/api/admin/evc-reservation-review/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 
@@ -12,38 +13,34 @@ export async function GET(
 
     if (isNaN(id)) {
       return NextResponse.json(
-        { error: "Invalid reservation ID" },
+        { error: "Invalid EVC reservation ID" },
         { status: 400 }
       );
     }
 
-    const reservation = await prisma.utilReq.findUnique({
+    // Use EVCReservation with capital "EVC" to match your schema
+    const reservation = await prisma.EVCReservation.findUnique({
       where: { id },
       include: {
-        accInfo: {
-          include: {
-            ClientInfo: true,
-            BusinessInfo: true,
-          },
-        },
-        UserServices: true,
-        UserTools: true,
+        accInfo: true,
+        EVCStudents: true,
+        NeededMaterials: true,
         UtilTimes: true,
       },
     });
 
     if (!reservation) {
       return NextResponse.json(
-        { error: "Reservation not found" },
+        { error: "EVC reservation not found" },
         { status: 404 }
       );
     }
 
     return NextResponse.json(reservation);
   } catch (error) {
-    console.error("Error fetching reservation details:", error);
+    console.error("Error fetching EVC reservation details:", error);
     return NextResponse.json(
-      { error: "Failed to fetch reservation details" },
+      { error: "Failed to fetch EVC reservation details", message: String(error) },
       { status: 500 }
     );
   }

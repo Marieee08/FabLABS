@@ -1,4 +1,5 @@
-// /survey/thank-you
+// /survey/questionnaire/page.tsx
+
 
 "use client";
 

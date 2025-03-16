@@ -8,9 +8,6 @@ import ReviewSubmit from '@/components/msme-forms/review-submit';
 import { toast } from "@/components/ui/use-toast";
 import DateTimeSelection from '@/components/msme-forms/date-time-selection';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import RoleGuard from '@/components/auth/role-guard';
-
-
 
 export interface FormData {
   days: {
@@ -150,45 +147,43 @@ export default function Schedule() {
   };
 
   return (
-    <RoleGuard allowedRoles={['MSME']}>
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
-        <Navbar />
+    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
+      <Navbar />
+      
+      <div className="container mx-auto py-10 px-4 mt-16 max-w-7xl">
+        <div className="mb-8 text-center">
+          <h1 className="text-3xl font-bold text-gray-800">Schedule a Service</h1>
+          <p className="text-gray-600 mt-2 max-w-3xl mx-auto">Complete the form below to schedule your service appointment</p>
+        </div>
         
-        <div className="container mx-auto py-10 px-4 mt-16 max-w-7xl">
-          <div className="mb-8 text-center">
-            <h1 className="text-3xl font-bold text-gray-800">Schedule a Service</h1>
-            <p className="text-gray-600 mt-2 max-w-3xl mx-auto">Complete the form below to schedule your service appointment</p>
-          </div>
+        <Card className="shadow-lg border border-gray-200">
+          <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-gray-50 py-6">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xl text-blue-800">{getStepTitle()}</CardTitle>
+              <span className="text-sm font-medium text-gray-500">Step {step} of 3</span>
+            </div>
+          </CardHeader>
           
-          <Card className="shadow-lg border border-gray-200">
-            <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-gray-50 py-6">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-xl text-blue-800">{getStepTitle()}</CardTitle>
-                <span className="text-sm font-medium text-gray-500">Step {step} of 3</span>
-              </div>
-            </CardHeader>
+          <CardContent className="pt-8 pb-6 px-8">
+            <ProgressBar currentStep={step} totalSteps={3} />
             
-            <CardContent className="pt-8 pb-6 px-8">
-              <ProgressBar currentStep={step} totalSteps={3} />
-              
-              <div className="mt-8 w-full">
-                {isLoading ? (
-                  <div className="flex flex-col items-center justify-center py-12">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                    <p className="mt-4 text-gray-600">Loading calendar data...</p>
-                  </div>
-                ) : (
-                  renderStep()
-                )}
-              </div>
-            </CardContent>
-          </Card>
-          
-          <div className="mt-6 text-center text-sm text-gray-500">
-            <p>Need help? Contact our support team at ctapales@evc.pshs.edu.ph</p>
-          </div>
+            <div className="mt-8 w-full">
+              {isLoading ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                  <p className="mt-4 text-gray-600">Loading calendar data...</p>
+                </div>
+              ) : (
+                renderStep()
+              )}
+            </div>
+          </CardContent>
+        </Card>
+        
+        <div className="mt-6 text-center text-sm text-gray-500">
+          <p>Need help? Contact our support team at ctapales@evc.pshs.edu.ph</p>
         </div>
       </div>
-    </RoleGuard>
+    </div>
   );
 }

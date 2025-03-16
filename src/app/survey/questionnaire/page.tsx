@@ -1,7 +1,5 @@
-// /survey/questionnaire
-
+// /survey/questionnaire/page.tsx
 "use client";
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,7 +11,6 @@ import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 import { toast } from '@/components/ui/use-toast';
 
-// Type definition for our form data
 interface DemographicData {
   clientType: string | undefined;
   sex: string | undefined;
@@ -117,10 +114,10 @@ const SurveyForm = () => {
   const reservationId = searchParams.get('reservationId');
   
   const [formType, setFormType] = useState('preliminary');
+  const [userRole, setUserRole] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  // Demographic data
   const [demographicData, setDemographicData] = useState<DemographicData>({
     clientType: undefined,
     sex: undefined,
@@ -137,13 +134,11 @@ const SurveyForm = () => {
   const [customerFormData, setCustomerFormData] = useState(
     Object.fromEntries(SURVEY_QUESTIONS.customer.map((_, i) => [`Q${i + 1}`, undefined]))
   );
-
   const [employeeFormData, setEmployeeFormData] = useState(
     Object.fromEntries(SURVEY_QUESTIONS.employee.map((_, i) => [`E${i + 1}`, undefined]))
   );
 
   useEffect(() => {
-    // Check if reservationId exists
     if (!reservationId) {
       toast({
         title: "Error",
@@ -154,7 +149,31 @@ const SurveyForm = () => {
       return;
     }
     
-    setIsLoading(false);
+    const fetchUserRole = async () => {
+      try {
+        const response = await fetch('/api/auth/check-roles');
+        const data = await response.json();
+        
+        if (data.role !== 'SURVEY') {
+          toast({
+            title: "Access Denied",
+            description: "You need survey access to view this page.",
+            variant: "destructive",
+          });
+          router.push('/');
+          return;
+        }
+        
+        setUserRole('SURVEY');
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error fetching user role:', error);
+        setUserRole('SURVEY');
+        setIsLoading(false);
+      }
+    };
+  
+    fetchUserRole();
   }, [reservationId, router]);
 
   const handleInputChange = (question: string, value: string) => {
@@ -179,18 +198,35 @@ const SurveyForm = () => {
     }
   };
 
+  const changeFormType = (newType: string) => {
+    setFormType(newType);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     
-    // Prepare data for API
+    if (formType === 'employee') {
+      const missingFields = Object.entries(employeeFormData).some(([key, value]) => !value);
+      if (missingFields) {
+        toast({
+          title: "Missing Information",
+          description: "Please complete all fields in the employee evaluation section.",
+          variant: "destructive",
+        });
+        setIsSubmitting(false);
+        return;
+      }
+    }
+    
     const surveyData = {
       preliminary: {
+        userRole: 'SURVEY',
         ...demographicData,
       },
       customer: Object.fromEntries(
         Object.entries(customerFormData).map(([key, value]) => {
-          // Map Q1, Q2, etc. to SQD0, SQD1, etc.
           const sqKey = key.replace('Q', 'SQD');
           const index = parseInt(key.substring(1)) - 1;
           return [sqKey, value];
@@ -216,15 +252,7 @@ const SurveyForm = () => {
         throw new Error('Failed to submit survey');
       }
       
-      const result = await response.json();
-      
-      toast({
-        title: "Success",
-        description: "Survey submitted successfully!",
-      });
-      
-      // Redirect to the survey dashboard
-      router.push('/survey');
+      router.push('/survey/thank-you');
     } catch (error) {
       console.error('Error submitting survey:', error);
       toast({
@@ -260,12 +288,11 @@ const SurveyForm = () => {
         <div className="mb-8 bg-white p-6 rounded-xl shadow-lg hover:shadow-blue-300/50 transition-all duration-300">
           <div className="mb-4">
             <p className="font-qanelas2 text-sm text-gray-700 mb-4">
-              This Client Satisfaction Measurement (CSM) tracks the customer experience of Philippine Science High School. Your
+              This Client Satisfaction Measurement (CSM) tracks the customer experience. Your
               feedback on your recently concluded transaction will help us provide better services. Personal information shared will be
               kept confidential and you always have the option not to answer this form.
             </p>
           </div>
-
           <div className="mb-6">
             <Label className="block mb-3 font-qanelas2 text-lg text-gray-700">Client type:</Label>
             <RadioGroup 
@@ -281,7 +308,7 @@ const SurveyForm = () => {
               ))}
             </RadioGroup>
           </div>
-
+          
           <div className="mb-6">
             <Label className="block mb-3 font-qanelas2 text-lg text-gray-700">Sex:</Label>
             <RadioGroup 
@@ -297,12 +324,12 @@ const SurveyForm = () => {
               ))}
             </RadioGroup>
           </div>
-
+          
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
-              <Label htmlFor="age" className="block mb-3 font-qanelas2 text-lg text-gray-700">Age:</Label>
+              <Label htmlFor="msme-age" className="block mb-3 font-qanelas2 text-lg text-gray-700">Age:</Label>
               <Input 
-                id="age" 
+                id="msme-age" 
                 type="number" 
                 min="0" 
                 max="120" 
@@ -353,7 +380,6 @@ const SurveyForm = () => {
                     onCheckedChange={(checked) => handleCheckboxChange(service, checked === true)}
                     className="mt-1 text-[#193d83] border-[#5e86ca]"
                   />
-
                   <Label htmlFor={`service-${service}`} className="font-poppins1 text-gray-600">{service}</Label>
                 </div>
               ))}
@@ -365,7 +391,7 @@ const SurveyForm = () => {
                   onCheckedChange={(checked) => handleCheckboxChange("Others", checked === true)}
                   className="mt-1 text-[#193d83] border-[#5e86ca]"
                 />
-              <div className="flex flex-col">
+                <div className="flex flex-col">
                   <Label htmlFor="service-others" className="font-poppins1 text-gray-600">Others (Please specify):</Label>
                   {demographicData.serviceAvailed.includes("Others") && (
                     <Input 
@@ -382,7 +408,6 @@ const SurveyForm = () => {
             </div>
           </div>
         </div>
-
         {/* Citizen's Charter Section */}
         <div className="mb-8 bg-white p-6 rounded-xl shadow-lg hover:shadow-blue-300/50 transition-all duration-300">
           <div className="mb-4 p-4 bg-gray-50 rounded border border-gray-200">
@@ -402,8 +427,8 @@ const SurveyForm = () => {
             >
               {CC1_OPTIONS.map((option) => (
                 <div key={option} className="flex items-start space-x-2">
-                  <RadioGroupItem value={option} id={`CC1-${option}`} className="mt-1 text-[#193d83] border-[#5e86ca]" />
-                  <Label htmlFor={`CC1-${option}`} className="font-poppins1 text-gray-600">{option}</Label>
+                  <RadioGroupItem value={option} id={`msme-CC1-${option}`} className="mt-1 text-[#193d83] border-[#5e86ca]" />
+                  <Label htmlFor={`msme-CC1-${option}`} className="font-poppins1 text-gray-600">{option}</Label>
                 </div>
               ))}
             </RadioGroup>
@@ -418,8 +443,8 @@ const SurveyForm = () => {
             >
               {CC2_OPTIONS.map((option) => (
                 <div key={option} className="flex items-center space-x-2">
-                  <RadioGroupItem value={option} id={`CC2-${option}`} className="text-[#193d83] border-[#5e86ca]" />
-                  <Label htmlFor={`CC2-${option}`} className="font-poppins1 text-gray-600">{option}</Label>
+                  <RadioGroupItem value={option} id={`msme-CC2-${option}`} className="text-[#193d83] border-[#5e86ca]" />
+                  <Label htmlFor={`msme-CC2-${option}`} className="font-poppins1 text-gray-600">{option}</Label>
                 </div>
               ))}
             </RadioGroup>
@@ -434,8 +459,8 @@ const SurveyForm = () => {
             >
               {CC3_OPTIONS.map((option) => (
                 <div key={option} className="flex items-center space-x-2">
-                  <RadioGroupItem value={option} id={`CC3-${option}`} className="text-[#193d83] border-[#5e86ca]" />
-                  <Label htmlFor={`CC3-${option}`} className="font-poppins1 text-gray-600">{option}</Label>
+                  <RadioGroupItem value={option} id={`msme-CC3-${option}`} className="text-[#193d83] border-[#5e86ca]" />
+                  <Label htmlFor={`msme-CC3-${option}`} className="font-poppins1 text-gray-600">{option}</Label>
                 </div>
               ))}
             </RadioGroup>
@@ -469,6 +494,27 @@ const SurveyForm = () => {
     );
   }
 
+  // Check if all required fields are filled in preliminary section
+  const preliminaryComplete = Boolean(
+    demographicData.clientType && 
+    demographicData.sex && 
+    demographicData.age && 
+    demographicData.age !== '0' &&
+    demographicData.region && 
+    demographicData.office && 
+    demographicData.office.trim() !== '' &&
+    demographicData.serviceAvailed.length > 0 &&
+    !(demographicData.serviceAvailed.includes("Others") && (!demographicData.otherService || demographicData.otherService.trim() === '')) &&
+    demographicData.CC1 &&
+    (demographicData.CC1 === CC1_OPTIONS[3] || (demographicData.CC2 && demographicData.CC3))
+  );
+
+  // Check if all customer questions are answered
+  const allCustomerQuestionsAnswered = Object.values(customerFormData).every(value => value !== undefined);
+
+  console.log("Preliminary complete:", preliminaryComplete);
+  console.log("Form data:", demographicData);
+
   return (
     <div className="py-8 px-4">
       <Card className="w-full max-w-3xl mx-auto bg-[#f4f8fc] border border-[#5e86ca] rounded-2xl">
@@ -482,55 +528,76 @@ const SurveyForm = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {formType === 'preliminary' && renderPreliminarySection()}
-          
-          {formType === 'customer' && renderCustomerSection()}
-          
-          {formType === 'employee' && SURVEY_QUESTIONS.employee.map((question, index) => (
-            renderRatingScale(question, `E${index + 1}`, employeeFormData[`E${index + 1}`])
-          ))}
-          
-          <div className="flex justify-between mt-8">
-            {formType === 'customer' && (
-              <Button type="button" onClick={() => setFormType('preliminary')} className="bg-white text-[#193d83] border border-[#5e86ca] hover:bg-blue-50 font-qanelas1">Back</Button>
-            )}
-            
-            {formType === 'employee' && (
-              <Button type="button" onClick={() => setFormType('customer')} className="bg-white text-[#193d83] border border-[#5e86ca] hover:bg-blue-50 font-qanelas1">Back</Button>
-            )}
-            
-            {formType === 'preliminary' && (
-              <Button 
-                type="button"
-                onClick={() => setFormType('customer')} 
-                className="bg-[#193d83] text-white hover:bg-[#2f61c2] font-qanelas1"
-                disabled={
-                  !demographicData.clientType || 
-                  !demographicData.sex || 
-                  !demographicData.age || 
-                  demographicData.serviceAvailed.length === 0
-                }
-              >
-                Next
-              </Button>
-            )}
-            
-            {formType === 'customer' && (
-              <Button type="button" onClick={() => setFormType('employee')} className="bg-[#193d83] text-white hover:bg-[#2f61c2] font-qanelas1">Next</Button>
-            )}
-            
-            {formType === 'employee' && (
-              <Button 
-                type="submit" 
-                className="bg-[#193d83] text-white hover:bg-[#2f61c2] font-qanelas1"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? 'Submitting...' : 'Submit'}
-              </Button>
-            )}
-          </div>
-        </form>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {formType === 'preliminary' && renderPreliminarySection()}
+            {formType === 'customer' && renderCustomerSection()}
+            {formType === 'employee' && SURVEY_QUESTIONS.employee.map((question, index) => (
+              renderRatingScale(question, `E${index + 1}`, employeeFormData[`E${index + 1}`])
+            ))}
+    
+            <div className="flex justify-between mt-8">
+              {/* Back buttons */}
+              {formType === 'customer' && (
+                <Button 
+                  type="button" 
+                  onClick={() => changeFormType('preliminary')} 
+                  className="bg-white text-[#193d83] border border-[#5e86ca] hover:bg-blue-50 font-qanelas1"
+                >
+                  Back
+                </Button>
+              )}
+              
+              {formType === 'employee' && (
+                <Button 
+                  type="button" 
+                  onClick={() => changeFormType('customer')} 
+                  className="bg-white text-[#193d83] border border-[#5e86ca] hover:bg-blue-50 font-qanelas1"
+                >
+                  Back
+                </Button>
+              )}
+              
+              {/* Next/Submit buttons */}
+              {formType === 'preliminary' && (
+                <Button 
+                  type="button"
+                  onClick={() => changeFormType('customer')} 
+                  className="bg-[#193d83] text-white hover:bg-[#2f61c2] font-qanelas1"
+                  disabled={!preliminaryComplete}
+                >
+                  Next
+                </Button>
+              )}
+              
+              {formType === 'customer' && (
+                <Button 
+                  type="button" 
+                  onClick={() => changeFormType('employee')} 
+                  className="bg-[#193d83] text-white hover:bg-[#2f61c2] font-qanelas1"
+                  disabled={!allCustomerQuestionsAnswered}
+                >
+                  Next
+                </Button>
+              )}
+              
+              {formType === 'employee' && (
+                <Button 
+                  type="submit" 
+                  className="bg-[#193d83] text-white hover:bg-[#2f61c2] font-qanelas1"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Submitting...' : 'Submit'}
+                </Button>
+              )}
+
+              {/* Debugging info - remove in production */}
+              {formType === 'preliminary' && !preliminaryComplete && (
+                <div className="text-red-500 text-sm mt-2">
+                  Please complete all required fields
+                </div>
+              )}
+            </div>
+          </form>
         </CardContent>
       </Card>
     </div>

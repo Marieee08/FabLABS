@@ -1,4 +1,4 @@
-// /api/survey/submit
+// /api/survey/submit/route.ts
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
         ...(surveyData?.preliminary && {
           PreliminarySurvey: {
             create: {
-              // No userRole field - removed from the schema
+              userRole: surveyData.preliminary.userRole || 'STUDENT',
               age: parseInt(surveyData.preliminary.age) || 0,
               sex: surveyData.preliminary.sex || '',
               CC1: surveyData.preliminary.CC1,
@@ -90,10 +90,7 @@ export async function POST(request: Request) {
           }
         })
       }
-      
     });
-
-    console.log('Received data:', { reservationId, surveyData });
 
     return NextResponse.json({
       success: true,
@@ -105,5 +102,4 @@ export async function POST(request: Request) {
     console.error('[COMPLETE_SURVEY_POST]', error);
     return new NextResponse("Internal Error", { status: 500 });
   }
-
 }

@@ -70,8 +70,6 @@ const DashboardUser = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const today = new Date();
   const formattedDate = format(today, 'EEEE, dd MMMM yyyy');
-  const [pendingReservations, setPendingReservations] = useState<Reservation[]>([]);
-  const [historyReservations, setHistoryReservations] = useState<Reservation[]>([]);
 
  // useEffect to fetch reservations
  useEffect(() => {
@@ -81,13 +79,6 @@ const DashboardUser = () => {
       if (response.ok) {
         const data = await response.json();
         setReservations(data);
-        
-        // Filter reservations based on status
-        const pending = data.filter((res: Reservation) => res.Status !== 'Completed');
-        const history = data.filter((res: Reservation) => res.Status === 'Completed');
-        
-        setPendingReservations(pending);
-        setHistoryReservations(history);
       }
     } catch (error) {
       console.error('Failed to fetch reservations:', error);
@@ -322,7 +313,7 @@ const handleReviewClick = (reservation: Reservation) => {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {pendingReservations.map((reservation) => (
+                    {reservations.map((reservation) => (
                       <tr key={reservation.id}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
@@ -446,73 +437,14 @@ const handleReviewClick = (reservation: Reservation) => {
         </Dialog>
 
 
-        <div className="bg-white rounded-lg text-blue-800 px-4 py-4 mt-4 shadow-md border border-[#5e86ca]">
-          <p className="text-xl font-bold text-[#143370]">History</p>
-          <p className="text-sm text-[#143370] mb-4">Here's a summary of your previous transactions!</p>
-          
-          <div className="overflow-x-auto rounded-lg bg-blue-100 shadow-lg">
-            <table className="min-w-full divide-y divide-gray-200 rounded-xl">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Services</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Equipment</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {historyReservations.map((reservation) => (
-                  <tr key={reservation.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div>
-                          <div className="text-sm font-medium text-gray-500">
-                            {new Date(reservation.RequestDate).toLocaleDateString()}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(reservation.Status)}`}>
-                        {reservation.Status}
-                      </span>
-                    </td>
-
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {reservation.UserServices.map(service => service.ServiceAvail).join(', ')}
-                      </div>
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {reservation.UserServices.map(service => service.EquipmentAvail).join(', ')}
-                      </div>
-                    </td>
-
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <a
-                        href="#"
-                        onClick={(e: { preventDefault: () => void; }) => {
-                          e.preventDefault();
-                          handleReviewClick(reservation);
-                        }}
-                        className="ml-2 text-blue-600 hover:text-blue-900"
-                      >
-                        Review
-                      </a>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="bg-white rounded-lg text-blue-800 pl-4 py-4 mt-4 shadow-md border border-[#5e86ca]">
+              <p className="text-xl font-bold text-[#143370]">History</p>
+              <p className="text-sm text-[#143370] mb-4">Here's a summary of your previous transactions!</p>
+            </div>
           </div>
-        </div>
-      </div>
 
-    </main>
+          
+        </main>
       </div>
     </div>
     </RoleGuard>
