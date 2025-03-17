@@ -14,8 +14,7 @@ import {
   MoreVertical,
   Edit,
   Trash2,
-  Wrench, // Changed from Tool to Wrench
-  Search,
+  Wrench,
   Plus,
   Minus,
 } from 'lucide-react';
@@ -53,7 +52,6 @@ const AdminTools = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetchTools();
@@ -242,10 +240,6 @@ const AdminTools = () => {
     );
   };
 
-  const filteredTools = tools.filter(tool => 
-    tool.Tool.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -268,18 +262,6 @@ const AdminTools = () => {
         </div>
       )}
 
-      <div className="relative mb-4">
-        <div className="absolute inset-y-0 left-0 flex items-center pl-3">
-          <Search className="h-4 w-4 text-gray-400" />
-        </div>
-        <Input
-          placeholder="Search tools..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
-      </div>
-
       {isLoading ? (
         <div className="flex justify-center items-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#143370]"></div>
@@ -294,12 +276,12 @@ const AdminTools = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredTools.length > 0 ? (
-              filteredTools.map((tool) => (
+            {tools.length > 0 ? (
+              tools.map((tool) => (
                 <TableRow key={tool.id}>
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-2">
-                      <Wrench className="h-4 w-4" /> {/* Changed from Tool to Wrench */}
+                      <Wrench className="h-4 w-4" />
                       {tool.Tool}
                     </div>
                   </TableCell>
@@ -350,9 +332,7 @@ const AdminTools = () => {
             ) : (
               <TableRow>
                 <TableCell colSpan={3} className="text-center py-6">
-                  {searchQuery 
-                    ? "No tools match your search. Try a different term."
-                    : "No tools available. Add your first tool to get started."}
+                  No tools available. Add your first tool to get started.
                 </TableCell>
               </TableRow>
             )}

@@ -293,11 +293,11 @@ export default function Services() {
 
                   {/* Instructions */}
                   {selectedMachine.Instructions && (
-                    <div>
-                      <h3 className="text-lg font-semibold mb-2 font-qanelas2">Instructions</h3>
-                      <p className="text-gray-700 font-poppins1">{selectedMachine.Instructions}</p>
-                    </div>
-                  )}
+  <div>
+    <h3 className="text-lg font-semibold mb-2 font-qanelas2">Instructions</h3>
+    <p className="text-gray-700 font-poppins1 whitespace-pre-line">{selectedMachine.Instructions}</p>
+  </div>
+)}
 
                   {/* Video Link */}
                   {selectedMachine.Link && (

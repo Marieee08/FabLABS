@@ -228,30 +228,32 @@ import RoleGuard from '@/components/auth/role-guard';
             </header>
 
             <main>
-            <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
-              <h2 className="text-[#143370] text-3xl font-bold font-qanelas3">Machine Management</h2>
-              <p className="text-sm text-[#143370] font-poppins1">{formattedDate}</p>
-            </div>
-            <div className="p-4 bg-white rounded-lg shadow-sm mx-auto max-w-[1200px] w-[95%]">
-          <Tabs defaultValue="machines" className="w-full">
-            <TabsList className="mb-4">
-              <TabsTrigger value="machines">Machines</TabsTrigger>
-              <TabsTrigger value="services">Services</TabsTrigger>
-              <TabsTrigger value="tools">Tools</TabsTrigger>
-            </TabsList>
+  <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
+    <h2 className="text-[#143370] text-3xl font-bold font-qanelas3">Machine Management</h2>
+    <p className="text-sm text-[#143370] font-poppins1">{formattedDate}</p>
+  </div>
+  
+  {/* Main content box with added bottom margin */}
+  <div className="p-4 bg-white rounded-lg shadow-sm mx-auto max-w-[1200px] w-[95%] mb-8">
+    <Tabs defaultValue="machines" className="w-full">
+      <TabsList className="mb-4">
+        <TabsTrigger value="machines">Machines</TabsTrigger>
+        <TabsTrigger value="services">Services</TabsTrigger>
+        <TabsTrigger value="tools">Tools</TabsTrigger>
+      </TabsList>
 
-            <TabsContent value="machines">
-              <AdminMachines/>
-            </TabsContent>
-            <TabsContent value="services">
-              <AdminServices/>
-            </TabsContent>
-            <TabsContent value="tools">
-              <AdminTools/>
-            </TabsContent>
-          </Tabs>
-        </div>
-            </main>
+      <TabsContent value="machines">
+        <AdminMachines/>
+      </TabsContent>
+      <TabsContent value="services">
+        <AdminServices/>
+      </TabsContent>
+      <TabsContent value="tools">
+        <AdminTools/>
+      </TabsContent>
+    </Tabs>
+  </div>
+</main>
           </div>
         </div>
       </RoleGuard>
