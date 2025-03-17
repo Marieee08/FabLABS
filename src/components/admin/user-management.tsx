@@ -161,7 +161,7 @@ const UserManagement = () => {
       console.log(`Deleting user with ID: ${selectedUser.id}`);
       
       // Use the new endpoint with POST and pass the userId in the body
-      const response = await fetch('/api/delete-user', {
+      const response = await fetch('/api/user/delete-user', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
