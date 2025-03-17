@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/table';
 import { useToast } from '@/components/ui/use-toast';
 import EditRoleModal from '@/components/admin-functions/admin-role';
+import DeleteConfirmationModal from '@/components/admin-functions/delete-confirmation-modal';
 
 interface User {
   id: string;
@@ -32,6 +33,7 @@ const UserManagement = () => {
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   // Fetch users data from the AccInfo table
@@ -55,13 +57,11 @@ const UserManagement = () => {
         }
         
         // Transform the data to match the component's interface
-        // Convert roles to uppercase for display
         const transformedUsers = data.map((user) => ({
           id: user.clerkId,
           name: user.Name,
           email: user.email,
-          role: user.Role.toUpperCase(), // Display role in uppercase
-          // Generate permissions based on role for initial display
+          role: user.Role.toUpperCase(),
           permissions: generatePermissions(user.Role),
           type: mapRoleToType(user.Role)
         }));
@@ -84,7 +84,7 @@ const UserManagement = () => {
     fetchUsers();
   }, [toast]);
 
-  // Generate permissions array based on role - make permissions uppercase
+  // Generate permissions array based on role
   const generatePermissions = (role: string): string[] => {
     switch (role.toLowerCase()) {
       case 'admin':
@@ -133,7 +133,6 @@ const UserManagement = () => {
       ADMIN: 'bg-purple-100 text-purple-800',
       CASHIER: 'bg-yellow-100 text-yellow-800'
     };
-    // Make sure to convert to uppercase for consistent lookup
     return colors[role.toUpperCase() as keyof typeof colors] || 'bg-gray-100 text-gray-800';
   };
 
@@ -145,35 +144,74 @@ const UserManagement = () => {
     }
   };
 
-  const handleDeleteAccount = async (userId: string) => {
-    if (confirm('Are you sure you want to delete this account? This action cannot be undone.')) {
-      try {
-        const response = await fetch(`/api/user/user-management/${userId}`, {
-          method: 'DELETE',
-        });
-        
-        if (!response.ok) {
-          throw new Error('Failed to delete account');
-        }
-        
-        // Remove user from the local state
-        setUsers(users.filter(user => user.id !== userId));
-        
-        toast({
-          title: 'Success',
-          description: 'Account deleted successfully',
-        });
-      } catch (error) {
-        console.error('Error deleting account:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to delete account. Please try again.',
-          variant: 'destructive',
-        });
-      }
+  const handleInitiateDelete = (userId: string) => {
+    const user = users.find(u => u.id === userId);
+    if (user) {
+      setSelectedUser(user);
+      setDeleteModalOpen(true);
     }
   };
 
+  const handleDeleteAccount = async () => {
+    if (!selectedUser) return;
+    
+    try {
+      setLoading(true);
+      
+      console.log(`Deleting user with ID: ${selectedUser.id}`);
+      
+      // Use the new endpoint with POST and pass the userId in the body
+      const response = await fetch('/api/delete-user', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: selectedUser.id }),
+      });
+      
+      console.log(`Delete response status: ${response.status}`);
+      console.log(`Delete response status text: ${response.statusText}`);
+      
+      if (!response.ok) {
+        let errorMessage = response.statusText;
+        
+        try {
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorMessage;
+          }
+        } catch (parseError) {
+          console.error('Error parsing error response:', parseError);
+        }
+        
+        throw new Error(`Failed to delete account: ${errorMessage}`);
+      }
+      
+      // Remove user from the local state
+      setUsers(users.filter(user => user.id !== selectedUser.id));
+      
+      toast({
+        title: 'Success',
+        description: `${selectedUser.name}'s account has been deleted successfully`,
+      });
+      
+      // Close the modal
+      setDeleteModalOpen(false);
+      setSelectedUser(null);
+      
+    } catch (error) {
+      console.error('Error deleting account:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to delete account. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   const handleContact = (userId: string, email: string) => {
     // Open default email client
     window.location.href = `mailto:${email}`;
@@ -231,7 +269,10 @@ const UserManagement = () => {
                       <Edit className="mr-2 h-4 w-4" />
                       Edit Role
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleDeleteAccount(user.id)}>
+                    <DropdownMenuItem 
+                      onClick={() => handleInitiateDelete(user.id)}
+                      className="text-red-600 focus:text-red-600"
+                    >
                       <Trash2 className="mr-2 h-4 w-4" />
                       Delete Account
                     </DropdownMenuItem>
@@ -255,7 +296,6 @@ const UserManagement = () => {
 
   const handleSaveRole = async (userId: string, newRole: string) => {
     try {
-      // Convert role to uppercase before sending to the database
       const upperCaseRole = newRole.toUpperCase();
       
       const response = await fetch(`/api/user/user-management/${userId}/role`, {
@@ -263,7 +303,7 @@ const UserManagement = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ role: upperCaseRole }), // Send uppercase role to database
+        body: JSON.stringify({ role: upperCaseRole }),
       });
       
       if (!response.ok) {
@@ -272,12 +312,11 @@ const UserManagement = () => {
       
       const updatedUser = await response.json();
       
-      // Update the user in the local state
       setUsers(users.map(user => {
         if (user.id === userId) {
           return {
             ...user,
-            role: updatedUser.Role.toUpperCase(), // Ensure displayed role is uppercase
+            role: updatedUser.Role.toUpperCase(),
             permissions: generatePermissions(updatedUser.Role),
             type: mapRoleToType(updatedUser.Role)
           };
@@ -300,7 +339,6 @@ const UserManagement = () => {
     }
   };
   
-
   return (
     <div className="p-4 bg-white rounded-lg shadow-sm">
       <Tabs defaultValue="all" className="w-full">
@@ -330,16 +368,28 @@ const UserManagement = () => {
       </Tabs>
       
       {selectedUser && (
-        <EditRoleModal
-          isOpen={editModalOpen}
-          onClose={() => {
-            setEditModalOpen(false);
-            setSelectedUser(null);
-          }}
-          userId={selectedUser.id}
-          currentRole={selectedUser.role}
-          onSave={handleSaveRole}
-        />
+        <>
+          <EditRoleModal
+            isOpen={editModalOpen}
+            onClose={() => {
+              setEditModalOpen(false);
+              setSelectedUser(null);
+            }}
+            userId={selectedUser.id}
+            currentRole={selectedUser.role}
+            onSave={handleSaveRole}
+          />
+          
+          <DeleteConfirmationModal
+            isOpen={deleteModalOpen}
+            onClose={() => {
+              setDeleteModalOpen(false);
+              setSelectedUser(null);
+            }}
+            onConfirm={handleDeleteAccount}
+            userName={selectedUser.name}
+          />
+        </>
       )}
     </div>
   );
