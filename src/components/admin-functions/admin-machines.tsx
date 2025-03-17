@@ -1,4 +1,4 @@
-import { Plus, Edit, Trash2, X } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Info } from 'lucide-react';
 import { Switch } from "@/components/ui/switch";
 import React, { useState, useEffect } from 'react';
 import { MultiSelect } from "@/components/ui/multi-select";
@@ -505,21 +505,30 @@ export default function AdminServices() {
         </div>
 
         {/* Services Input */}
-        <div>
-      <label className="block text-sm font-medium text-gray-700 mb-2">
-        Services
-      </label>
-      <MultiSelect
-  options={allServices.map(service => ({
-    value: service.id,
-    label: `${service.Service} ${service.Costs ? `- ${service.Costs} PHP` : ''}`
-  }))}
-  selected={selectedServices}  // Changed from value to selected
-  onChange={setSelectedServices}
-  className="w-full"
-  placeholder="Select services..."
-/>
+<div>
+  <div className="flex items-center mb-2">
+    <label className="text-sm font-medium text-gray-700">Services</label>
+    <div className="relative ml-2 group">
+      <Info 
+        size={16} 
+        className="text-gray-500 cursor-help" 
+      />
+      <div className="hidden group-hover:block absolute left-0 bottom-full mb-2 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg z-50">
+      If no service is associated with the machine, the "Bulk of Commodity per Production" field in MSME forms will automatically be marked as "None."
+      </div>
     </div>
+  </div>
+  <MultiSelect
+    options={allServices.map(service => ({
+      value: service.id,
+      label: `${service.Service} ${service.Costs ? `- ${service.Costs} PHP` : ''}`
+    }))}
+    selected={selectedServices}
+    onChange={setSelectedServices}
+    className="w-full"
+    placeholder="Select services..."
+  />
+</div>
 
         {/* Video URL Input */}
         <div>

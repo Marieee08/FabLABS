@@ -22,6 +22,17 @@ interface FormData {
   [key: string]: any;
 }
 
+interface Service {
+  id: string;
+  Service: string;
+  Machines?: { 
+    machine: { 
+      id: string;
+      Machine: string;
+    } 
+  }[];
+}
+
 interface ToolsSelectorProps {
   value: string;
   onChange: (value: string) => void;
@@ -39,6 +50,7 @@ const ToolsSelector: React.FC<ToolsSelectorProps> = ({
   className,
   id 
 }) => {
+  // ToolsSelector component code remains the same
   const [availableTools, setAvailableTools] = useState<Tool[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -332,10 +344,11 @@ const ToolsSelector: React.FC<ToolsSelectorProps> = ({
 export default function ProcessInformation({ formData, updateFormData, nextStep, prevStep }: StepProps) {
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
   const [touchedFields, setTouchedFields] = useState<Set<keyof FormData>>(new Set());
-  const [services, setServices] = useState<{ id: string; Service: string }[]>([]);
+  const [services, setServices] = useState<Service[]>([]);
   const [isLoadingServices, setIsLoadingServices] = useState(true);
   const [serviceError, setServiceError] = useState<string | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [hasMachines, setHasMachines] = useState<boolean>(true);
   
   useEffect(() => {
     const fetchServices = async () => {
@@ -357,6 +370,30 @@ export default function ProcessInformation({ formData, updateFormData, nextStep,
     fetchServices();
   }, []);
 
+  // Check if selected services have machines
+  useEffect(() => {
+    if (formData.ProductsManufactured && formData.ProductsManufactured.length > 0) {
+      // Find if any selected service has associated machines
+      const selectedServices = services.filter(service => 
+        formData.ProductsManufactured.includes(service.Service)
+      );
+      
+      const anyServiceHasMachines = selectedServices.some(service => 
+        service.Machines && service.Machines.length > 0
+      );
+      
+      setHasMachines(anyServiceHasMachines);
+      
+      // If no machines, set BulkofCommodity to "none"
+      if (!anyServiceHasMachines) {
+        updateFormData('BulkofCommodity', 'none');
+      } else if (formData.BulkofCommodity === 'none') {
+        // If machines exist and value is 'none', reset it
+        updateFormData('BulkofCommodity', '');
+      }
+    }
+  }, [formData.ProductsManufactured, services]);
+
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     updateFormData(name as keyof FormData, value);
@@ -364,7 +401,10 @@ export default function ProcessInformation({ formData, updateFormData, nextStep,
   };
 
   const isFieldDisabled = (fieldName: keyof FormData): boolean => {
-    // Disable fields if Benchmarking is selected
+    // Disable fields if Benchmarking is selected or if no machines for BulkofCommodity
+    if (fieldName === 'BulkofCommodity') {
+      return formData.ProductsManufactured?.includes('Benchmarking') || !hasMachines;
+    }
     return formData.ProductsManufactured?.includes('Benchmarking') || false;
   };
 
@@ -430,11 +470,11 @@ export default function ProcessInformation({ formData, updateFormData, nextStep,
       }
     }
 
-    // Add validation for other fields when not in Benchmarking mode
-    if (!isFieldDisabled(fieldName)) {
+    // Add validation for other fields when not in Benchmarking mode and has machines
+    if (!isFieldDisabled(fieldName) || (fieldName === 'BulkofCommodity' && hasMachines)) {
       switch(fieldName) {
         case 'BulkofCommodity':
-          if (!value) {
+          if (!value && hasMachines) {
             error = 'This field is required';
           }
           break;
@@ -461,7 +501,7 @@ export default function ProcessInformation({ formData, updateFormData, nextStep,
     // Only validate dependent fields if not in Benchmarking mode
     if (formData.ProductsManufactured && 
         !formData.ProductsManufactured.includes('Benchmarking')) {
-      if (!formData.BulkofCommodity) {
+      if (!formData.BulkofCommodity && hasMachines) {
         newErrors.BulkofCommodity = 'This field is required';
         isValid = false;
       }
@@ -570,16 +610,19 @@ export default function ProcessInformation({ formData, updateFormData, nextStep,
                 type="text"
                 id="BulkofCommodity"
                 name="BulkofCommodity"
-                value={formData.BulkofCommodity}
+                value={!hasMachines ? 'none' : formData.BulkofCommodity}
                 onChange={handleInputChange}
                 onBlur={() => handleBlur('BulkofCommodity')}
                 className={getInputClassName('BulkofCommodity')}
                 disabled={isFieldDisabled('BulkofCommodity')}
-                placeholder="e.g. 500 kg, 200 liters"
+                placeholder={!hasMachines ? 'none' : 'e.g. 500 kg, 200 liters'}
                 required={!isFieldDisabled('BulkofCommodity')}
               />
               {!isFieldDisabled('BulkofCommodity') && touchedFields.has('BulkofCommodity') && errors.BulkofCommodity && (
                 <p className="mt-1 text-sm text-red-500">{errors.BulkofCommodity}</p>
+              )}
+              {!hasMachines && (
+                <p className="mt-1 text-sm text-gray-500">No machines are connected to the selected services.</p>
               )}
             </div>
 
