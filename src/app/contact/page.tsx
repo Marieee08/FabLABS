@@ -1,81 +1,125 @@
+'use client';
+
+import { useState } from 'react';
 import Navbar from '@/components/custom/navbar';
 
 export default function Contact() {
-    return (
-      <main className="min-h-screen bg-[#f1f1f8] pt-24">
-        
-        <Navbar />
-  
-        <section>
-              <div className="container mx-auto px-5 py-24">
-          
-          <div className="mb-12 flex w-full flex-col text-center">
-            <h1 className="title-font mb-4 text-2xl font-medium text-gray-800 sm:text-3xl">Contact Us</h1>
-            <p className="mx-auto text-base leading-relaxed lg:w-2/3">Feel free to reach out to us! Whether you have a question,
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [message, setMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatus, setSubmitStatus] = useState(null);
+
+  const handleSubmit = async (e: { preventDefault: () => void; }) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    
+    try {
+      const response = await fetch('/api/contact', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ name, email, message }),
+      });
+      
+      if (response.ok) {
+        setSubmitStatus('success');
+        setName('');
+        setEmail('');
+        setMessage('');
+      } else {
+        setSubmitStatus('error');
+      }
+    } catch (error) {
+      console.error('Error sending email:', error);
+      setSubmitStatus('error');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      <Navbar />
+      
+      <div className="container mx-auto px-4 py-20 mt-16">
+        <div className="max-w-5xl mx-auto bg-white rounded-lg shadow-lg overflow-hidden md:flex">
+          <div className="md:w-1/2 p-8">
+            <h2 className="text-3xl font-bold mb-4">Contact Us</h2>
+            <p className="text-gray-600 mb-6">
+              Feel free to reach out to us! Whether you have a question,
               feedback, or a collaboration proposal, we'd love to hear from you.
             </p>
+
+            <form onSubmit={handleSubmit}>
+              <div className="mb-4">
+                <label htmlFor="name" className="block text-gray-700 mb-2">Name</label>
+                <input
+                  id="name"
+                  type="text"
+                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="mb-4">
+                <label htmlFor="email" className="block text-gray-700 mb-2">Email</label>
+                <input
+                  id="email"
+                  type="email"
+                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="mb-4">
+                <label htmlFor="message" className="block text-gray-700 mb-2">Message</label>
+                <textarea
+                  id="message"
+                  rows="4"
+                  className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  required
+                ></textarea>
+              </div>
+
+              <button
+                type="submit"
+                className="bg-blue-600 text-white py-2 px-6 rounded-lg hover:bg-blue-700 transition duration-300"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Sending...' : 'Submit'}
+              </button>
+              
+              {submitStatus === 'success' && (
+                <p className="mt-4 text-green-600">Message sent successfully!</p>
+              )}
+              
+              {submitStatus === 'error' && (
+                <p className="mt-4 text-red-600">Failed to send message. Please try again.</p>
+              )}
+            </form>
           </div>
 
-          <div className="mx-auto md:w-2/3 lg:w-1/2">
-            <div className="-m-2 flex flex-wrap">
-
-              <div className="w-1/2 p-2">
-                <div className="relative">
-                  <input type="text" id="name" name="name" className="peer w-full rounded border border-gray-700 bg-gray-500 bg-opacity-40 py-1 px-3 text-base leading-8 text-gray-800 placeholder-transparent outline-none transition-colors duration-200 ease-in-out focus:border-indigo-500 focus:bg-gray-100 focus:ring-2 focus:ring-blue-900" placeholder="Name" />
-                  <label className="absolute left-3 -top-6 bg-transparent text-sm leading-7 text-blue-900 transition-all peer-placeholder-shown:left-3 peer-placeholder-shown:top-2 peer-placeholder-shown:bg-currentColor peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-500 peer-focus:left-3 peer-focus:-top-6 peer-focus:text-sm peer-focus:text-blue-500">Name</label>
-                </div>
-              </div>
-              <div className="w-1/2 p-2">
-                <div className="relative">
-                  <input type="email" id="email" name="email" className="peer w-full rounded border border-gray-700 bg-gray-500 bg-opacity-40 py-1 px-3 text-base leading-8 text-gray-800 placeholder-transparent outline-none transition-colors duration-200 ease-in-out focus:border-indigo-500 focus:bg-gray-100 focus:ring-2 focus:ring-blue-900" placeholder="Email" />
-                  <label className="absolute left-3 -top-6 bg-transparent text-sm leading-7 text-blue-900 transition-all peer-placeholder-shown:left-3 peer-placeholder-shown:top-2 peer-placeholder-shown:bg-currentColor peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-500 peer-focus:left-3 peer-focus:-top-6 peer-focus:text-sm peer-focus:text-blue-500">Email</label>
-                </div>
-              </div>
-              <div className="mt-4 w-full p-2">
-                <div className="relative">
-                  <textarea id="message" name="message" className="peer h-32 w-full resize-none rounded border border-gray-700 bg-gray-500 bg-opacity-40 py-1 px-3 text-base leading-6 text-gray-900 placeholder-transparent outline-none transition-colors duration-200 ease-in-out focus:border-indigo-500 focus:bg-gray-100 focus:ring-2 focus:ring-blue-900" placeholder="Message"></textarea>
-                  <label className="absolute left-3 -top-6 bg-transparent text-sm leading-7 text-blue-900 transition-all peer-placeholder-shown:left-3 peer-placeholder-shown:top-2 peer-placeholder-shown:currentColor peer-placeholder-shown:text-base peer-placeholder-shown:text-gray-500 peer-focus:left-3 peer-focus:-top-6 peer-focus:text-sm peer-focus:text-blue-500">Message</label>
-                </div>
-              </div>
-              <div className="w-full p-2">
-                <button className="mx-auto flex rounded border-0 bg-[#10539b] py-2 px-8 text-lg text-white hover:bg-blue-600 focus:outline-none">Submit</button>
-              </div>
-
-
-              <div className="mt-8 w-full border-t border-gray-800 p-2 pt-8 text-center">
-                <a className="text-indigo-400">ctapales@evc.pshs.edu.ph</a>
-                {/* Not sure: (fab lab email from fb) <br /><a className="text-indigo-400">fablab@evc.pshs.edu.ph</a> */}
-                <p className="my-5 leading-normal">Ground Floor of Crest Building, PSHS-EVC <br />Pawing, Palo, Leyte, 6501, Philippines</p>
-                <span className="inline-flex">
-                  <a href="https://www.facebook.com/fablabeasternvisayas" target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-blue-500">
-                    <svg fill="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" className="h-5 w-5" viewBox="0 0 24 24">
-                      <path d="M18 2h-3a5 5 0 00-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 011-1h3z"></path>
-                    </svg>
-                  </a>
-                  {/* Other icons
-                  <a className="ml-4 text-gray-500">
-                    <svg fill="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" className="h-5 w-5" viewBox="0 0 24 24">
-                      <path d="M23 3a10.9 10.9 0 01-3.14 1.53 4.48 4.48 0 00-7.86 3v1A10.66 10.66 0 013 4s-4 9 5 13a11.64 11.64 0 01-7 2c9 5 20 0 20-11.5a4.5 4.5 0 00-.08-.83A7.72 7.72 0 0023 3z"></path>
-                    </svg>
-                  </a>
-                  <a className="ml-4 text-gray-500">
-                    <svg fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" className="h-5 w-5" viewBox="0 0 24 24">
-                      <rect width="20" height="20" x="2" y="2" rx="5" ry="5"></rect>
-                      <path d="M16 11.37A4 4 0 1112.63 8 4 4 0 0116 11.37zm1.5-4.87h.01"></path>
-                    </svg>
-                  </a>
-                  <a className="ml-4 text-gray-500">
-                    <svg fill="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" className="h-5 w-5" viewBox="0 0 24 24">
-                      <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z"></path>
-                    </svg>
-                  </a>
-                  */}
-                </span>
+          <div className="md:w-1/2 bg-gray-100 p-8">
+            <div className="flex flex-col h-full justify-between">
+              <div>
+                <p className="mb-2">ctapales@evc.pshs.edu.ph</p>
+                <p className="mb-4">
+                  Ground Floor of Crest Building, PSHS-EVC<br />
+                  Pawing, Palo, Leyte, 6501, Philippines
+                </p>
               </div>
             </div>
           </div>
-          </div>
-        </section>
-      </main>
-    );
-  }
+        </div>
+      </div>
+    </>
+  );
+}
