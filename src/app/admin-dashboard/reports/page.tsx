@@ -1,8 +1,11 @@
+// app/admin-dashboard/reports/page.tsx
+
 "use client";
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useUser, UserButton } from "@clerk/nextjs";
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import {
   LineChart,
   Line,
@@ -13,11 +16,21 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  BarChart,
+  Bar,
+  Legend,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  Radar
 } from 'recharts';
 import { format } from 'date-fns';
 import RoleGuard from '@/components/auth/role-guard';
-
+import { DateRangeSelector } from '@/components/admin-reports/date-range-selector';
+import { useDashboardData } from '@/components/admin-reports/use-dashboard-data';
+import { DateRange } from 'react-day-picker';
 
 const DashboardAdmin = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -26,6 +39,13 @@ const DashboardAdmin = () => {
   const formattedDate = format(today, 'EEEE, dd MMMM yyyy');
   const { user, isLoaded } = useUser();
   const [userRole, setUserRole] = useState("Loading...");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: new Date(new Date().setMonth(new Date().getMonth() - 1)),
+    to: new Date(),
+  });
+
+  // Use our custom hook for dashboard data
+  const { data: dashboardData, isLoading, error, refreshData, lastUpdated } = useDashboardData();
 
   // useEffect to get user role
   useEffect(() => {
@@ -51,25 +71,35 @@ const DashboardAdmin = () => {
     fetchUserRole();
   }, [user, isLoaded]);
 
-  const reservationTrendsData = [
-    { month: 'Jan', reservations: 40 },
-    { month: 'Feb', reservations: 30 },
-    { month: 'Mar', reservations: 50 },
-    { month: 'Apr', reservations: 45 },
-    { month: 'May', reservations: 60 },
-    { month: 'Jun', reservations: 70 }
-  ];
+  // Handle date range change
+  const handleDateRangeChange = (range: DateRange | undefined) => {
+    setDateRange(range);
+    // Pass the date range to the refreshData function
+    refreshData(range);
+  };
 
+  // Color constants
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+  const RADIAN = Math.PI / 180;
 
-  const serviceBreakdownData = [
-    { name: 'Laser Cutter', value: 400 },
-    { name: '3D Printer', value: 300 },
-    { name: 'Heat Press', value: 200 }
-  ];
-
-
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28'];
-
+  // Custom label for pie charts
+  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }) => {
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * RADIAN);
+    const y = cy + radius * Math.sin(-midAngle * RADIAN);
+  
+    return (
+      <text 
+        x={x} 
+        y={y} 
+        fill="white" 
+        textAnchor={x > cx ? 'start' : 'end'} 
+        dominantBaseline="central"
+      >
+        {`${name} ${(percent * 100).toFixed(0)}%`}
+      </text>
+    );
+  };
 
   return (
     <RoleGuard allowedRoles={['ADMIN']}>
@@ -109,7 +139,6 @@ const DashboardAdmin = () => {
                     className="group relative flex w-full items-center justify-between gap-2.5 rounded-full py-2 px-4 font-medium text-white border border-transparent hover:bg-[#1c2a52] hover:border-[#5e86ca]"
                   >
                     <span>Orders</span>
-                    {/* Dropdown arrow */}
                     <svg
                       className={`w-4 h-4 transform transition-transform duration-300 ${orderDropdownOpen ? 'rotate-180' : ''}`}
                       xmlns="http://www.w3.org/2000/svg"
@@ -158,7 +187,6 @@ const DashboardAdmin = () => {
           </nav>
         </aside>
 
-
         {/* Main Content */}
         <div className="relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden">
           {/* Header */}
@@ -200,102 +228,284 @@ const DashboardAdmin = () => {
             </div>
           </header>
 
-
           {/* Main */}
           <main>
             <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
-            <h2 className="text-[#143370] text-3xl font-bold font-qanelas3">Analytics Overview</h2>
-            <p className="text-sm text-[#143370] mb-4 font-poppins1">{formattedDate}</p>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 mb-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+                <div>
+                  <h2 className="text-[#143370] text-3xl font-bold font-qanelas3">Analytics Overview</h2>
+                  <p className="text-sm text-[#143370] font-poppins1">{formattedDate}</p>
+                </div>
+                
+                <div className="mt-4 sm:mt-0">
+                  <Button 
+                    onClick={() => refreshData()}
+                    className="bg-[#143370] hover:bg-[#0d2555] text-white"
+                  >
+                    Refresh Data
+                  </Button>
+                </div>
+              </div>
+
+              {/* Date Range Selector */}
+              <DateRangeSelector onRangeChange={handleDateRangeChange} />
               
-              <Card className="bg-white shadow-sm transform hover:scale-105 transition-all duration-300 border border-[#5e86ca]">
-                <CardHeader>
-                  <CardTitle>Something</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <h2 className="text-4xl font-bold text-[#143370]">2</h2>
-                  <p className="text-sm text-[#143370]">Next 7 Days</p>
-                </CardContent>
-              </Card>
+              {isLoading ? (
+                <div className="flex justify-center items-center h-64">
+                  <p>Loading dashboard data...</p>
+                </div>
+              ) : error ? (
+                <div className="flex justify-center items-center h-64">
+                  <p className="text-red-500">{error}</p>
+                </div>
+              ) : (
+                <>
+                  {/* Key Metrics */}
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3 mb-6">
+                    <Card className="bg-white shadow-sm transform hover:scale-105 transition-all duration-300 border border-[#5e86ca]">
+                      <CardHeader>
+                        <CardTitle>Pending Requests</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <h2 className="text-4xl font-bold text-[#143370]">{dashboardData.pendingRequests}</h2>
+                        <p className="text-sm text-[#143370]">Awaiting Approval</p>
+                      </CardContent>
+                    </Card>
 
-              <Card className="bg-white shadow-sm transform hover:scale-105 transition-all duration-300 border border-[#5e86ca]">
-                <CardHeader>
-                  <CardTitle>Past Reservations</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <h2 className="text-4xl font-bold text-[#143370]">24</h2>
-                  <p className="text-sm text-[#143370]">Last 30 Days</p>
-                </CardContent>
-              </Card>
+                    <Card className="bg-white shadow-sm transform hover:scale-105 transition-all duration-300 border border-[#5e86ca]">
+                      <CardHeader>
+                        <CardTitle>Completed Requests</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <h2 className="text-4xl font-bold text-[#143370]">{dashboardData.completedRequestsLastMonth}</h2>
+                        <p className="text-sm text-[#143370]">Last 30 Days</p>
+                      </CardContent>
+                    </Card>
 
-              <Card className="bg-white shadow-sm transform hover:scale-105 transition-all duration-300 border border-[#5e86ca]">
-                <CardHeader>
-                  <CardTitle>Something</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <h2 className="text-4xl font-bold text-[#143370]">3</h2>
-                  <p className="text-sm text-[#143370]">Last 30 Days</p>
-                </CardContent>
-              </Card>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-              {/* Reservation Trends Line Chart */}
-              <Card className="p-4 border border-[#5e86ca]">
-                <CardHeader>
-                  <CardTitle className="text-[#143370]">Reservation Trends</CardTitle>
-                  <p className="text-sm text-[#143370]">A summary of the number of reservations per month</p>
-                </CardHeader>
-                <CardContent className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={reservationTrendsData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="month" />
-                      <YAxis />
-                      <Tooltip />
-                      <Line
-                        type="monotone"
-                        dataKey="reservations"
-                        stroke="#8884d8"
-                        strokeWidth={2}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
+                    <Card className="bg-white shadow-sm transform hover:scale-105 transition-all duration-300 border border-[#5e86ca]">
+                      <CardHeader>
+                        <CardTitle>Active EVC Reservations</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <h2 className="text-4xl font-bold text-[#143370]">{dashboardData.activeEVCReservations}</h2>
+                        <p className="text-sm text-[#143370]">Currently Scheduled</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+                  
+                  {/* Machine Availability */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <Card className="p-4 border border-[#5e86ca]">
+                      <CardHeader>
+                        <CardTitle className="text-[#143370]">Machine Availability</CardTitle>
+                        <p className="text-sm text-[#143370]">Current status of all machines</p>
+                      </CardHeader>
+                      <CardContent className="h-[300px]">
+  {dashboardData.machineAvailability && 
+   (dashboardData.machineAvailability.available > 0 || dashboardData.machineAvailability.unavailable > 0) ? (
+    <ResponsiveContainer width="100%" height="100%">
+      <PieChart>
+        <Pie
+          data={[
+            { name: 'Available', value: dashboardData.machineAvailability.available || 0 },
+            { name: 'Unavailable', value: dashboardData.machineAvailability.unavailable || 0 }
+          ]}
+          cx="50%"
+          cy="50%"
+          labelLine={false}
+          outerRadius={80}
+          fill="#8884d8"
+          dataKey="value"
+          label={renderCustomizedLabel}
+        >
+                              {[
+                                { name: 'Available', value: dashboardData.machineAvailability.available },
+                                { name: 'Unavailable', value: dashboardData.machineAvailability.unavailable }
+                              ].map((entry, index) => (
+                                <Cell 
+                                  key={`cell-${index}`} 
+                                  fill={index === 0 ? '#00C49F' : '#FF8042'} 
+                                />
+                              ))}
+                             </Pie>
+        <Tooltip />
+      </PieChart>
+    </ResponsiveContainer>
+  ) : (
+    <div className="flex h-full items-center justify-center">
+      <p>No data available</p>
+    </div>
+  )}
+</CardContent>
+                    </Card>
 
+                    {/* Request Trends */}
+                    <Card className="p-4 border border-[#5e86ca]">
+                      <CardHeader>
+                        <CardTitle className="text-[#143370]">Request Trends</CardTitle>
+                        <p className="text-sm text-[#143370]">Monthly request volume over time</p>
+                      </CardHeader>
+                      <CardContent className="h-[300px]">
+  {dashboardData.utilizationTrends && dashboardData.utilizationTrends.length > 0 ? (
+    <ResponsiveContainer width="100%" height="100%">
+      <LineChart data={dashboardData.utilizationTrends}>
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis dataKey="month" />
+        <YAxis />
+        <Tooltip />
+        <Line
+          type="monotone"
+          dataKey="requests"
+          stroke="#8884d8"
+          strokeWidth={2}
+          activeDot={{ r: 8 }}
+        />
+      </LineChart>
+    </ResponsiveContainer>
+  ) : (
+    <div className="flex h-full items-center justify-center">
+      <p>No data available</p>
+    </div>
+  )}
+</CardContent>
+                    </Card>
+                  </div>
+                  
+                  {/* Service Breakdown and User Role Distribution */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <Card className="p-4 border border-[#5e86ca]">
+                      <CardHeader>
+                        <CardTitle className="text-[#143370]">Service Popularity</CardTitle>
+                        <p className="text-sm text-[#143370]">Most frequently used services</p>
+                      </CardHeader>
+                      <CardContent className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={dashboardData.serviceStats}
+                              cx="50%"
+                              cy="50%"
+                              labelLine={false}
+                              outerRadius={80}
+                              fill="#8884d8"
+                              dataKey="value"
+                              label={renderCustomizedLabel}
+                            >
+                              {dashboardData.serviceStats.map((entry, index) => (
+                                <Cell 
+                                  key={`cell-${index}`} 
+                                  fill={COLORS[index % COLORS.length]} 
+                                />
+                              ))}
+                            </Pie>
+                            <Tooltip />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
 
-              {/* Service Breakdown Pie Chart */}
-              <Card className="p-4 border border-[#5e86ca]">
-                <CardHeader>
-                  <CardTitle className="text-[#143370]">Machine Usage</CardTitle>
-                  <p className="text-sm text-[#143370]">A chart of the most commonly availed services</p>
-                </CardHeader>
-                <CardContent className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={serviceBreakdownData}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="value"
-                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                      >
-                        {serviceBreakdownData.map((entry, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={COLORS[index % COLORS.length]}
-                          />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-            </div>
+                    <Card className="p-4 border border-[#5e86ca]">
+                      <CardHeader>
+                        <CardTitle className="text-[#143370]">User Role Distribution</CardTitle>
+                        <p className="text-sm text-[#143370]">Breakdown of users by role</p>
+                      </CardHeader>
+                      <CardContent className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={dashboardData.userRoleDistribution}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" />
+                            <YAxis />
+                            <Tooltip />
+                            <Bar dataKey="value" fill="#8884d8" name="Users" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  </div>
+                  
+                  {/* Machine Downtime and Repair Types */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <Card className="p-4 border border-[#5e86ca]">
+                      <CardHeader>
+                        <CardTitle className="text-[#143370]">Machine Downtime</CardTitle>
+                        <p className="text-sm text-[#143370]">Total downtime by machine (minutes)</p>
+                      </CardHeader>
+                      <CardContent className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart 
+                            data={dashboardData.machineDowntime}
+                            layout="vertical"
+                          >
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis type="number" />
+                            <YAxis dataKey="machine" type="category" width={100} />
+                            <Tooltip />
+                            <Bar dataKey="downtime" fill="#FF8042" name="Downtime (min)" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="p-4 border border-[#5e86ca]">
+                      <CardHeader>
+                        <CardTitle className="text-[#143370]">Repair Types</CardTitle>
+                        <p className="text-sm text-[#143370]">Frequency of repair types</p>
+                      </CardHeader>
+                      <CardContent className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={dashboardData.repairsByType}
+                              cx="50%"
+                              cy="50%"
+                              labelLine={false}
+                              outerRadius={80}
+                              fill="#8884d8"
+                              dataKey="count"
+                              nameKey="type"
+                              label={renderCustomizedLabel}
+                            >
+                              {dashboardData.repairsByType.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* User Satisfaction Radar Chart */}
+                  <div className="mb-6">
+                    <Card className="p-4 border border-[#5e86ca]">
+                      <CardHeader>
+                        <CardTitle className="text-[#143370]">User Satisfaction Metrics</CardTitle>
+                        <p className="text-sm text-[#143370]">Average scores across different satisfaction categories (1-5 scale)</p>
+                      </CardHeader>
+                      <CardContent className="h-[400px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RadarChart cx="50%" cy="50%" outerRadius="80%" data={dashboardData.satisfactionScores}>
+                            <PolarGrid />
+                            <PolarAngleAxis dataKey="category" />
+                            <PolarRadiusAxis angle={30} domain={[0, 5]} />
+                            <Radar name="Satisfaction Score" dataKey="score" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
+                            <Tooltip />
+                            <Legend />
+                          </RadarChart>
+                        </ResponsiveContainer>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Last updated information */}
+                  <div className="text-right text-sm text-gray-500 mt-4">
+                    {lastUpdated && (
+                      <p>Last updated: {format(lastUpdated, 'MMM dd, yyyy HH:mm:ss')}</p>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </main>
         </div>
@@ -303,6 +513,5 @@ const DashboardAdmin = () => {
     </RoleGuard>
   );
 };
-
 
 export default DashboardAdmin;
