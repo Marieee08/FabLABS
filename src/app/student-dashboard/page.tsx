@@ -1,5 +1,3 @@
-// /student-dashbaord/page.tsx
-
 "use client";
 
 import Link from "next/link";
@@ -54,9 +52,11 @@ const DashboardUser = () => {
   const { user, isLoaded } = useUser();
   const [userRole, setUserRole] = useState<string>("Loading...");
   const [evcReservations, setEvcReservations] = useState<EVCReservation[]>([]);
+  const [historyReservations, setHistoryReservations] = useState<EVCReservation[]>([]);
   const [selectedEVCReservation, setSelectedEVCReservation] = useState<EVCReservation | null>(null);
   const [isEVCModalOpen, setIsEVCModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   const today = new Date();
   const formattedDate = format(today, 'EEEE, dd MMMM yyyy');
 
@@ -66,6 +66,8 @@ const DashboardUser = () => {
       if (!isLoaded || !user) return;
       
       setIsLoading(true);
+      setIsHistoryLoading(true);
+      
       try {
         // Fetch EVC reservations
         const evcResponse = await fetch('/api/user/fetch-evc-reservations');
@@ -75,11 +77,25 @@ const DashboardUser = () => {
         }
         
         const evcData = await evcResponse.json();
-        setEvcReservations(evcData);
+        
+        // Filter into pending/active and history (completed or rejected)
+        const pendingReservations = evcData.filter((reservation: EVCReservation) => 
+          reservation.EVCStatus.toLowerCase() !== 'completed' && 
+          reservation.EVCStatus.toLowerCase() !== 'rejected'
+        );
+        
+        const completedReservations = evcData.filter((reservation: EVCReservation) => 
+          reservation.EVCStatus.toLowerCase() === 'completed' || 
+          reservation.EVCStatus.toLowerCase() === 'rejected'
+        );
+        
+        setEvcReservations(pendingReservations);
+        setHistoryReservations(completedReservations);
       } catch (error) {
         console.error('Error fetching reservations:', error);
       } finally {
         setIsLoading(false);
+        setIsHistoryLoading(false);
       }
     };
   
@@ -88,7 +104,7 @@ const DashboardUser = () => {
     }
   }, [user, isLoaded]);
 
- // useEffect to user role
+ // useEffect to fetch user role
  useEffect(() => {
   const fetchUserRole = async () => {
     if (!isLoaded || !user) {
@@ -225,7 +241,7 @@ const DashboardUser = () => {
                 // EVC Reservations Table
                 evcReservations.length === 0 ? (
                   <div className="bg-blue-50 p-6 rounded-lg text-center">
-                    <p className="text-blue-800">You don't have any EVC reservations at the moment.</p>
+                    <p className="text-blue-800">You don't have any pending EVC reservations at the moment.</p>
                     <Link href="/user-services/student-schedule" className="mt-4 inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
                       Create a New Reservation
                     </Link>
@@ -303,9 +319,82 @@ const DashboardUser = () => {
               <p className="text-xl font-bold text-[#143370]">History</p>
               <p className="text-sm text-[#143370] mb-4">Here's a summary of your previous transactions!</p>
               
-              <div className="bg-blue-50 p-6 rounded-lg text-center">
-                <p className="text-blue-800">History feature coming soon!</p>
-              </div>
+              {isHistoryLoading ? (
+                <div className="flex justify-center items-center h-32">
+                  <p>Loading your history...</p>
+                </div>
+              ) : (
+                historyReservations.length === 0 ? (
+                  <div className="bg-blue-50 p-6 rounded-lg text-center">
+                    <p className="text-blue-800">You don't have any completed or rejected reservations yet.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-lg bg-blue-50 shadow-md">
+                    <table className="min-w-full divide-y divide-gray-200 rounded-lg">
+                      <thead className="bg-blue-100">
+                        <tr>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Date</th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Subject</th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Topic</th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Level/Section</th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {historyReservations.map((reservation) => (
+                          <tr key={reservation.id} className="hover:bg-blue-50 transition-colors">
+                            {/* Date */}
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm font-medium text-gray-900">
+                                {formatDate(reservation.DateRequested)}
+                              </div>
+                            </td>
+
+                            {/* Status */}
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeClass(reservation.EVCStatus)}`}>
+                                {reservation.EVCStatus}
+                              </span>
+                            </td>
+
+                            {/* Subject */}
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">
+                                {reservation.Subject || 'Not specified'}
+                              </div>
+                            </td>
+
+                            {/* Topic */}
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">
+                                {reservation.Topic || 'Not specified'}
+                              </div>
+                            </td>
+
+                            {/* Level/Section */}
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">
+                                {reservation.LvlSec || 'Not specified'}
+                              </div>
+                            </td>
+
+                            {/* Actions */}
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <button
+                                onClick={() => handleEVCReviewClick(reservation)}
+                                className="text-blue-600 hover:text-blue-900 transition"
+                              >
+                                Review
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              )}
             </div>
           </div>
         </main>
