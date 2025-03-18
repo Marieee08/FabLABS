@@ -138,36 +138,22 @@ export async function GET(request: NextRequest) {
     // 3. Get completed requests - FIXED to count both utilReq and EVCReservations
     try {
       console.log("Fetching completed requests count...");
-      // Define date filter condition for each query
-      const dateFilter = {};
-      if (fromDate) {
-        dateFilter['gte'] = fromDate;
-      } else {
-        // Default to last 30 days if no date range specified
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        dateFilter['gte'] = thirtyDaysAgo;
-      }
       
-      if (toDate) {
-        dateFilter['lte'] = toDate;
-      }
-      
-      // Count completed UtilReq
+      // Count completed UtilReq (standard requests)
       const completedUtilReqCount = await prisma.utilReq.count({
         where: {
-          Status: 'Completed',
-          ...(Object.keys(dateFilter).length > 0 ? { RequestDate: dateFilter } : {})
+          Status: 'Completed'
+          // No date filter - count ALL completed requests regardless of date
         }
       });
       
       console.log("Completed UtilReq count:", completedUtilReqCount);
       
-      // Count completed EVCReservations
+      // Count ALL approved EVCReservations (student reservations)
       const completedEVCCount = await prisma.eVCReservation.count({
         where: {
-          EVCStatus: 'Approved', // Adjust status value if needed
-          ...(Object.keys(dateFilter).length > 0 ? { DateRequested: dateFilter } : {})
+          EVCStatus: 'Completed'
+          // No date filter - count ALL approved reservations regardless of date
         }
       });
       

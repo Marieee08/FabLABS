@@ -82,25 +82,30 @@ const DashboardAdmin = () => {
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
   const RADIAN = Math.PI / 180;
 
-  // Custom label for pie charts
+  // Improved custom label for pie charts that handles position better
   const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, index, name }) => {
-    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    // Only show labels for segments that are big enough (more than 5%)
+    if (percent < 0.05) return null;
+    
+    // Move labels further out from the pie
+    const radius = innerRadius + (outerRadius - innerRadius) * 1.5; // Increase this multiplier
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
-  
+    
     return (
       <text 
         x={x} 
         y={y} 
-        fill="white" 
+        fill="#143370"
         textAnchor={x > cx ? 'start' : 'end'} 
         dominantBaseline="central"
+        fontSize="12"
       >
-        {`${name} ${(percent * 100).toFixed(0)}%`}
+        {`${name}: ${(percent * 100).toFixed(0)}%`}
       </text>
     );
   };
-
+  
   return (
     <RoleGuard allowedRoles={['ADMIN']}>
       <div className="flex h-screen overflow-hidden bg-[#f1f5f9]">
@@ -190,7 +195,7 @@ const DashboardAdmin = () => {
         {/* Main Content */}
         <div className="relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden">
           {/* Header */}
-          <header className="sticky top-0 z-999 flex w-full bg-white shadow-md">
+          <header className="sticky top-0 z-[999] flex w-full bg-white shadow-md">
             <div className="flex flex-grow items-center justify-between py-4 px-4 shadow-2 md:px-6 2xl:px-11">
               <div className="flex items-center gap-2 sm:gap-4 lg:hidden">
                 <button
@@ -230,7 +235,7 @@ const DashboardAdmin = () => {
 
           {/* Main */}
           <main>
-            <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
+            <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10 z-1">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
                 <div>
                   <h2 className="text-[#143370] text-3xl font-bold font-qanelas3">Analytics Overview</h2>
@@ -301,42 +306,35 @@ const DashboardAdmin = () => {
                         <p className="text-sm text-[#143370]">Current status of all machines</p>
                       </CardHeader>
                       <CardContent className="h-[300px]">
-  {dashboardData.machineAvailability && 
-   (dashboardData.machineAvailability.available > 0 || dashboardData.machineAvailability.unavailable > 0) ? (
-    <ResponsiveContainer width="100%" height="100%">
-      <PieChart>
-        <Pie
-          data={[
-            { name: 'Available', value: dashboardData.machineAvailability.available || 0 },
-            { name: 'Unavailable', value: dashboardData.machineAvailability.unavailable || 0 }
-          ]}
-          cx="50%"
-          cy="50%"
-          labelLine={false}
-          outerRadius={80}
-          fill="#8884d8"
-          dataKey="value"
-          label={renderCustomizedLabel}
-        >
-                              {[
-                                { name: 'Available', value: dashboardData.machineAvailability.available },
-                                { name: 'Unavailable', value: dashboardData.machineAvailability.unavailable }
-                              ].map((entry, index) => (
-                                <Cell 
-                                  key={`cell-${index}`} 
-                                  fill={index === 0 ? '#00C49F' : '#FF8042'} 
-                                />
-                              ))}
-                             </Pie>
-        <Tooltip />
-      </PieChart>
-    </ResponsiveContainer>
-  ) : (
-    <div className="flex h-full items-center justify-center">
-      <p>No data available</p>
-    </div>
-  )}
-</CardContent>
+                        {dashboardData.machineAvailability && 
+                         (dashboardData.machineAvailability.available > 0 || dashboardData.machineAvailability.unavailable > 0) ? (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                            <Pie
+  data={dashboardData.serviceStats}
+  cx="50%"
+  cy="50%"
+  labelLine={false} // Remove label lines
+  label={false} // Remove direct labels
+  outerRadius={80}
+  fill="#8884d8"
+  dataKey="value"
+  nameKey="name"
+>
+  {/* Cells remain the same */}
+</Pie>
+<Tooltip formatter={(value, name) => [`${value} requests`, name]} />
+<Legend verticalAlign="bottom" height={36} />
+                              <Tooltip formatter={(value, name) => [`${value} machines`, name]} />
+                              <Legend verticalAlign="bottom" height={36} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="flex h-full items-center justify-center">
+                            <p>No data available</p>
+                          </div>
+                        )}
+                      </CardContent>
                     </Card>
 
                     {/* Request Trends */}
@@ -346,28 +344,39 @@ const DashboardAdmin = () => {
                         <p className="text-sm text-[#143370]">Monthly request volume over time</p>
                       </CardHeader>
                       <CardContent className="h-[300px]">
-  {dashboardData.utilizationTrends && dashboardData.utilizationTrends.length > 0 ? (
-    <ResponsiveContainer width="100%" height="100%">
-      <LineChart data={dashboardData.utilizationTrends}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="month" />
-        <YAxis />
-        <Tooltip />
-        <Line
-          type="monotone"
-          dataKey="requests"
-          stroke="#8884d8"
-          strokeWidth={2}
-          activeDot={{ r: 8 }}
-        />
-      </LineChart>
-    </ResponsiveContainer>
-  ) : (
-    <div className="flex h-full items-center justify-center">
-      <p>No data available</p>
-    </div>
-  )}
-</CardContent>
+                        {dashboardData.utilizationTrends && dashboardData.utilizationTrends.length > 0 ? (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart 
+                              data={dashboardData.utilizationTrends}
+                              margin={{ top: 5, right: 30, left: 20, bottom: 25 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis 
+                                dataKey="month" 
+                                angle={-45} 
+                                textAnchor="end" 
+                                height={60} 
+                                tick={{ fontSize: 12 }} 
+                              />
+                              <YAxis />
+                              <Tooltip />
+                              <Legend verticalAlign="top" height={36} />
+                              <Line
+                                name="Request Volume"
+                                type="monotone"
+                                dataKey="requests"
+                                stroke="#8884d8"
+                                strokeWidth={2}
+                                activeDot={{ r: 8 }}
+                              />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="flex h-full items-center justify-center">
+                            <p>No data available</p>
+                          </div>
+                        )}
+                      </CardContent>
                     </Card>
                   </div>
                   
@@ -379,28 +388,37 @@ const DashboardAdmin = () => {
                         <p className="text-sm text-[#143370]">Most frequently used services</p>
                       </CardHeader>
                       <CardContent className="h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={dashboardData.serviceStats}
-                              cx="50%"
-                              cy="50%"
-                              labelLine={false}
-                              outerRadius={80}
-                              fill="#8884d8"
-                              dataKey="value"
-                              label={renderCustomizedLabel}
-                            >
-                              {dashboardData.serviceStats.map((entry, index) => (
-                                <Cell 
-                                  key={`cell-${index}`} 
-                                  fill={COLORS[index % COLORS.length]} 
-                                />
-                              ))}
-                            </Pie>
-                            <Tooltip />
-                          </PieChart>
-                        </ResponsiveContainer>
+                        {dashboardData.serviceStats && dashboardData.serviceStats.length > 0 ? (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                              <Pie
+                                data={dashboardData.serviceStats}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={false}
+                                label={false}
+                                outerRadius={80}
+                                fill="#8884d8"
+                                dataKey="value"
+                                nameKey="name"
+                                label
+                              >
+                                {dashboardData.serviceStats.map((entry, index) => (
+                                  <Cell 
+                                    key={`cell-${index}`} 
+                                    fill={COLORS[index % COLORS.length]} 
+                                  />
+                                ))}
+                              </Pie>
+                              <Tooltip formatter={(value, name) => [`${value} requests`, name]} />
+                              <Legend verticalAlign="bottom" height={36} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="flex h-full items-center justify-center">
+                            <p>No data available</p>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
 
@@ -410,15 +428,25 @@ const DashboardAdmin = () => {
                         <p className="text-sm text-[#143370]">Breakdown of users by role</p>
                       </CardHeader>
                       <CardContent className="h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={dashboardData.userRoleDistribution}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <Tooltip />
-                            <Bar dataKey="value" fill="#8884d8" name="Users" />
-                          </BarChart>
-                        </ResponsiveContainer>
+                        {dashboardData.userRoleDistribution && dashboardData.userRoleDistribution.length > 0 ? (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart 
+                              data={dashboardData.userRoleDistribution}
+                              margin={{ top: 20, right: 30, left: 20, bottom: 25 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" />
+                              <YAxis />
+                              <Tooltip formatter={(value) => [`${value} users`]} />
+                              <Legend verticalAlign="top" height={36} />
+                              <Bar dataKey="value" name="Number of Users" fill="#8884d8" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="flex h-full items-center justify-center">
+                            <p>No data available</p>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   </div>
@@ -431,18 +459,31 @@ const DashboardAdmin = () => {
                         <p className="text-sm text-[#143370]">Total downtime by machine (minutes)</p>
                       </CardHeader>
                       <CardContent className="h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart 
-                            data={dashboardData.machineDowntime}
-                            layout="vertical"
-                          >
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis type="number" />
-                            <YAxis dataKey="machine" type="category" width={100} />
-                            <Tooltip />
-                            <Bar dataKey="downtime" fill="#FF8042" name="Downtime (min)" />
-                          </BarChart>
-                        </ResponsiveContainer>
+                        {dashboardData.machineDowntime && dashboardData.machineDowntime.length > 0 ? (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart 
+                              data={dashboardData.machineDowntime}
+                              layout="vertical"
+                              margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis type="number" />
+                              <YAxis 
+                                dataKey="machine" 
+                                type="category" 
+                                tick={{ fontSize: 12 }}
+                                width={75}
+                              />
+                              <Tooltip formatter={(value) => [`${value} minutes`]} />
+                              <Legend verticalAlign="top" height={36} />
+                              <Bar dataKey="downtime" name="Downtime (minutes)" fill="#FF8042" />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="flex h-full items-center justify-center">
+                            <p>No data available</p>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
 
@@ -452,26 +493,36 @@ const DashboardAdmin = () => {
                         <p className="text-sm text-[#143370]">Frequency of repair types</p>
                       </CardHeader>
                       <CardContent className="h-[300px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={dashboardData.repairsByType}
-                              cx="50%"
-                              cy="50%"
-                              labelLine={false}
-                              outerRadius={80}
-                              fill="#8884d8"
-                              dataKey="count"
-                              nameKey="type"
-                              label={renderCustomizedLabel}
-                            >
-                              {dashboardData.repairsByType.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <Tooltip />
-                          </PieChart>
-                        </ResponsiveContainer>
+                        {dashboardData.repairsByType && dashboardData.repairsByType.length > 0 ? (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <PieChart margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                              <Pie
+                                data={dashboardData.repairsByType}
+                                cx="50%"
+                                cy="50%"
+                                labelLine={true}
+                                outerRadius={80}
+                                fill="#8884d8"
+                                dataKey="count"
+                                nameKey="type"
+                                label={(props) => {
+                                  const { type, percent } = props;
+                                  return `${type}: ${(percent * 100).toFixed(0)}%`;
+                                }}
+                              >
+                                {dashboardData.repairsByType.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                ))}
+                              </Pie>
+                              <Tooltip formatter={(value, name) => [`${value} repairs`, name]} />
+                              <Legend verticalAlign="bottom" height={36} />
+                            </PieChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="flex h-full items-center justify-center">
+                            <p>No data available</p>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   </div>
@@ -484,16 +535,36 @@ const DashboardAdmin = () => {
                         <p className="text-sm text-[#143370]">Average scores across different satisfaction categories (1-5 scale)</p>
                       </CardHeader>
                       <CardContent className="h-[400px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <RadarChart cx="50%" cy="50%" outerRadius="80%" data={dashboardData.satisfactionScores}>
-                            <PolarGrid />
-                            <PolarAngleAxis dataKey="category" />
-                            <PolarRadiusAxis angle={30} domain={[0, 5]} />
-                            <Radar name="Satisfaction Score" dataKey="score" stroke="#8884d8" fill="#8884d8" fillOpacity={0.6} />
-                            <Tooltip />
-                            <Legend />
-                          </RadarChart>
-                        </ResponsiveContainer>
+                        {dashboardData.satisfactionScores && dashboardData.satisfactionScores.length > 0 ? (
+                          <ResponsiveContainer width="100%" height="100%">
+                            <RadarChart 
+                              cx="50%" 
+                              cy="50%" 
+                              outerRadius="70%" 
+                              data={dashboardData.satisfactionScores}
+                            >
+                              <PolarGrid />
+                              <PolarAngleAxis 
+                                dataKey="category" 
+                                tick={{ fill: '#143370', fontSize: 12 }}
+                              />
+                              <PolarRadiusAxis angle={30} domain={[0, 5]} />
+                              <Radar 
+                                name="Satisfaction Score" 
+                                dataKey="score" 
+                                stroke="#8884d8" 
+                                fill="#8884d8" 
+                                fillOpacity={0.6} 
+                              />
+                              <Tooltip />
+                              <Legend verticalAlign="bottom" height={36} />
+                            </RadarChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="flex h-full items-center justify-center">
+                            <p>No data available</p>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   </div>
