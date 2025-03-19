@@ -1,3 +1,5 @@
+// /user-services/student-schedule
+
 'use client';
 
 

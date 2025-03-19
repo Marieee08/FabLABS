@@ -1,3 +1,5 @@
+// /components/student-forms/lab-reservation/page.tsx
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useUser } from "@clerk/nextjs";
 

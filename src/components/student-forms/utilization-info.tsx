@@ -1,4 +1,4 @@
-//UtilizationInfo
+// /components/student-forms/utilization-info/page.tsx
 
 import React, { useState, ChangeEvent, useEffect } from 'react';
 import { Plus, Minus, X } from 'lucide-react';

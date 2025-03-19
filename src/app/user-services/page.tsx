@@ -7,7 +7,8 @@ import Link from "next/link";
 import { useRouter } from 'next/navigation';
 import PricingTable from '@/components/admin-functions/price-table';
 import Navbar from '@/components/custom/navbar';
-import { AlertCircle, Clock, BadgeX, X, Info } from 'lucide-react';
+import { AlertCircle, Clock, BadgeX, X, Info, Loader } from 'lucide-react';
+import { useAuth } from '@clerk/nextjs';
 
 interface Machine {
   id: string;
@@ -28,8 +29,30 @@ interface ClientInfo {
   Zipcode: number | null;
 }
 
+interface BusinessInfo {
+  CompanyName: string | null;
+  BusinessOwner: string | null;
+  BusinessPermitNum: string | null;
+  TINNum: string | null;
+  CompanyIDNum: string | null;
+  CompanyEmail: string | null;
+  ContactPerson: string | null;
+  Designation: string | null;
+  CompanyAddress: string | null;
+  CompanyCity: string | null;
+  CompanyProvince: string | null;
+  CompanyZipcode: number | null;
+  CompanyPhoneNum: string | null;
+  CompanyMobileNum: string | null;
+  Manufactured: string | null;
+  ProductionFrequency: string | null;
+  Bulk: string | null;
+  isNotBusinessOwner?: boolean;
+}
+
 export default function Services() {
   const router = useRouter();
+  const { userId } = useAuth();
   const [isAnimating, setIsAnimating] = useState(false);
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -37,6 +60,8 @@ export default function Services() {
   const [userRole, setUserRole] = useState<string>("");
   const [isBusinessInfoMissing, setIsBusinessInfoMissing] = useState(false);
   const [isMissingInfoModalOpen, setIsMissingInfoModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isMachinesLoading, setIsMachinesLoading] = useState(true);
   const pricingRef = useRef<HTMLElement>(null);
 
   const handleButtonClick = () => {
@@ -50,10 +75,11 @@ export default function Services() {
   const handleCloseMissingInfoModal = () => {
     setIsMissingInfoModalOpen(false);
   };
-
+  
   useEffect(() => {
     // Fetch machines
     const fetchMachines = async () => {
+      setIsMachinesLoading(true);
       try {
         const response = await fetch('/api/machines');
         const data = await response.json();
@@ -73,13 +99,24 @@ export default function Services() {
         setMachines(sortedMachines);
       } catch (error) {
         console.error('Error fetching machines:', error);
+      } finally {
+        setIsMachinesLoading(false);
       }
     };
   
     // Fetch user info to get role and check business info
     const fetchUserInfo = async () => {
+      if (!userId) {
+        setUserRole("");
+        return;
+      }
+
       try {
-        const response = await fetch('/api/user/info');
+        const response = await fetch(`/api/account/${userId}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch user account');
+        }
+        
         const data = await response.json();
         
         if (data && data.Role) {
@@ -87,28 +124,50 @@ export default function Services() {
           
           // If user is MSME, check if business info is missing
           if (data.Role === "MSME") {
-            const hasBusinessInfo = 
-              data.ClientInfo && 
-              data.ClientInfo.Address && 
-              data.ClientInfo.City && 
-              data.ClientInfo.Province && 
-              data.ClientInfo.Zipcode;
+            // Check if the user has indicated they are not a business owner
+            if (data.BusinessInfo?.isNotBusinessOwner === true) {
+              setIsBusinessInfoMissing(false);
+              return;
+            }
             
-            setIsBusinessInfoMissing(!hasBusinessInfo);
+            // Check for required business fields
+            const hasCompleteBusinessInfo = 
+              data.BusinessInfo && 
+              data.BusinessInfo.CompanyName && 
+              data.BusinessInfo.CompanyName !== "Not applicable" &&
+              data.BusinessInfo.BusinessOwner && 
+              data.BusinessInfo.BusinessOwner !== "Not applicable" &&
+              data.BusinessInfo.CompanyAddress && 
+              data.BusinessInfo.CompanyAddress !== "Not applicable" &&
+              data.BusinessInfo.CompanyCity && 
+              data.BusinessInfo.CompanyCity !== "Not applicable" &&
+              data.BusinessInfo.CompanyProvince && 
+              data.BusinessInfo.CompanyProvince !== "Not applicable" &&
+              data.BusinessInfo.CompanyPhoneNum && 
+              data.BusinessInfo.CompanyPhoneNum !== "Not applicable";
+            
+            setIsBusinessInfoMissing(!hasCompleteBusinessInfo);
           }
         }
       } catch (error) {
         console.error('Error fetching user info:', error);
-        // Default to MSME if there's an error
-        setUserRole("MSME");
+        // Default to empty if there's an error
+        setUserRole("");
       }
     };
 
     fetchMachines();
     fetchUserInfo();
-  }, []);
+  }, [userId]);
 
   const handleScheduleClick = () => {
+    // If user is not logged in, redirect to login
+    if (!userId || !userRole) {
+      setIsLoading(true);
+      router.push('/sign-in');
+      return;
+    }
+    
     // Check if user is MSME and business info is missing
     if (userRole === "MSME" && isBusinessInfoMissing) {
       setIsMissingInfoModalOpen(true);
@@ -116,6 +175,7 @@ export default function Services() {
     }
     
     // If all good, navigate to the appropriate scheduling page
+    setIsLoading(true);
     if (userRole === "STUDENT") {
       router.push('/user-services/student-schedule');
     } else {
@@ -124,7 +184,8 @@ export default function Services() {
   };
 
   const redirectToInformation = () => {
-    router.push('/student-dashboard/information');
+    setIsLoading(true);
+    router.push('/user-dashboard/information');
     setIsMissingInfoModalOpen(false);
   };
 
@@ -140,8 +201,32 @@ export default function Services() {
     setSelectedMachine(null);
   };
 
+  // Machine Loading Skeleton
+  const MachineSkeleton = () => (
+    <div className="bg-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
+      <div className="animate-pulse">
+        <div className="h-80 w-full bg-gray-300 rounded-lg mb-4"></div>
+        <div className="h-6 w-3/4 bg-gray-300 rounded mb-3"></div>
+        <div className="h-4 w-full bg-gray-200 rounded mb-2"></div>
+        <div className="h-4 w-full bg-gray-200 rounded mb-2"></div>
+        <div className="h-4 w-2/3 bg-gray-200 rounded mb-4"></div>
+        <div className="h-12 w-full bg-gray-300 rounded-full"></div>
+      </div>
+    </div>
+  );
+
   return (
     <main className="min-h-screen bg-[#f4f8fc]">
+      {/* Loading Overlay */}
+      {isLoading && (
+        <div className="fixed inset-0 bg-white bg-opacity-70 z-50 flex items-center justify-center">
+          <div className="flex flex-col items-center">
+            <Loader className="h-8 w-8 animate-spin text-blue-600" />
+            <p className="mt-2 text-sm font-medium text-blue-600">Loading...</p>
+          </div>
+        </div>
+      )}
+      
       <div className="relative h-[300px]">
         <div 
           className="absolute inset-0 bg-cover bg-center rounded-b-[50px] z-10"
@@ -204,57 +289,67 @@ export default function Services() {
             )}
           </div>
           
-          <div className={`grid grid-cols-1 md:grid-cols-3 gap-8 transition-opacity duration-1000 ease-in-out ${isAnimating ? 'opacity-0' : 'opacity-100'}`}>
-            {machines.map((machine) => (
-              <div 
-                key={machine.id} 
-                className="bg-white p-6 rounded-2xl shadow-lg relative overflow-hidden hover:transform hover:scale-105 transition-all duration-300"
-              >
-                {!machine.isAvailable && (
-                  <div className="absolute inset-0 bg-black bg-opacity-40 rounded-2xl backdrop-blur-sm flex flex-col items-center justify-center space-y-4 z-10">
-                    <p className="text-white text-lg font-bold font-qanelas2">{machine.Machine}</p>
-                    <BadgeX size={48} className="text-white" />
-                    <span className="text-white text-lg font-bold">Currently Unavailable</span>
-                    <Clock size={24} className="text-white animate-pulse" />
-                    <span className="text-white text-sm font-poppins1">Come back later!</span>
-                  </div>
-                )}
-                <div className="relative">
-                  <img 
-                    src={machine.Image} 
-                    alt={machine.Machine} 
-                    className="h-80 w-full object-cover rounded-lg mb-4" 
-                  />
-                  {machine.isAvailable && (
-                    <div className="absolute top-2 right-2 mt-2 mr-1 bg-[#1c62b5] text-white px-3 py-1 rounded-full text-sm font-poppins1 shadow-lg ">
-                      Available
+          {isMachinesLoading ? (
+            // Show loading skeleton grid while machines are loading
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {[...Array(6)].map((_, index) => (
+                <MachineSkeleton key={index} />
+              ))}
+            </div>
+          ) : (
+            // Show actual machines once loaded
+            <div className={`grid grid-cols-1 md:grid-cols-3 gap-8 transition-opacity duration-1000 ease-in-out ${isAnimating ? 'opacity-0' : 'opacity-100'}`}>
+              {machines.map((machine) => (
+                <div 
+                  key={machine.id} 
+                  className="bg-white p-6 rounded-2xl shadow-lg relative overflow-hidden hover:transform hover:scale-105 transition-all duration-300"
+                >
+                  {!machine.isAvailable && (
+                    <div className="absolute inset-0 bg-black bg-opacity-40 rounded-2xl backdrop-blur-sm flex flex-col items-center justify-center space-y-4 z-10">
+                      <p className="text-white text-lg font-bold font-qanelas2">{machine.Machine}</p>
+                      <BadgeX size={48} className="text-white" />
+                      <span className="text-white text-lg font-bold">Currently Unavailable</span>
+                      <Clock size={24} className="text-white animate-pulse" />
+                      <span className="text-white text-sm font-poppins1">Come back later!</span>
                     </div>
                   )}
+                  <div className="relative">
+                    <img 
+                      src={machine.Image} 
+                      alt={machine.Machine} 
+                      className="h-80 w-full object-cover rounded-lg mb-4" 
+                    />
+                    {machine.isAvailable && (
+                      <div className="absolute top-2 right-2 mt-2 mr-1 bg-[#1c62b5] text-white px-3 py-1 rounded-full text-sm font-poppins1 shadow-lg ">
+                        Available
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-xl font-qanelas2">{machine.Machine}</h3>
+                  </div>
+                  <p className="text-gray-600 mb-4 line-clamp-3 font-poppins1 text-md">
+                    {machine.Desc}
+                  </p>
+                  <button
+                    onClick={() => openModal(machine)}
+                    className={`w-full py-3 px-6 rounded-full transition duration-300 flex items-center justify-center gap-2 font-poppins1 ${
+                      !machine.isAvailable 
+                        ? 'bg-gray-400 text-white opacity-50 cursor-not-allowed' 
+                        : 'bg-[#1c62b5] text-white hover:bg-[#154c8f] hover:shadow-lg'
+                    }`}
+                    disabled={!machine.isAvailable}
+                  >
+                    {machine.isAvailable ? (
+                      <>Learn More</>
+                    ) : (
+                      <><AlertCircle size={20} /> Unavailable</>
+                    )}
+                  </button>
                 </div>
-                <div className="flex justify-between items-center mb-2">
-                  <h3 className="text-xl font-qanelas2">{machine.Machine}</h3>
-                </div>
-                <p className="text-gray-600 mb-4 line-clamp-3 font-poppins1 text-md">
-                  {machine.Desc}
-                </p>
-                <button
-                  onClick={() => openModal(machine)}
-                  className={`w-full py-3 px-6 rounded-full transition duration-300 flex items-center justify-center gap-2 font-poppins1 ${
-                    !machine.isAvailable 
-                      ? 'bg-gray-400 text-white opacity-50 cursor-not-allowed' 
-                      : 'bg-[#1c62b5] text-white hover:bg-[#154c8f] hover:shadow-lg'
-                  }`}
-                  disabled={!machine.isAvailable}
-                >
-                  {machine.isAvailable ? (
-                    <>Learn More</>
-                  ) : (
-                    <><AlertCircle size={20} /> Unavailable</>
-                  )}
-                </button>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </section>
 
         {selectedMachine && (
@@ -293,11 +388,11 @@ export default function Services() {
 
                   {/* Instructions */}
                   {selectedMachine.Instructions && (
-  <div>
-    <h3 className="text-lg font-semibold mb-2 font-qanelas2">Instructions</h3>
-    <p className="text-gray-700 font-poppins1 whitespace-pre-line">{selectedMachine.Instructions}</p>
-  </div>
-)}
+                    <div>
+                      <h3 className="text-lg font-semibold mb-2 font-qanelas2">Instructions</h3>
+                      <p className="text-gray-700 font-poppins1 whitespace-pre-line">{selectedMachine.Instructions}</p>
+                    </div>
+                  )}
 
                   {/* Video Link */}
                   {selectedMachine.Link && (
@@ -350,10 +445,10 @@ export default function Services() {
               
               <div className="mb-6">
                 <p className="text-gray-700 font-poppins1 mb-4">
-                  To schedule a service, you need to complete your business information first. This helps us better serve your business needs.
+                  Looks like you haven't filled out all the necessary business information yet. To schedule a service, you need to complete your business profile first.
                 </p>
                 <div className="bg-amber-50 border-l-4 border-amber-500 p-4 text-amber-700">
-                  <p className="font-poppins1">Please fill out your business details to continue with scheduling.</p>
+                  <p className="font-poppins1">Would you like to proceed to your information page first before scheduling?</p>
                 </div>
               </div>
               

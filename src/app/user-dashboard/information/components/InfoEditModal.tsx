@@ -1,3 +1,5 @@
+// /user-dashboard/information/components/InfoEditModal.tsx
+
 import React, { useState, useEffect } from 'react';
 
 interface ClientInfo {

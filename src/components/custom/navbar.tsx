@@ -76,7 +76,7 @@ const Navbar = () => {
     setIsMenuOpen(!isMenuOpen);
   };
 
-  const handleNavigation = (href) => {
+  const handleNavigation = (href: string) => {
     setIsLoading(true);
     router.push(href);
   };

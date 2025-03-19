@@ -1,6 +1,9 @@
+// /api/user/update-info/route.ts
+
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { routeModule } from 'next/dist/build/templates/pages';
 
 const processField = (value: any) => {
   if (value === '' || value === null || value === undefined) {
