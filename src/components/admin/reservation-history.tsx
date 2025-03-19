@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import ReviewReservation from '@/components/admin/review-reservation';
 import ReviewEVCReservation from '@/components/admin/review-evcreservation';
+import PdfModal from '@/components/admin/pdf-modal'; // Import the new PDF modal component
 
 
 interface UserService {
@@ -134,8 +135,10 @@ const ReservationHistory = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEVCModalOpen, setIsEVCModalOpen] = useState(false);
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false); // New state for PDF modal
   const [selectedReservation, setSelectedReservation] = useState<DetailedReservation | null>(null);
   const [selectedEVCReservation, setSelectedEVCReservation] = useState<DetailedEVCReservation | null>(null);
+  const [selectedReservationType, setSelectedReservationType] = useState<'utilization' | 'evc' | null>(null); // Track reservation type for PDF generation
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 21 }, (_, i) => currentYear - 10 + i);
   
@@ -249,6 +252,45 @@ const ReservationHistory = () => {
       }
     } catch (error: any) {
       console.error('Error fetching reservation details:', error instanceof Error ? error.message : String(error));
+      alert(`Error fetching details: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  };
+
+  // New function to handle PDF generation modal
+  const handleGeneratePdfClick = async (reservation: Reservation) => {
+    try {
+      console.log("Generate PDF clicked for reservation:", reservation);
+      
+      // Check if this is an EVC reservation
+      if (reservation.type === 'evc') {
+        // Extract the actual ID from the prefixed string (evc-123)
+        const evcId = reservation.id.replace('evc-', '');
+        
+        const response = await fetch(`/api/admin/evc-reservation-review/${evcId}`);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch EVC details: ${response.status} ${response.statusText}`);
+        }
+        
+        const detailedData = await response.json();
+        setSelectedEVCReservation(detailedData);
+        setSelectedReservationType('evc');
+        setIsPdfModalOpen(true);
+      } else {
+        // Handle regular utilization reservations
+        const response = await fetch(`/api/admin/reservation-review/${reservation.id}`);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch details: ${response.status} ${response.statusText}`);
+        }
+        
+        const detailedData = await response.json();
+        setSelectedReservation(detailedData);
+        setSelectedReservationType('utilization');
+        setIsPdfModalOpen(true);
+      }
+    } catch (error: any) {
+      console.error('Error fetching reservation details for PDF:', error instanceof Error ? error.message : String(error));
       alert(`Error fetching details: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
@@ -476,7 +518,7 @@ const ReservationHistory = () => {
                     <DropdownMenuItem onSelect={() => handleReviewClick(reservation)}>
                       Review
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => handleGeneratePdfClick(reservation)}>
                       Generate PDF
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -501,6 +543,14 @@ const ReservationHistory = () => {
         setIsModalOpen={setIsEVCModalOpen}
         selectedReservation={selectedEVCReservation}
         handleStatusUpdate={handleEVCStatusUpdate}
+      />
+
+      {/* PDF Generation Modal */}
+      <PdfModal
+        isModalOpen={isPdfModalOpen}
+        setIsModalOpen={setIsPdfModalOpen}
+        reservation={selectedReservationType === 'evc' ? selectedEVCReservation : selectedReservation}
+        reservationType={selectedReservationType}
       />
     </div>
   );
