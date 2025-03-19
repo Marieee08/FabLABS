@@ -1,63 +1,9 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-
-
-// Create proper TypeScript definitions for jspdf-autotable
-interface AutoTableResult {
-  finalY: number;
-  pageNumber?: number;
-}
-
-
-interface AutoTableStyles {
-  fontSize?: number;
-  fontStyle?: 'normal' | 'bold' | 'italic' | 'bolditalic';
-  cellWidth?: number | 'auto' | 'wrap';
-  cellPadding?: number;
-  font?: string;
-  textColor?: string;
-  fillColor?: string;
-  lineColor?: string;
-  lineWidth?: number;
-  halign?: 'left' | 'center' | 'right';
-  valign?: 'top' | 'middle' | 'bottom';
-}
-
-
-interface AutoTableColumnStyles {
-  [key: number]: Partial<AutoTableStyles>;
-}
-
-
-interface AutoTableColumnOption {
-  content?: string;
-  styles?: Partial<AutoTableStyles>;
-}
-
-
-interface AutoTableSettings {
-  head?: Array<string[] | AutoTableColumnOption[]>;
-  body?: Array<string[] | AutoTableColumnOption[]>;
-  foot?: Array<string[] | AutoTableColumnOption[]>;
-  startY?: number;
-  margin?: { top?: number; right?: number; bottom?: number; left?: number };
-  pageBreak?: 'auto' | 'avoid' | 'always';
-  rowPageBreak?: 'auto' | 'avoid';
-  showHead?: 'everyPage' | 'firstPage' | 'never';
-  showFoot?: 'everyPage' | 'lastPage' | 'never';
-  theme?: 'striped' | 'grid' | 'plain';
-  styles?: Partial<AutoTableStyles>;
-  columnStyles?: AutoTableColumnStyles;
-  didDrawPage?: (data: any) => void;
-}
-
-
-declare module 'jspdf-autotable' {
-  export default function autoTable(
-    doc: jsPDF,
-    options: AutoTableSettings
-  ): AutoTableResult;
-}
+import {
+  AutoTableResult,
+  AutoTableColumnOption
+} from "@/components/admin-functions/pdf-types";
 
 
 // Define interfaces for DetailedReservation
