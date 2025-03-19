@@ -27,12 +27,9 @@ import {
   DialogTitle,
   DialogFooter
 } from "@/components/ui/dialog";
-import { downloadJobPaymentPDF } from "@/components/admin-functions/job-payment-pdf";
 import { downloadPDF } from "@/components/admin-functions/utilization-request-pdf";
+import { downloadJobPaymentPDF } from "@/components/admin-functions/job-payment-pdf";
 import { downloadMachineUtilPDF } from "@/components/admin-functions/machine-utilization-pdf";
-
-
-
 
 interface UserService {
   id: string;
@@ -325,99 +322,127 @@ const ReservationHistory = () => {
 
 
   // Function to handle PDF generation - UPDATED 
-  const handleGeneratePDF = async (reservationId: string, formType: string) => {
-    try {
-      // Fetch detailed reservation data
-      const response = await fetch(`/api/admin/reservation-review/${reservationId}`);
-      if (!response.ok) throw new Error('Failed to fetch details');
-      const detailedData = await response.json();
-
-
-      // Call different PDF functions based on form type
-      switch (formType) {
-        case 'utilization-request':
-          await downloadPDF(detailedData);
-          break;
-        case 'machine-utilization':
-          // Create sample machine utilization data from reservation data
-          const machineUtilData = {
-            id: detailedData.id,
-            Machine: detailedData.UserServices.length > 0 ?
-              detailedData.UserServices[0].EquipmentAvail : 'N/A',
-            UtilizationDate: detailedData.RequestDate || new Date().toISOString(),
-            StartTime: detailedData.UtilTimes && detailedData.UtilTimes.length > 0 ?
-              detailedData.UtilTimes[0].StartTime : null,
-            EndTime: detailedData.UtilTimes && detailedData.UtilTimes.length > 0 ?
-              detailedData.UtilTimes[0].EndTime : null,
-            Duration: detailedData.UserServices.length > 0 ?
-              detailedData.UserServices[0].MinsAvail || null : null,
-            User: {
-              Name: detailedData.accInfo?.Name || '',
-              email: detailedData.accInfo?.email || '',
-              Role: detailedData.accInfo?.Role || ''
-            },
-            Status: detailedData.Status || 'Pending',
-            Notes: ''
-          };
-          await downloadMachineUtilPDF(machineUtilData);
-          break;
-        case 'job-payment':
-          // Create job payment data from reservation details
-          const jobPaymentData = {
-            id: detailedData.id,
-            invoiceNumber: `INV-${detailedData.id}`,
-            dateIssued: new Date().toISOString(),
-            dueDate: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString(),
-            paymentStatus: detailedData.Status || 'Unpaid',
-            items: detailedData.UserServices?.map((service: any) => ({
-              id: service.id,
-              name: service.ServiceAvail,
-              quantity: 1,
-              unitPrice: service.CostsAvail || 0,
-              totalPrice: service.CostsAvail || 0,
-              description: service.EquipmentAvail
-            })) || [],
-            subtotal: detailedData.TotalAmntDue || 0,
-            taxRate: 0,
-            taxAmount: 0,
-            totalAmount: detailedData.TotalAmntDue || 0,
-            amountPaid: detailedData.Status === 'Paid' ? (detailedData.TotalAmntDue || 0) : 0,
-            balanceDue: detailedData.Status === 'Paid' ? 0 : (detailedData.TotalAmntDue || 0),
-            client: {
-              name: detailedData.accInfo?.Name || '',
-              email: detailedData.accInfo?.email || '',
-              phone: detailedData.accInfo?.ClientInfo?.ContactNum || '',
-              address: detailedData.accInfo?.ClientInfo ?
-                `${detailedData.accInfo.ClientInfo.Address}, ${detailedData.accInfo.ClientInfo.City}, ${detailedData.accInfo.ClientInfo.Province}` : '',
-              role: detailedData.accInfo?.Role || ''
-            }
-          };
-          await downloadJobPaymentPDF(jobPaymentData);
-          break;
-        case 'registration':
-        case 'lab-request':
-          // For forms that don't have implemented functions yet
-          alert(`${formType} PDF generation not yet implemented`);
-          break;
-        default:
-          console.error('Unknown form type:', formType);
-      }
-
-
-      // Close modal and trigger scroll fix
-      setIsPdfModalOpen(false);
-      setSelectedReservationId(null);
-      setNeedsScrollFix(true);
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      alert('Failed to generate PDF. Please try again.');
+// Updated handleGeneratePDF function to fix the error
+const handleGeneratePDF = async (reservationId: string, formType: string) => {
+  try {
+    // First check if this is an EVC reservation (if the ID starts with "evc-")
+    const isEVC = reservationId.toString().startsWith('evc-');
+    let detailedData;
+    
+    if (isEVC) {
+      // Extract the actual ID for EVC reservations
+      const evcId = reservationId.replace('evc-', '');
+      const response = await fetch(`/api/admin/evc-reservation-review/${evcId}`);
       
-      // Still need to close modal and fix scroll
-      setIsPdfModalOpen(false);
-      setSelectedReservationId(null);
-      setNeedsScrollFix(true);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Failed to fetch EVC details: ${response.status} ${response.statusText}`, errorText);
+        throw new Error(`Failed to fetch EVC details: ${response.status} ${response.statusText}`);
+      }
+      
+      detailedData = await response.json();
+      
+      // For EVC reservations, we need to handle them differently for PDFs
+      // Currently, just show an alert since we don't have EVC-specific PDF generation
+      alert('EVC PDF generation is not yet implemented');
+      return;
+    } else {
+      // It's a regular utilization reservation
+      const response = await fetch(`/api/admin/reservation-review/${reservationId}`);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Failed to fetch utilization details: ${response.status} ${response.statusText}`, errorText);
+        throw new Error(`Failed to fetch details: ${response.status} ${response.statusText}`);
+      }
+      
+      detailedData = await response.json();
     }
-  };
+
+    // Call different PDF functions based on form type
+    switch (formType) {
+      case 'utilization-request':
+        await downloadPDF(detailedData);
+        break;
+      case 'machine-utilization':
+        // Create sample machine utilization data from reservation data
+        const machineUtilData = {
+          id: detailedData.id,
+          Machine: detailedData.UserServices && detailedData.UserServices.length > 0 ?
+            detailedData.UserServices[0].EquipmentAvail : 'N/A',
+          UtilizationDate: detailedData.RequestDate || new Date().toISOString(),
+          StartTime: detailedData.UtilTimes && detailedData.UtilTimes.length > 0 ?
+            detailedData.UtilTimes[0].StartTime : null,
+          EndTime: detailedData.UtilTimes && detailedData.UtilTimes.length > 0 ?
+            detailedData.UtilTimes[0].EndTime : null,
+          Duration: detailedData.UserServices && detailedData.UserServices.length > 0 ?
+            detailedData.UserServices[0].MinsAvail || null : null,
+          User: {
+            Name: detailedData.accInfo?.Name || '',
+            email: detailedData.accInfo?.email || '',
+            Role: detailedData.accInfo?.Role || ''
+          },
+          Status: detailedData.Status || 'Pending',
+          Notes: ''
+        };
+        await downloadMachineUtilPDF(machineUtilData);
+        break;
+      case 'job-payment':
+        // Create job payment data from reservation details
+        const jobPaymentData = {
+          id: detailedData.id,
+          invoiceNumber: `INV-${detailedData.id}`,
+          dateIssued: new Date().toISOString(),
+          dueDate: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString(),
+          paymentStatus: detailedData.Status || 'Unpaid',
+          items: detailedData.UserServices?.map((service: any) => ({
+            id: service.id,
+            name: service.ServiceAvail,
+            quantity: 1,
+            unitPrice: service.CostsAvail || 0,
+            totalPrice: service.CostsAvail || 0,
+            description: service.EquipmentAvail
+          })) || [],
+          subtotal: detailedData.TotalAmntDue || 0,
+          taxRate: 0,
+          taxAmount: 0,
+          totalAmount: detailedData.TotalAmntDue || 0,
+          amountPaid: detailedData.Status === 'Paid' ? (detailedData.TotalAmntDue || 0) : 0,
+          balanceDue: detailedData.Status === 'Paid' ? 0 : (detailedData.TotalAmntDue || 0),
+          client: {
+            name: detailedData.accInfo?.Name || '',
+            email: detailedData.accInfo?.email || '',
+            phone: detailedData.accInfo?.ClientInfo?.ContactNum || '',
+            address: detailedData.accInfo?.ClientInfo ?
+              `${detailedData.accInfo.ClientInfo.Address}, ${detailedData.accInfo.ClientInfo.City}, ${detailedData.accInfo.ClientInfo.Province}` : '',
+            role: detailedData.accInfo?.Role || ''
+          }
+        };
+        await downloadJobPaymentPDF(jobPaymentData);
+        break;
+      case 'registration':
+      case 'lab-request':
+        // For forms that don't have implemented functions yet
+        alert(`${formType} PDF generation not yet implemented`);
+        break;
+      default:
+        console.error('Unknown form type:', formType);
+    }
+
+    // Close modal and trigger scroll fix
+    setIsPdfModalOpen(false);
+    setSelectedReservationId(null);
+    setNeedsScrollFix(true);
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    alert('Failed to generate PDF. Please try again.');
+    
+    // Still need to close modal and fix scroll
+    setIsPdfModalOpen(false);
+    setSelectedReservationId(null);
+    setNeedsScrollFix(true);
+  }
+};
 
 
   const handleStatusUpdate = async (
