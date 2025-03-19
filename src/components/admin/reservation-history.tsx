@@ -19,6 +19,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import ReviewReservation from '@/components/admin/review-reservation';
 import ReviewEVCReservation from '@/components/admin/review-evcreservation';
+import { FileText } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter
+} from "@/components/ui/dialog";
+import { downloadJobPaymentPDF } from "@/components/admin-functions/job-payment-pdf";
+import { downloadPDF } from "@/components/admin-functions/utilization-request-pdf";
+import { downloadMachineUtilPDF } from "@/components/admin-functions/machine-utilization-pdf";
+
+
 
 
 interface UserService {
@@ -29,11 +42,13 @@ interface UserService {
   MinsAvail: number | null;
 }
 
+
 interface UserTool {
   id: string;
   ToolUser: string;
   ToolQuantity: number;
 }
+
 
 interface UtilTime {
   id: number;
@@ -41,6 +56,7 @@ interface UtilTime {
   StartTime: string | null;
   EndTime: string | null;
 }
+
 
 interface DetailedReservation {
   id: number;
@@ -84,6 +100,7 @@ interface DetailedReservation {
   };
 }
 
+
 type Reservation = {
   id: string;
   date: string;
@@ -95,6 +112,7 @@ type Reservation = {
   totalAmount: number | null | undefined;
   type?: 'utilization' | 'evc'; // Add type to distinguish between different reservations
 };
+
 
 interface DetailedEVCReservation {
   id: number;
@@ -124,6 +142,8 @@ interface DetailedEVCReservation {
 }
 
 
+
+
 const ReservationHistory = () => {
   const [activeTab, setActiveTab] = useState('all');
   const [selectedDate, setSelectedDate] = useState('all');
@@ -134,15 +154,18 @@ const ReservationHistory = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEVCModalOpen, setIsEVCModalOpen] = useState(false);
+  const [isPdfModalOpen, setIsPdfModalOpen] = useState(false); // New state for PDF modal
   const [selectedReservation, setSelectedReservation] = useState<DetailedReservation | null>(null);
   const [selectedEVCReservation, setSelectedEVCReservation] = useState<DetailedEVCReservation | null>(null);
+  const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null); // Track reservation ID for PDF generation
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 21 }, (_, i) => currentYear - 10 + i);
-  
+ 
   const months = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
+
 
   useEffect(() => {
     const fetchReservations = async () => {
@@ -161,8 +184,10 @@ const ReservationHistory = () => {
       }
     };
 
+
     fetchReservations();
   }, []);
+
 
   // Add the missing functions
   const formatDate = (dateString: string): string => {
@@ -173,6 +198,7 @@ const ReservationHistory = () => {
       day: 'numeric'
     });
   };
+
 
   const getStatusColor = (status: string): string => {
     switch (status.toLowerCase()) {
@@ -197,6 +223,7 @@ const ReservationHistory = () => {
     }
   };
 
+
   const handleDateSelect = (year: number, month: number) => {
     setSelectedYear(year);
     setSelectedMonth(month);
@@ -204,46 +231,47 @@ const ReservationHistory = () => {
     setIsCustomSelectOpen(false);
   };
 
+
   const handleReviewClick = async (reservation: Reservation) => {
     try {
       console.log("Review clicked for reservation:", reservation);
-      
+     
       // Check if this is an EVC reservation
       if (reservation.type === 'evc') {
         // Extract the actual ID from the prefixed string (evc-123)
         const evcId = reservation.id.replace('evc-', '');
         console.log(`Fetching EVC reservation with ID: ${evcId}`);
-        
+       
         const response = await fetch(`/api/admin/evc-reservation-review/${evcId}`);
         console.log("EVC API response status:", response.status);
-        
+       
         if (!response.ok) {
           const errorText = await response.text();
           console.error("EVC API error response:", errorText);
           throw new Error(`Failed to fetch EVC details: ${response.status} ${response.statusText}`);
         }
-        
+       
         const detailedData = await response.json();
         console.log("EVC detailed data:", detailedData);
-        
+       
         setSelectedEVCReservation(detailedData);
         setIsEVCModalOpen(true);
       } else {
         // Handle regular utilization reservations
         console.log(`Fetching utilization reservation with ID: ${reservation.id}`);
-        
+       
         const response = await fetch(`/api/admin/reservation-review/${reservation.id}`);
         console.log("Utilization API response status:", response.status);
-        
+       
         if (!response.ok) {
           const errorText = await response.text();
           console.error("Utilization API error response:", errorText);
           throw new Error(`Failed to fetch details: ${response.status} ${response.statusText}`);
         }
-        
+       
         const detailedData = await response.json();
         console.log("Utilization detailed data:", detailedData);
-        
+       
         setSelectedReservation(detailedData);
         setIsModalOpen(true);
       }
@@ -253,8 +281,105 @@ const ReservationHistory = () => {
     }
   };
 
+
+  // Function to open the PDF generation modal
+  const handleGeneratePdfClick = (reservation: Reservation) => {
+    setSelectedReservationId(reservation.id);
+    setIsPdfModalOpen(true);
+  };
+
+
+  // Function to handle PDF generation based on form type
+  const handleGeneratePDF = async (reservationId: string, formType: string) => {
+    try {
+      // Fetch detailed reservation data
+      const response = await fetch(`/api/admin/reservation-review/${reservationId}`);
+      if (!response.ok) throw new Error('Failed to fetch details');
+      const detailedData = await response.json();
+
+
+      // Call different PDF functions based on form type
+      switch (formType) {
+        case 'utilization-request':
+          await downloadPDF(detailedData);
+          break;
+        case 'machine-utilization':
+          // Create sample machine utilization data from reservation data
+          const machineUtilData = {
+            id: detailedData.id,
+            Machine: detailedData.UserServices.length > 0 ?
+              detailedData.UserServices[0].EquipmentAvail : 'N/A',
+            UtilizationDate: detailedData.RequestDate || new Date().toISOString(),
+            StartTime: detailedData.UtilTimes && detailedData.UtilTimes.length > 0 ?
+              detailedData.UtilTimes[0].StartTime : null,
+            EndTime: detailedData.UtilTimes && detailedData.UtilTimes.length > 0 ?
+              detailedData.UtilTimes[0].EndTime : null,
+            Duration: detailedData.UserServices.length > 0 ?
+              detailedData.UserServices[0].MinsAvail || null : null,
+            User: {
+              Name: detailedData.accInfo?.Name || '',
+              email: detailedData.accInfo?.email || '',
+              Role: detailedData.accInfo?.Role || ''
+            },
+            Status: detailedData.Status || 'Pending',
+            Notes: ''
+          };
+          await downloadMachineUtilPDF(machineUtilData);
+          break;
+        case 'job-payment':
+          // Create job payment data from reservation details
+          const jobPaymentData = {
+            id: detailedData.id,
+            invoiceNumber: `INV-${detailedData.id}`,
+            dateIssued: new Date().toISOString(),
+            dueDate: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString(),
+            paymentStatus: detailedData.Status || 'Unpaid',
+            items: detailedData.UserServices?.map((service: any) => ({
+              id: service.id,
+              name: service.ServiceAvail,
+              quantity: 1,
+              unitPrice: service.CostsAvail || 0,
+              totalPrice: service.CostsAvail || 0,
+              description: service.EquipmentAvail
+            })) || [],
+            subtotal: detailedData.TotalAmntDue || 0,
+            taxRate: 0,
+            taxAmount: 0,
+            totalAmount: detailedData.TotalAmntDue || 0,
+            amountPaid: detailedData.Status === 'Paid' ? (detailedData.TotalAmntDue || 0) : 0,
+            balanceDue: detailedData.Status === 'Paid' ? 0 : (detailedData.TotalAmntDue || 0),
+            client: {
+              name: detailedData.accInfo?.Name || '',
+              email: detailedData.accInfo?.email || '',
+              phone: detailedData.accInfo?.ClientInfo?.ContactNum || '',
+              address: detailedData.accInfo?.ClientInfo ?
+                `${detailedData.accInfo.ClientInfo.Address}, ${detailedData.accInfo.ClientInfo.City}, ${detailedData.accInfo.ClientInfo.Province}` : '',
+              role: detailedData.accInfo?.Role || ''
+            }
+          };
+          await downloadJobPaymentPDF(jobPaymentData);
+          break;
+        case 'registration':
+        case 'lab-request':
+          // For forms that don't have implemented functions yet
+          alert(`${formType} PDF generation not yet implemented`);
+          break;
+        default:
+          console.error('Unknown form type:', formType);
+      }
+
+
+      // Close the modal after generating the PDF
+      setIsPdfModalOpen(false);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('Failed to generate PDF. Please try again.');
+    }
+  };
+
+
   const handleStatusUpdate = async (
-    reservationId: number, 
+    reservationId: number,
     newStatus: 'Approved' | 'Ongoing' | 'Pending payment' | 'Paid' | 'Completed' | 'Cancelled'
   ) => {
     try {
@@ -266,9 +391,11 @@ const ReservationHistory = () => {
         body: JSON.stringify({ status: newStatus }),
       });
 
+
       if (!response.ok) {
         throw new Error(`Failed to update status: ${response.status} ${response.statusText}`);
       }
+
 
       // Update the reservations list with the new status
       setReservations(prevReservations =>
@@ -279,10 +406,12 @@ const ReservationHistory = () => {
         )
       );
 
+
       // Update the selected reservation if it's open in the modal
       if (selectedReservation && selectedReservation.id === reservationId) {
         setSelectedReservation({ ...selectedReservation, Status: newStatus });
       }
+
 
       // Close the modal
       setIsModalOpen(false);
@@ -290,6 +419,7 @@ const ReservationHistory = () => {
       console.error('Error updating reservation status:', error instanceof Error ? error.message : String(error));
     }
   };
+
 
   // Add a new function to handle EVC status updates
   const handleEVCStatusUpdate = async (
@@ -305,9 +435,11 @@ const ReservationHistory = () => {
         body: JSON.stringify({ status: newStatus }),
       });
 
+
       if (!response.ok) {
         throw new Error(`Failed to update EVC status: ${response.status} ${response.statusText}`);
       }
+
 
       // Update the reservations list with the new status
       setReservations(prevReservations =>
@@ -318,10 +450,12 @@ const ReservationHistory = () => {
         )
       );
 
+
       // Update the selected EVC reservation if it's open in the modal
       if (selectedEVCReservation && selectedEVCReservation.id === reservationId) {
         setSelectedEVCReservation({ ...selectedEVCReservation, EVCStatus: newStatus });
       }
+
 
       // Close the modal
       setIsEVCModalOpen(false);
@@ -330,30 +464,34 @@ const ReservationHistory = () => {
     }
   };
 
+
   const filteredReservations = reservations.filter(reservation => {
     const matchesTab = activeTab === 'all' || reservation.role.toLowerCase() === activeTab.toLowerCase();
-    
+   
     if (selectedDate === 'all') {
       return matchesTab;
     }
-    
+   
     const reservationDate = new Date(reservation.date);
     const [filterYear, filterMonth] = selectedDate.split('-').map(Number);
-    
-    return matchesTab && 
+   
+    return matchesTab &&
            reservationDate.getFullYear() === filterYear &&
            reservationDate.getMonth() === filterMonth - 1;
   });
 
+
   if (isLoading) {
     return <div className="flex items-center justify-center p-12">Loading...</div>;
   }
+
 
   const formatCurrency = (amount: number | string | null): string => {
     if (amount === null || amount === undefined) return '0.00';
     const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
     return Number(numAmount).toFixed(2);
   };
+
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-sm">
@@ -365,7 +503,7 @@ const ReservationHistory = () => {
             <TabsTrigger value="student">Student</TabsTrigger>
           </TabsList>
         </Tabs>
-        
+       
         <div className="relative">
           <Button
             variant="outline"
@@ -373,11 +511,12 @@ const ReservationHistory = () => {
             onClick={() => setIsCustomSelectOpen(!isCustomSelectOpen)}
           >
             <Calendar className="mr-2 h-4 w-4" />
-            {selectedDate === 'all' 
+            {selectedDate === 'all'
               ? 'All Dates'
               : `${months[selectedMonth]} ${selectedYear}`
             }
           </Button>
+
 
           {isCustomSelectOpen && (
             <div className="absolute top-full mt-2 right-0 w-[280px] rounded-md border bg-white shadow-lg z-50">
@@ -391,7 +530,7 @@ const ReservationHistory = () => {
                 >
                   All Dates
                 </button>
-                
+               
                 <div className="flex gap-2">
                   <div className="w-1/2 border-r">
                     <div className="font-medium px-3 py-1">Year</div>
@@ -410,7 +549,7 @@ const ReservationHistory = () => {
                       ))}
                     </div>
                   </div>
-                  
+                 
                   <div className="w-1/2">
                     <div className="font-medium px-3 py-1">Month</div>
                     <div className="max-h-48 overflow-y-auto">
@@ -434,6 +573,7 @@ const ReservationHistory = () => {
           )}
         </div>
       </div>
+
 
       <Table>
         <TableHeader>
@@ -476,7 +616,7 @@ const ReservationHistory = () => {
                     <DropdownMenuItem onSelect={() => handleReviewClick(reservation)}>
                       Review
                     </DropdownMenuItem>
-                    <DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => handleGeneratePdfClick(reservation)}>
                       Generate PDF
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -487,6 +627,7 @@ const ReservationHistory = () => {
         </TableBody>
       </Table>
 
+
       {/* Regular Utilization Reservation Review Modal */}
       <ReviewReservation
         isModalOpen={isModalOpen}
@@ -495,6 +636,7 @@ const ReservationHistory = () => {
         handleStatusUpdate={handleStatusUpdate}
       />
 
+
       {/* EVC Reservation Review Modal */}
       <ReviewEVCReservation
         isModalOpen={isEVCModalOpen}
@@ -502,8 +644,104 @@ const ReservationHistory = () => {
         selectedReservation={selectedEVCReservation}
         handleStatusUpdate={handleEVCStatusUpdate}
       />
+
+
+      {/* PDF Generation Modal */}
+      <Dialog open={isPdfModalOpen} onOpenChange={setIsPdfModalOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold flex items-center">
+              <FileText className="mr-2 h-5 w-5" />
+              Generate PDF Documents
+            </DialogTitle>
+          </DialogHeader>
+         
+          <div className="py-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Document Type</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                <TableRow>
+                  <TableCell className="font-medium">Registration Form</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => selectedReservationId && handleGeneratePDF(selectedReservationId, 'registration')}
+                    >
+                      Generate PDF
+                    </Button>
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">Utilization Request Form</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => selectedReservationId && handleGeneratePDF(selectedReservationId, 'utilization-request')}
+                    >
+                      Generate PDF
+                    </Button>
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">Machine Utilization Form</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => selectedReservationId && handleGeneratePDF(selectedReservationId, 'machine-utilization')}
+                    >
+                      Generate PDF
+                    </Button>
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">Job and Payment Order</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => selectedReservationId && handleGeneratePDF(selectedReservationId, 'job-payment')}
+                    >
+                      Generate PDF
+                    </Button>
+                  </TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell className="font-medium">Laboratory Request Form (Students)</TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => selectedReservationId && handleGeneratePDF(selectedReservationId, 'lab-request')}
+                    >
+                      Generate PDF
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+         
+          <DialogFooter>
+            <Button
+              variant="secondary"
+              onClick={() => setIsPdfModalOpen(false)}
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
+
 
 export default ReservationHistory;
