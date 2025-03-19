@@ -1,3 +1,5 @@
+// /components/auth/role-guard/page.tsx
+
 'use client';
 
 import { useEffect, useState } from 'react';

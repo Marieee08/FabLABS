@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import PricingTable from '@/components/admin-functions/price-table';
 import Navbar from '@/components/custom/navbar';
 import { AlertCircle, Clock, BadgeX, X, Info } from 'lucide-react';
+import { useAuth } from '@clerk/nextjs';
 
 interface Machine {
   id: string;
@@ -28,8 +29,30 @@ interface ClientInfo {
   Zipcode: number | null;
 }
 
+interface BusinessInfo {
+  CompanyName: string | null;
+  BusinessOwner: string | null;
+  BusinessPermitNum: string | null;
+  TINNum: string | null;
+  CompanyIDNum: string | null;
+  CompanyEmail: string | null;
+  ContactPerson: string | null;
+  Designation: string | null;
+  CompanyAddress: string | null;
+  CompanyCity: string | null;
+  CompanyProvince: string | null;
+  CompanyZipcode: number | null;
+  CompanyPhoneNum: string | null;
+  CompanyMobileNum: string | null;
+  Manufactured: string | null;
+  ProductionFrequency: string | null;
+  Bulk: string | null;
+  isNotBusinessOwner?: boolean;
+}
+
 export default function Services() {
   const router = useRouter();
+  const { userId } = useAuth();
   const [isAnimating, setIsAnimating] = useState(false);
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -50,7 +73,7 @@ export default function Services() {
   const handleCloseMissingInfoModal = () => {
     setIsMissingInfoModalOpen(false);
   };
-
+  
   useEffect(() => {
     // Fetch machines
     const fetchMachines = async () => {
@@ -78,8 +101,17 @@ export default function Services() {
   
     // Fetch user info to get role and check business info
     const fetchUserInfo = async () => {
+      if (!userId) {
+        setUserRole("");
+        return;
+      }
+
       try {
-        const response = await fetch('/api/user/info');
+        const response = await fetch(`/api/account/${userId}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch user account');
+        }
+        
         const data = await response.json();
         
         if (data && data.Role) {
@@ -87,28 +119,49 @@ export default function Services() {
           
           // If user is MSME, check if business info is missing
           if (data.Role === "MSME") {
-            const hasBusinessInfo = 
-              data.ClientInfo && 
-              data.ClientInfo.Address && 
-              data.ClientInfo.City && 
-              data.ClientInfo.Province && 
-              data.ClientInfo.Zipcode;
+            // Check if the user has indicated they are not a business owner
+            if (data.BusinessInfo?.isNotBusinessOwner === true) {
+              setIsBusinessInfoMissing(false);
+              return;
+            }
             
-            setIsBusinessInfoMissing(!hasBusinessInfo);
+            // Check for required business fields
+            const hasCompleteBusinessInfo = 
+              data.BusinessInfo && 
+              data.BusinessInfo.CompanyName && 
+              data.BusinessInfo.CompanyName !== "Not applicable" &&
+              data.BusinessInfo.BusinessOwner && 
+              data.BusinessInfo.BusinessOwner !== "Not applicable" &&
+              data.BusinessInfo.CompanyAddress && 
+              data.BusinessInfo.CompanyAddress !== "Not applicable" &&
+              data.BusinessInfo.CompanyCity && 
+              data.BusinessInfo.CompanyCity !== "Not applicable" &&
+              data.BusinessInfo.CompanyProvince && 
+              data.BusinessInfo.CompanyProvince !== "Not applicable" &&
+              data.BusinessInfo.CompanyPhoneNum && 
+              data.BusinessInfo.CompanyPhoneNum !== "Not applicable";
+            
+            setIsBusinessInfoMissing(!hasCompleteBusinessInfo);
           }
         }
       } catch (error) {
         console.error('Error fetching user info:', error);
-        // Default to MSME if there's an error
-        setUserRole("MSME");
+        // Default to empty if there's an error
+        setUserRole("");
       }
     };
 
     fetchMachines();
     fetchUserInfo();
-  }, []);
+  }, [userId]);
 
   const handleScheduleClick = () => {
+    // If user is not logged in, redirect to login
+    if (!userId || !userRole) {
+      router.push('/sign-in');
+      return;
+    }
+    
     // Check if user is MSME and business info is missing
     if (userRole === "MSME" && isBusinessInfoMissing) {
       setIsMissingInfoModalOpen(true);
@@ -124,7 +177,7 @@ export default function Services() {
   };
 
   const redirectToInformation = () => {
-    router.push('/student-dashboard/information');
+    router.push('/user-dashboard/information');
     setIsMissingInfoModalOpen(false);
   };
 
@@ -293,11 +346,11 @@ export default function Services() {
 
                   {/* Instructions */}
                   {selectedMachine.Instructions && (
-  <div>
-    <h3 className="text-lg font-semibold mb-2 font-qanelas2">Instructions</h3>
-    <p className="text-gray-700 font-poppins1 whitespace-pre-line">{selectedMachine.Instructions}</p>
-  </div>
-)}
+                    <div>
+                      <h3 className="text-lg font-semibold mb-2 font-qanelas2">Instructions</h3>
+                      <p className="text-gray-700 font-poppins1 whitespace-pre-line">{selectedMachine.Instructions}</p>
+                    </div>
+                  )}
 
                   {/* Video Link */}
                   {selectedMachine.Link && (
@@ -350,10 +403,10 @@ export default function Services() {
               
               <div className="mb-6">
                 <p className="text-gray-700 font-poppins1 mb-4">
-                  To schedule a service, you need to complete your business information first. This helps us better serve your business needs.
+                  Looks like you haven't filled out all the necessary business information yet. To schedule a service, you need to complete your business profile first.
                 </p>
                 <div className="bg-amber-50 border-l-4 border-amber-500 p-4 text-amber-700">
-                  <p className="font-poppins1">Please fill out your business details to continue with scheduling.</p>
+                  <p className="font-poppins1">Would you like to proceed to your information page first before scheduling?</p>
                 </div>
               </div>
               
