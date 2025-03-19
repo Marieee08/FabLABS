@@ -11,7 +11,7 @@ export default function Contact() {
     const [email, setEmail] = useState('');
     const [message, setMessage] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [submitStatus, setSubmitStatus] = useState(null);
+    const [submitStatus, setSubmitStatus] = useState<SubmitStatusType>(null);
 
     const handleSubmit = async (e: { preventDefault: () => void; }) => {
       e.preventDefault();
@@ -108,9 +108,22 @@ export default function Contact() {
                 <button 
                   type="submit"
                   disabled={isSubmitting}
-                  className="mx-auto flex rounded border-0 bg-[#10539b] py-2 px-8 text-lg text-white hover:bg-blue-600 focus:outline-none"
+                  className={`mx-auto flex items-center justify-center rounded border-0 bg-[#10539b] py-2 px-8 text-lg text-white hover:bg-blue-600 focus:outline-none transition-all duration-300 ${isSubmitting ? 'opacity-90' : ''}`}
                 >
-                  {isSubmitting ? 'Sending...' : 'Submit'}
+                  {isSubmitting ? (
+                    <>
+                      <span className="relative flex h-5 w-5 mr-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-300 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-5 w-5 bg-sky-400"></span>
+                      </span>
+                      <span className="inline-block mr-1">Sending</span>
+                      <span className="inline-flex items-baseline">
+                        <span className="dot-animation">.</span>
+                        <span className="dot-animation animation-delay-200">.</span>
+                        <span className="dot-animation animation-delay-400">.</span>
+                      </span>
+                    </>
+                  ) : 'Submit'}
                 </button>
               </div>
 
@@ -157,6 +170,28 @@ export default function Contact() {
           </div>
           </div>
         </section>
+
+        {/* Add this CSS for the dot animation */}
+        <style jsx>{`
+          .dot-animation {
+            animation: dotAnimation 1.4s infinite;
+            opacity: 0;
+          }
+          
+          .animation-delay-200 {
+            animation-delay: 0.2s;
+          }
+          
+          .animation-delay-400 {
+            animation-delay: 0.4s;
+          }
+          
+          @keyframes dotAnimation {
+            0% { opacity: 0; }
+            50% { opacity: 1; }
+            100% { opacity: 0; }
+          }
+        `}</style>
       </main>
     );
   }
