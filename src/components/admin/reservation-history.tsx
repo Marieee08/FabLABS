@@ -158,6 +158,9 @@ const ReservationHistory = () => {
   const [selectedReservation, setSelectedReservation] = useState<DetailedReservation | null>(null);
   const [selectedEVCReservation, setSelectedEVCReservation] = useState<DetailedEVCReservation | null>(null);
   const [selectedReservationId, setSelectedReservationId] = useState<string | null>(null); // Track reservation ID for PDF generation
+  // Add state to track if we need to manually fix body scroll
+  const [needsScrollFix, setNeedsScrollFix] = useState(false);
+  
   const currentYear = new Date().getFullYear();
   const years = Array.from({ length: 21 }, (_, i) => currentYear - 10 + i);
  
@@ -165,6 +168,34 @@ const ReservationHistory = () => {
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
+
+  // Effect to fix body scroll when modal closes
+  useEffect(() => {
+    if (needsScrollFix) {
+      // This will force the body to be scrollable again
+      document.body.style.overflow = '';
+      document.body.style.overflowY = 'auto';
+      document.body.style.position = '';
+      document.body.style.paddingRight = '';
+      document.documentElement.style.overflow = '';
+      document.documentElement.style.paddingRight = '';
+      
+      // Reset any "inert" attributes that might be locking focus
+      document.body.removeAttribute('inert');
+      document.body.removeAttribute('aria-hidden');
+      
+      // Clear any background overlay elements that might be left
+      const overlays = document.querySelectorAll('[role="presentation"]');
+      overlays.forEach(node => {
+        if (node.parentNode) {
+          node.parentNode.removeChild(node);
+        }
+      });
+      
+      // Reset state
+      setNeedsScrollFix(false);
+    }
+  }, [needsScrollFix]);
 
 
   useEffect(() => {
@@ -282,14 +313,18 @@ const ReservationHistory = () => {
   };
 
 
-  // Function to open the PDF generation modal
+  // Function to open the PDF generation modal - UPDATED
   const handleGeneratePdfClick = (reservation: Reservation) => {
-    setSelectedReservationId(reservation.id);
-    setIsPdfModalOpen(true);
+    // Clear previous state before opening new modal
+    setSelectedReservationId(null);
+    setTimeout(() => {
+      setSelectedReservationId(reservation.id);
+      setIsPdfModalOpen(true);
+    }, 10);
   };
 
 
-  // Function to handle PDF generation based on form type
+  // Function to handle PDF generation - UPDATED 
   const handleGeneratePDF = async (reservationId: string, formType: string) => {
     try {
       // Fetch detailed reservation data
@@ -369,11 +404,18 @@ const ReservationHistory = () => {
       }
 
 
-      // Close the modal after generating the PDF
+      // Close modal and trigger scroll fix
       setIsPdfModalOpen(false);
+      setSelectedReservationId(null);
+      setNeedsScrollFix(true);
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('Failed to generate PDF. Please try again.');
+      
+      // Still need to close modal and fix scroll
+      setIsPdfModalOpen(false);
+      setSelectedReservationId(null);
+      setNeedsScrollFix(true);
     }
   };
 
@@ -646,9 +688,21 @@ const ReservationHistory = () => {
       />
 
 
-      {/* PDF Generation Modal */}
-      <Dialog open={isPdfModalOpen} onOpenChange={setIsPdfModalOpen}>
-        <DialogContent className="max-w-lg">
+      {/* PDF Generation Modal - UPDATED */}
+      <Dialog 
+        open={isPdfModalOpen} 
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsPdfModalOpen(false);
+            setSelectedReservationId(null);
+            // Schedule scroll fix
+            setTimeout(() => {
+              setNeedsScrollFix(true);
+            }, 50);
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg" forceMount>
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold flex items-center">
               <FileText className="mr-2 h-5 w-5" />
@@ -732,7 +786,14 @@ const ReservationHistory = () => {
           <DialogFooter>
             <Button
               variant="secondary"
-              onClick={() => setIsPdfModalOpen(false)}
+              onClick={() => {
+                setIsPdfModalOpen(false);
+                setSelectedReservationId(null);
+                // Schedule scroll fix
+                setTimeout(() => {
+                  setNeedsScrollFix(true);
+                }, 50);
+              }}
             >
               Close
             </Button>

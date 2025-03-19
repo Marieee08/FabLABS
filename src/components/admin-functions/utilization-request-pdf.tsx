@@ -1,64 +1,9 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-
-
-// Create proper TypeScript definitions for jspdf-autotable
-interface AutoTableResult {
-  finalY: number;
-  pageNumber?: number;
-}
-
-
-interface AutoTableStyles {
-  fontSize?: number;
-  fontStyle?: 'normal' | 'bold' | 'italic' | 'bolditalic';
-  cellWidth?: number | 'auto' | 'wrap';
-  cellPadding?: number;
-  font?: string;
-  textColor?: string;
-  fillColor?: string;
-  lineColor?: string;
-  lineWidth?: number;
-  halign?: 'left' | 'center' | 'right';
-  valign?: 'top' | 'middle' | 'bottom';
-}
-
-
-interface AutoTableColumnStyles {
-  [key: number]: Partial<AutoTableStyles>;
-}
-
-
-interface AutoTableColumnOption {
-  content?: string;
-  styles?: Partial<AutoTableStyles>;
-}
-
-
-interface AutoTableSettings {
-  head?: Array<string[] | AutoTableColumnOption[]>;
-  body?: Array<string[] | AutoTableColumnOption[]>;
-  foot?: Array<string[] | AutoTableColumnOption[]>;
-  startY?: number;
-  margin?: { top?: number; right?: number; bottom?: number; left?: number };
-  pageBreak?: 'auto' | 'avoid' | 'always';
-  rowPageBreak?: 'auto' | 'avoid';
-  showHead?: 'everyPage' | 'firstPage' | 'never';
-  showFoot?: 'everyPage' | 'lastPage' | 'never';
-  theme?: 'striped' | 'grid' | 'plain';
-  styles?: Partial<AutoTableStyles>;
-  columnStyles?: AutoTableColumnStyles;
-  didDrawPage?: (data: any) => void;
-}
-
-
-declare module 'jspdf-autotable' {
-  export default function autoTable(
-    doc: jsPDF,
-    options: AutoTableSettings
-  ): AutoTableResult;
-}
-
+import {
+  AutoTableResult,
+  AutoTableColumnOption
+} from "@/components/admin-functions/pdf-types";
 
 // Define interfaces for DetailedReservation
 interface UserService {
@@ -69,13 +14,11 @@ interface UserService {
   MinsAvail: number | null;
 }
 
-
 interface UserTool {
   id: string;
   ToolUser: string;
   ToolQuantity: number;
 }
-
 
 interface UtilTime {
   id: number;
@@ -84,7 +27,6 @@ interface UtilTime {
   EndTime: string | null;
 }
 
-
 interface ClientInfo {
   ContactNum: string;
   Address: string;
@@ -92,7 +34,6 @@ interface ClientInfo {
   Province: string;
   Zipcode: number;
 }
-
 
 interface BusinessInfo {
   CompanyName: string;
@@ -115,6 +56,8 @@ interface BusinessInfo {
 }
 
 
+
+
 interface AccountInfo {
   Name: string;
   email: string;
@@ -122,6 +65,8 @@ interface AccountInfo {
   ClientInfo?: ClientInfo;
   BusinessInfo?: BusinessInfo;
 }
+
+
 
 
 interface DetailedReservation {
@@ -137,6 +82,8 @@ interface DetailedReservation {
 }
 
 
+
+
 /**
  * Format currency values
  * @param amount - The amount to format
@@ -147,6 +94,8 @@ const formatCurrency = (amount: number | string | null): string => {
   const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
   return Number(numAmount).toFixed(2);
 };
+
+
 
 
 /**
@@ -161,6 +110,8 @@ const formatDate = (dateString: string | null): string => {
 };
 
 
+
+
 /**
  * Format time for display in the form
  * @param timeString - Time string to format
@@ -171,6 +122,8 @@ const formatTime = (timeString: string | null): string => {
   const date = new Date(timeString);
   return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 };
+
+
 
 
 /**
@@ -188,6 +141,8 @@ const getServiceDetailsString = (services: UserService[]): string => {
     `Duration: ${service.MinsAvail || 0} min, Cost: ₱${formatCurrency(service.CostsAvail)}`
   ).join('\n');
 };
+
+
 
 
 /**
@@ -418,6 +373,8 @@ const generatePrintPDF = (reservationData: DetailedReservation): void => {
   // Focus the new window
   printWindow.focus();
 };
+
+
 
 
 /**
@@ -721,4 +678,3 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
     generatePrintPDF(reservationData);
   }
 };
-
