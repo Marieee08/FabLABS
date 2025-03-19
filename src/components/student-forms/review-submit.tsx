@@ -1,11 +1,13 @@
-// /components/student-forms/review-submit/page.tsx
+// @/components/student-forms/review-submit
 
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { useUser } from "@clerk/nextjs";
-import { useEffect, useState } from "react";
-import { Card } from '@/components/ui/card';
+import React, { useEffect, useState, useCallback } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from "@/components/ui/button";
+import { CheckCircle, Clock, School, Book, User, CreditCard, FileText } from 'lucide-react';
 import Link from 'next/link';
 
 interface ClientInfo {
@@ -16,25 +18,6 @@ interface ClientInfo {
   Zipcode: number | null;
 }
 
-interface BusinessInfo {
-  CompanyName: string | null;
-  BusinessOwner: string | null;
-  BusinessPermitNum: string | null;
-  TINNum: string | null;
-  CompanyEmail: string | null;
-  ContactPerson: string | null;
-  Designation: string | null;
-  CompanyAddress: string | null;
-  CompanyCity: string | null;
-  CompanyProvince: string | null;
-  CompanyZipcode: number | null;
-  CompanyPhoneNum: string | null;
-  CompanyMobileNum: string | null;
-  Manufactured: string | null;
-  ProductionFrequency: string | null;
-  Bulk: string | null;
-}
-
 interface AccInfo {
   id: number;
   clerkId: string;
@@ -42,35 +25,58 @@ interface AccInfo {
   email: string;
   Role: string;
   ClientInfo: ClientInfo | null;
-  BusinessInfo: BusinessInfo | null;
+}
+
+// Updated Day interface to match your input schema
+interface Day {
+  date: Date;
+  startTime: string | null;
+  endTime: string | null;
+}
+
+// Updated Material interface to match your input schema
+interface Material {
+  id: string; 
+  Item: string;
+  ItemQty: number;
+  Description: string;
+}
+
+// Updated Student interface to match your input schema
+interface Student {
+  id: number;
+  name: string;
 }
 
 interface FormData {
-  days: {
-    date: Date;
-    startTime: string | null;
-    endTime: string | null;
-  }[];
-  ProductsManufactured: string | string[];
-  BulkofCommodity: string;
-  Equipment: string;
-  Tools: string;
+  days: Day[];
+  syncTimes?: boolean;
+  unifiedStartTime?: string | null;
+  unifiedEndTime?: string | null;
+  ProductsManufactured?: string;
+  BulkofCommodity?: string;
+  Equipment?: string;
+  Tools?: string;
+  ToolsQty?: number;
+  ControlNo?: number;
+  LvlSec?: string;
+  NoofStudents?: number;
+  Subject?: string;
+  Teacher?: string;
+  TeacherEmail?: string;
+  Topic?: string;
+  SchoolYear?: number;
+  NeededMaterials?: Material[];
+  Students?: Student[];
+  [key: string]: any; // Add index signature for dynamic access
 }
 
 interface ReviewSubmitProps {
   formData: FormData;
   prevStep: () => void;
-  updateFormData: (field: keyof FormData, value: FormData[keyof FormData]) => void;
+  nextStep?: () => void;
+  updateFormData: <K extends keyof FormData>(field: K, value: FormData[K]) => void;
 }
-
-const parseToolString = (toolString: string): { Tool: string; Quantity: number }[] => {
-  if (!toolString || toolString === 'NOT APPLICABLE') return [];
-  try {
-    return JSON.parse(toolString);
-  } catch {
-    return [];
-  }
-};
 
 const formatDate = (date: Date): string => {
   return new Date(date).toLocaleDateString('en-US', {
@@ -81,7 +87,13 @@ const formatDate = (date: Date): string => {
   });
 };
 
-export default function ReviewSubmit({ formData, prevStep, updateFormData }: ReviewSubmitProps) {
+// Format school year to show range (e.g., "2024 to 2025")
+const formatSchoolYear = (year: number | undefined): string => {
+  if (!year) return 'Not provided';
+  return `${year} to ${year + 1}`;
+};
+
+export default function ReviewSubmit({ formData, prevStep, updateFormData, nextStep }: ReviewSubmitProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -115,42 +127,113 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData }: Rev
     try {
       setIsSubmitting(true);
       setError('');
-
+  
       const token = await getToken();
       
+      // Format UtilTimes to match the Prisma model
+      const utilTimes = formData.days.map((day, index) => {
+        // Make sure we have a proper date object
+        const dateObj = day.date instanceof Date ? day.date : new Date(day.date);
+        
+        // Create ISO strings for the API
+        let startTimeISO = null;
+        let endTimeISO = null;
+        
+        if (day.startTime) {
+          const [hours, minutes] = day.startTime.split(':');
+          const startTimeDate = new Date(dateObj);
+          startTimeDate.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+          startTimeISO = startTimeDate.toISOString();
+        }
+        
+        if (day.endTime) {
+          const [hours, minutes] = day.endTime.split(':');
+          const endTimeDate = new Date(dateObj);
+          endTimeDate.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+          endTimeISO = endTimeDate.toISOString();
+        }
+        
+        return {
+          DayNum: index + 1,
+          StartTime: startTimeISO,
+          EndTime: endTimeISO,
+        };
+      });
+  
+      // Format needed materials to match the model
+      const neededMaterials = formData.NeededMaterials?.map(material => ({
+        Item: material.Item,
+        ItemQty: Number(material.ItemQty),
+        Description: material.Description,
+      })) || [];
+  
+      // Format students to match the API expectations
+      const evcStudents = formData.Students?.map(student => ({
+        Students: student.name
+      })) || [];
+  
+      // Prepare submission data in the format expected by the API
       const submissionData = {
-        ...formData,
-        days: formData.days.map(day => ({
-          ...day,
-          date: new Date(day.date)
-        }))
+        // EVCReservation base fields
+        ControlNo: formData.ControlNo ? Number(formData.ControlNo) : undefined,
+        LvlSec: formData.LvlSec || undefined,
+        NoofStudents: formData.Students?.length || 0,
+        Subject: formData.Subject || undefined,
+        Teacher: formData.Teacher || undefined,
+        TeacherEmail: formData.TeacherEmail || undefined,
+        Topic: formData.Topic || undefined,
+        SchoolYear: formData.SchoolYear ? Number(formData.SchoolYear) : undefined,
+        
+        // Related data collections
+        UtilTimes: utilTimes,
+        EVCStudents: evcStudents,
+        NeededMaterials: neededMaterials,
+        
+        // Link to user account
+        accInfoId: accInfo?.id
       };
-
-      const response = await fetch('/api/user/create-reservation', {
+  
+      console.log('Sending data to API:', JSON.stringify(submissionData, null, 2));
+  
+      const response = await fetch('/api/user/create-evc-reservation', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          ...submissionData,
-          userInfo: {
-            clientInfo: accInfo?.ClientInfo,
-            businessInfo: accInfo?.BusinessInfo
-          }
-        }),
+        body: JSON.stringify(submissionData),
       });
+      
+      const responseText = await response.text();
+      console.log('Raw response:', responseText);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to submit reservation');
-      }
+      let errorData = null;
+        if (responseText) {
+          try {
+            errorData = JSON.parse(responseText);
+          } catch (e) {
+            console.error('Failed to parse response as JSON:', e);
+          }
+        }
 
+        if (!response.ok) {
+          const errorMessage = errorData?.details || errorData?.error || 'Failed to submit reservation';
+          throw new Error(errorMessage);
+        }
+  
+      // Redirect to dashboard on success
       router.push('/user-dashboard');
       
     } catch (err) {
       console.error('Submission error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to submit reservation');
+      // Handle error object properly
+      let errorMessage = 'Failed to submit reservation';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (typeof err === 'object' && err !== null) {
+        errorMessage = JSON.stringify(err);
+      }
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -158,137 +241,205 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData }: Rev
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto mt-11">
-        <Card className="p-6">
-          <div className="flex items-center justify-center">
-            <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"/>
-          </div>
+      <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 pt-0 flex flex-col">
+        <Card className="p-6 mt-6 bg-white shadow-sm border border-gray-200">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-center p-8">
+              <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"/>
+            </div>
+          </CardContent>
         </Card>
       </div>
     );
   }
 
-  const renderSection = (title: string, content: JSX.Element) => (
-    <div className="mb-6">
-      <h3 className="text-lg font-medium mb-3">{title}</h3>
-      {content}
-    </div>
-  );
-
   return (
-    <div className="max-w-4xl mx-auto">
-      <Card className="p-6 mt-11">
-        <h2 className="text-2xl font-semibold mb-6">Review Your Information</h2>
+    <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 pt-0 flex flex-col">
+      <Card className="bg-white shadow-sm border border-gray-200 mt-6">
+        
+        <CardContent className="pt-0">
+          {/* Dates and Times */}
+          <div className="mb-6">
+            <h3 className="text-lg font-medium mb-3 flex items-center">
+              <Clock className="h-5 w-5 text-blue-600 mr-2" /> Selected Dates and Times
+            </h3>
+            <div className="grid md:grid-cols-2 gap-4 border rounded-lg p-4 bg-gray-50">
+              {formData.days.length > 0 ? (
+                [...formData.days]
+                  .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                  .map((day, index) => (
+                    <Card key={index} className="bg-white border-gray-200 shadow-none">
+                      <CardContent className="p-4">
+                        <h4 className="text-md font-semibold text-blue-800 mb-3">
+                          {new Date(day.date).toLocaleDateString('en-US', { 
+                            weekday: 'short', 
+                            month: 'short', 
+                            day: 'numeric'
+                          })}
+                        </h4>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm font-medium text-gray-700">Start Time</p>
+                            <p className="mt-1 text-blue-700">{day.startTime || 'Not set'}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-700">End Time</p>
+                            <p className="mt-1 text-blue-700">{day.endTime || 'Not set'}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+              ) : (
+                <p className="text-gray-500 text-center p-4">No dates selected</p>
+              )}
+            </div>
+          </div>
 
-        {renderSection('Selected Dates and Times',
-          <div className="grid grid-cols-2 gap-6 border border-gray-300 rounded-md p-4">
-            {formData.days.length > 0 ? (
-              [...formData.days]
-                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                .map((day, index) => (
-                  <div key={index} className="mb-4">
-                    <h4 className="font-medium">Day {index + 1}</h4>
-                    <p>Date: {formatDate(day.date)}</p>
-                    <p>Start Time: {day.startTime}</p>
-                    <p>End Time: {day.endTime}</p>
+          {/* School/Class Information */}
+          <div className="mb-6">
+            <h3 className="text-lg font-medium mb-3 flex items-center">
+              <School className="h-5 w-5 text-blue-600 mr-2" /> School Information
+            </h3>
+            <Card className="border-gray-200 shadow-none">
+              <CardContent className="p-4">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Control Number</p>
+                    <p className="mt-1 text-gray-800">{formData.ControlNo || 'Not provided'}</p>
                   </div>
-                ))
-            ) : (
-              <p>No dates selected</p>
-            )}
-          </div>
-        )}
-
-        {renderSection('Personal Information',
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-gray-600">Name</p>
-              <p className="mt-1">{user?.firstName} {user?.lastName}</p>
-            </div>
-            <div>
-              <p className="text-sm text-gray-600">Grade Level and Section</p>
-              <p className="mt-1">{accInfo?.ClientInfo?.ContactNum || 'Not provided'}</p>
-            </div>
-            <div className="col-span-2">
-              <p className="text-sm text-gray-600">Email</p>
-              <p className="mt-1">
-                {accInfo?.ClientInfo ? 
-                  `${accInfo.ClientInfo.Address || ''}, ${accInfo.ClientInfo.City || ''}, ${accInfo.ClientInfo.Province || ''} ${accInfo.ClientInfo.Zipcode || ''}`.replace(/^[,\s]+|[,\s]+$/g, '') 
-                  : 'Not provided'}
-              </p>
-            </div>
-          </div>
-        )}
-
-
-        {renderSection('Utilization Information',
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <p className="text-sm text-gray-600">Services Availed</p>
-              {Array.isArray(formData.ProductsManufactured) ? (
-                <div className="mt-1 flex flex-wrap gap-2">
-                  {formData.ProductsManufactured.map((service, index) => (
-                    <span 
-                      key={index} 
-                      className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm"
-                    >
-                      {service}
-                    </span>
-                  ))}
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">School Year</p>
+                    <p className="mt-1 text-gray-800">{formatSchoolYear(formData.SchoolYear)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Level/Section</p>
+                    <p className="mt-1 text-gray-800">{formData.LvlSec || 'Not provided'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Number of Students</p>
+                    <p className="mt-1 text-gray-800">{formData.Students?.length || 'Not provided'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Teacher</p>
+                    <p className="mt-1 text-gray-800">{formData.Teacher || 'Not provided'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Teacher Email</p>
+                    <p className="mt-1 text-gray-800">{formData.TeacherEmail || 'Not provided'}</p>
+                  </div>                 
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Topic</p>
+                    <p className="mt-1 text-gray-800">{formData.Topic || 'Not provided'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Subject</p>
+                    <p className="mt-1 text-gray-800">{formData.Subject || 'Not provided'}</p>
+                  </div>
                 </div>
-              ) : (
-                <p className="mt-1">{formData.ProductsManufactured || 'Not provided'}</p>
-              )}
-            </div>
-            <div className="col-span-2">
-              <p className="text-sm text-gray-600">Bulk of Commodity</p>
-              <p className="mt-1">{formData.BulkofCommodity || 'Not provided'}</p>
-            </div>
-            <div className="col-span-2">
-              <p className="text-sm text-gray-600">Tools</p>
-              {parseToolString(formData.Tools).length > 0 ? (
-                <div className="mt-2 space-y-2">
-                  {parseToolString(formData.Tools).map((tool, index) => (
-                    <div 
-                      key={index} 
-                      className="flex items-center justify-between bg-gray-50 p-2 rounded"
-                    >
-                      <span className="flex-grow">{tool.Tool}</span>
-                      <span className="text-gray-600">
-                        Quantity: {tool.Quantity}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="mt-1">No tools selected</p>
-              )}
-            </div>
+              </CardContent>
+            </Card>
           </div>
-        )}
 
-        {error && (
-          <Alert variant="destructive" className="mt-4">
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+          {/* Students List */}
+          {formData.Students && formData.Students.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-lg font-medium mb-3 flex items-center">
+                <User className="h-5 w-5 text-blue-600 mr-2" /> Students
+              </h3>
+              <Card className="border-gray-200 shadow-none">
+                <CardContent className="p-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {formData.Students.map((student) => (
+                      <div key={student.id} className="bg-gray-50 p-2 rounded">
+                        <p className="text-gray-800">{student.name}</p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
-        <div className="mt-6 flex justify-between">
-          <button 
-            onClick={prevStep}
-            disabled={isSubmitting}
-            className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600 transition-colors disabled:opacity-50"
-          >
-            Previous
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={isSubmitting || loading}
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors disabled:opacity-50"
-          >
-            {isSubmitting ? 'Submitting...' : 'Submit Request'}
-          </button>
-        </div>
+          {/* Materials Needed */}
+          {formData.NeededMaterials && formData.NeededMaterials.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-lg font-medium mb-3 flex items-center">
+                <FileText className="h-5 w-5 text-blue-600 mr-2" /> Materials Needed
+              </h3>
+              <Card className="border-gray-200 shadow-none">
+                <CardContent className="p-4">
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 border-b">
+                          <th className="p-2 text-left border">Item</th>
+                          <th className="p-2 text-center border">Quantity</th>
+                          <th className="p-2 text-left border">Description</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {formData.NeededMaterials.map((material) => (
+                          <tr key={material.id} className="border-b hover:bg-gray-50">
+                            <td className="p-2 border">{material.Item}</td>
+                            <td className="p-2 border text-center">{material.ItemQty}</td>
+                            <td className="p-2 border">{material.Description}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Contact Information */}
+          <div className="mb-6">
+            <h3 className="text-lg font-medium mb-3 flex items-center">
+              <Book className="h-5 w-5 text-blue-600 mr-2" /> Contact Information
+            </h3>
+            <Card className="border-gray-200 shadow-none">
+              <CardContent className="p-4">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Name</p>
+                    <p className="mt-1 text-gray-800">{user?.firstName} {user?.lastName}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Email</p>
+                    <p className="mt-1 text-gray-800">{user?.emailAddresses[0]?.emailAddress || accInfo?.email}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Error messages */}
+          {error && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {/* Navigation buttons */}
+          <div className="mt-6 flex justify-between">
+            <Button
+              onClick={prevStep}
+              disabled={isSubmitting}
+              className="bg-gray-500 text-white hover:bg-gray-600 transition-colors disabled:opacity-50"
+            >
+              Previous Step
+            </Button>
+            <Button
+              onClick={handleSubmit}
+              disabled={isSubmitting || loading}
+              className="bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50"
+            >
+              {isSubmitting ? 'Submitting...' : 'Submit Request'}
+            </Button>
+          </div>
+        </CardContent>
       </Card>
     </div>
   );

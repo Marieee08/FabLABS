@@ -1,4 +1,4 @@
-// /components/student-forms/lab-reservation/page.tsx
+// @/components/student-forms/lab-reservation
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useUser } from "@clerk/nextjs";
@@ -276,6 +276,7 @@ return (
                   value={formData.LvlSec}
                   onChange={(e) => handleFieldChange('LvlSec', e.target.value)}
                   aria-invalid={!!errors.LvlSec}
+                  placeholder="e.g. Grade 10-A"
                 />
                 {errors.LvlSec && <p className="mt-1 text-sm text-red-500">{errors.LvlSec}</p>}
               </div>
@@ -292,6 +293,7 @@ return (
                   value={formData.Subject}
                   onChange={(e) => handleFieldChange('Subject', e.target.value)}
                   aria-invalid={!!errors.Subject}
+                  placeholder="e.g. Chemistry"
                 />
                 {errors.Subject && <p className="mt-1 text-sm text-red-500">{errors.Subject}</p>}
               </div>
@@ -308,6 +310,7 @@ return (
                   value={formData.Teacher}
                   onChange={(e) => handleFieldChange('Teacher', e.target.value)}
                   aria-invalid={!!errors.Teacher}
+                  placeholder="e.g. Dr. Jane Smith"
                 />
                 {errors.Teacher && <p className="mt-1 text-sm text-red-500">{errors.Teacher}</p>}
               </div>
@@ -324,6 +327,7 @@ return (
                   value={formData.TeacherEmail}
                   onChange={(e) => handleFieldChange('TeacherEmail', e.target.value)}
                   aria-invalid={!!errors.TeacherEmail}
+                  placeholder="e.g. teacher@school.edu"
                 />
                 {errors.TeacherEmail && <p className="mt-1 text-sm text-red-500">{errors.TeacherEmail}</p>}
               </div>
@@ -340,6 +344,7 @@ return (
                   value={formData.Topic}
                   onChange={(e) => handleFieldChange('Topic', e.target.value)}
                   aria-invalid={!!errors.Topic}
+                  placeholder="e.g. Acid-Base Reactions"
                 />
                 {errors.Topic && <p className="mt-1 text-sm text-red-500">{errors.Topic}</p>}
               </div>
@@ -480,6 +485,7 @@ return (
                   <div className="col-span-5">
                     <input
                       type="text"
+                      placeholder="Item name"
                       className={`w-full border ${errors.NeededMaterials && errors.NeededMaterials[material.id]?.Item ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition`}
                       value={material.Item}
                       onChange={(e) => updateMaterial(material.id, 'Item', e.target.value)}
@@ -492,6 +498,7 @@ return (
                   <div className="col-span-2">
                     <input
                       type="number"
+                      placeholder="Qty"
                       className={`w-full border ${errors.NeededMaterials && errors.NeededMaterials[material.id]?.ItemQty ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition`}
                       value={material.ItemQty}
                       onChange={(e) => updateMaterial(material.id, 'ItemQty', parseInt(e.target.value) || 0)}
