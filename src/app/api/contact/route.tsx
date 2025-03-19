@@ -20,12 +20,12 @@ export async function POST(request: { json: () => PromiseLike<{ name: any; email
     // Email options
     const mailOptions = {
       from: process.env.EMAIL_USER,
-      to: 'leilasabando@gmail.com', // Recipient email
-      subject: `New FabLABS Contact Form Message from ${name}`,
+      to: 'leilasabando@gmail.com', // fablab@evc.pshs.edu.ph'
+      subject: `New FabLABS Inquiry from ${name}`,
       text: `
         Name: ${name}
         Email: ${email}
-        
+
         Message: ${message}
       `,
       html: `
