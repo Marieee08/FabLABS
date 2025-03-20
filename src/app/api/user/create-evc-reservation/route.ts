@@ -48,7 +48,7 @@ export async function POST(request: Request) {
         TeacherEmail: data.TeacherEmail || null, 
         Topic: data.Topic || null,
         SchoolYear: data.SchoolYear || null,
-        EVCStatus: "Pending",
+        EVCStatus: data.EVCStatus || "Pending Teacher Approval", // Accept the EVCStatus from the client
         DateRequested: new Date(),
         
         // Link to the user account
@@ -105,6 +105,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       message: 'EVC reservation created successfully',
+      id: evcReservation.id, // Make sure to include the ID in the response
       reservation: completeReservation
     });
   } catch (error: any) {
