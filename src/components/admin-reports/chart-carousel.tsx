@@ -1,4 +1,4 @@
-// ChartCarousel.tsx
+// src\components\admin-reports\chart-carousel.tsx
 import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,9 @@ import {
   PolarGrid,
   PolarAngleAxis,
   PolarRadiusAxis,
-  Radar
+  Radar,
+  AreaChart,
+  Area
 } from 'recharts';
 
 // Define the chart data interface based on your dashboard data
@@ -34,81 +36,41 @@ const ChartCarousel: React.FC<ChartCarouselProps> = ({ dashboardData, isLoading,
   const [currentIndex, setCurrentIndex] = useState(0);
   
   // Define the COLORS array
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
+  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#ff7300'];
   
   // Define all the charts you want to include in the carousel
   const charts = [
     {
-      id: 'machineAvailability',
-      title: 'Machine Availability',
-      description: 'Current status of all machines',
+      id: 'machinesUsed',
+      title: 'Machines Used',
+      description: 'Most frequently used machines',
       component: () => (
         <CardContent className="h-[400px]">
-          {dashboardData.machineAvailability && 
-           (dashboardData.machineAvailability.available > 0 || dashboardData.machineAvailability.unavailable > 0) ? (
+          {dashboardData.machinesUsed && dashboardData.machinesUsed.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={[
-                    { name: 'Available', value: dashboardData.machineAvailability.available },
-                    { name: 'Unavailable', value: dashboardData.machineAvailability.unavailable }
-                  ]}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={false}
-                  outerRadius={120}
-                  fill="#8884d8"
-                  dataKey="value"
-                  nameKey="name"
-                >
-                  <Cell fill="#00C49F" />
-                  <Cell fill="#FF8042" />
-                </Pie>
-                <Tooltip formatter={(value, name) => [`${value} machines`, name]} />
-                <Legend verticalAlign="bottom" height={36} />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <p>No data available</p>
-            </div>
-          )}
-        </CardContent>
-      )
-    },
-    {
-      id: 'requestTrends',
-      title: 'Request Trends',
-      description: 'Monthly request volume over time',
-      component: () => (
-        <CardContent className="h-[400px]">
-          {dashboardData.utilizationTrends && dashboardData.utilizationTrends.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart 
-                data={dashboardData.utilizationTrends}
-                margin={{ top: 20, right: 30, left: 20, bottom: 40 }}
+              <BarChart 
+                data={dashboardData.machinesUsed || [
+                  { machine: 'CNC Machine', count: 25 },
+                  { machine: '3D Printer', count: 18 },
+                  { machine: 'Laser Cutter', count: 15 },
+                  { machine: 'Milling Machine', count: 12 },
+                  { machine: 'Waterjet Cutter', count: 8 }
+                ]}
+                margin={{ top: 20, right: 30, left: 20, bottom: 30 }}
               >
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis 
-                  dataKey="month" 
+                  dataKey="machine" 
                   angle={-45} 
                   textAnchor="end" 
-                  height={60} 
+                  height={80} 
                   tick={{ fontSize: 12 }} 
                 />
                 <YAxis />
-                <Tooltip />
+                <Tooltip formatter={(value) => [`${value} uses`]} />
                 <Legend verticalAlign="top" height={36} />
-                <Line
-                  name="Request Volume"
-                  type="monotone"
-                  dataKey="requests"
-                  stroke="#8884d8"
-                  strokeWidth={2}
-                  activeDot={{ r: 8 }}
-                />
-              </LineChart>
+                <Bar dataKey="count" name="Number of Uses" fill="#8884d8" />
+              </BarChart>
             </ResponsiveContainer>
           ) : (
             <div className="flex h-full items-center justify-center">
@@ -119,9 +81,9 @@ const ChartCarousel: React.FC<ChartCarouselProps> = ({ dashboardData, isLoading,
       )
     },
     {
-      id: 'servicePopularity',
-      title: 'Service Popularity',
-      description: 'Most frequently used services',
+      id: 'servicesAvailed',
+      title: 'Services Availed',
+      description: 'Most popular services',
       component: () => (
         <CardContent className="h-[400px]">
           {dashboardData.serviceStats && dashboardData.serviceStats.length > 0 ? (
@@ -131,8 +93,8 @@ const ChartCarousel: React.FC<ChartCarouselProps> = ({ dashboardData, isLoading,
                   data={dashboardData.serviceStats}
                   cx="50%"
                   cy="50%"
-                  labelLine={false}
-                  label={false}
+                  labelLine={true}
+                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
                   outerRadius={120}
                   fill="#8884d8"
                   dataKey="value"
@@ -158,24 +120,38 @@ const ChartCarousel: React.FC<ChartCarouselProps> = ({ dashboardData, isLoading,
       )
     },
     {
-      id: 'userRoleDistribution',
-      title: 'User Role Distribution',
-      description: 'Breakdown of users by role',
+      id: 'salesData',
+      title: 'Sales Data',
+      description: 'Monthly sales revenue',
       component: () => (
         <CardContent className="h-[400px]">
-          {dashboardData.userRoleDistribution && dashboardData.userRoleDistribution.length > 0 ? (
+          {dashboardData.salesData ? (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart 
-                data={dashboardData.userRoleDistribution}
-                margin={{ top: 20, right: 30, left: 20, bottom: 25 }}
+              <AreaChart 
+                data={dashboardData.salesData || [
+                  { month: 'Jan', revenue: 4500 },
+                  { month: 'Feb', revenue: 5200 },
+                  { month: 'Mar', revenue: 4800 },
+                  { month: 'Apr', revenue: 6000 },
+                  { month: 'May', revenue: 5700 },
+                  { month: 'Jun', revenue: 6200 }
+                ]}
+                margin={{ top: 20, right: 30, left: 20, bottom: 30 }}
               >
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
+                <XAxis dataKey="month" />
                 <YAxis />
-                <Tooltip formatter={(value) => [`${value} users`]} />
+                <Tooltip formatter={(value) => [`₱${value.toLocaleString()}`]} />
                 <Legend verticalAlign="top" height={36} />
-                <Bar dataKey="value" name="Number of Users" fill="#8884d8" />
-              </BarChart>
+                <Area 
+                  type="monotone" 
+                  dataKey="revenue" 
+                  name="Revenue" 
+                  stroke="#8884d8" 
+                  fill="#8884d8" 
+                  fillOpacity={0.6} 
+                />
+              </AreaChart>
             </ResponsiveContainer>
           ) : (
             <div className="flex h-full items-center justify-center">
@@ -186,66 +162,37 @@ const ChartCarousel: React.FC<ChartCarouselProps> = ({ dashboardData, isLoading,
       )
     },
     {
-      id: 'machineDowntime',
-      title: 'Machine Downtime',
-      description: 'Total downtime by machine (minutes)',
+      id: 'reservationsByType',
+      title: 'Reservations',
+      description: 'Number of reservations by type',
       component: () => (
         <CardContent className="h-[400px]">
-          {dashboardData.machineDowntime && dashboardData.machineDowntime.length > 0 ? (
+          {dashboardData.utilizationTrends && dashboardData.utilizationTrends.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart 
-                data={dashboardData.machineDowntime}
-                layout="vertical"
-                margin={{ top: 20, right: 30, left: 100, bottom: 5 }}
+              <LineChart 
+                data={dashboardData.utilizationTrends}
+                margin={{ top: 20, right: 30, left: 20, bottom: 40 }}
               >
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" />
-                <YAxis 
-                  dataKey="machine" 
-                  type="category" 
-                  tick={{ fontSize: 12 }}
-                  width={90}
+                <XAxis 
+                  dataKey="month" 
+                  angle={-45} 
+                  textAnchor="end" 
+                  height={60} 
+                  tick={{ fontSize: 12 }} 
                 />
-                <Tooltip formatter={(value) => [`${value} minutes`]} />
+                <YAxis />
+                <Tooltip />
                 <Legend verticalAlign="top" height={36} />
-                <Bar dataKey="downtime" name="Downtime (minutes)" fill="#FF8042" />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <p>No data available</p>
-            </div>
-          )}
-        </CardContent>
-      )
-    },
-    {
-      id: 'repairTypes',
-      title: 'Repair Types',
-      description: 'Frequency of repair types',
-      component: () => (
-        <CardContent className="h-[400px]">
-          {dashboardData.repairsByType && dashboardData.repairsByType.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-                <Pie
-                  data={dashboardData.repairsByType}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={false}
-                  outerRadius={120}
-                  fill="#8884d8"
-                  dataKey="count"
-                  nameKey="type"
-                >
-                  {dashboardData.repairsByType.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value, name) => [`${value} repairs`, name]} />
-                <Legend verticalAlign="bottom" height={36} />
-              </PieChart>
+                <Line
+                  name="Reservations"
+                  type="monotone"
+                  dataKey="requests"
+                  stroke="#8884d8"
+                  strokeWidth={2}
+                  activeDot={{ r: 8 }}
+                />
+              </LineChart>
             </ResponsiveContainer>
           ) : (
             <div className="flex h-full items-center justify-center">
@@ -257,8 +204,8 @@ const ChartCarousel: React.FC<ChartCarouselProps> = ({ dashboardData, isLoading,
     },
     {
       id: 'userSatisfaction',
-      title: 'User Satisfaction Metrics',
-      description: 'Average scores across different satisfaction categories (1-5 scale)',
+      title: 'User Satisfaction',
+      description: 'User feedback ratings across categories',
       component: () => (
         <CardContent className="h-[400px]">
           {dashboardData.satisfactionScores && dashboardData.satisfactionScores.length > 0 ? (
@@ -267,7 +214,14 @@ const ChartCarousel: React.FC<ChartCarouselProps> = ({ dashboardData, isLoading,
                 cx="50%" 
                 cy="50%" 
                 outerRadius="70%" 
-                data={dashboardData.satisfactionScores}
+                data={dashboardData.satisfactionScores || [
+                  { category: 'Service Quality', score: 4.2 },
+                  { category: 'Staff Helpfulness', score: 4.5 },
+                  { category: 'Equipment Quality', score: 4.0 },
+                  { category: 'Timeliness', score: 3.8 },
+                  { category: 'Value for Money', score: 4.3 },
+                  { category: 'Overall Experience', score: 4.4 }
+                ]}
               >
                 <PolarGrid />
                 <PolarAngleAxis 
@@ -276,13 +230,13 @@ const ChartCarousel: React.FC<ChartCarouselProps> = ({ dashboardData, isLoading,
                 />
                 <PolarRadiusAxis angle={30} domain={[0, 5]} />
                 <Radar 
-                  name="Satisfaction Score" 
+                  name="Satisfaction Score (out of 5)" 
                   dataKey="score" 
                   stroke="#8884d8" 
                   fill="#8884d8" 
                   fillOpacity={0.6} 
                 />
-                <Tooltip />
+                <Tooltip formatter={(value) => [`${value} / 5`]} />
                 <Legend verticalAlign="bottom" height={36} />
               </RadarChart>
             </ResponsiveContainer>

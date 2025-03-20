@@ -1,4 +1,4 @@
-// app/api/admin/reports/route.ts - with fixed completed request counting
+// app/api/admin/reports/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
@@ -34,20 +34,25 @@ export async function GET(request: NextRequest) {
   try {
     // Initialize with default values
     const dashboardData = {
-      serviceStats: [{ name: 'Test Service', value: 10 }],
-      utilizationTrends: [
-        { month: 'Jan', requests: 5 },
-        { month: 'Feb', requests: 8 },
-        { month: 'Mar', requests: 12 }
+      serviceStats: [{ name: 'No Data', value: 1 }],
+      machinesUsed: [{ machine: 'No Data', count: 0 }],
+      salesData: [
+        { month: 'Jan', revenue: 0 },
+        { month: 'Feb', revenue: 0 },
+        { month: 'Mar', revenue: 0 }
       ],
-      machineAvailability: { available: 5, unavailable: 2 },
-      userRoleDistribution: [{ name: 'Test User', value: 5 }],
-      pendingRequests: 3,
-      completedRequestsLastMonth: 25,
-      activeEVCReservations: 7,
-      satisfactionScores: Array(9).fill(0).map((_, i) => ({ category: `SQD${i}`, score: 4.5 })),
-      machineDowntime: [{ machine: 'Test Machine', downtime: 120 }],
-      repairsByType: [{ type: 'Test Repair', count: 8 }]
+      utilizationTrends: [
+        { month: 'Jan', requests: 0 },
+        { month: 'Feb', requests: 0 },
+        { month: 'Mar', requests: 0 }
+      ],
+      satisfactionScores: Array(6).fill(0).map((_, i) => ({ 
+        category: ['Service Quality', 'Staff Helpfulness', 'Equipment Quality', 'Timeliness', 'Value for Money', 'Overall Experience'][i], 
+        score: 0 
+      })),
+      pendingRequests: 0,
+      completedRequestsLastMonth: 0,
+      activeEVCReservations: 0
     };
     
     // Authentication check (optional)
@@ -94,17 +99,29 @@ export async function GET(request: NextRequest) {
       }, { status: 500 });
     }
     
-    // Now, let's try to fetch actual data from database
-    // We'll wrap each query in its own try/catch block to prevent one failing query from breaking everything
-    
-    // 1. Get service stats
+    // 1. Get service stats (Services Availed)
     try {
       console.log("Fetching service stats...");
+      
+      // Create date filter condition if dates are provided
+      let dateFilter = {};
+      if (fromDate || toDate) {
+        dateFilter = {
+          utilReq: {
+            RequestDate: {
+              ...(fromDate && { gte: fromDate }),
+              ...(toDate && { lte: toDate })
+            }
+          }
+        };
+      }
+      
       const serviceStats = await prisma.serviceAvailed.groupBy({
         by: ['service'],
         _count: {
           service: true
-        }
+        },
+        where: dateFilter
       });
 
       if (serviceStats && serviceStats.length > 0) {
@@ -119,7 +136,47 @@ export async function GET(request: NextRequest) {
       // Continue with default values
     }
 
-    // 2. Get pending requests count
+    // 2. Get machines used stats
+    try {
+      console.log("Fetching machines used stats...");
+      
+      // Create date filter condition if dates are provided
+      let dateFilter = {};
+      if (fromDate || toDate) {
+        dateFilter = {
+          utilReq: {
+            RequestDate: {
+              ...(fromDate && { gte: fromDate }),
+              ...(toDate && { lte: toDate })
+            }
+          }
+        };
+      }
+      
+      const machineStats = await prisma.machineUtilization.groupBy({
+        by: ['Machine'],
+        _count: {
+          id: true
+        },
+        where: {
+          Machine: { not: null },
+          ...dateFilter
+        }
+      });
+
+      if (machineStats && machineStats.length > 0) {
+        dashboardData.machinesUsed = machineStats.map(stat => ({
+          machine: stat.Machine || 'Unknown',
+          count: stat._count.id
+        }));
+      }
+      console.log("Machines used stats fetched successfully");
+    } catch (error) {
+      console.error("Error fetching machines used stats:", error);
+      // Continue with default values
+    }
+
+    // 3. Get pending requests count
     try {
       console.log("Fetching pending requests count...");
       const pendingCount = await prisma.utilReq.count({
@@ -135,7 +192,7 @@ export async function GET(request: NextRequest) {
       // Continue with default values
     }
 
-    // 3. Get completed requests - FIXED to count both utilReq and EVCReservations
+    // 4. Get completed requests - total regardless of date
     try {
       console.log("Fetching completed requests count...");
       
@@ -143,7 +200,6 @@ export async function GET(request: NextRequest) {
       const completedUtilReqCount = await prisma.utilReq.count({
         where: {
           Status: 'Completed'
-          // No date filter - count ALL completed requests regardless of date
         }
       });
       
@@ -153,7 +209,6 @@ export async function GET(request: NextRequest) {
       const completedEVCCount = await prisma.eVCReservation.count({
         where: {
           EVCStatus: 'Completed'
-          // No date filter - count ALL approved reservations regardless of date
         }
       });
       
@@ -164,31 +219,6 @@ export async function GET(request: NextRequest) {
       console.log("Total completed requests:", dashboardData.completedRequestsLastMonth);
     } catch (error) {
       console.error("Error fetching completed requests:", error);
-      // Continue with default values
-    }
-
-    // 4. Get machine availability stats
-    try {
-      console.log("Fetching machine availability stats...");
-      const machineStats = await prisma.machine.findMany({
-        select: {
-          Machine: true,
-          isAvailable: true
-        }
-      });
-
-      if (machineStats && machineStats.length > 0) {
-        const available = machineStats.filter(m => m.isAvailable).length;
-        const unavailable = machineStats.length - available;
-        
-        dashboardData.machineAvailability = { 
-          available: available || 1, 
-          unavailable: unavailable || 0 
-        };
-      }
-      console.log("Machine availability stats fetched successfully");
-    } catch (error) {
-      console.error("Error fetching machine availability:", error);
       // Continue with default values
     }
 
@@ -208,17 +238,22 @@ export async function GET(request: NextRequest) {
       // Continue with default values
     }
 
-    // 6. Process machine usage per month (utilization trends)
+    // 6. Process reservations by month (utilization trends)
     try {
       console.log("Fetching utilization trends...");
       const sixMonthsAgo = new Date();
       sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
       
+      // Apply date filter if provided, otherwise use six months ago
+      const startDate = fromDate || sixMonthsAgo;
+      const endDate = toDate || new Date();
+      
       // Get UtilReq trends
       const recentUtilReqs = await prisma.utilReq.findMany({
         where: {
           RequestDate: {
-            gte: sixMonthsAgo
+            gte: startDate,
+            lte: endDate
           }
         },
         select: {
@@ -233,7 +268,8 @@ export async function GET(request: NextRequest) {
       const recentEVCReqs = await prisma.eVCReservation.findMany({
         where: {
           DateRequested: {
-            gte: sixMonthsAgo
+            gte: startDate,
+            lte: endDate
           }
         },
         select: {
@@ -276,25 +312,120 @@ export async function GET(request: NextRequest) {
       // Continue with default values
     }
 
-    // 7. Get stats on user roles
+    // 7. Get sales data (monthly revenue from TotalAmntDue)
     try {
-      console.log("Fetching user role distribution...");
-      const userStats = await prisma.accInfo.groupBy({
-        by: ['Role'],
-        _count: {
-          id: true
+      console.log("Fetching sales data...");
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      
+      // Apply date filter if provided, otherwise use six months ago
+      const startDate = fromDate || sixMonthsAgo;
+      const endDate = toDate || new Date();
+      
+      // Get all requests with payment data
+      const salesRecords = await prisma.utilReq.findMany({
+        where: {
+          RequestDate: {
+            gte: startDate,
+            lte: endDate
+          },
+          TotalAmntDue: { not: null }
+        },
+        select: {
+          RequestDate: true,
+          TotalAmntDue: true
+        },
+        orderBy: {
+          RequestDate: 'asc'
         }
       });
 
-      if (userStats && userStats.length > 0) {
-        dashboardData.userRoleDistribution = userStats.map(stat => ({
-          name: stat.Role || 'Unknown',
-          value: stat._count.id
+      // Group sales by month
+      const salesByMonth: Record<string, number> = {};
+      
+      salesRecords.forEach(record => {
+        if (record.RequestDate && record.TotalAmntDue) {
+          const month = new Date(record.RequestDate).toLocaleString('default', { month: 'short' });
+          salesByMonth[month] = (salesByMonth[month] || 0) + Number(record.TotalAmntDue);
+        }
+      });
+
+      if (Object.keys(salesByMonth).length > 0) {
+        dashboardData.salesData = Object.entries(salesByMonth).map(([month, revenue]) => ({
+          month,
+          revenue: parseFloat(revenue.toFixed(2))
         }));
       }
-      console.log("User role distribution fetched successfully");
+      
+      console.log("Sales data fetched successfully");
     } catch (error) {
-      console.error("Error fetching user role distribution:", error);
+      console.error("Error fetching sales data:", error);
+      // Continue with default values
+    }
+
+    // 8. Get user satisfaction scores from SatisfactionSurvey
+    try {
+      console.log("Fetching user satisfaction scores...");
+      
+      // Create date filter condition if dates are provided
+      let dateFilter = {};
+      if (fromDate || toDate) {
+        dateFilter = {
+          utilReq: {
+            RequestDate: {
+              ...(fromDate && { gte: fromDate }),
+              ...(toDate && { lte: toDate })
+            }
+          }
+        };
+      }
+      
+      const surveys = await prisma.satisfactionSurvey.findMany({
+        where: dateFilter,
+        select: {
+          SQD0: true,
+          SQD1: true,
+          SQD2: true,
+          SQD3: true,
+          SQD4: true,
+          SQD5: true,
+          SQD6: true,
+          SQD7: true,
+          SQD8: true
+        }
+      });
+
+      if (surveys && surveys.length > 0) {
+        // Map SQD fields to categories and calculate average scores
+        const categories = [
+          { field: 'SQD0', name: 'Service Quality' },
+          { field: 'SQD1', name: 'Staff Helpfulness' },
+          { field: 'SQD2', name: 'Equipment Quality' },
+          { field: 'SQD3', name: 'Timeliness' },
+          { field: 'SQD4', name: 'Value for Money' },
+          { field: 'SQD5', name: 'Overall Experience' }
+        ];
+        
+        const satisfactionScores = categories.map(category => {
+          const scores = surveys
+            .map(survey => parseInt(survey[category.field] || '0'))
+            .filter(score => !isNaN(score));
+          
+          const avgScore = scores.length > 0
+            ? scores.reduce((sum, score) => sum + score, 0) / scores.length
+            : 0;
+          
+          return {
+            category: category.name,
+            score: parseFloat(avgScore.toFixed(1))
+          };
+        });
+        
+        dashboardData.satisfactionScores = satisfactionScores;
+      }
+      console.log("User satisfaction scores fetched successfully");
+    } catch (error) {
+      console.error("Error fetching user satisfaction scores:", error);
       // Continue with default values
     }
 
