@@ -109,7 +109,7 @@ const formatTime = (timeString: string | null): string => {
 };
 
 /**
- * Generate a string with all service details
+ * Generate a string with service details - WITHOUT cost information
  * @param services - Array of UserService objects
  * @returns Formatted service details string
  */
@@ -120,7 +120,7 @@ const getServiceDetailsString = (services: UserService[]): string => {
  
   return services.map(service =>
     `Service: ${service.ServiceAvail}, Equipment: ${service.EquipmentAvail}, ` +
-    `Duration: ${service.MinsAvail || 0} min, Cost: ₱${formatCurrency(service.CostsAvail)}`
+    `Duration: ${service.MinsAvail || 0} min`
   ).join('\n');
 };
 
@@ -264,9 +264,12 @@ const generatePrintPDF = (reservationData: DetailedReservation): void => {
         <tr>
           <td><strong>Service Type:</strong></td>
         </tr>
+        ${(reservationData.UserServices || []).map(service => `
         <tr>
-          <td>${serviceDetails}</td>
+          <td>Service: ${service.ServiceAvail}, Equipment: ${service.EquipmentAvail}, Duration: ${service.MinsAvail || 0} min</td>
         </tr>
+        `).join('')}
+        ${(reservationData.UserServices || []).length === 0 ? '<tr><td>No services selected</td></tr>' : ''}
       </table>
      
       <table>
@@ -352,6 +355,7 @@ const generatePrintPDF = (reservationData: DetailedReservation): void => {
   // Focus the new window
   printWindow.focus();
 };
+
 /**
  * Main function to generate and download a PDF for a reservation
  * @param reservationData - The reservation data
@@ -466,7 +470,7 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
       const result = autoTable(doc, {
         startY: yPosition,
         head: [],
-        body: clientTableData,
+        body: clientTableData as any,
         theme: 'grid',
         styles: { fontSize: 10 },
         margin: { left: margin, right: margin },
@@ -474,8 +478,8 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
           0: { cellWidth: contentWidth / 2 },
           1: { cellWidth: contentWidth / 2 }
         }
-      });
-      yPosition = (result?.finalY) ? result.finalY : 70;
+      }) as AutoTableResult;
+      yPosition = result && typeof result.finalY === 'number' ? result.finalY : 70;
     } catch (error) {
       console.error('Error in first autoTable:', error);
       yPosition = 70;
@@ -487,24 +491,60 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
     doc.setFont('helvetica', 'bold');
     doc.text('PROCESSING INFORMATION', margin + 2, yPosition + 5);
    
-    // Service type - using our helper function
-    const serviceDetails = getServiceDetailsString(safeServices);
-   
-    const serviceTableData: AutoTableColumnOption[][] = [
-      [{ content: 'Service Type:', styles: { fontStyle: 'bold' } }],
-      [{ content: serviceDetails }]
+    // Create completely separate tables for the service type header and each service
+    // First, add just the header
+    const serviceHeaderRows = [
+      [{ content: 'Service Type:', styles: { fontStyle: 'bold' } }]
     ];
-   
+    
     try {
-      const result = autoTable(doc, {
+      const headerResult = autoTable(doc, {
         startY: yPosition + 8,
         head: [],
-        body: serviceTableData,
+        body: serviceHeaderRows as any,
         theme: 'grid',
         styles: { fontSize: 10 },
         margin: { left: margin, right: margin }
+      }) as AutoTableResult;
+      
+      yPosition = headerResult && typeof headerResult.finalY === 'number' ? headerResult.finalY : (yPosition + 15);
+    } catch (error) {
+      console.error('Error in service header table:', error);
+      yPosition += 15;
+    }
+    
+    // Now add each service as a separate table row for better formatting
+    const serviceTableRows = [];
+    
+    if (safeServices.length === 0) {
+      serviceTableRows.push([{ content: 'No services selected' }]);
+    } else {
+      safeServices.forEach(service => {
+        serviceTableRows.push([{
+          content: `Service: ${service.ServiceAvail}, Equipment: ${service.EquipmentAvail}, Duration: ${service.MinsAvail || 0} min`
+        }]);
       });
-      yPosition = (result?.finalY) ? result.finalY : (yPosition + 15);
+    }
+   
+    // Now add the service details in a separate table
+    try {
+      const result = autoTable(doc, {
+        startY: yPosition,
+        head: [],
+        body: serviceTableRows as any,
+        theme: 'grid',
+        styles: { fontSize: 10 },
+        margin: { left: margin, right: margin, bottom: 0 },
+        willDrawCell: function(data) {
+          // Ensure text fits within cell by allowing wrapping
+          if (data.column.index === 0) {
+            data.cell.styles.cellPadding = 3;
+            data.cell.styles.overflow = 'linebreak';
+            data.cell.styles.cellWidth = 'wrap';
+          }
+        }
+      }) as AutoTableResult;
+      yPosition = result && typeof result.finalY === 'number' ? result.finalY : (yPosition + 15);
     } catch (error) {
       console.error('Error in service type table:', error);
       yPosition += 15;
@@ -520,12 +560,12 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
       const result = autoTable(doc, {
         startY: yPosition,
         head: [],
-        body: bulkTableData,
+        body: bulkTableData as any,
         theme: 'grid',
         styles: { fontSize: 10 },
         margin: { left: margin, right: margin }
-      });
-      yPosition = (result?.finalY) ? result.finalY : (yPosition + 20);
+      }) as AutoTableResult;
+      yPosition = result && typeof result.finalY === 'number' ? result.finalY : (yPosition + 20);
     } catch (error) {
       console.error('Error in bulk table:', error);
       yPosition += 20;
@@ -548,12 +588,12 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
       const result = autoTable(doc, {
         startY: yPosition,
         head: [],
-        body: toolsTableData,
+        body: toolsTableData as any,
         theme: 'grid',
         styles: { fontSize: 10 },
         margin: { left: margin, right: margin }
-      });
-      yPosition = (result?.finalY) ? result.finalY : (yPosition + 20);
+      }) as AutoTableResult;
+      yPosition = result && typeof result.finalY === 'number' ? result.finalY : (yPosition + 20);
     } catch (error) {
       console.error('Error in tools table:', error);
       yPosition += 20;
@@ -570,7 +610,7 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
       const result = autoTable(doc, {
         startY: yPosition,
         head: [],
-        body: requestDateTableData,
+        body: requestDateTableData as any,
         theme: 'grid',
         styles: { fontSize: 10 },
         margin: { left: margin, right: margin },
@@ -578,8 +618,8 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
           0: { cellWidth: contentWidth / 2 },
           1: { cellWidth: contentWidth / 2 }
         }
-      });
-      yPosition = (result?.finalY) ? result.finalY : (yPosition + 15);
+      }) as AutoTableResult;
+      yPosition = result && typeof result.finalY === 'number' ? result.finalY : (yPosition + 15);
     } catch (error) {
       console.error('Error in request date table:', error);
       yPosition += 15;
@@ -606,7 +646,7 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
       const result = autoTable(doc, {
         startY: yPosition,
         head: [],
-        body: day12TableData,
+        body: day12TableData as any,
         theme: 'grid',
         styles: { fontSize: 10 },
         margin: { left: margin, right: margin },
@@ -614,8 +654,8 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
           0: { cellWidth: contentWidth / 2 },
           1: { cellWidth: contentWidth / 2 }
         }
-      });
-      yPosition = (result?.finalY) ? result.finalY : (yPosition + 15);
+      }) as AutoTableResult;
+      yPosition = result && typeof result.finalY === 'number' ? result.finalY : (yPosition + 15);
     } catch (error) {
       console.error('Error in day12 table:', error);
       yPosition += 15;
@@ -635,7 +675,7 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
       const result = autoTable(doc, {
         startY: yPosition,
         head: [],
-        body: day34TableData,
+        body: day34TableData as any,
         theme: 'grid',
         styles: { fontSize: 10 },
         margin: { left: margin, right: margin },
@@ -643,8 +683,8 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
           0: { cellWidth: contentWidth / 2 },
           1: { cellWidth: contentWidth / 2 }
         }
-      });
-      yPosition = (result?.finalY) ? result.finalY : (yPosition + 15);
+      }) as AutoTableResult;
+      yPosition = result && typeof result.finalY === 'number' ? result.finalY : (yPosition + 15);
     } catch (error) {
       console.error('Error in day34 table:', error);
       yPosition += 15;
@@ -654,8 +694,8 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
     const currentDate = formatDate(new Date().toISOString());
     const processingTableData: AutoTableColumnOption[][] = [
       [
-        { content: 'Date the processing of request was done:\nRequest processed by:', styles: { fontStyle: 'bold', halign: 'right' } },
-        { content: 'Name and Signature of employee:', styles: { fontStyle: 'bold', halign: 'right' } }
+        { content: 'Date the processing of request was done:\nRequest processed by:', styles: { fontStyle: 'bold', halign: 'left' } },
+        { content: 'Name and Signature of employee:', styles: { fontStyle: 'bold', halign: 'left' } }
       ],
       [{ content: `${currentDate}\n${safeAccInfo.Name}` }, { content: '' }]
     ];
@@ -664,7 +704,7 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
       autoTable(doc, {
         startY: yPosition,
         head: [],
-        body: processingTableData,
+        body: processingTableData as any,
         theme: 'grid',
         styles: { fontSize: 10 },
         margin: { left: margin, right: margin },
