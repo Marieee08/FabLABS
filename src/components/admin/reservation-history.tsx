@@ -30,6 +30,8 @@ import {
 import { downloadPDF } from "@/components/admin-functions/utilization-request-pdf";
 import { downloadJobPaymentPDF } from "@/components/admin-functions/job-payment-pdf";
 import { downloadMachineUtilPDF } from "@/components/admin-functions/machine-utilization-pdf";
+import { downloadRegistrationFormPDF } from "@/components/admin-functions/registration-form-pdf";
+import { downloadLabRequestFormPDF } from "@/components/admin-functions/lab-request-form-pdf";
 
 interface UserService {
   id: string;
@@ -343,11 +345,86 @@ const handleGeneratePDF = async (
       }
       
       detailedData = await response.json();
+      console.log('EVC Reservation details for PDF generation:', detailedData);
       
-      // For EVC reservations, we need to handle them differently for PDFs
-      // Currently, just show an alert since we don't have EVC-specific PDF generation
-      alert('EVC PDF generation is not yet implemented');
-      return;
+      // For lab-request form specifically, we'll use the EVC data
+      if (formType === 'lab-request') {
+        // Format the needed materials into the required format
+        const materialItems = Array.isArray(detailedData.NeededMaterials) 
+          ? detailedData.NeededMaterials.map((material: any) => ({
+              quantity: material.MaterialQty?.toString() || '',
+              item: material.MaterialName || '',
+              description: material.MaterialDesc || '',
+              issuedCondition: '',
+              returnedCondition: ''
+            }))
+          : [];
+          
+        // Format student list
+        const studentList = Array.isArray(detailedData.EVCStudents)
+          ? detailedData.EVCStudents.map((student: any) => ({
+              name: student.StudentName || ''
+            }))
+          : [];
+          
+        // Format time from UtilTimes if available
+        let inclusiveTime = '';
+        if (Array.isArray(detailedData.UtilTimes) && detailedData.UtilTimes.length > 0) {
+          const firstTime = detailedData.UtilTimes[0];
+          if (firstTime.StartTime && firstTime.EndTime) {
+            const startTime = new Date(firstTime.StartTime);
+            const endTime = new Date(firstTime.EndTime);
+            inclusiveTime = `${startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+          }
+        }
+          
+        // Create lab request form data
+        const labRequestData = {
+          campus: 'Eastern Visayas Campus', // Default value
+          controlNo: detailedData.ControlNo?.toString() || '',
+          schoolYear: detailedData.SchoolYear?.toString() || new Date().getFullYear().toString(),
+          gradeLevel: detailedData.LvlSec || '',
+          numberOfStudents: detailedData.NoofStudents?.toString() || '',
+          subject: detailedData.Subject || '',
+          concurrentTopic: detailedData.Topic || '',
+          unit: '', // Not available in EVC data
+          teacherInCharge: detailedData.Teacher || '',
+          venue: '', // Not available in EVC data
+          inclusiveTimeOfUse: inclusiveTime,
+          date: detailedData.DateRequested ? new Date(detailedData.DateRequested).toLocaleDateString() : '',
+          materials: materialItems,
+          receivedBy: detailedData.ReceivedBy || '',
+          receivedAndInspectedBy: detailedData.InspectedBy || '',
+          receivedDate: detailedData.ReceivedDate ? new Date(detailedData.ReceivedDate).toLocaleDateString() : '',
+          inspectedDate: detailedData.InspectedDate ? new Date(detailedData.InspectedDate).toLocaleDateString() : '',
+          requestedBy: detailedData.accInfo?.Name || '',
+          dateRequested: detailedData.DateRequested ? new Date(detailedData.DateRequested).toLocaleDateString() : '',
+          students: studentList,
+          endorsedBy: detailedData.Teacher || '', // Using teacher as endorser
+          approvedBy: detailedData.ApprovedBy || ''
+        };
+          
+        try {
+          console.log('Generating lab request PDF with data:', labRequestData);
+          await downloadLabRequestFormPDF(labRequestData);
+        } catch (error) {
+          console.error('Error in lab request PDF generation:', error);
+          alert(`Error generating lab request PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+        
+        // After generating, close modal and trigger scroll fix
+        setIsPdfModalOpen(false);
+        setSelectedReservationId(null);
+        setNeedsScrollFix(true);
+        return;
+      } else {
+        // For other form types with EVC data, show not implemented message
+        alert(`${formType} PDF generation for EVC reservations is not yet implemented`);
+        setIsPdfModalOpen(false);
+        setSelectedReservationId(null);
+        setNeedsScrollFix(true);
+        return;
+      }
     } else {
       // It's a regular utilization reservation
       const response = await fetch(`/api/admin/reservation-review/${reservationId}`);
@@ -482,9 +559,124 @@ const handleGeneratePDF = async (
         break;
         
       case 'registration':
+        try {
+          // Create registration form data from reservation details
+          if (!detailedData.accInfo?.BusinessInfo) {
+            alert('Cannot generate registration form: No business information available');
+            break;
+          }
+          
+          const businessInfo = detailedData.accInfo.BusinessInfo;
+          
+          // Create client info list - at least add the current user
+          const clientInfoList = [{
+            Name: detailedData.accInfo.Name || '',
+            CompanyIDNo: businessInfo.CompanyIDNum || '',
+            TINNo: businessInfo.TINNum || '',
+            ContactNo: detailedData.accInfo.ClientInfo?.ContactNum || '',
+            Address: detailedData.accInfo.ClientInfo?.Address || '',
+            City: detailedData.accInfo.ClientInfo?.City || '',
+            Province: detailedData.accInfo.ClientInfo?.Province || '',
+            ZipCode: detailedData.accInfo.ClientInfo?.Zipcode?.toString() || ''
+          }];
+          
+          const registrationData = {
+            businessInfo: {
+              CompanyName: businessInfo.CompanyName || '',
+              BusinessOwner: businessInfo.BusinessOwner || '',
+              BusinessPermitNo: businessInfo.BusinessPermitNum || '',
+              TINNo: businessInfo.TINNum || '',
+              Email: businessInfo.CompanyEmail || '',
+              ContactPerson: businessInfo.ContactPerson || '',
+              PositionDesignation: businessInfo.Designation || '',
+              CompanyAddress: businessInfo.CompanyAddress || '',
+              City: businessInfo.CompanyCity || '',
+              Province: businessInfo.CompanyProvince || '',
+              ZipCode: businessInfo.CompanyZipcode?.toString() || '',
+              PhoneNo: businessInfo.CompanyPhoneNum || '',
+              MobileNo: businessInfo.CompanyMobileNum || '',
+              CommodityManufactured: businessInfo.Manufactured || '',
+              ProductionFrequency: businessInfo.ProductionFrequency || '',
+              BulkOfCommodity: businessInfo.Bulk || detailedData.BulkofCommodity || ''
+            },
+            clientInfoList: clientInfoList,
+            numberOfClients: 1 // Default to 1 for now
+          };
+          
+          console.log('Registration form data before PDF generation:', registrationData);
+          await downloadRegistrationFormPDF(registrationData);
+        } catch (error) {
+          console.error('Error in registration form PDF generation:', error);
+          alert(`Error generating registration form: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+        break;
+        
       case 'lab-request':
-        // For forms that don't have implemented functions yet
-        alert(`${formType} PDF generation not yet implemented`);
+        // For normal utilization reservations, create a basic lab request form
+        try {
+          // Format time from UtilTimes if available
+          let inclusiveTime = '';
+          if (Array.isArray(detailedData.UtilTimes) && detailedData.UtilTimes.length > 0) {
+            const firstTime = detailedData.UtilTimes[0];
+            if (firstTime.StartTime && firstTime.EndTime) {
+              const startTime = new Date(firstTime.StartTime);
+              const endTime = new Date(firstTime.EndTime);
+              inclusiveTime = `${startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+            }
+          }
+          
+          // Create material items from UserServices and UserTools
+          const materialItems = [
+            // Convert services to materials
+            ...detailedData.UserServices.map((service: any) => ({
+              quantity: '1',
+              item: service.ServiceAvail || '',
+              description: service.EquipmentAvail || '',
+              issuedCondition: '',
+              returnedCondition: ''
+            })),
+            // Add tools as materials
+            ...detailedData.UserTools.map((tool: any) => ({
+              quantity: tool.ToolQuantity?.toString() || '1',
+              item: tool.ToolUser || '',
+              description: '',
+              issuedCondition: '',
+              returnedCondition: ''
+            }))
+          ];
+          
+          // Create a basic lab request form for non-EVC reservations
+          const labRequestData = {
+            campus: 'Eastern Visayas Campus', // Default value
+            controlNo: `U-${detailedData.id}`,
+            schoolYear: new Date().getFullYear().toString(),
+            gradeLevel: '', // Not applicable for regular utilization
+            numberOfStudents: '1', // Default to 1 for regular utilization
+            subject: '', // Not applicable for regular utilization
+            concurrentTopic: '', // Not applicable for regular utilization
+            unit: '', // Not applicable for regular utilization
+            teacherInCharge: '', // Not applicable for regular utilization
+            venue: 'Fabrication Laboratory',
+            inclusiveTimeOfUse: inclusiveTime,
+            date: new Date(detailedData.RequestDate).toLocaleDateString(),
+            materials: materialItems,
+            receivedBy: '',
+            receivedAndInspectedBy: '',
+            receivedDate: '',
+            inspectedDate: '',
+            requestedBy: detailedData.accInfo?.Name || '',
+            dateRequested: new Date(detailedData.RequestDate).toLocaleDateString(),
+            students: [{ name: detailedData.accInfo?.Name || '' }],
+            endorsedBy: '',
+            approvedBy: ''
+          };
+          
+          console.log('Lab request data for regular utilization:', labRequestData);
+          await downloadLabRequestFormPDF(labRequestData);
+        } catch (error) {
+          console.error('Error in lab request PDF generation for regular utilization:', error);
+          alert(`Error generating lab request PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
         break;
         
       default:
