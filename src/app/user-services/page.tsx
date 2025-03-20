@@ -7,9 +7,9 @@ import Link from "next/link";
 import { useRouter } from 'next/navigation';
 import PricingTable from '@/components/admin-functions/price-table';
 import Navbar from '@/components/custom/navbar';
-import { AlertCircle, Clock, BadgeX, X, Info, Loader } from 'lucide-react';
+import { AlertCircle, Clock, BadgeX, X, Info, Loader, Calendar as CalendarIcon } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
-
+import MachineCalendar from '@/components/user/machine-calendar';
 interface Machine {
   id: string;
   Machine: string;
@@ -63,6 +63,9 @@ export default function Services() {
   const [isLoading, setIsLoading] = useState(false);
   const [isMachinesLoading, setIsMachinesLoading] = useState(true);
   const pricingRef = useRef<HTMLElement>(null);
+  
+  // New state for calendar modal
+  const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
 
   const handleButtonClick = () => {
     setIsModalOpen(true);
@@ -74,6 +77,15 @@ export default function Services() {
 
   const handleCloseMissingInfoModal = () => {
     setIsMissingInfoModalOpen(false);
+  };
+  
+  // New handlers for calendar
+  const handleOpenCalendar = () => {
+    setIsCalendarModalOpen(true);
+  };
+
+  const handleCloseCalendar = () => {
+    setIsCalendarModalOpen(false);
   };
   
   useEffect(() => {
@@ -245,7 +257,7 @@ export default function Services() {
         <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-1/2 bg-white rounded-3xl shadow-xl p-8 w-11/12 max-w-4xl z-10">
           <h2 className="mb-4 text-center block text-3xl md:text-2xl font-qanelas2">Avail a service now!</h2>
           <p className="text-gray-700 mb-8 text-center text-md font-poppins1 mb-5">Check out the latest updates on machine availability and maintenance.</p>
-          <div className="text-center">
+          <div className="text-center space-x-4">
             <button 
               onClick={handleScheduleClick} 
               className="inline-block transition duration-700 
@@ -253,6 +265,16 @@ export default function Services() {
                 bg-[#193d83] text-white font-qanelas1 text-lg py-1 px-6 rounded-md hover:bg-[#2f61c2]"
             >
               Schedule Service
+            </button>
+            <button 
+              onClick={handleOpenCalendar} 
+              className="inline-block transition duration-700 
+                hover:scale-105
+                bg-[#eef2f7] text-[#193d83] font-qanelas1 text-lg py-1 px-6 rounded-md hover:bg-[#dce6f5] border border-[#193d83]"
+            >
+              <span className="flex items-center">
+                <CalendarIcon className="w-5 h-5 mr-2" /> View Availability
+              </span>
             </button>
           </div>
         </div>
@@ -331,21 +353,29 @@ export default function Services() {
                   <p className="text-gray-600 mb-4 line-clamp-3 font-poppins1 text-md">
                     {machine.Desc}
                   </p>
-                  <button
-                    onClick={() => openModal(machine)}
-                    className={`w-full py-3 px-6 rounded-full transition duration-300 flex items-center justify-center gap-2 font-poppins1 ${
-                      !machine.isAvailable 
-                        ? 'bg-gray-400 text-white opacity-50 cursor-not-allowed' 
-                        : 'bg-[#1c62b5] text-white hover:bg-[#154c8f] hover:shadow-lg'
-                    }`}
-                    disabled={!machine.isAvailable}
-                  >
-                    {machine.isAvailable ? (
-                      <>Learn More</>
-                    ) : (
-                      <><AlertCircle size={20} /> Unavailable</>
-                    )}
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => openModal(machine)}
+                      className={`flex-1 py-3 px-4 rounded-full transition duration-300 flex items-center justify-center gap-2 font-poppins1 ${
+                        !machine.isAvailable 
+                          ? 'bg-gray-400 text-white opacity-50 cursor-not-allowed' 
+                          : 'bg-[#1c62b5] text-white hover:bg-[#154c8f] hover:shadow-lg'
+                      }`}
+                      disabled={!machine.isAvailable}
+                    >
+                      {machine.isAvailable ? (
+                        <>Learn More</>
+                      ) : (
+                        <><AlertCircle size={20} /> Unavailable</>
+                      )}
+                    </button>
+                    <button
+                      onClick={handleOpenCalendar}
+                      className="py-3 px-4 rounded-full transition duration-300 flex items-center justify-center gap-2 font-poppins1 bg-[#eef2f7] text-[#1c62b5] hover:bg-[#dce6f5] hover:shadow-md"
+                    >
+                      <CalendarIcon size={18} />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -466,6 +496,20 @@ export default function Services() {
                   Update Information
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Calendar Modal */}
+        {isCalendarModalOpen && (
+          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+            <div className="bg-white rounded-lg shadow-lg p-6 max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between mb-4">
+              </div>
+              <MachineCalendar 
+                machines={machines}
+                onClose={handleCloseCalendar}
+              />
             </div>
           </div>
         )}
