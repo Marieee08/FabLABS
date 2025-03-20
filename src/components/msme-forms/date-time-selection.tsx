@@ -14,12 +14,6 @@ interface DateTimeSelectionProps {
   isDateBlocked: (date: Date) => boolean;
 }
 
-interface Day {
-  date: Date;
-  startTime: string | null;
-  endTime: string | null;
-}
-
 const MAX_DATES = 5;
 
 // Helper functions
@@ -43,6 +37,8 @@ function formatTime(hour: string, minute: string): string {
 
 export default function DateTimeSelection({ formData, setFormData, nextStep, isDateBlocked }: DateTimeSelectionProps) {
   const [errors, setErrors] = useState<string[]>([]);
+  // Track which individual day is being edited to prevent propagation to other days
+  const [editingDayIndex, setEditingDayIndex] = useState<number | null>(null);
 
   const validateTimes = () => {
     const newErrors: string[] = [];
@@ -120,33 +116,46 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
   };
 
   // Handle unified time changes
-  const handleUnifiedTimeChange = (time: string, field: 'unifiedStartTime' | 'unifiedEndTime') => {
+  const handleUnifiedTimeChange = (time: string, field: 'startTime' | 'endTime') => {
     setFormData(prevData => {
-      // Update all days with the new time when sync is enabled
-      const updatedDays = prevData.days.map(day => ({
-        ...day,
-        [field === 'unifiedStartTime' ? 'startTime' : 'endTime']: time
-      }));
-     
-      return {
-        ...prevData,
-        [field]: time,
-        days: updatedDays
-      };
+      // Only update the unified time field without automatically propagating to individual days
+      if (field === 'startTime') {
+        return {
+          ...prevData,
+          unifiedStartTime: time,
+          // When sync is on, also update all days
+          days: prevData.syncTimes ? prevData.days.map(day => ({
+            ...day,
+            startTime: time
+          })) : prevData.days
+        };
+      } else {
+        return {
+          ...prevData,
+          unifiedEndTime: time,
+          // When sync is on, also update all days
+          days: prevData.syncTimes ? prevData.days.map(day => ({
+            ...day,
+            endTime: time
+          })) : prevData.days
+        };
+      }
     });
   };
 
-  // Handle individual time changes
+  // Handle individual time changes - fixed to prevent unwanted propagation
   const handleIndividualTimeChange = (time: string, field: 'startTime' | 'endTime', index: number) => {
+    setEditingDayIndex(index);
+    
     setFormData(prevData => {
       const updatedDays = [...prevData.days];
-     
+      
       if (prevData.syncTimes) {
-        // If sync is enabled, update all days
+        // If sync is enabled, update all days AND the unified time
         updatedDays.forEach(day => {
           day[field] = time;
         });
-       
+        
         return {
           ...prevData,
           [field === 'startTime' ? 'unifiedStartTime' : 'unifiedEndTime']: time,
@@ -167,29 +176,32 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
     });
   };
 
-  // Handle sync toggle
+  // Handle sync toggle with improved logic
   const handleSyncToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newSyncState = e.target.checked;
-   
+    
     setFormData(prevData => {
       let newStartTime = prevData.unifiedStartTime;
       let newEndTime = prevData.unifiedEndTime;
-     
-      if (newSyncState && prevData.days.length > 0) {
-        // If unified times aren't set, use the first day's times or default to null
-        if (!newStartTime || !newEndTime) {
-          const firstDay = prevData.days[0];
-          newStartTime = firstDay.startTime;
-          newEndTime = firstDay.endTime;
+      
+      // When enabling sync
+      if (newSyncState) {
+        // If unified times aren't set, use the first day's times as default
+        if ((!newStartTime || newStartTime === '--:-- AM') && prevData.days.length > 0) {
+          newStartTime = prevData.days[0].startTime;
         }
-       
-        // Apply these times to all existing dates
+        
+        if ((!newEndTime || newEndTime === '--:-- PM') && prevData.days.length > 0) {
+          newEndTime = prevData.days[0].endTime;
+        }
+        
+        // Apply unified times to all days
         const updatedDays = prevData.days.map(day => ({
           ...day,
           startTime: newStartTime,
           endTime: newEndTime
         }));
-       
+        
         return {
           ...prevData,
           syncTimes: newSyncState,
@@ -198,7 +210,8 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
           days: updatedDays
         };
       }
-     
+      
+      // When disabling sync, keep current times but don't auto-propagate changes
       return {
         ...prevData,
         syncTimes: newSyncState,
@@ -221,16 +234,23 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
 
     const dateString = date.toDateString();
     const isAlreadySelected = formData.days.some(day => new Date(day.date).toDateString() === dateString);
-   
+    
     return !isAlreadySelected && formData.days.length >= MAX_DATES;
   };
+
+  // Clear editing index when switching away
+  useEffect(() => {
+    return () => {
+      setEditingDayIndex(null);
+    };
+  }, []);
 
   return (
     <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 pt-0 flex flex-col">
       {/* Calendar and Error Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-10 mt-6 flex-grow"> 
         <div className="space-y-4 md:space-y-6 h-full">
-          <div className="bg-white p-3 sm:p-6 rounded-lg shadow-sm border border-gray-200 h-[645px]">
+        <div className="bg-white p-3 sm:p-6 rounded-lg shadow-sm border border-gray-200 h-[645px]">
             <h3 className="text-xl font-medium text-gray-800 mb-3 flex items-center">
               <CheckCircle className="h-5 w-5 text-blue-600 mr-2" /> Select Available Dates
             </h3>
@@ -245,7 +265,7 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
                     addNewDay(selectedDay);
                   }
                 }}
-                disabled={date => isDateDisabled(date) || isDateBlocked(date)}
+                disabled={(date) => isDateDisabled(date) || isDateBlocked(date)}
                 className="w-full"
                 styles={{
                   day: { width: 'auto', height: 'auto', minWidth: '2rem', minHeight: '2rem' },
@@ -310,13 +330,13 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
                     required
                     label="Start Time"
                     value={formData.unifiedStartTime}
-                    onChange={(time) => handleUnifiedTimeChange(time, 'unifiedStartTime')}
+                    onChange={(time) => handleUnifiedTimeChange(time, 'startTime')}
                   />
                   <TimePicker
                     required
                     label="End Time"
                     value={formData.unifiedEndTime}
-                    onChange={(time) => handleUnifiedTimeChange(time, 'unifiedEndTime')}
+                    onChange={(time) => handleUnifiedTimeChange(time, 'endTime')}
                     startTime={formData.unifiedStartTime}
                     isEndTime={true}
                   />
@@ -332,52 +352,56 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
                 <h3 className="text-lg font-medium text-gray-800 flex items-center">
                   <Clock className="h-5 w-5 text-blue-600 mr-2" /> Selected Dates & Times
                 </h3>
-                      
+                        
                 <div className="max-h-[330px] overflow-y-auto">
                   <div className="max-h-full overflow-y-auto pr-2 space-y-3">
                     {[...formData.days]
                       .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
                       .map((day, index) => (
                         <Card key={new Date(day.date).toISOString()} className="bg-white border-gray-200">
-                          <CardContent className="p-4">
-                            <h4 className="text-md font-semibold text-blue-800 mb-3">
-                              {new Date(day.date).toLocaleDateString('en-US', { 
-                                weekday: 'short', 
-                                month: 'short', 
-                                day: 'numeric'
-                              })}
-                            </h4>
-                            
-                            {!formData.syncTimes ? (
-                              <div className="grid grid-cols-2 gap-4">
-                                <TimePicker
-                                  required
-                                  label="Start Time"
-                                  value={day.startTime}
-                                  onChange={(time) => handleIndividualTimeChange(time, 'startTime', index)}
-                                />
-                                <TimePicker
-                                  required
-                                  label="End Time"
-                                  value={day.endTime}
-                                  onChange={(time) => handleIndividualTimeChange(time, 'endTime', index)}
-                                  startTime={day.startTime}
-                                  isEndTime={true}
-                                />
+                        <CardContent className="p-4">
+                          <h4 className="text-md font-semibold text-blue-800 mb-3">
+                            {new Date(day.date).toLocaleDateString('en-US', { 
+                              weekday: 'short', 
+                              month: 'short', 
+                              day: 'numeric'
+                            })}
+                          </h4>
+                          
+                          {!formData.syncTimes ? (
+                            <div className="grid grid-cols-2 gap-4">
+                              <TimePicker
+                                required
+                                label="Start Time"
+                                value={day.startTime}
+                                onChange={(time) => handleIndividualTimeChange(time, 'startTime', index)}
+                                isEditing={editingDayIndex === index}
+                                onFocus={() => setEditingDayIndex(index)}
+                              />
+                              <TimePicker
+                                required
+                                label="End Time"
+                                value={day.endTime}
+                                onChange={(time) => handleIndividualTimeChange(time, 'endTime', index)}
+                                startTime={day.startTime}
+                                isEndTime={true}
+                                isEditing={editingDayIndex === index}
+                                onFocus={() => setEditingDayIndex(index)}
+                              />
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-md h-full items-center">
+                              <div className="pb-1.5 pt-1.5">
+                                <p className="text-sm font-medium text-gray-700">Start Time</p>
+                                <p className="mt-1 text-blue-700">{day.startTime || 'Not set'}</p>
                               </div>
-                            ) : (
-                              <div className="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-md h-full items-center">
-                                <div className="pb-1.5 pt-1.5">
-                                  <p className="text-sm font-medium text-gray-700">Start Time</p>
-                                  <p className="mt-1 text-blue-700">{day.startTime || 'Not set'}</p>
-                                </div>
-                                <div className="pb-1.5 pt-1.5">
-                                  <p className="text-sm font-medium text-gray-700">End Time</p>
-                                  <p className="mt-1 text-blue-700">{day.endTime || 'Not set'}</p>
-                                </div>
+                              <div className="pb-1.5 pt-1.5">
+                                <p className="text-sm font-medium text-gray-700">End Time</p>
+                                <p className="mt-1 text-blue-700">{day.endTime || 'Not set'}</p>
                               </div>
-                            )}
-                          </CardContent>
+                            </div>
+                          )}
+                        </CardContent>
                         </Card>
                       ))}
                   </div>
@@ -393,8 +417,20 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
         </div>
       </div>
       
+      {/* Error messages */}
+      {errors.length > 0 && (
+        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
+          <h4 className="text-red-600 font-medium mb-1">Please fix the following issues:</h4>
+          <ul className="list-disc pl-5 text-sm text-red-700">
+            {errors.map((error, index) => (
+              <li key={index}>{error}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      
       {/* Navigation buttons */}
-      <div className="mt-4 flex justify-end">
+      <div className="mt-4 flex justify-end">  {/* Reduced margin */}
         <Button
           onClick={handleNext}
           className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium"
@@ -403,42 +439,54 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
           Continue to Next Step
         </Button>
       </div>
-
-      {/* Error display */}
-      {errors.length > 0 && (
-        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
-          <ul className="text-red-600 text-sm">
-            {errors.map((error, index) => (
-              <li key={index}>{error}</li>
-            ))}
-          </ul>
-        </div>
-      )}
     </div>
   );
 }
 
-// TimePicker Component
-interface TimePickerProps {
-  label: string;
-  value: string | null;
-  onChange: (time: string) => void;
-  startTime?: string | null;
-  isEndTime?: boolean;
-  required?: boolean;
-}
-
+// TimePicker Component - Improved to prevent cascading validation errors
 function TimePicker({
   label,
   value,
   onChange,
   startTime,
   isEndTime = false,
-  required = true
-}: TimePickerProps) {
-  const isFirstSelection = React.useRef(true);
+  required = true,
+  isEditing = false,
+  onFocus = () => {}
+}: {
+  label: string;
+  value: string | null;
+  onChange: (time: string) => void;
+  startTime?: string | null;
+  isEndTime?: boolean;
+  required?: boolean;
+  isEditing?: boolean;
+  onFocus?: () => void;
+}) {
+  const timePickerRef = React.useRef<HTMLDivElement>(null);
   const [showError, setShowError] = React.useState(false);
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = React.useState(false);
+  const [isInvalid, setIsInvalid] = React.useState(false);
+  const hasRendered = React.useRef(false);
+
+  // Parse the incoming time value
+  const parseTime = (timeString: string | null): { hour: string; minute: string } => {
+    if (!timeString || timeString === '--:-- AM' || timeString === '--:-- PM') {
+      return { hour: '--', minute: '--' };
+    }
+   
+    const match = timeString.match(/(\d{1,2}):(\d{2}) (AM|PM)/);
+    if (match) {
+      const [_, hours, minutes, period] = match;
+      const hour = `${hours.padStart(2, '0')} ${period}`;
+      return { hour, minute: minutes };
+    }
+    return { hour: '--', minute: '--' };
+  };
+
+  // Local state for hour and minute values
+  const [localHour, setLocalHour] = React.useState<string>(() => parseTime(value).hour);
+  const [localMinute, setLocalMinute] = React.useState<string>(() => parseTime(value).minute);
 
   // Listen for validation attempts from parent
   React.useEffect(() => {
@@ -458,6 +506,7 @@ function TimePicker({
     };
   }, []);
 
+  // Validate time order only when relevant
   const validateTimeOrder = React.useCallback((currentTime: string) => {
     if (!isEndTime || !startTime) return false;
 
@@ -468,23 +517,10 @@ function TimePicker({
     return endMinutes <= startMinutes;
   }, [isEndTime, startTime]);
 
-  const parseTime = (timeString: string | null): { hour: string; minute: string } => {
-    if (!timeString || timeString === '--:-- AM' || timeString === '--:-- PM') {
-      return { hour: '--', minute: '--' };
-    }
-   
-    const match = timeString.match(/(\d{1,2}):(\d{2}) (AM|PM)/);
-    if (match) {
-      const [_, hours, minutes, period] = match;
-      const hour = `${hours.padStart(2, '0')} ${period}`;
-      return { hour, minute: minutes };
-    }
-    return { hour: '--', minute: '--' };
+  // Focus handler to indicate which time picker is being edited
+  const handleFocus = () => {
+    onFocus();
   };
-
-  const [localHour, setLocalHour] = React.useState<string>(() => parseTime(value).hour);
-  const [localMinute, setLocalMinute] = React.useState<string>(() => parseTime(value).minute);
-  const [isInvalid, setIsInvalid] = React.useState(false);
 
   // Listen for parent validation triggers
   React.useEffect(() => {
@@ -493,16 +529,26 @@ function TimePicker({
     }
   }, [hasAttemptedSubmit, required, localHour, localMinute]);
 
+  // Handle hour changes with validation
   const handleHourChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newHour = e.target.value;
     setLocalHour(newHour);
-   
+    
+    onFocus(); // Set this time picker as being edited
+    
     if (newHour !== '--') {
-      // Automatically set minutes to '00' when hour is selected
-      setLocalMinute('00');
-      const formattedTime = formatTime(newHour, '00');
-      setIsInvalid(validateTimeOrder(formattedTime));
-      onChange(formattedTime);
+      // If minute is not set, default to '00'
+      const minuteToUse = localMinute === '--' ? '00' : localMinute;
+      setLocalMinute(minuteToUse);
+      
+      const formattedTime = formatTime(newHour, minuteToUse);
+      const newIsInvalid = validateTimeOrder(formattedTime);
+      setIsInvalid(newIsInvalid);
+      
+      if (!newIsInvalid) {
+        onChange(formattedTime);
+      }
+      
       if (hasAttemptedSubmit) {
         setShowError(false);
       }
@@ -513,18 +559,24 @@ function TimePicker({
         setShowError(true);
       }
     }
-   
-    isFirstSelection.current = false;
   };
 
+  // Handle minute changes with validation
   const handleMinuteChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newMinute = e.target.value;
     setLocalMinute(newMinute);
-   
+    
+    onFocus(); // Set this time picker as being edited
+    
     if (localHour !== '--' && newMinute !== '--') {
       const formattedTime = formatTime(localHour, newMinute);
-      setIsInvalid(validateTimeOrder(formattedTime));
-      onChange(formattedTime);
+      const newIsInvalid = validateTimeOrder(formattedTime);
+      setIsInvalid(newIsInvalid);
+      
+      if (!newIsInvalid) {
+        onChange(formattedTime);
+      }
+      
       if (hasAttemptedSubmit) {
         setShowError(false);
       }
@@ -535,23 +587,27 @@ function TimePicker({
         setShowError(true);
       }
     }
-   
-    isFirstSelection.current = false;
   };
 
-  // Sync with parent value changes
+  // Sync with parent value changes, but only when not actively editing
   React.useEffect(() => {
-    if (!isFirstSelection.current) {
+    if (hasRendered.current && !isEditing && value) {
       const parsed = parseTime(value);
       setLocalHour(parsed.hour);
       setLocalMinute(parsed.minute);
     }
-  }, [value]);
+    
+    // Mark component as rendered after first render
+    if (!hasRendered.current) {
+      hasRendered.current = true;
+    }
+  }, [value, isEditing]);
 
-  // Validate on startTime changes
+  // Validate on startTime changes for end time pickers
   React.useEffect(() => {
     if (value && startTime && isEndTime) {
-      setIsInvalid(validateTimeOrder(value));
+      const newIsInvalid = validateTimeOrder(value);
+      setIsInvalid(newIsInvalid);
     }
   }, [startTime, value, isEndTime, validateTimeOrder]);
 
@@ -572,7 +628,7 @@ function TimePicker({
   `;
 
   return (
-    <div>
+    <div ref={timePickerRef} onFocus={handleFocus}>
       <label className="block text-sm font-medium text-gray-700 mb-1">
         {label}
         {required && <span className="text-red-500 ml-1">*</span>}
