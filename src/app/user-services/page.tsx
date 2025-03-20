@@ -1,5 +1,3 @@
-// /user-services/page.tsx
-
 "use client";
 
 import React, { useEffect, useState, useRef } from 'react';
@@ -10,6 +8,7 @@ import Navbar from '@/components/custom/navbar';
 import { AlertCircle, Clock, BadgeX, X, Info, Loader, Calendar as CalendarIcon } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
 import MachineCalendar from '@/components/user/machine-calendar';
+
 interface Machine {
   id: string;
   Machine: string;
@@ -64,7 +63,7 @@ export default function Services() {
   const [isMachinesLoading, setIsMachinesLoading] = useState(true);
   const pricingRef = useRef<HTMLElement>(null);
   
-  // New state for calendar modal
+  // Only use one state for calendar modal
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
 
   const handleButtonClick = () => {
@@ -79,7 +78,7 @@ export default function Services() {
     setIsMissingInfoModalOpen(false);
   };
   
-  // New handlers for calendar
+  // Calendar handlers
   const handleOpenCalendar = () => {
     setIsCalendarModalOpen(true);
   };
@@ -266,16 +265,6 @@ export default function Services() {
             >
               Schedule Service
             </button>
-            <button 
-              onClick={handleOpenCalendar} 
-              className="inline-block transition duration-700 
-                hover:scale-105
-                bg-[#eef2f7] text-[#193d83] font-qanelas1 text-lg py-1 px-6 rounded-md hover:bg-[#dce6f5] border border-[#193d83]"
-            >
-              <span className="flex items-center">
-                <CalendarIcon className="w-5 h-5 mr-2" /> View Availability
-              </span>
-            </button>
           </div>
         </div>
       </div>
@@ -283,13 +272,20 @@ export default function Services() {
       <div className="pt-40">
         <section className="container mx-auto px-10 pb-10 pt-4">
           <div className="flex justify-between items-center mb-4">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center mb-2">
               <h2 className="text-3xl font-qanelas2">Machines</h2>
               <button
                 onClick={handleButtonClick}
                 className="font-semibold text-ms bg-blue-100 border border-[#5e86ca] rounded-full text-blue-800 ml-4 px-4 py-1 hover:bg-[#154c8f] hover:text-white transition duration-300"
               >
                 See Prices
+              </button>
+              {/* Added "View Availability" button here */}
+              <button
+                onClick={handleOpenCalendar}
+                className="font-semibold text-ms bg-blue-100 border border-[#5e86ca] rounded-full text-blue-800 ml-4 px-4 py-1 hover:bg-[#154c8f] hover:text-white transition duration-300 flex items-center"
+              >
+                <CalendarIcon className="w-4 h-4 mr-1" /> View Availability
               </button>
             </div>
 
@@ -353,10 +349,11 @@ export default function Services() {
                   <p className="text-gray-600 mb-4 line-clamp-3 font-poppins1 text-md">
                     {machine.Desc}
                   </p>
-                  <div className="flex gap-2">
+                  <div>
+                    {/* Changed to full-width button without the calendar icon */}
                     <button
                       onClick={() => openModal(machine)}
-                      className={`flex-1 py-3 px-4 rounded-full transition duration-300 flex items-center justify-center gap-2 font-poppins1 ${
+                      className={`w-full py-3 px-4 rounded-full transition duration-300 flex items-center justify-center gap-2 font-poppins1 ${
                         !machine.isAvailable 
                           ? 'bg-gray-400 text-white opacity-50 cursor-not-allowed' 
                           : 'bg-[#1c62b5] text-white hover:bg-[#154c8f] hover:shadow-lg'
@@ -368,12 +365,6 @@ export default function Services() {
                       ) : (
                         <><AlertCircle size={20} /> Unavailable</>
                       )}
-                    </button>
-                    <button
-                      onClick={handleOpenCalendar}
-                      className="py-3 px-4 rounded-full transition duration-300 flex items-center justify-center gap-2 font-poppins1 bg-[#eef2f7] text-[#1c62b5] hover:bg-[#dce6f5] hover:shadow-md"
-                    >
-                      <CalendarIcon size={18} />
                     </button>
                   </div>
                 </div>
@@ -500,15 +491,29 @@ export default function Services() {
           </div>
         )}
 
-        {/* Calendar Modal */}
+        {/* Calendar Modal - Updated to close when clicking outside */}
         {isCalendarModalOpen && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-            <div className="bg-white rounded-lg shadow-lg p-6 max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-              <div className="flex items-center justify-between mb-4">
+          <div 
+            className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4"
+            onClick={handleCloseCalendar} // Close when clicking the backdrop
+          >
+            <div 
+              className="bg-white rounded-lg shadow-lg p-4 max-w-5xl w-full h-auto max-h-[90vh] flex flex-col"
+              onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside the modal
+            >
+              <div className="flex items-center justify-between mb-2 flex-shrink-0">
+                <h2 className="text-xl font-bold font-qanelas2">Machine Availability Calendar</h2>
+                <button
+                  onClick={handleCloseCalendar}
+                  className="text-gray-500 hover:text-gray-700 transition duration-300"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
               <MachineCalendar 
                 machines={machines}
                 onClose={handleCloseCalendar}
+                isOpen={true} // Always true when modal is open
               />
             </div>
           </div>
