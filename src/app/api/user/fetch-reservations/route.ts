@@ -1,5 +1,4 @@
-/* api/user/fetch-reservations/route.ts */
-
+// src\app\api\user\fetch-reservations\route.ts
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
@@ -34,6 +33,7 @@ export async function GET() {
         UserServices: true,
         UtilTimes: true,
         UserTools: true,
+        MachineUtilizations: true, // Include machine utilizations
         accInfo: {
           select: {
             Name: true,

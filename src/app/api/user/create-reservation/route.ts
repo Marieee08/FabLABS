@@ -1,4 +1,4 @@
-// app/api/user/create-reservation/route.ts
+// src\app\api\user\create-reservation\route.ts
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
@@ -41,6 +41,8 @@ export async function POST(request: Request) {
       ? data.ProductsManufactured 
       : [data.ProductsManufactured].filter(Boolean);
       
+    console.log('Selected services:', selectedServices);
+    
     // Fetch the machines associated with these services
     const serviceWithMachines = await prisma.service.findMany({
       where: {
@@ -56,6 +58,29 @@ export async function POST(request: Request) {
         }
       }
     });
+    
+    // Log for debugging
+    console.log(`Found ${serviceWithMachines.length} services with their machines`);
+    
+    // Create an array to hold all machines for each service
+    const machinesToCreate = [];
+
+    // For each service, find all the associated machines
+    serviceWithMachines.forEach(service => {
+      console.log(`Service: ${service.Service} has ${service.Machines.length} machines`);
+      
+      // Add each machine for this service to our array
+      service.Machines.forEach(machineService => {
+        machinesToCreate.push({
+          Machine: machineService.machine.Machine,
+          MachineApproval: false,
+          DateReviewed: null,
+          ServiceName: service.Service
+        });
+      });
+    });
+
+    console.log(`Total machines to create: ${machinesToCreate.length}`);
 
     // Create the reservation with all related records
     const utilReq = await prisma.utilReq.create({
@@ -107,15 +132,9 @@ export async function POST(request: Request) {
           }))
         },
         
-        // Create MachineUtilization entries for each machine associated with selected services
+        // Create MachineUtilization entries for all machines associated with selected services
         MachineUtilizations: {
-          create: serviceWithMachines.flatMap(service => 
-            service.Machines.map(machineService => ({
-              Machine: machineService.machine.Machine,
-              MachineApproval: false, // Default to not approved
-              DateReviewed: null // Will be set when reviewed
-            }))
-          )
+          create: machinesToCreate
         }
       },
       include: {
