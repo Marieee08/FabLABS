@@ -1,3 +1,4 @@
+// app/api/user/create-reservation/route.ts
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
@@ -34,6 +35,27 @@ export async function POST(request: Request) {
 
     // Parse the total cost from the request data
     const totalAmountDue = parseFloat(data.totalCost) || 0;
+
+    // Get the services selected by the user
+    const selectedServices = Array.isArray(data.ProductsManufactured) 
+      ? data.ProductsManufactured 
+      : [data.ProductsManufactured].filter(Boolean);
+      
+    // Fetch the machines associated with these services
+    const serviceWithMachines = await prisma.service.findMany({
+      where: {
+        Service: {
+          in: selectedServices
+        }
+      },
+      include: {
+        Machines: {
+          include: {
+            machine: true
+          }
+        }
+      }
+    });
 
     // Create the reservation with all related records
     const utilReq = await prisma.utilReq.create({
@@ -76,12 +98,32 @@ export async function POST(request: Request) {
             StartTime: combineDateAndTime(day.date, day.startTime),
             EndTime: combineDateAndTime(day.date, day.endTime),
           }))
+        },
+        
+        // Create ServiceAvailed entries for each selected service
+        ServiceAvailed: {
+          create: selectedServices.map((service: string) => ({
+            service
+          }))
+        },
+        
+        // Create MachineUtilization entries for each machine associated with selected services
+        MachineUtilizations: {
+          create: serviceWithMachines.flatMap(service => 
+            service.Machines.map(machineService => ({
+              Machine: machineService.machine.Machine,
+              MachineApproval: false, // Default to not approved
+              DateReviewed: null // Will be set when reviewed
+            }))
+          )
         }
       },
       include: {
         UserTools: true,
         UserServices: true,
         UtilTimes: true,
+        MachineUtilizations: true,
+        ServiceAvailed: true
       }
     });
 
