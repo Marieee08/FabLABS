@@ -21,19 +21,12 @@ interface Reservation {
   status: string;
   role: string;
   service: string;
-  machines: string[]; 
+  machines: string[]; // Array of machines instead of single machine
   totalAmount: number | null;
   type: 'utilization' | 'evc';
   startTime?: string;
   endTime?: string;
   UtilTimes?: Array<{StartTime: string, EndTime: string}>;
-  timeSlots?: Array<{
-    id: number;
-    dayNum: number;
-    startTime: string | null;
-    endTime: string | null;
-    duration: number | null;
-  }>;
 }
 
 const AdminCalendar: React.FC = () => {
@@ -137,7 +130,7 @@ const AdminCalendar: React.FC = () => {
       });
     }
   };
-  
+
   const formatTimeString = (timeString: string): string => {
     try {
       // Ensure we have a valid date string
@@ -346,74 +339,19 @@ const AdminCalendar: React.FC = () => {
 
   return (
     <div className="calendar-container p-4">
-      <div className="calendar rounded-lg shadow-lg bg-white border border-gray-200 overflow-hidden">
-        <div className="calendar-header p-4 bg-white border-b border-gray-200">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <h2 className="text-xl font-bold flex items-center gap-2 text-gray-800">
-              <Calendar className="h-5 w-5 text-blue-600" />
-              {new Intl.DateTimeFormat('en-US', {
-                month: 'long',
-                year: 'numeric'
-              }).format(currentMonth)}
-            </h2>
-            
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                <div className="flex items-center gap-1">
-                  <span className="inline-block w-3 h-3 rounded-full bg-green-100 border border-green-300"></span>
-                  <span>Approved</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="inline-block w-3 h-3 rounded-full bg-yellow-100 border border-yellow-300"></span>
-                  <span>Pending</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="inline-block w-3 h-3 rounded-full bg-red-50 border border-red-200"></span>
-                  <span>Blocked</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <span className="inline-block w-3 h-3 rounded-full bg-slate-100 border border-slate-300 relative overflow-hidden">
-                    <span className="absolute inset-0" style={{ 
-                      background: "linear-gradient(to bottom right, transparent 48%, #cbd5e1 49%, #cbd5e1 51%, transparent 52%)"
-                    }}></span>
-                  </span>
-                  <span>Past</span>
-                </div>
-              </div>
-              
-              <div className="flex items-center">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={previousMonth}
-                  className="rounded-l-md"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={nextMonth}
-                  className="rounded-r-md border-l-0"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <CalendarGrid 
-          days={getDaysInMonth(currentMonth)}
-          isDateBlocked={isDateBlocked}
-          isDateInPast={isDateInPast}
-          isToday={isToday}
-          getDateReservations={getDateReservations}
-          handleDateClick={handleDateClick}
-          handleReservationClick={handleReservationClick}
-          formatTime={formatTime}
-        />
-      </div>
+      <CalendarGrid 
+        days={getDaysInMonth(currentMonth)}
+        isDateBlocked={isDateBlocked}
+        isDateInPast={isDateInPast}
+        isToday={isToday}
+        getDateReservations={getDateReservations}
+        handleDateClick={handleDateClick}
+        handleReservationClick={handleReservationClick}
+        formatTime={formatTime}
+        currentMonth={currentMonth}
+        nextMonth={nextMonth}
+        previousMonth={previousMonth}
+      />
       
       <BlockDateModal 
         isOpen={isModalOpen}
@@ -433,14 +371,6 @@ const AdminCalendar: React.FC = () => {
         reservation={selectedReservation}
         formatTime={formatTime}
       />
-      
-      <style jsx>{`
-        .calendar-container {
-          max-width: 1200px;
-          margin: 0 auto;
-          font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        }
-      `}</style>
     </div>
   );
 };
