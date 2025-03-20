@@ -18,7 +18,7 @@ interface Reservation {
   status: string;
   role: string;
   service: string;
-  machine?: string; // Add machine property
+  machines: string[]; // Array of machines
   totalAmount: number | null;
   type: 'utilization' | 'evc';
   startTime?: string;
@@ -112,19 +112,26 @@ const ReservationModal: React.FC<ReservationModalProps> = ({
                   <p className="text-xs text-gray-500">Type</p>
                   <p className="font-medium capitalize">{reservation.type}</p>
                 </div>
-                {/* Add Machine Information */}
-                {reservation.machine && (
-                  <div>
-                    <p className="text-xs text-gray-500">Machine</p>
-                    <p className="font-medium flex items-center">
-                      <Cpu className="h-3 w-3 mr-1 text-gray-500" />
-                      {reservation.machine}
-                    </p>
-                  </div>
-                )}
               </div>
             </div>
           </div>
+          
+          {/* Machines section */}
+          {reservation.machines && reservation.machines.length > 0 && (
+            <div className="bg-gray-50 p-3 rounded-md">
+              <h4 className="font-semibold text-gray-700 mb-2 flex items-center">
+                <Cpu className="h-4 w-4 mr-1" />
+                Machines
+              </h4>
+              <div className="space-y-1">
+                {reservation.machines.map((machine, index) => (
+                  <div key={index} className="flex items-center p-1.5 bg-white rounded border border-gray-200">
+                    <span className="font-medium">{machine}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
           
           <div className="bg-gray-50 p-3 rounded-md">
             <h4 className="font-semibold text-gray-700 mb-2">Schedule</h4>

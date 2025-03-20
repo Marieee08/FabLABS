@@ -24,46 +24,51 @@ export async function GET(req: NextRequest) {
             EndTime: true
           }
         },
+        MachineUtilizations: {
+          select: {
+            id: true,
+            Machine: true,
+            ServiceName: true
+          }
+        }
       },
       orderBy: {
         RequestDate: 'desc',
       },
     });
 
-    // Fetch EVCReservation (educational visit center reservations)
-    const evcReservations = await prisma.eVCReservation.findMany({
-      include: {
-        accInfo: true,
-        UtilTimes: {
-          select: {
-            id: true,
-            DayNum: true,
-            StartTime: true,
-            EndTime: true
-          }
-        },
-      },
-      orderBy: {
-        DateRequested: 'desc',
-      },
-    });
-
     // Transform UtilReq data into the expected format
     const formattedUtilReservations = utilReservations.map((reservation) => {
-      // Get the first service name for display
-      const serviceName = reservation.UserServices.length > 0 
-        ? reservation.UserServices[0].ServiceAvail 
+      // Get all service names
+      const serviceNames = reservation.UserServices.map(service => service.ServiceAvail);
+      const serviceName = serviceNames.length > 0 
+        ? serviceNames.join(", ")
         : "No service";
-
-      const machineName = reservation.UserServices.length > 0 
-        ? reservation.UserServices[0].EquipmentAvail 
-        : "No machine";
+      
+      // Get all machine names from UserServices
+      const userServiceMachines = reservation.UserServices
+        .filter(service => service.EquipmentAvail)
+        .map(service => service.EquipmentAvail);
+      
+      // Get all machine names from MachineUtilizations
+      const machineUtilMachines = reservation.MachineUtilizations
+        ?.filter(machine => machine.Machine)
+        .map(machine => machine.Machine) || [];
+      
+      // Combine all machine names and remove duplicates
+      const allMachines = [...new Set([...userServiceMachines, ...machineUtilMachines])];
+      
+      // Format machines for display
+      const machines = allMachines.length > 0 
+        ? allMachines 
+        : ["Not specified"];
       
       // Determine the date from UtilTimes if available, otherwise use RequestDate
       const firstTime = reservation.UtilTimes.length > 0 ? reservation.UtilTimes[0] : null;
       const date = firstTime && firstTime.StartTime 
         ? new Date(firstTime.StartTime).toISOString() 
         : reservation.RequestDate.toISOString();
+
       // Format all time slots
       const timeSlots = reservation.UtilTimes.map(time => ({
         id: time.id,
@@ -83,13 +88,31 @@ export async function GET(req: NextRequest) {
         status: reservation.Status,
         role: reservation.accInfo?.Role || "MSME",
         service: serviceName,
-        machine: machineName, // Add the machine name
+        machines: machines, // Array of machines
         totalAmount: reservation.TotalAmntDue ? Number(reservation.TotalAmntDue) : null,
         type: 'utilization',
         timeSlots: timeSlots,
         totalScheduledTime: timeSlots.reduce((total, slot) => 
-          total + (slot.duration || 0), 0) // Total scheduled time in minutes
+          total + (slot.duration || 0), 0)
       };
+    });
+
+    // Fetch EVCReservation (educational visit center reservations)
+    const evcReservations = await prisma.eVCReservation.findMany({
+      include: {
+        accInfo: true,
+        UtilTimes: {
+          select: {
+            id: true,
+            DayNum: true,
+            StartTime: true,
+            EndTime: true
+          }
+        },
+      },
+      orderBy: {
+        DateRequested: 'desc',
+      },
     });
 
     // Transform EVCReservation data into the expected format
@@ -121,7 +144,7 @@ export async function GET(req: NextRequest) {
         status: reservation.EVCStatus,
         role: reservation.accInfo?.Role || "Student",
         service: "Laboratory Reservation",
-        machine: "EVC Lab", // Default machine for EVC
+        machines: ["EVC Lab"], // Default machine for EVC as array
         totalAmount: null,
         type: 'evc',
         timeSlots: timeSlots,
