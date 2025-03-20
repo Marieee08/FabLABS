@@ -55,9 +55,6 @@ interface BusinessInfo {
   Bulk: string;
 }
 
-
-
-
 interface AccountInfo {
   Name: string;
   email: string;
@@ -65,9 +62,6 @@ interface AccountInfo {
   ClientInfo?: ClientInfo;
   BusinessInfo?: BusinessInfo;
 }
-
-
-
 
 interface DetailedReservation {
   id: number;
@@ -81,9 +75,6 @@ interface DetailedReservation {
   accInfo: AccountInfo;
 }
 
-
-
-
 /**
  * Format currency values
  * @param amount - The amount to format
@@ -94,9 +85,6 @@ const formatCurrency = (amount: number | string | null): string => {
   const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
   return Number(numAmount).toFixed(2);
 };
-
-
-
 
 /**
  * Format date for display in the form
@@ -109,9 +97,6 @@ const formatDate = (dateString: string | null): string => {
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 };
 
-
-
-
 /**
  * Format time for display in the form
  * @param timeString - Time string to format
@@ -122,9 +107,6 @@ const formatTime = (timeString: string | null): string => {
   const date = new Date(timeString);
   return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 };
-
-
-
 
 /**
  * Generate a string with all service details
@@ -142,9 +124,6 @@ const getServiceDetailsString = (services: UserService[]): string => {
   ).join('\n');
 };
 
-
-
-
 /**
  * Generates a PDF for a reservation using browser print capabilities
  * This is a fallback method that uses HTML and browser printing
@@ -152,7 +131,7 @@ const getServiceDetailsString = (services: UserService[]): string => {
  */
 const generatePrintPDF = (reservationData: DetailedReservation): void => {
   // Create service details string
-  const serviceDetails = getServiceDetailsString(reservationData.UserServices);
+  const serviceDetails = getServiceDetailsString(reservationData.UserServices || []);
  
   // Create a new window for printing
   const printWindow = window.open('', '_blank', 'width=800,height=600');
@@ -263,8 +242,8 @@ const generatePrintPDF = (reservationData: DetailedReservation): void => {
           <td width="50%"><strong>Position/Designation:</strong></td>
         </tr>
         <tr>
-          <td>1. ${reservationData.accInfo.Name}</td>
-          <td>${reservationData.accInfo.Role}</td>
+          <td>1. ${reservationData.accInfo?.Name || 'Name Not Available'}</td>
+          <td>${reservationData.accInfo?.Role || 'Role Not Available'}</td>
         </tr>
         <tr>
           <td>2.</td>
@@ -304,7 +283,7 @@ const generatePrintPDF = (reservationData: DetailedReservation): void => {
           <td><strong>Tools to Use, Qty, & no. of hours:</strong></td>
         </tr>
         <tr>
-          <td>${reservationData.UserTools.map(tool =>
+          <td>${(reservationData.UserTools || []).map(tool =>
             `${tool.ToolUser} (Qty: ${tool.ToolQuantity})`
           ).join(', ') || ''}</td>
         </tr>
@@ -327,10 +306,10 @@ const generatePrintPDF = (reservationData: DetailedReservation): void => {
           <td width="50%"><strong>Day 2</strong></td>
         </tr>
         <tr>
-          <td>Start Time: ${formatTime(reservationData.UtilTimes.find(t => t.DayNum === 1)?.StartTime || null)}
-              End Time: ${formatTime(reservationData.UtilTimes.find(t => t.DayNum === 1)?.EndTime || null)}</td>
-          <td>Start Time: ${formatTime(reservationData.UtilTimes.find(t => t.DayNum === 2)?.StartTime || null)}
-              End Time: ${formatTime(reservationData.UtilTimes.find(t => t.DayNum === 2)?.EndTime || null)}</td>
+          <td>Start Time: ${formatTime((reservationData.UtilTimes || []).find(t => t.DayNum === 1)?.StartTime || null)}
+              End Time: ${formatTime((reservationData.UtilTimes || []).find(t => t.DayNum === 1)?.EndTime || null)}</td>
+          <td>Start Time: ${formatTime((reservationData.UtilTimes || []).find(t => t.DayNum === 2)?.StartTime || null)}
+              End Time: ${formatTime((reservationData.UtilTimes || []).find(t => t.DayNum === 2)?.EndTime || null)}</td>
         </tr>
       </table>
      
@@ -340,10 +319,10 @@ const generatePrintPDF = (reservationData: DetailedReservation): void => {
           <td width="50%"><strong>Day 4</strong></td>
         </tr>
         <tr>
-          <td>Start Time: ${formatTime(reservationData.UtilTimes.find(t => t.DayNum === 3)?.StartTime || null)}
-              End Time: ${formatTime(reservationData.UtilTimes.find(t => t.DayNum === 3)?.EndTime || null)}</td>
-          <td>Start Time: ${formatTime(reservationData.UtilTimes.find(t => t.DayNum === 4)?.StartTime || null)}
-              End Time: ${formatTime(reservationData.UtilTimes.find(t => t.DayNum === 4)?.EndTime || null)}</td>
+          <td>Start Time: ${formatTime((reservationData.UtilTimes || []).find(t => t.DayNum === 3)?.StartTime || null)}
+              End Time: ${formatTime((reservationData.UtilTimes || []).find(t => t.DayNum === 3)?.EndTime || null)}</td>
+          <td>Start Time: ${formatTime((reservationData.UtilTimes || []).find(t => t.DayNum === 4)?.StartTime || null)}
+              End Time: ${formatTime((reservationData.UtilTimes || []).find(t => t.DayNum === 4)?.EndTime || null)}</td>
         </tr>
       </table>
      
@@ -353,7 +332,7 @@ const generatePrintPDF = (reservationData: DetailedReservation): void => {
           <td width="50%"><strong>Name and Signature of employee:</strong></td>
         </tr>
         <tr>
-          <td>${new Date().toLocaleDateString()}<br>${reservationData.accInfo.Name}</td>
+          <td>${new Date().toLocaleDateString()}<br>${reservationData.accInfo?.Name || 'Name Not Available'}</td>
           <td>&nbsp;<br>&nbsp;</td>
         </tr>
       </table>
@@ -373,24 +352,52 @@ const generatePrintPDF = (reservationData: DetailedReservation): void => {
   // Focus the new window
   printWindow.focus();
 };
-
-
-
-
 /**
  * Main function to generate and download a PDF for a reservation
  * @param reservationData - The reservation data
  */
 export const downloadPDF = (reservationData: DetailedReservation): void => {
   try {
-    // First try to use jsPDF
+    console.log('Starting utilization request PDF generation with data:', reservationData);
+    
+    // Robust validation - check if reservationData exists and has minimum required fields
+    if (!reservationData) {
+      console.error('Missing entire reservation data object');
+      alert('Cannot generate PDF: No reservation data found');
+      return;
+    }
+    
+    // Check if accInfo exists at all
+    if (!reservationData.accInfo) {
+      console.error('Missing accInfo in reservation data');
+      alert('Cannot generate PDF: Missing essential reservation data or account info');
+      return;
+    }
+    
+    // Create safe accInfo with defaults for all potentially missing properties
+    const safeAccInfo = {
+      Name: reservationData.accInfo.Name || 'Name Not Available',
+      email: reservationData.accInfo.email || 'Email Not Available',
+      Role: reservationData.accInfo.Role || 'Role Not Specified',
+      ClientInfo: reservationData.accInfo.ClientInfo || {},
+      BusinessInfo: reservationData.accInfo.BusinessInfo || {}
+    };
+    
+    console.log('Using safe accInfo with defaults:', safeAccInfo);
+    
+    // Safe access to services, tools, and times
+    const safeServices = Array.isArray(reservationData.UserServices) ? reservationData.UserServices : [];
+    const safeTools = Array.isArray(reservationData.UserTools) ? reservationData.UserTools : [];
+    const safeTimes = Array.isArray(reservationData.UtilTimes) ? reservationData.UtilTimes : [];
+    
+    // Initialize jsPDF
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
       format: 'a4'
     });
    
-    // Test if autoTable is available
+    // Check if autoTable is available
     if (typeof autoTable !== 'function') {
       console.warn('jspdf-autotable function not available, falling back to browser print');
       generatePrintPDF(reservationData);
@@ -447,7 +454,7 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
     const clientTableData: AutoTableColumnOption[][] = [
       [{ content: 'Name of Client(s) to Use Facility:', styles: { fontStyle: 'bold' } },
        { content: 'Position/Designation:', styles: { fontStyle: 'bold' } }],
-      [{ content: '1. ' + reservationData.accInfo.Name }, { content: reservationData.accInfo.Role }],
+      [{ content: '1. ' + safeAccInfo.Name }, { content: safeAccInfo.Role }],
       [{ content: '2.' }, { content: '' }],
       [{ content: '3.' }, { content: '' }],
       [{ content: '4.' }, { content: '' }]
@@ -468,7 +475,7 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
           1: { cellWidth: contentWidth / 2 }
         }
       });
-      yPosition = result.finalY || 70;
+      yPosition = (result?.finalY) ? result.finalY : 70;
     } catch (error) {
       console.error('Error in first autoTable:', error);
       yPosition = 70;
@@ -481,7 +488,7 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
     doc.text('PROCESSING INFORMATION', margin + 2, yPosition + 5);
    
     // Service type - using our helper function
-    const serviceDetails = getServiceDetailsString(reservationData.UserServices);
+    const serviceDetails = getServiceDetailsString(safeServices);
    
     const serviceTableData: AutoTableColumnOption[][] = [
       [{ content: 'Service Type:', styles: { fontStyle: 'bold' } }],
@@ -497,7 +504,7 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
         styles: { fontSize: 10 },
         margin: { left: margin, right: margin }
       });
-      yPosition = result.finalY || (yPosition + 15);
+      yPosition = (result?.finalY) ? result.finalY : (yPosition + 15);
     } catch (error) {
       console.error('Error in service type table:', error);
       yPosition += 15;
@@ -518,7 +525,7 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
         styles: { fontSize: 10 },
         margin: { left: margin, right: margin }
       });
-      yPosition = result.finalY || (yPosition + 20);
+      yPosition = (result?.finalY) ? result.finalY : (yPosition + 20);
     } catch (error) {
       console.error('Error in bulk table:', error);
       yPosition += 20;
@@ -526,8 +533,8 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
    
     // Tools information
     let toolsText = '';
-    if (reservationData.UserTools && reservationData.UserTools.length > 0) {
-      toolsText = reservationData.UserTools.map(tool =>
+    if (safeTools.length > 0) {
+      toolsText = safeTools.map(tool =>
         `${tool.ToolUser} (Qty: ${tool.ToolQuantity})`
       ).join(', ');
     }
@@ -546,7 +553,7 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
         styles: { fontSize: 10 },
         margin: { left: margin, right: margin }
       });
-      yPosition = result.finalY || (yPosition + 20);
+      yPosition = (result?.finalY) ? result.finalY : (yPosition + 20);
     } catch (error) {
       console.error('Error in tools table:', error);
       yPosition += 20;
@@ -572,18 +579,18 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
           1: { cellWidth: contentWidth / 2 }
         }
       });
-      yPosition = result.finalY || (yPosition + 15);
+      yPosition = (result?.finalY) ? result.finalY : (yPosition + 15);
     } catch (error) {
       console.error('Error in request date table:', error);
       yPosition += 15;
     }
    
     // Days and times
-    // Find time entries for each day
-    const day1Time = reservationData.UtilTimes.find(t => t.DayNum === 1);
-    const day2Time = reservationData.UtilTimes.find(t => t.DayNum === 2);
-    const day3Time = reservationData.UtilTimes.find(t => t.DayNum === 3);
-    const day4Time = reservationData.UtilTimes.find(t => t.DayNum === 4);
+    // Find time entries for each day - safely accessing with defaults
+    const day1Time = safeTimes.find(t => t.DayNum === 1);
+    const day2Time = safeTimes.find(t => t.DayNum === 2);
+    const day3Time = safeTimes.find(t => t.DayNum === 3);
+    const day4Time = safeTimes.find(t => t.DayNum === 4);
    
     // Day 1-2 row
     const day12TableData: AutoTableColumnOption[][] = [
@@ -608,7 +615,7 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
           1: { cellWidth: contentWidth / 2 }
         }
       });
-      yPosition = result.finalY ?? (yPosition + 15);
+      yPosition = (result?.finalY) ? result.finalY : (yPosition + 15);
     } catch (error) {
       console.error('Error in day12 table:', error);
       yPosition += 15;
@@ -637,7 +644,7 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
           1: { cellWidth: contentWidth / 2 }
         }
       });
-      yPosition = result.finalY || (yPosition + 15);
+      yPosition = (result?.finalY) ? result.finalY : (yPosition + 15);
     } catch (error) {
       console.error('Error in day34 table:', error);
       yPosition += 15;
@@ -647,10 +654,10 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
     const currentDate = formatDate(new Date().toISOString());
     const processingTableData: AutoTableColumnOption[][] = [
       [
-        { content: 'Date the processing of request was done:\nRequest processed by:', styles: { fontStyle: 'bold' } },
-        { content: 'Name and Signature of employee:', styles: { fontStyle: 'bold' } }
+        { content: 'Date the processing of request was done:\nRequest processed by:', styles: { fontStyle: 'bold', halign: 'right' } },
+        { content: 'Name and Signature of employee:', styles: { fontStyle: 'bold', halign: 'right' } }
       ],
-      [{ content: `${currentDate}\n${reservationData.accInfo.Name}` }, { content: '' }]
+      [{ content: `${currentDate}\n${safeAccInfo.Name}` }, { content: '' }]
     ];
    
     try {
@@ -671,10 +678,16 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
     }
    
     // Save the PDF with a name based on the reservation ID
-    doc.save(`Utilization_Request_Form_${reservationData.id}.pdf`);
+    doc.save(`Utilization_Request_Form_${reservationData.id || 'Unknown'}.pdf`);
+    console.log('Utilization request PDF saved successfully');
   } catch (error) {
-    console.error('Error generating PDF:', error);
+    console.error('Error generating utilization request PDF:', error);
     // Fall back to browser print method
-    generatePrintPDF(reservationData);
+    try {
+      generatePrintPDF(reservationData);
+    } catch (printError) {
+      console.error('Even fallback print failed:', printError);
+      alert(`Unable to generate PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 };
