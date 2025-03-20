@@ -5,13 +5,19 @@ import { Calendar } from '@/components/ui/calendar';
 import { FormData } from './schedule';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { CheckCircle, Clock } from 'lucide-react';
 
 interface DateTimeSelectionProps {
   formData: FormData;
   setFormData: React.Dispatch<React.SetStateAction<FormData>>;
   nextStep: () => void;
   isDateBlocked: (date: Date) => boolean;
+}
+
+interface Day {
+  date: Date;
+  startTime: string | null;
+  endTime: string | null;
 }
 
 const MAX_DATES = 5;
@@ -114,17 +120,17 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
   };
 
   // Handle unified time changes
-  const handleUnifiedTimeChange = (time: string, field: 'startTime' | 'endTime') => {
+  const handleUnifiedTimeChange = (time: string, field: 'unifiedStartTime' | 'unifiedEndTime') => {
     setFormData(prevData => {
       // Update all days with the new time when sync is enabled
       const updatedDays = prevData.days.map(day => ({
         ...day,
-        [field]: time
+        [field === 'unifiedStartTime' ? 'startTime' : 'endTime']: time
       }));
      
       return {
         ...prevData,
-        [field === 'startTime' ? 'unifiedStartTime' : 'unifiedEndTime']: time,
+        [field]: time,
         days: updatedDays
       };
     });
@@ -148,7 +154,11 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
         };
       } else {
         // If sync is disabled, update only the selected day
-        updatedDays[index][field] = time;
+        updatedDays[index] = {
+          ...updatedDays[index],
+          [field]: time
+        };
+        
         return {
           ...prevData,
           days: updatedDays
@@ -220,32 +230,32 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
       {/* Calendar and Error Section */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-10 mt-6 flex-grow"> 
         <div className="space-y-4 md:space-y-6 h-full">
-        <div className="bg-white p-3 sm:p-6 rounded-lg shadow-sm border border-gray-200 h-[645px]">
+          <div className="bg-white p-3 sm:p-6 rounded-lg shadow-sm border border-gray-200 h-[645px]">
             <h3 className="text-xl font-medium text-gray-800 mb-3 flex items-center">
               <CheckCircle className="h-5 w-5 text-blue-600 mr-2" /> Select Available Dates
             </h3>
             <p className="text-sm text-gray-600 mb-4">Click on a date to select it. You can choose up to {MAX_DATES} dates.</p>
             
             <div className="border rounded-lg overflow-hidden p-2 sm:p-4">
-  <Calendar
-    mode="multiple"
-    selected={formData.days.map(day => new Date(day.date))}
-    onSelect={(_, selectedDay) => {
-      if (selectedDay) {
-        addNewDay(selectedDay);
-      }
-    }}
-    disabled={(date) => isDateDisabled(date) || isDateBlocked(date)}
-    className="w-full"
-    styles={{
-      day: { width: 'auto', height: 'auto', minWidth: '2rem', minHeight: '2rem' },
-      head_cell: { width: 'auto', paddingBottom: '0.5rem' },
-      table: { width: '100%', tableLayout: 'fixed', borderSpacing: '0.25rem', borderCollapse: 'separate' },
-      cell: { padding: '0.1rem' },
-      nav_button: { width: 'auto', height: 'auto', padding: '0.25rem' }
-    }}
-  />
-</div>
+              <Calendar
+                mode="multiple"
+                selected={formData.days.map(day => new Date(day.date))}
+                onSelect={(_, selectedDay) => {
+                  if (selectedDay) {
+                    addNewDay(selectedDay);
+                  }
+                }}
+                disabled={date => isDateDisabled(date) || isDateBlocked(date)}
+                className="w-full"
+                styles={{
+                  day: { width: 'auto', height: 'auto', minWidth: '2rem', minHeight: '2rem' },
+                  head_cell: { width: 'auto', paddingBottom: '0.5rem' },
+                  table: { width: '100%', tableLayout: 'fixed', borderSpacing: '0.25rem', borderCollapse: 'separate' },
+                  cell: { padding: '0.1rem' },
+                  nav_button: { width: 'auto', height: 'auto', padding: '0.25rem' }
+                }}
+              />
+            </div>
             
             <div className="mt-4 text-sm text-gray-500 flex items-center">
               <div className="w-4 h-4 rounded-full bg-blue-100 border-2 border-blue-500 mr-2"></div>
@@ -300,13 +310,13 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
                     required
                     label="Start Time"
                     value={formData.unifiedStartTime}
-                    onChange={(time) => handleUnifiedTimeChange(time, 'startTime')}
+                    onChange={(time) => handleUnifiedTimeChange(time, 'unifiedStartTime')}
                   />
                   <TimePicker
                     required
                     label="End Time"
                     value={formData.unifiedEndTime}
-                    onChange={(time) => handleUnifiedTimeChange(time, 'endTime')}
+                    onChange={(time) => handleUnifiedTimeChange(time, 'unifiedEndTime')}
                     startTime={formData.unifiedStartTime}
                     isEndTime={true}
                   />
@@ -317,87 +327,107 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
          
           {/* Selected dates */}
           <div className="space-y-4 h-full overflow-hidden">
-{formData.days.length > 0 ? (
-  <div className="space-y-4 h-full overflow-hidden">
-    <h3 className="text-lg font-medium text-gray-800 flex items-center">
-      <Clock className="h-5 w-5 text-blue-600 mr-2" /> Selected Dates & Times
-    </h3>
-              
-    <div className="max-h-[330px] overflow-y-auto">
-    <div className="max-h-full overflow-y-auto pr-2 space-y-3">
-                  {[...formData.days]
-                    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-                    .map((day, index) => (
-                      <Card key={new Date(day.date).toISOString()} className="bg-white border-gray-200">
-                      <CardContent className="p-4">
-                        <h4 className="text-md font-semibold text-blue-800 mb-3">
-                          {new Date(day.date).toLocaleDateString('en-US', { 
-                            weekday: 'short', 
-                            month: 'short', 
-                            day: 'numeric'
-                          })}
-                        </h4>
-                        
-                        {!formData.syncTimes ? (
-                          <div className="grid grid-cols-2 gap-4">
-                            <TimePicker
-                              required
-                              label="Start Time"
-                              value={day.startTime}
-                              onChange={(time) => handleIndividualTimeChange(time, 'startTime', index)}
-                            />
-                            <TimePicker
-                              required
-                              label="End Time"
-                              value={day.endTime}
-                              onChange={(time) => handleIndividualTimeChange(time, 'endTime', index)}
-                              startTime={day.startTime}
-                              isEndTime={true}
-                            />
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-md h-full items-center">
-                            <div className="pb-1.5 pt-1.5">
-                              <p className="text-sm font-medium text-gray-700">Start Time</p>
-                              <p className="mt-1 text-blue-700">{day.startTime || 'Not set'}</p>
-                            </div>
-                            <div className="pb-1.5 pt-1.5">
-                              <p className="text-sm font-medium text-gray-700">End Time</p>
-                              <p className="mt-1 text-blue-700">{day.endTime || 'Not set'}</p>
-                            </div>
-                          </div>
-                        )}
-                      </CardContent>
-                      </Card>
-                    ))}
+            {formData.days.length > 0 ? (
+              <div className="space-y-4 h-full overflow-hidden">
+                <h3 className="text-lg font-medium text-gray-800 flex items-center">
+                  <Clock className="h-5 w-5 text-blue-600 mr-2" /> Selected Dates & Times
+                </h3>
+                      
+                <div className="max-h-[330px] overflow-y-auto">
+                  <div className="max-h-full overflow-y-auto pr-2 space-y-3">
+                    {[...formData.days]
+                      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+                      .map((day, index) => (
+                        <Card key={new Date(day.date).toISOString()} className="bg-white border-gray-200">
+                          <CardContent className="p-4">
+                            <h4 className="text-md font-semibold text-blue-800 mb-3">
+                              {new Date(day.date).toLocaleDateString('en-US', { 
+                                weekday: 'short', 
+                                month: 'short', 
+                                day: 'numeric'
+                              })}
+                            </h4>
+                            
+                            {!formData.syncTimes ? (
+                              <div className="grid grid-cols-2 gap-4">
+                                <TimePicker
+                                  required
+                                  label="Start Time"
+                                  value={day.startTime}
+                                  onChange={(time) => handleIndividualTimeChange(time, 'startTime', index)}
+                                />
+                                <TimePicker
+                                  required
+                                  label="End Time"
+                                  value={day.endTime}
+                                  onChange={(time) => handleIndividualTimeChange(time, 'endTime', index)}
+                                  startTime={day.startTime}
+                                  isEndTime={true}
+                                />
+                              </div>
+                            ) : (
+                              <div className="grid grid-cols-2 gap-4 bg-gray-50 p-3 rounded-md h-full items-center">
+                                <div className="pb-1.5 pt-1.5">
+                                  <p className="text-sm font-medium text-gray-700">Start Time</p>
+                                  <p className="mt-1 text-blue-700">{day.startTime || 'Not set'}</p>
+                                </div>
+                                <div className="pb-1.5 pt-1.5">
+                                  <p className="text-sm font-medium text-gray-700">End Time</p>
+                                  <p className="mt-1 text-blue-700">{day.endTime || 'Not set'}</p>
+                                </div>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      ))}
+                  </div>
                 </div>
-    </div>
-  </div>
-) : (
-  <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200 text-center h-[352px] flex flex-col justify-center">
-    <p className="text-gray-500">No dates selected yet</p>
-    <p className="text-sm text-gray-400 mt-2">Click on available dates in the calendar</p>
-  </div>
-)}
-</div>
+              </div>
+            ) : (
+              <div className="bg-white p-8 rounded-lg shadow-sm border border-gray-200 text-center h-[352px] flex flex-col justify-center">
+                <p className="text-gray-500">No dates selected yet</p>
+                <p className="text-sm text-gray-400 mt-2">Click on available dates in the calendar</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       
       {/* Navigation buttons */}
-      <div className="mt-4 flex justify-end">  {/* Reduced margin */}
-      <Button
+      <div className="mt-4 flex justify-end">
+        <Button
           onClick={handleNext}
           className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium"
           disabled={formData.days.length === 0}
         >
           Continue to Next Step
         </Button>
+      </div>
+
+      {/* Error display */}
+      {errors.length > 0 && (
+        <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
+          <ul className="text-red-600 text-sm">
+            {errors.map((error, index) => (
+              <li key={index}>{error}</li>
+            ))}
+          </ul>
         </div>
+      )}
     </div>
   );
 }
 
 // TimePicker Component
+interface TimePickerProps {
+  label: string;
+  value: string | null;
+  onChange: (time: string) => void;
+  startTime?: string | null;
+  isEndTime?: boolean;
+  required?: boolean;
+}
+
 function TimePicker({
   label,
   value,
@@ -405,14 +435,7 @@ function TimePicker({
   startTime,
   isEndTime = false,
   required = true
-}: {
-  label: string;
-  value: string | null;
-  onChange: (time: string) => void;
-  startTime?: string | null;
-  isEndTime?: boolean;
-  required?: boolean;
-}) {
+}: TimePickerProps) {
   const isFirstSelection = React.useRef(true);
   const [showError, setShowError] = React.useState(false);
   const [hasAttemptedSubmit, setHasAttemptedSubmit] = React.useState(false);
@@ -470,17 +493,6 @@ function TimePicker({
     }
   }, [hasAttemptedSubmit, required, localHour, localMinute]);
 
-  // Validate times whenever either time changes
-  const validateTimes = React.useCallback((currentTime: string) => {
-    if (!isEndTime || !startTime) return false;
-
-    const startMinutes = timeToMinutes(startTime);
-    const endMinutes = timeToMinutes(currentTime);
-   
-    if (startMinutes === -1 || endMinutes === -1) return false;
-    return endMinutes <= startMinutes;
-  }, [isEndTime, startTime]);
-
   const handleHourChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const newHour = e.target.value;
     setLocalHour(newHour);
@@ -489,7 +501,7 @@ function TimePicker({
       // Automatically set minutes to '00' when hour is selected
       setLocalMinute('00');
       const formattedTime = formatTime(newHour, '00');
-      setIsInvalid(validateTimes(formattedTime));
+      setIsInvalid(validateTimeOrder(formattedTime));
       onChange(formattedTime);
       if (hasAttemptedSubmit) {
         setShowError(false);
@@ -511,7 +523,7 @@ function TimePicker({
    
     if (localHour !== '--' && newMinute !== '--') {
       const formattedTime = formatTime(localHour, newMinute);
-      setIsInvalid(validateTimes(formattedTime));
+      setIsInvalid(validateTimeOrder(formattedTime));
       onChange(formattedTime);
       if (hasAttemptedSubmit) {
         setShowError(false);
@@ -567,28 +579,28 @@ function TimePicker({
       </label>
 
       <div className="flex space-x-3">
-  <select
-    className={`${selectClassName} flex-1 h-10`}
-    value={localHour}
-    onChange={handleHourChange}
-    required={required}
-  >
-    {hours.map(hourValue => (
-      <option key={hourValue} value={hourValue}>{hourValue}</option>
-    ))}
-  </select>
+        <select
+          className={`${selectClassName} flex-1 h-10`}
+          value={localHour}
+          onChange={handleHourChange}
+          required={required}
+        >
+          {hours.map(hourValue => (
+            <option key={hourValue} value={hourValue}>{hourValue}</option>
+          ))}
+        </select>
 
-  <select
-    className={`${selectClassName} flex-1 h-10`}
-    value={localMinute}
-    onChange={handleMinuteChange}
-    required={required}
-  >
-    {minutes.map(minuteValue => (
-      <option key={minuteValue} value={minuteValue}>{minuteValue}</option>
-    ))}
-  </select>
-</div> 
+        <select
+          className={`${selectClassName} flex-1 h-10`}
+          value={localMinute}
+          onChange={handleMinuteChange}
+          required={required}
+        >
+          {minutes.map(minuteValue => (
+            <option key={minuteValue} value={minuteValue}>{minuteValue}</option>
+          ))}
+        </select>
+      </div> 
 
       <div className="mt-1 min-h-4">
         {isInvalid && (
