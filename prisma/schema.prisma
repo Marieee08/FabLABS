@@ -199,9 +199,11 @@ model NeededMaterial {
 
 model MachineUtilization {
   id              Int             @id @default(autoincrement())
+  Machine         String?
   ReviwedBy       String?
   MachineApproval Boolean?
   DateReviewed    DateTime?
+  ServiceName     String?
   utilReqId       Int?
   DownTimes       DownTime[]      @relation("MachineUtilizationtoDownTime")
   utilReq         UtilReq?        @relation("UtilReqToMachineUtilization", fields: [utilReqId], references: [id])

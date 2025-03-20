@@ -1,3 +1,4 @@
+// src\app\api\user\create-reservation\route.ts
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
@@ -34,6 +35,52 @@ export async function POST(request: Request) {
 
     // Parse the total cost from the request data
     const totalAmountDue = parseFloat(data.totalCost) || 0;
+
+    // Get the services selected by the user
+    const selectedServices = Array.isArray(data.ProductsManufactured) 
+      ? data.ProductsManufactured 
+      : [data.ProductsManufactured].filter(Boolean);
+      
+    console.log('Selected services:', selectedServices);
+    
+    // Fetch the machines associated with these services
+    const serviceWithMachines = await prisma.service.findMany({
+      where: {
+        Service: {
+          in: selectedServices
+        }
+      },
+      include: {
+        Machines: {
+          include: {
+            machine: true
+          }
+        }
+      }
+    });
+    
+    // Log for debugging
+    console.log(`Found ${serviceWithMachines.length} services with their machines`);
+    
+    // Create an array to hold all machines for each service
+    const machinesToCreate = [];
+
+    // For each service, find all the associated machines
+    serviceWithMachines.forEach(service => {
+      console.log(`Service: ${service.Service} has ${service.Machines.length} machines`);
+      
+      // Add each machine for this service to our array
+      service.Machines.forEach(machineService => {
+        machinesToCreate.push({
+          Machine: machineService.machine.Machine,
+          MachineApproval: false,
+          DateReviewed: null,
+          ServiceName: service.Service
+        });
+      });
+    });
+
+    console.log(`Total machines to create: ${machinesToCreate.length}`);
 
     // Create the reservation with all related records
     const utilReq = await prisma.utilReq.create({
@@ -76,12 +123,26 @@ export async function POST(request: Request) {
             StartTime: combineDateAndTime(day.date, day.startTime),
             EndTime: combineDateAndTime(day.date, day.endTime),
           }))
+        },
+        
+        // Create ServiceAvailed entries for each selected service
+        ServiceAvailed: {
+          create: selectedServices.map((service: string) => ({
+            service
+          }))
+        },
+        
+        // Create MachineUtilization entries for all machines associated with selected services
+        MachineUtilizations: {
+          create: machinesToCreate
         }
       },
       include: {
         UserTools: true,
         UserServices: true,
         UtilTimes: true,
+        MachineUtilizations: true,
+        ServiceAvailed: true
       }
     });
 

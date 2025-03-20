@@ -1,3 +1,4 @@
+// src\app\user-dashboard\page.tsx
 "use client";
 
 import Link from "next/link";
@@ -31,6 +32,14 @@ interface UtilTime {
   EndTime: Date | null;
 }
 
+interface MachineUtilization {
+  id: number;
+  Machine: string | null;
+  MachineApproval: boolean | null;
+  DateReviewed: Date | null;
+  ServiceName: string | null;
+}
+
 interface Reservation {
   id: number;
   Status: string;
@@ -39,6 +48,7 @@ interface Reservation {
   UserServices: UserService[];
   UserTools: UserTool[];
   UtilTimes: UtilTime[];
+  MachineUtilizations: MachineUtilization[];
   accInfo: {
     Name: string;
     email: string;
@@ -50,7 +60,7 @@ const DashboardUser = () => {
   const { user, isLoaded } = useUser();
   const [userRole, setUserRole] = useState<string>("Loading...");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [orderDropdownOpen, setOrderDropdownOpen] = useState(true); // Set to true by default to show the dropdown
+  const [orderDropdownOpen, setOrderDropdownOpen] = useState(true);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -121,20 +131,6 @@ const DashboardUser = () => {
     fetchUserRole();
   }, [user, isLoaded]);
 
-  const renderSection = (title: string, fields: { label: string, value: any }[]) => (
-    <div className="mb-6">
-      <h3 className="text-lg font-medium text-gray-900 mb-3">{title}</h3>
-      <div className="grid grid-cols-2 gap-4">
-        {fields.map(({ label, value }) => (
-          <div key={label} className={`${label.toLowerCase().includes('address') ? 'col-span-2' : ''}`}>
-            <p className="text-sm text-gray-600">{label}</p>
-            <p className="mt-1">{value?.toString() || 'Not provided'}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
   const handleReviewClick = (reservation: Reservation) => {
     setSelectedReservation(reservation);
     setIsModalOpen(true);
@@ -155,7 +151,7 @@ const DashboardUser = () => {
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Services</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Equipment</th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Equipment/Machines</th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
             <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
           </tr>
@@ -421,7 +417,7 @@ const DashboardUser = () => {
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Services</th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Equipment</th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Equipment/Machines</th>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
@@ -452,9 +448,18 @@ const DashboardUser = () => {
                             </td>
 
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm font-medium text-gray-900">
-                                {reservation.UserServices.map(service => service.EquipmentAvail).join(', ')}
-                              </div>
+                              {reservation.MachineUtilizations && reservation.MachineUtilizations.length > 0 ? (
+                                <div className="text-sm font-medium text-gray-900">
+                                  {reservation.MachineUtilizations
+                                    .map(machine => machine.Machine)
+                                    .filter(Boolean)
+                                    .join(', ')}
+                                </div>
+                              ) : (
+                                <div className="text-sm font-medium text-gray-900">
+                                  {reservation.UserServices.map(service => service.EquipmentAvail).join(', ')}
+                                </div>
+                              )}
                             </td>
 
                             <td className="px-6 py-4 whitespace-nowrap font-medium text-sm text-gray-500">
@@ -481,8 +486,7 @@ const DashboardUser = () => {
                 </div>
               </div>
 
-              {/* Update the Review Modal content */}
-                      
+              {/* Modal for reviewing reservations */}
               <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                 <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
                   <DialogHeader>
@@ -509,6 +513,19 @@ const DashboardUser = () => {
                         <div className="mt-2">
                           <p><span className="text-gray-600">Services:</span> {selectedReservation.UserServices.map(service => service.ServiceAvail).join(', ')}</p>
                           <p><span className="text-gray-600">Equipment:</span> {selectedReservation.UserServices.map(service => service.EquipmentAvail).join(', ')}</p>
+                          
+                          {/* Display machine utilizations if available */}
+                          {selectedReservation.MachineUtilizations && selectedReservation.MachineUtilizations.length > 0 && (
+                            <p>
+                              <span className="text-gray-600">Machines:</span> {
+                                selectedReservation.MachineUtilizations
+                                  .map(machine => machine.Machine)
+                                  .filter(Boolean)
+                                  .join(', ')
+                              }
+                            </p>
+                          )}
+                          
                           <p><span className="text-gray-600">Bulk of Commodity:</span> {selectedReservation.BulkofCommodity || 'Not specified'}</p>
                         </div>
                       </div>
@@ -543,6 +560,33 @@ const DashboardUser = () => {
                           )}
                         </div>
                       </div>
+                      
+                      {/* Machine Utilization Details */}
+                      {selectedReservation.MachineUtilizations && selectedReservation.MachineUtilizations.length > 0 && (
+                        <div>
+                          <h3 className="font-medium text-gray-900">Machine Details</h3>
+                          <div className="mt-2">
+                            <div className="space-y-2">
+                              {selectedReservation.MachineUtilizations.map((machine, index) => (
+                                <div key={index} className="p-2 bg-gray-50 rounded">
+                                  <p><span className="text-gray-600">Machine:</span> {machine.Machine}</p>
+                                  {machine.ServiceName && (
+                                    <p><span className="text-gray-600">For Service:</span> {machine.ServiceName}</p>
+                                  )}
+                                  <p><span className="text-gray-600">Approval Status:</span> {
+                                    machine.MachineApproval ? 
+                                      <span className="text-green-600">Approved</span> : 
+                                      <span className="text-yellow-600">Pending Approval</span>
+                                  }</p>
+                                  {machine.DateReviewed && (
+                                    <p><span className="text-gray-600">Reviewed On:</span> {new Date(machine.DateReviewed).toLocaleDateString()}</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </DialogContent>
