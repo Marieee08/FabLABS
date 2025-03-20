@@ -1,11 +1,10 @@
-// src\components\user\machine-calendar.tsx
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { Info, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Info, Filter, ChevronLeft, ChevronRight, Loader2, Calendar as CalendarIcon, X } from 'lucide-react';
 
 // Set up the localizer for the calendar
 const localizer = momentLocalizer(moment);
@@ -41,15 +40,21 @@ interface BlockedDate {
 interface MachineCalendarProps {
   machines: Machine[];
   onClose?: () => void;
+  isOpen: boolean;
 }
 
-const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose }) => {
+const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose, isOpen }) => {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [blockedDates, setBlockedDates] = useState<BlockedDate[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
   const [selectedMachine, setSelectedMachine] = useState<string>('all');
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [hoveredEvent, setHoveredEvent] = useState<any>(null);
+  const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
+  const [tooltipContent, setTooltipContent] = useState('');
+  const calendarRef = useRef<HTMLDivElement>(null);
 
   // Time slots definitions
   const MORNING_START = 8; // 8 AM
@@ -77,8 +82,6 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose }) 
           res.machines.some(machine => machine !== 'Not specified' && machine)
         );
         
-        console.log("Fetched reservations:", filteredReservations);
-        
         setReservations(filteredReservations);
         setBlockedDates(blockedDatesData);
       } catch (error) {
@@ -95,17 +98,41 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose }) 
   useEffect(() => {
     const events = [];
 
-    // Filter reservations by selected machine if needed
-    const filteredReservations = selectedMachine === 'all' 
-      ? reservations 
-      : reservations.filter(res => res.machines.includes(selectedMachine));
+    // First, filter reservations by selected machine
+    let filteredReservations = reservations;
+    
+    if (selectedMachine !== 'all') {
+      // Find the machine ID or name for comparison
+      const selectedMachineObj = machines.find(m => 
+        m.id === selectedMachine || m.Machine === selectedMachine
+      );
+      
+      const machineId = selectedMachineObj?.id || selectedMachine;
+      const machineName = selectedMachineObj?.Machine || selectedMachine;
+      
+      // Filter reservations that contain this machine
+      filteredReservations = reservations.filter(res => 
+        res.machines.some(machine => 
+          machine === machineId || machine === machineName
+        )
+      );
+    }
 
     // Process reservations - create separate events for each machine
     for (const reservation of filteredReservations) {
       // Process each machine separately
       for (const machineName of reservation.machines) {
         // Skip if we're filtering for a specific machine and this isn't it
-        if (selectedMachine !== 'all' && machineName !== selectedMachine) continue;
+        if (selectedMachine !== 'all') {
+          const selectedMachineObj = machines.find(m => 
+            m.id === selectedMachine || m.Machine === selectedMachine
+          );
+          
+          const machineId = selectedMachineObj?.id || selectedMachine;
+          const machineName2 = selectedMachineObj?.Machine || selectedMachine;
+          
+          if (machineName !== machineId && machineName !== machineName2) continue;
+        }
         
         // Skip any "Not specified" or empty machine names
         if (!machineName || machineName === 'Not specified') continue;
@@ -141,7 +168,8 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose }) 
                   allDay: true,
                   resource: {
                     machine: machineName,
-                    timeSlot: 'allday'
+                    timeSlot: 'allday',
+                    reservationId: reservation.id
                   }
                 });
               } else if (isMorning) {
@@ -159,7 +187,8 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose }) 
                   allDay: false,
                   resource: {
                     machine: machineName,
-                    timeSlot: 'morning'
+                    timeSlot: 'morning',
+                    reservationId: reservation.id
                   }
                 });
               } else if (isAfternoon) {
@@ -177,7 +206,8 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose }) 
                   allDay: false,
                   resource: {
                     machine: machineName,
-                    timeSlot: 'afternoon'
+                    timeSlot: 'afternoon',
+                    reservationId: reservation.id
                   }
                 });
               }
@@ -194,63 +224,98 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose }) 
             allDay: true,
             resource: {
               machine: machineName,
-              timeSlot: 'allday'
+              timeSlot: 'allday',
+              reservationId: reservation.id
             }
           });
         }
       }
     }
 
-    // Process blocked dates (these apply to all machines)
-    if (selectedMachine === 'all' || machines.find(m => m.id === selectedMachine)) {
-      for (const blockedDate of blockedDates) {
-        const date = new Date(blockedDate.date);
-        
-        events.push({
-          title: 'All Machines',
-          start: new Date(date.setHours(0, 0, 0, 0)),
-          end: new Date(date.setHours(23, 59, 59, 999)),
-          allDay: true,
-          resource: {
-            timeSlot: 'blocked'
-          }
-        });
-      }
+    // Process blocked dates - show for all machines or just the selected one
+    for (const blockedDate of blockedDates) {
+      const date = new Date(blockedDate.date);
+      
+      events.push({
+        title: 'Unavailable', 
+        start: new Date(date.setHours(0, 0, 0, 0)),
+        end: new Date(date.setHours(23, 59, 59, 999)),
+        allDay: true,
+        resource: {
+          timeSlot: 'allday',
+          isBlocked: true,
+          blockedId: blockedDate.id
+        }
+      });
     }
 
     setCalendarEvents(events);
-    console.log("Calendar Events:", events);
   }, [reservations, blockedDates, selectedMachine, machines]);
 
   // Custom event styling based on time slot
   const eventStyleGetter = (event: any) => {
-    let backgroundColor = '#1c62b5'; // Default blue for all day
+    let backgroundColor = '#4F46E5'; // Indigo for all day
+    let borderColor = '#4338CA';
     
     if (event.resource) {
-      if (event.resource.timeSlot === 'blocked') {
-        backgroundColor = '#1c62b5'; // Red for blocked dates
+      // Check if this is a blocked date
+      if (event.resource.isBlocked) {
+        backgroundColor = '#EF4444'; // Red for blocked dates
+        borderColor = '#DC2626';
       } else if (event.resource.timeSlot === 'morning') {
-        backgroundColor = '#22C55E'; // Green for morning reservations
+        backgroundColor = '#10B981'; // Green for morning reservations
+        borderColor = '#059669';
       } else if (event.resource.timeSlot === 'afternoon') {
         backgroundColor = '#F59E0B'; // Amber for afternoon reservations
+        borderColor = '#D97706';
       }
     }
     
     const style = {
       backgroundColor,
+      borderLeft: `4px solid ${borderColor}`,
       color: 'white',
-      border: 'none',
-      display: 'block',
       borderRadius: '4px',
-      fontSize: '0.8rem'
+      fontSize: '0.8rem',
+      padding: '4px 6px',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap',
+      transition: 'all 0.2s ease-in-out'
     };
     
     return {
-      style
+      style,
+      className: 'event-item hover:shadow-md'
     };
   };
   
-  // Custom toolbar with month navigation
+  // Day cell styling
+  const dayPropGetter = (date: Date) => {
+    // Check if the date is a weekend
+    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+    const isToday = moment(date).isSame(moment(), 'day');
+    
+    if (isWeekend) {
+      return {
+        style: {
+          backgroundColor: '#F9FAFB'
+        },
+        className: 'weekend-day'
+      };
+    }
+    
+    if (isToday) {
+      return {
+        className: 'today-cell'
+      };
+    }
+    
+    return {};
+  };
+  
+  // Custom toolbar with modern month navigation - more compact
   const CustomToolbar = (toolbar: any) => {
     const goToBack = () => {
       const newDate = new Date(toolbar.date);
@@ -267,81 +332,153 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose }) 
     };
 
     return (
-      <div className="rbc-toolbar">
-        <div className="flex items-center justify-center py-2">
-          <button 
-            onClick={goToBack} 
-            className="p-1 rounded-full hover:bg-gray-200"
-          >
-            <ChevronLeft className="h-5 w-5 text-gray-600" />
-          </button>
-          <span className="font-semibold mx-4">{toolbar.label}</span>
-          <button 
-            onClick={goToNext} 
-            className="p-1 rounded-full hover:bg-gray-200"
-          >
-            <ChevronRight className="h-5 w-5 text-gray-600" />
-          </button>
-        </div>
+      <div className="rbc-toolbar py-2 px-3 flex flex-row items-center justify-between border-b border-gray-200 bg-white relative">
+  <div className="flex items-center">
+    <div className="flex items-center">
+      <button 
+        onClick={goToBack} 
+        className="p-1 rounded-l border border-gray-200 hover:bg-gray-50 transition-colors"
+        aria-label="Previous month"
+      >
+        <ChevronLeft className="h-4 w-4 text-gray-600" />
+      </button>
+    </div>
+    
+    <span className="font-semibold mx-3 text-gray-800 text-base">{toolbar.label}</span>
+    <button 
+        onClick={goToNext} 
+        className="p-1 rounded-r border-t border-r border-b border-gray-200 hover:bg-gray-50 transition-colors"
+        aria-label="Next month"
+      >
+        <ChevronRight className="h-4 w-4 text-gray-600" />
+      </button>
+  </div>
+  
+  {/* Empty middle space to push filter to the right */}
+  <div className="flex-grow"></div>
+  
+  {/* Machine filter - moved to right with padding */}
+  <div className="relative pl-4">
+    <div className="relative flex items-center">
+      <Filter className="text-indigo-500 h-3 w-3 absolute left-2" />
+      <select
+        value={selectedMachine}
+        onChange={(e) => setSelectedMachine(e.target.value)}
+        className="pl-6 pr-6 py-1 border border-gray-200 rounded text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 font-medium min-w-[180px] appearance-none bg-white"
+        aria-label="Select Machine"
+      >
+        <option value="all">All Machines</option>
+        {machines
+          .filter(machine => machine.id !== 'EVC Lab' && machine.Machine !== 'EVC Lab')
+          .map(machine => (
+            <option key={machine.id} value={machine.id} disabled={!machine.isAvailable}>
+              {machine.Machine} {!machine.isAvailable ? '(Unavailable)' : ''}
+            </option>
+        ))}
+      </select>
+      <ChevronRight className="h-3 w-3 text-gray-500 transform rotate-90 absolute right-2 pointer-events-none" />
+    </div>
+  </div>
+</div>
+    );
+  };
+
+  // Custom event component with tooltip
+  const EventComponent = ({ event }: { event: any }) => {
+    const handleMouseEnter = (e: React.MouseEvent) => {
+      setHoveredEvent(event);
+      
+      // If it's blocked, set tooltip content
+      if (event.resource?.isBlocked) {
+        setTooltipContent('This date is unavailable for reservations');
+      } else {
+        // For machine reservations
+        const timeSlot = event.resource?.timeSlot || 'unknown';
+        let timeString = '';
+        
+        if (timeSlot === 'morning') {
+          timeString = '8:00 AM - 12:00 PM';
+        } else if (timeSlot === 'afternoon') {
+          timeString = '1:00 PM - 5:00 PM';
+        } else if (timeSlot === 'allday') {
+          timeString = 'All Day';
+        }
+        
+        setTooltipContent(`${event.title} - ${timeString}`);
+      }
+      
+      // Position the tooltip
+      const rect = e.currentTarget.getBoundingClientRect();
+      setTooltipPosition({
+        top: rect.top + window.scrollY - 40,
+        left: rect.left + window.scrollX + (rect.width / 2)
+      });
+      
+      setShowTooltip(true);
+    };
+    
+    return (
+      <div
+        className="event-content truncate cursor-pointer px-1 py-0.5 hover:opacity-90"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={() => setShowTooltip(false)}
+      >
+        {event.title}
       </div>
     );
   };
 
+  // Debugs to help identify issues
+  console.log('Calendar rendering with:', {
+    machinesCount: machines?.length || 0,
+    eventsCount: calendarEvents?.length || 0,
+    reservationsCount: reservations?.length || 0,
+    isLoading
+  });
+
   return (
-    <div className="bg-white p-6 rounded-2xl">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-3">
-        <h3 className="text-xl font-bold font-qanelas2">
-          Machine Availability Calendar
-        </h3>
-        
-        <div className="relative">
-          <select
-            value={selectedMachine}
-            onChange={(e) => setSelectedMachine(e.target.value)}
-            className="pl-9 pr-4 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="all">All Machines</option>
-            {machines.filter(machine => machine.id !== 'EVC Lab' && machine.Machine !== 'EVC Lab').map(machine => (
-              <option key={machine.id} value={machine.id} disabled={!machine.isAvailable}>
-                {machine.Machine} {!machine.isAvailable ? '(Unavailable)' : ''}
-              </option>
-            ))}
-          </select>
-          <Filter className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-500 h-5 w-5" />
-        </div>
-      </div>
-      
-      <div className="font-poppins1 mb-4 flex items-start gap-2 bg-blue-50 p-3 rounded-lg">
-        <Info className="text-blue-500 h-5 w-5 mt-0.5 flex-shrink-0" />
-        <div>
-          <p className="text-sm text-gray-700">
-            This calendar shows the availability of all machines. Reserved time slots 
-            are marked on the calendar. Use the filter to view availability for a specific machine.
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Info banner - More compact */}
+      <div className="p-2 bg-indigo-50 border-b border-indigo-100">
+        <div className="flex items-start gap-2">
+          <Info className="text-indigo-500 h-4 w-4 mt-0.5 flex-shrink-0" />
+          <p className="text-xs text-gray-700 leading-relaxed">
+            This calendar shows machine availability. Reserved time slots are marked.
+            Use the filter to view a specific machine.
           </p>
         </div>
       </div>
-      
-      <div className="mb-3 flex flex-wrap gap-3">
-        <div className="flex items-center">
-          <div className="w-4 h-4 bg-[#1c62b5] rounded-sm mr-2"></div>
-          <span className="text-sm">All Day</span>
-        </div>
-        <div className="flex items-center">
-          <div className="w-4 h-4 bg-[#22C55E] rounded-sm mr-2"></div>
-          <span className="text-sm">Morning (8AM-12PM)</span>
-        </div>
-        <div className="flex items-center">
-          <div className="w-4 h-4 bg-[#F59E0B] rounded-sm mr-2"></div>
-          <span className="text-sm">Afternoon (1PM-5PM)</span>
+
+      {/* Legend - More compact */}
+      <div className="px-3 py-2 border-b border-gray-200 bg-gray-50">
+        <div className="flex flex-wrap gap-3">
+          <div className="flex items-center">
+            <div className="w-3 h-3 bg-[#4F46E5] rounded-sm mr-1 shadow-sm"></div>
+            <span className="text-xs text-gray-700">All Day</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-3 h-3 bg-[#10B981] rounded-sm mr-1 shadow-sm"></div>
+            <span className="text-xs text-gray-700">Morning (8AM-12PM)</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-3 h-3 bg-[#F59E0B] rounded-sm mr-1 shadow-sm"></div>
+            <span className="text-xs text-gray-700">Afternoon (1PM-5PM)</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-3 h-3 bg-[#EF4444] rounded-sm mr-1 shadow-sm"></div>
+            <span className="text-xs text-gray-700">Blocked Dates</span>
+          </div>
         </div>
       </div>
       
+      {/* Calendar Section */}
       {isLoading ? (
-        <div className="h-[500px] flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="h-[450px] md:h-[550px] flex flex-col items-center justify-center bg-gray-50">
+          <Loader2 className="h-8 w-8 text-indigo-600 animate-spin mb-2" />
+          <p className="text-sm text-gray-600">Loading calendar data...</p>
         </div>
       ) : (
-        <div className="h-[500px]">
+        <div className="calendar-container flex-grow" style={{ height: "500px" }}>
           <Calendar
             localizer={localizer}
             events={calendarEvents}
@@ -352,25 +489,221 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose }) 
             date={currentDate}
             toolbar={true}
             components={{
-              toolbar: CustomToolbar
+              toolbar: CustomToolbar,
+              event: EventComponent
             }}
             eventPropGetter={eventStyleGetter}
+            dayPropGetter={dayPropGetter}
             popup
-            className="font-poppins1"
+            className="font-sans h-full"
+            formats={{
+              monthHeaderFormat: 'MMMM YYYY',
+              dayHeaderFormat: 'dddd, MMMM D',
+              dayRangeHeaderFormat: ({ start, end }) => 
+                `${moment(start).format('MMMM D')} - ${moment(end).format('MMMM D, YYYY')}`
+            }}
           />
         </div>
       )}
       
-      {onClose && (
-        <div className="mt-6 flex justify-end">
-          <button 
-            onClick={onClose}
-            className="bg-gray-100 text-gray-700 py-2 px-6 rounded-full transition duration-300 hover:bg-gray-200 font-poppins1"
-          >
-            Close
-          </button>
+      {/* Event Tooltip */}
+      {showTooltip && (
+        <div 
+          className="fixed z-50 bg-gray-900 text-white px-3 py-1.5 rounded shadow-lg text-sm pointer-events-none"
+          style={{
+            top: `${tooltipPosition.top}px`,
+            left: `${tooltipPosition.left}px`,
+            transform: 'translateX(-50%)'
+          }}
+        >
+          {tooltipContent}
+          <div className="absolute w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-gray-900" style={{ top: '100%', left: '50%', transform: 'translateX(-50%)' }}></div>
         </div>
       )}
+      
+      {/* Add custom styling for better calendar appearance */}
+      <style jsx global>{`
+        /* Calendar header styling - more compact */
+        .rbc-header {
+          padding: 6px 4px;
+          font-weight: 600;
+          font-size: 0.7rem;
+          background-color: #F1F5F9;
+          color: #475569;
+          border-width: 1px;
+          border-color: #E2E8F0;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+        
+        /* Calendar cell styling - more compact */
+        .rbc-date-cell {
+          padding: 4px 4px 0 0;
+          font-size: 0.7rem;
+          color: #64748B;
+          font-weight: 500;
+        }
+        
+        /* Remove the today cell special styling */
+        .rbc-date-cell.rbc-now {
+          font-weight: 700;
+          color: #4F46E5;
+        }
+        
+        /* Today indicator */
+        .rbc-day-bg.rbc-today {
+          background-color: rgba(224, 231, 255, 0.5);
+        }
+        
+        /* Month view cell border styling */
+        .rbc-month-view {
+          border-width: 1px;
+          border-style: solid;
+          border-color: #E2E8F0;
+          border-radius: 0.5rem;
+          overflow: hidden;
+          background-color: #FFFFFF;
+          box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+          margin: 4px;
+        }
+        
+        .rbc-month-row {
+          border-width: 0;
+          margin-bottom: 0;
+          min-height: 0;
+        }
+        
+        .rbc-day-bg {
+          border-width: 0;
+          margin: 1px;
+          border-radius: 2px;
+          background-color: #FAFBFC;
+        }
+        
+        /* Event styling - more compact */
+        .rbc-event {
+          padding: 0 !important;
+          border-radius: 2px !important;
+          margin-bottom: 1px;
+          transition: all 0.15s ease-in-out;
+          font-size: 0.65rem !important;
+        }
+        
+        .rbc-event:hover {
+          transform: translateY(-1px);
+        }
+        
+        /* Month row styling - more compact */
+        .rbc-month-row {
+          min-height: 65px;
+        }
+        
+        /* Weekends styling */
+        .weekend-day {
+          background-color: #F8FAFC !important;
+        }
+        
+        /* Today's cell */
+        .today-cell {
+          box-shadow: inset 0 0 0 1px #4F46E5;
+          z-index: 1;
+          position: relative;
+        }
+        
+        /* Off-range day styling (days from other months) */
+        .rbc-off-range {
+          color: #CBD5E1;
+        }
+        
+        /* Active day styling when clicked */
+        .rbc-day-bg.rbc-selected-cell {
+          background-color: rgba(224, 231, 255, 0.5);
+        }
+        
+        /* Ensure borders connect properly */
+        .rbc-month-view, .rbc-month-row, .rbc-week-row, .rbc-day-bg {
+          border-collapse: separate;
+        }
+        
+        /* Make events container scrollable if many events */
+        .rbc-row-content {
+          max-height: 100%;
+        }
+
+        /* Popup styling - more compact */
+        .rbc-overlay {
+          z-index: 100;
+          border-radius: 4px;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+          border: 1px solid #E5E7EB;
+          overflow: hidden;
+          font-size: 0.75rem;
+        }
+        
+        .rbc-overlay-header {
+          padding: 6px 10px;
+          background-color: #F1F5F9;
+          border-bottom: 1px solid #E2E8F0;
+          font-weight: 600;
+          color: #334155;
+          font-size: 0.75rem;
+        }
+        
+        /* Animation for hover effects */
+        .event-item {
+          transition: all 0.2s ease-in-out;
+        }
+        
+        /* Calendar container scroll */
+        .rbc-calendar {
+          height: 100% !important;
+        }
+        
+        /* Custom scrollbar for calendar */
+        .rbc-month-view::-webkit-scrollbar {
+          width: 6px;
+        }
+        
+        .rbc-month-view::-webkit-scrollbar-track {
+          background: #F1F5F9;
+        }
+        
+        .rbc-month-view::-webkit-scrollbar-thumb {
+          background-color: #CBD5E1;
+          border-radius: 3px;
+        }
+        
+        /* Compact rows*/
+        .rbc-row {
+          margin-bottom: 0;
+        }
+        
+        /* Make all components more compact */
+        .rbc-calendar, .rbc-month-view, .rbc-month-row {
+          box-sizing: border-box !important;
+        }
+        
+        /* Fix the row height to make a compact calendar */
+        .rbc-row-segment {
+          padding: 0 1px !important;
+        }
+        
+        /* Adjust the toolbar size */
+        .rbc-toolbar {
+          font-size: 0.8rem !important;
+          margin-bottom: 5px !important;
+        }
+        
+        /* Adjust the time information display in events */
+        .rbc-event-label {
+          font-size: 0.65rem !important;
+        }
+        
+        /* Fixed height for more deterministic sizing */
+        .calendar-container {
+          height: 500px !important;
+        }
+      `}</style>
     </div>
   );
 };
