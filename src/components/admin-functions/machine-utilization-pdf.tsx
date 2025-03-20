@@ -20,25 +20,7 @@ interface MachineUtilization {
   };
   Status: string;
   Notes?: string;
-  ProductType?: string;
-  OperatorName?: string;
-  Downtime?: {
-    Date: string;
-    ProductType: string;
-    Duration: number;
-    Cause: string;
-    OperatorName: string;
-  }[];
-  Maintenance?: {
-    Date: string;
-    ServiceType: string;
-    Duration: number;
-    Reason: string;
-    PartsReplaced: string;
-    PersonnelName: string;
-  }[];
-  ReviewedBy?: string;
-  ReviewDate?: string;
+  TypeOfProducts?: string;
 }
 
 /**
@@ -78,13 +60,47 @@ const formatDuration = (minutes: number | null): string => {
 };
 
 /**
+ * Generates a PDF for a machine utilization using browser print capabilities
+ * This is a fallback method that uses HTML and browser printing
+ * @param utilizationData - The machine utilization data
+ */
+const generatePrintPDF = (utilizationData: MachineUtilization): void => {
+  // Create a new window for printing
+  const printWindow = window.open('', '_blank', 'width=800,height=600');
+ 
+  if (!printWindow) {
+    alert('Please allow pop-ups to generate the PDF');
+    return;
+  }
+ 
+};
+
+/**
  * Main function to generate and download a PDF for a machine utilization
  * @param utilizationData - The machine utilization data
  */
 function downloadMachineUtilPDF(utilizationData: MachineUtilization): void {
   try {
-    // Log the data received to help with debugging
     console.log('Starting machine utilization PDF generation with data:', utilizationData);
+    
+    // Ensure all data is properly formatted to prevent errors
+    const safeUtilizationData = {
+      ...utilizationData,
+      id: utilizationData.id || 0,
+      Machine: utilizationData.Machine || 'N/A',
+      UtilizationDate: utilizationData.UtilizationDate || new Date().toISOString(),
+      StartTime: utilizationData.StartTime || null,
+      EndTime: utilizationData.EndTime || null,
+      Duration: typeof utilizationData.Duration === 'number' ? utilizationData.Duration : 0,
+      User: {
+        Name: utilizationData.User?.Name || 'Unknown',
+        email: utilizationData.User?.email || 'No email provided',
+        Role: utilizationData.User?.Role || 'Unknown'
+      },
+      Status: utilizationData.Status || 'Pending',
+      Notes: utilizationData.Notes || '',
+      TypeOfProducts: utilizationData.TypeOfProducts || ''
+    };
     
     // Initialize jsPDF
     const doc = new jsPDF({
@@ -101,198 +117,375 @@ function downloadMachineUtilPDF(utilizationData: MachineUtilization): void {
     }
    
     const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 15;
+    const margin = 10;
     const contentWidth = pageWidth - (margin * 2);
+    
+    // ============ HEADER SECTION (Matching the image) ============
+    
+    // Create a border around the entire header   
+    // Add logo placeholders - Use images instead of placeholder text
+    try {
+      // Left logo - Use the image path
+      const leftLogoUrl = '/images/logos/left_logo.png';
+      doc.addImage(leftLogoUrl, 'PNG', margin, 10, 20, 20);
+    } catch (error) {
+      console.error('Error adding left logo:', error);
+      // Fallback to placeholder rectangle
+      doc.rect(margin, 10, 20, 20);
+      doc.text('LOGO', margin + 10, 22, { align: 'center' });
+    }
    
-    // Add header with logos and title
-    // Top position
-    let yPosition = 20;
-    
-    // Add title
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('FABRICATION LABORATORY SHARED SERVICE FACILITY', pageWidth / 2, yPosition, { align: 'center' });
-    
-    yPosition += 8;
-    doc.setFontSize(18);
-    doc.text('MACHINE UTILIZATION FORM', pageWidth / 2, yPosition, { align: 'center' });
-    
-    yPosition += 8;
+    try {
+      // Right logo - Use the image path
+      const rightLogoUrl = '/images/logos/dti_logo.png';
+      doc.addImage(rightLogoUrl, 'PNG', pageWidth - margin - 20, 10, 20, 20);
+    } catch (error) {
+      console.error('Error adding right logo:', error);
+      // Fallback to placeholder rectangle
+      doc.rect(pageWidth - margin - 20, 10, 20, 20);
+      doc.text('DTI', pageWidth - margin - 10, 22, { align: 'center' });
+    }
+   
+    // Add header text (centered)
     doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('FABRICATION LABORATORY SHARED SERVICE FACILITY', pageWidth / 2, 15, { align: 'center' });
+   
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('MACHINE UTILIZATION FORM', pageWidth / 2, 22, { align: 'center' });
+   
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
-    doc.text('Philippine Science High School-Eastern Visayas Campus (PSHS-EVC)', pageWidth / 2, yPosition, { align: 'center' });
+    doc.text('Philippine Science High School-Eastern Visayas Campus (PSHS-EVC)', pageWidth / 2, 27, { align: 'center' });
+    doc.text('AH26 Brgy. Pawing, Palo, Leyte 6501', pageWidth / 2, 31, { align: 'center' });
     
-    yPosition += 5;
-    doc.text('AH26 Brgy. Pawing, Palo, Leyte 6501', pageWidth / 2, yPosition, { align: 'center' });
+    // ============ MACHINE TYPE SECTION ============
+    let yPosition = 40;
     
-    // Add machine type section
-    yPosition += 10;
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Type of Machine or Equipment used:', margin, yPosition);
-    doc.setFont('helvetica', 'normal');
-    doc.text(utilizationData.Machine || 'N/A', margin + 80, yPosition);
-    
-    // Add Utilization Information section title
-    yPosition += 8;
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Utilization Information', margin, yPosition);
-    
-    // Operating Time Table
-    yPosition += 8;
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Operating Time', margin, yPosition);
-    
-    // Create the header for the operating time table
-    const operatingTimeHead = [
-      [
-        { content: 'Date', styles: { fontStyle: 'bold', halign: 'center' } },
-        { content: 'Type of products processed', styles: { fontStyle: 'bold', halign: 'center' } },
-        { content: 'Start time', styles: { fontStyle: 'bold', halign: 'center' } },
-        { content: 'End time', styles: { fontStyle: 'bold', halign: 'center' } },
-        { content: 'Name and Signature of Machine operator', styles: { fontStyle: 'bold', halign: 'center' } }
-      ]
+    // Machine type section with a bordered header
+    const machineTypeHeader: AutoTableColumnOption[][] = [
+      [{ content: 'Type of Machine or Equipment used:', styles: { fontStyle: 'bold', fillColor: '#f0f0f0' } }]
     ];
     
-    // Create the body for the operating time table
-    const operatingTimeBody = [
-      [
-        formatDate(utilizationData.UtilizationDate),
-        utilizationData.ProductType || '',
-        formatTime(utilizationData.StartTime),
-        formatTime(utilizationData.EndTime),
-        utilizationData.OperatorName || utilizationData.User.Name
-      ],
-      ['', '', '', '', ''],
-      ['', '', '', '', ''],
-      ['', '', '', '', '']
-    ];
-    
-    // Draw the operating time table
-    const operatingTimeTable = autoTable(doc, {
-      startY: yPosition + 2,
-      head: operatingTimeHead as any,
-      body: operatingTimeBody,
-      theme: 'grid',
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0] },
-      margin: { left: margin, right: margin }
-    }) as unknown as AutoTableResult;
-    
-    // Downtimes section
-    yPosition = (operatingTimeTable.finalY || yPosition + 30) + 10;
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Downtimes', margin, yPosition);
-    
-    // Create the header for the downtimes table
-    const downtimesHead = [
-      [
-        { content: 'Date', styles: { fontStyle: 'bold', halign: 'center' } },
-        { content: 'Type of products processed', styles: { fontStyle: 'bold', halign: 'center' } },
-        { content: 'Duration of stoppage', styles: { fontStyle: 'bold', halign: 'center' } },
-        { content: 'Cause/s of stoppage', styles: { fontStyle: 'bold', halign: 'center' } },
-        { content: 'Name and Signature of Machine operator', styles: { fontStyle: 'bold', halign: 'center' } }
-      ]
-    ];
-    
-    // Create the body for the downtimes table
-    const downtimesBody = [];
-    if (utilizationData.Downtime && utilizationData.Downtime.length > 0) {
-      for (const downtime of utilizationData.Downtime) {
-        downtimesBody.push([
-          formatDate(downtime.Date),
-          downtime.ProductType,
-          formatDuration(downtime.Duration),
-          downtime.Cause,
-          downtime.OperatorName
-        ]);
-      }
-    } else {
-      downtimesBody.push(['', '', '', '', '']);
-      downtimesBody.push(['', '', '', '', '']);
-      downtimesBody.push(['', '', '', '', '']);
+    try {
+      const result = autoTable(doc, {
+        startY: yPosition,
+        head: [],
+        body: machineTypeHeader as any,
+        theme: 'grid',
+        styles: { fontSize: 10, cellPadding: 2 },
+        margin: { left: margin, right: margin },
+        tableWidth: contentWidth
+      });
+      
+      // Safely check for finalY property and provide a fallback
+      yPosition = (result as any)?.finalY || (yPosition + 7);
+    } catch (error) {
+      console.error('Error in machine type header:', error);
+      yPosition += 7;
     }
     
-    // Draw the downtimes table
-    const downtimesTable = autoTable(doc, {
-      startY: yPosition + 2,
-      head: downtimesHead as any,
-      body: downtimesBody,
-      theme: 'grid',
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0] },
-      margin: { left: margin, right: margin }
-    }) as unknown as AutoTableResult;
+    // Machine name cell (empty cell for filling)
+    const machineNameData: AutoTableColumnOption[][] = [
+      [{ content: safeUtilizationData.Machine }]
+    ];
     
-    // Repair and Maintenance Check section
-    yPosition = (downtimesTable.finalY || yPosition + 30) + 10;
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Repair and Maintenance Check', margin, yPosition);
+    try {
+      const result = autoTable(doc, {
+        startY: yPosition,
+        head: [],
+        body: machineNameData as any,
+        theme: 'grid',
+        styles: { fontSize: 10, cellPadding: 2 },
+        margin: { left: margin, right: margin },
+        tableWidth: contentWidth
+      });
+      
+      // Safely check for finalY property and provide a fallback
+      yPosition = (result as any)?.finalY || (yPosition + 7);
+    } catch (error) {
+      console.error('Error in machine name table:', error);
+      yPosition += 7;
+    }
     
-    // Create the header for the maintenance table
-    const maintenanceHead = [
+    // ============ UTILIZATION INFORMATION SECTION ============
+    
+    // Utilization Information header
+    const utilizationInfoHeader: AutoTableColumnOption[][] = [
+      [{ content: 'Utilization Information', styles: { fontStyle: 'bold', fillColor: '#f0f0f0' } }]
+    ];
+    
+    try {
+      const result = autoTable(doc, {
+        startY: yPosition,
+        head: [],
+        body: utilizationInfoHeader as any,
+        theme: 'grid',
+        styles: { fontSize: 10, cellPadding: 2 },
+        margin: { left: margin, right: margin },
+        tableWidth: contentWidth
+      });
+      
+      // Safely check for finalY property and provide a fallback
+      yPosition = (result as any)?.finalY || (yPosition + 7);
+    } catch (error) {
+      console.error('Error in utilization info header:', error);
+      yPosition += 7;
+    }
+    
+    // ============ OPERATING TIME SECTION ============
+    
+    // Operating Time header
+    const operatingTimeHeader: AutoTableColumnOption[][] = [
+      [{ content: 'Operating Time', styles: { fontStyle: 'bold', fillColor: '#f0f0f0' } }]
+    ];
+    
+    try {
+      const result = autoTable(doc, {
+        startY: yPosition,
+        head: [],
+        body: operatingTimeHeader as any,
+        theme: 'grid',
+        styles: { fontSize: 10, cellPadding: 2 },
+        margin: { left: margin, right: margin },
+        tableWidth: contentWidth
+      });
+      
+      // Safely check for finalY property and provide a fallback
+      yPosition = (result as any)?.finalY || (yPosition + 7);
+    } catch (error) {
+      console.error('Error in operating time header:', error);
+      yPosition += 7;
+    }
+    
+    // Operating Time table
+    const operatingTimeHeaders: AutoTableColumnOption[] = [
+      { content: 'Date', styles: { halign: 'center', fontStyle: 'bold', textColor: '#333' } },
+      { content: 'Type of products processed', styles: { halign: 'center', fontStyle: 'bold', textColor: '#333'} },
+      { content: 'Start time', styles: { halign: 'center', fontStyle: 'bold', textColor: '#333' } },
+      { content: 'End time', styles: { halign: 'center', fontStyle: 'bold', textColor: '#333' } },
+      { content: 'Name and Signature of Machine operator', styles: { halign: 'center', fontStyle: 'bold', textColor: '#333'} }
+    ];
+    
+    // First row with actual data
+    const operatingTimeFirstRow: AutoTableColumnOption[] = [
+      { content: formatDate(safeUtilizationData.UtilizationDate) },
+      { content: safeUtilizationData.TypeOfProducts || '' },
+      { content: formatTime(safeUtilizationData.StartTime) },
+      { content: formatTime(safeUtilizationData.EndTime) },
+      { content: safeUtilizationData.User.Name }
+    ];
+    
+    // Empty rows for additional entries
+    const emptyRow: AutoTableColumnOption[] = [
+      { content: '' }, { content: '' }, { content: '' }, { content: '' }, { content: '' }
+    ];
+    
+    const operatingTimeData: AutoTableColumnOption[][] = [
+      operatingTimeFirstRow,
+      [...emptyRow],
+      [...emptyRow],
+      [...emptyRow]
+    ];
+    
+    try {
+      const result = autoTable(doc, {
+        startY: yPosition,
+        head: [operatingTimeHeaders],
+        body: operatingTimeData as any,
+        theme: 'grid',
+        styles: { fontSize: 9, cellPadding: 3 },
+        headStyles: { fillColor: '#ffffff' },
+        margin: { left: margin, right: margin },
+        tableWidth: contentWidth,
+        columnStyles: {
+          0: { cellWidth: contentWidth * 0.15 }, // Date
+          1: { cellWidth: contentWidth * 0.30 }, // Type of products
+          2: { cellWidth: contentWidth * 0.15 }, // Start time
+          3: { cellWidth: contentWidth * 0.15 }, // End time
+          4: { cellWidth: contentWidth * 0.25 }  // Name and signature
+        }
+      });
+      
+      // Safely check for finalY property and provide a fallback
+      yPosition = (result as any)?.finalY || (yPosition + 35);
+    } catch (error) {
+      console.error('Error in operating time table:', error);
+      yPosition += 35;
+    }
+    
+    // ============ DOWNTIMES SECTION ============
+    
+    // Downtimes header
+    const downtimesHeader: AutoTableColumnOption[][] = [
+      [{ content: 'Downtimes', styles: { fontStyle: 'bold', fillColor: '#f0f0f0' } }]
+    ];
+    
+    try {
+      const result = autoTable(doc, {
+        startY: yPosition,
+        head: [],
+        body: downtimesHeader as any,
+        theme: 'grid',
+        styles: { fontSize: 10, cellPadding: 2 },
+        margin: { left: margin, right: margin },
+        tableWidth: contentWidth
+      });
+      
+      // Safely check for finalY property and provide a fallback
+      yPosition = (result as any)?.finalY || (yPosition + 7);
+    } catch (error) {
+      console.error('Error in downtimes header:', error);
+      yPosition += 7;
+    }
+    
+    // Downtimes table
+    const downtimesHeaders: AutoTableColumnOption[] = [
+      { content: 'Date', styles: { halign: 'center', fontStyle: 'bold', textColor: '#333' } },
+      { content: 'Type of products processed', styles: { halign: 'center', fontStyle: 'bold', textColor: '#333' } },
+      { content: 'Duration of stoppage', styles: { halign: 'center', fontStyle: 'bold', textColor: '#333' } },
+      { content: 'Cause/s of stoppage', styles: { halign: 'center', fontStyle: 'bold', textColor: '#333' } },
+      { content: 'Name and Signature of Machine operator', styles: { halign: 'center', fontStyle: 'bold', textColor: '#333' } }
+    ];
+    
+    // Empty rows for downtime entries
+    const downtimesData: AutoTableColumnOption[][] = [
+      [...emptyRow],
+      [...emptyRow],
+      [...emptyRow]
+    ];
+    
+    try {
+      const result = autoTable(doc, {
+        startY: yPosition,
+        head: [downtimesHeaders],
+        body: downtimesData as any,
+        theme: 'grid',
+        styles: { fontSize: 9, cellPadding: 3 },
+        headStyles: { fillColor: [255, 255, 255] },
+        margin: { left: margin, right: margin },
+        tableWidth: contentWidth,
+        columnStyles: {
+          0: { cellWidth: contentWidth * 0.15 }, // Date
+          1: { cellWidth: contentWidth * 0.25 }, // Type of products
+          2: { cellWidth: contentWidth * 0.15 }, // Duration of stoppage
+          3: { cellWidth: contentWidth * 0.25 }, // Cause/s of stoppage
+          4: { cellWidth: contentWidth * 0.20 }  // Name and signature
+        }
+      });
+      
+      // Safely check for finalY property and provide a fallback
+      yPosition = (result as any)?.finalY || (yPosition + 28);
+    } catch (error) {
+      console.error('Error in downtimes table:', error);
+      yPosition += 28;
+    }
+    
+    // ============ REPAIR AND MAINTENANCE SECTION ============
+    
+    // Repair and Maintenance header
+    const repairHeader: AutoTableColumnOption[][] = [
+      [{ content: 'Repair and Maintenance Check', styles: { fontStyle: 'bold', fillColor: '#f0f0f0' } }]
+    ];
+    
+    try {
+      const result = autoTable(doc, {
+        startY: yPosition,
+        head: [],
+        body: repairHeader as any,
+        theme: 'grid',
+        styles: { fontSize: 10, cellPadding: 2 },
+        margin: { left: margin, right: margin },
+        tableWidth: contentWidth
+      });
+      
+      // Safely check for finalY property and provide a fallback
+      yPosition = (result as any)?.finalY || (yPosition + 7);
+    } catch (error) {
+      console.error('Error in repair header:', error);
+      yPosition += 7;
+    }
+    
+    // Repair and Maintenance table
+    const repairHeaders: AutoTableColumnOption[] = [
+      { content: 'Date', styles: { halign: 'center', fontStyle: 'bold', textColor: '#333' } },
+      { content: 'Type of service\n(R-repair, M-maintenance)', styles: { halign: 'center', fontStyle: 'bold', textColor: '#333' } },
+      { content: 'Duration', styles: { halign: 'center', fontStyle: 'bold', textColor: '#333' } },
+      { content: 'Reason for Repair or maintenance', styles: { halign: 'center', fontStyle: 'bold', textColor: '#333' } },
+      { content: 'Parts replaced', styles: { halign: 'center', fontStyle: 'bold', textColor: '#333' } },
+      { content: 'Name and Signature of the R&P personnel', styles: { halign: 'center', fontStyle: 'bold', textColor: '#333' } }
+    ];
+    
+    // Empty rows for repair entries
+    const emptyRepairRow: AutoTableColumnOption[] = [
+      { content: '' }, { content: '' }, { content: '' }, { content: '' }, { content: '' }, { content: '' }
+    ];
+    
+    const repairData: AutoTableColumnOption[][] = [
+      [...emptyRepairRow],
+      [...emptyRepairRow],
+      [...emptyRepairRow]
+    ];
+    
+    try {
+      const result = autoTable(doc, {
+        startY: yPosition,
+        head: [repairHeaders],
+        body: repairData as any,
+        theme: 'grid',
+        styles: { fontSize: 9, cellPadding: 3 },
+        headStyles: { fillColor: [255, 255, 255] },
+        margin: { left: margin, right: margin },
+        tableWidth: contentWidth,
+        columnStyles: {
+          0: { cellWidth: contentWidth * 0.12 }, // Date
+          1: { cellWidth: contentWidth * 0.18 }, // Type of service
+          2: { cellWidth: contentWidth * 0.12 }, // Duration
+          3: { cellWidth: contentWidth * 0.20 }, // Reason for Repair
+          4: { cellWidth: contentWidth * 0.15 }, // Parts replaced
+          5: { cellWidth: contentWidth * 0.23 }  // Name and signature
+        }
+      });
+      
+      // Safely check for finalY property and provide a fallback
+      yPosition = (result as any)?.finalY || (yPosition + 28);
+    } catch (error) {
+      console.error('Error in repair table:', error);
+      yPosition += 28;
+    }
+    
+    // ============ REVIEWED AND CHECKED SECTION ============
+    
+    // Create a single row for the reviewed and checked section
+    const reviewedData: AutoTableColumnOption[][] = [
       [
-        { content: 'Date', styles: { fontStyle: 'bold', halign: 'center' } },
-        { content: 'Type of service (R-repair, M-maintenance)', styles: { fontStyle: 'bold', halign: 'center' } },
-        { content: 'Duration', styles: { fontStyle: 'bold', halign: 'center' } },
-        { content: 'Reason for Repair or maintenance', styles: { fontStyle: 'bold', halign: 'center' } },
-        { content: 'Parts replaced', styles: { fontStyle: 'bold', halign: 'center' } },
-        { content: 'Name and Signature of the R&P personnel', styles: { fontStyle: 'bold', halign: 'center' } }
+        { content: 'Reviewed an checked by: Name and signature of the employee', styles: { fontStyle: 'bold' } },
+        { content: 'Date:', styles: { fontStyle: 'bold' } }
       ]
     ];
     
-    // Create the body for the maintenance table
-    const maintenanceBody = [];
-    if (utilizationData.Maintenance && utilizationData.Maintenance.length > 0) {
-      for (const maintenance of utilizationData.Maintenance) {
-        maintenanceBody.push([
-          formatDate(maintenance.Date),
-          maintenance.ServiceType,
-          formatDuration(maintenance.Duration),
-          maintenance.Reason,
-          maintenance.PartsReplaced,
-          maintenance.PersonnelName
-        ]);
-      }
-    } else {
-      maintenanceBody.push(['', '', '', '', '', '']);
-      maintenanceBody.push(['', '', '', '', '', '']);
-      maintenanceBody.push(['', '', '', '', '', '']);
+    try {
+      autoTable(doc, {
+        startY: yPosition + 20,
+        head: [],
+        body: reviewedData as any,
+        theme: 'grid',
+        styles: { fontSize: 10, cellPadding: 3 },
+        margin: { left: margin, right: margin },
+        tableWidth: contentWidth,
+        columnStyles: {
+          0: { cellWidth: contentWidth * 0.7 },
+          1: { cellWidth: contentWidth * 0.3 }
+        }
+      });
+    } catch (error) {
+      console.error('Error in reviewed section:', error);
     }
     
-    // Draw the maintenance table
-    const maintenanceTable = autoTable(doc, {
-      startY: yPosition + 2,
-      head: maintenanceHead as any,
-      body: maintenanceBody,
-      theme: 'grid',
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [255, 255, 255], textColor: [0, 0, 0] },
-      margin: { left: margin, right: margin }
-    }) as unknown as AutoTableResult;
-    
-    // Add review section
-    yPosition = (maintenanceTable.finalY || yPosition + 30) + 5;
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Reviewed and checked by: ', margin, yPosition);
-    doc.setFont('helvetica', 'normal');
-    doc.text(utilizationData.ReviewedBy || 'Name and signature of the employee', margin + 60, yPosition);
-    
-    doc.setFont('helvetica', 'bold');
-    doc.text('Date: ', pageWidth - margin - 30, yPosition);
-    doc.setFont('helvetica', 'normal');
-    doc.text(utilizationData.ReviewDate ? formatDate(utilizationData.ReviewDate) : '', pageWidth - margin - 15, yPosition);
-    
-    console.log('PDF generation completed, saving file');
-    
-    // Save the PDF with a name based on the utilization ID
-    doc.save(`Machine_Utilization_Form_${utilizationData.id}.pdf`);
-    console.log('PDF saved successfully');
+    // Save the PDF with a name based on the machine utilization
+    doc.save(`Machine_Utilization_Form_${safeUtilizationData.id}.pdf`);
+    console.log('Machine utilization form PDF saved successfully');
   } catch (error) {
     console.error('Error generating machine utilization PDF:', error);
     // Fall back to browser print method
@@ -304,188 +497,6 @@ function downloadMachineUtilPDF(utilizationData: MachineUtilization): void {
     }
   }
 }
-
-/**
- * Generates a PDF for a machine utilization using browser print capabilities
- * This is a fallback method that uses HTML and browser printing
- * @param utilizationData - The machine utilization data
- */
-const generatePrintPDF = (utilizationData: MachineUtilization): void => {
-  // Create a new window for printing
-  const printWindow = window.open('', '_blank', 'width=800,height=600');
- 
-  if (!printWindow) {
-    alert('Please allow pop-ups to generate the PDF');
-    return;
-  }
- 
-  // Create the HTML content for printing based on the new form layout
-  const htmlContent = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Machine Utilization Form</title>
-      <style>
-        body {
-          font-family: Arial, sans-serif;
-          margin: 20px;
-          color: #333;
-        }
-        .header {
-          text-align: center;
-          margin-bottom: 20px;
-        }
-        h1 {
-          font-size: 18px;
-          margin-bottom: 5px;
-        }
-        h2 {
-          font-size: 20px;
-          margin-bottom: 5px;
-          font-weight: bold;
-        }
-        .section {
-          margin-bottom: 20px;
-        }
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-bottom: 15px;
-        }
-        th, td {
-          border: 1px solid #000;
-          padding: 8px;
-          text-align: left;
-        }
-        th {
-          font-weight: bold;
-        }
-        .footer {
-          margin-top: 30px;
-          font-size: 12px;
-        }
-        @media print {
-          .no-print { display: none; }
-          button { display: none; }
-        }
-      </style>
-    </head>
-    <body>
-      <div class="no-print" style="padding: 10px; background: #f0f0f0; margin-bottom: 20px;">
-        <button onclick="window.print()" style="padding: 8px 12px;">Print PDF</button>
-        <button onclick="window.close()" style="padding: 8px 12px; margin-left: 10px;">Close</button>
-      </div>
-     
-      <div class="header">
-        <h1>FABRICATION LABORATORY SHARED SERVICE FACILITY</h1>
-        <h2>MACHINE UTILIZATION FORM</h2>
-        <p>Philippine Science High School-Eastern Visayas Campus (PSHS-EVC)</p>
-        <p>AH26 Brgy. Pawing, Palo, Leyte 6501</p>
-      </div>
-     
-      <div class="section">
-        <p><strong>Type of Machine or Equipment used:</strong> ${utilizationData.Machine || 'N/A'}</p>
-      </div>
-     
-      <div class="section">
-        <h3>Utilization Information</h3>
-        <h4>Operating Time</h4>
-        <table>
-          <tr>
-            <th>Date</th>
-            <th>Type of products processed</th>
-            <th>Start time</th>
-            <th>End time</th>
-            <th>Name and Signature of Machine operator</th>
-          </tr>
-          <tr>
-            <td>${formatDate(utilizationData.UtilizationDate)}</td>
-            <td>${utilizationData.ProductType || ''}</td>
-            <td>${formatTime(utilizationData.StartTime)}</td>
-            <td>${formatTime(utilizationData.EndTime)}</td>
-            <td>${utilizationData.OperatorName || utilizationData.User.Name}</td>
-          </tr>
-          <tr><td></td><td></td><td></td><td></td><td></td></tr>
-          <tr><td></td><td></td><td></td><td></td><td></td></tr>
-          <tr><td></td><td></td><td></td><td></td><td></td></tr>
-        </table>
-      </div>
-     
-      <div class="section">
-        <h4>Downtimes</h4>
-        <table>
-          <tr>
-            <th>Date</th>
-            <th>Type of products processed</th>
-            <th>Duration of stoppage</th>
-            <th>Cause/s of stoppage</th>
-            <th>Name and Signature of Machine operator</th>
-          </tr>
-          ${utilizationData.Downtime && utilizationData.Downtime.length > 0 
-            ? utilizationData.Downtime.map(d => `
-              <tr>
-                <td>${formatDate(d.Date)}</td>
-                <td>${d.ProductType}</td>
-                <td>${formatDuration(d.Duration)}</td>
-                <td>${d.Cause}</td>
-                <td>${d.OperatorName}</td>
-              </tr>
-            `).join('')
-            : `
-              <tr><td></td><td></td><td></td><td></td><td></td></tr>
-              <tr><td></td><td></td><td></td><td></td><td></td></tr>
-              <tr><td></td><td></td><td></td><td></td><td></td></tr>
-            `
-          }
-        </table>
-      </div>
-     
-      <div class="section">
-        <h4>Repair and Maintenance Check</h4>
-        <table>
-          <tr>
-            <th>Date</th>
-            <th>Type of service (R-repair, M-maintenance)</th>
-            <th>Duration</th>
-            <th>Reason for Repair or maintenance</th>
-            <th>Parts replaced</th>
-            <th>Name and Signature of the R&P personnel</th>
-          </tr>
-          ${utilizationData.Maintenance && utilizationData.Maintenance.length > 0 
-            ? utilizationData.Maintenance.map(m => `
-              <tr>
-                <td>${formatDate(m.Date)}</td>
-                <td>${m.ServiceType}</td>
-                <td>${formatDuration(m.Duration)}</td>
-                <td>${m.Reason}</td>
-                <td>${m.PartsReplaced}</td>
-                <td>${m.PersonnelName}</td>
-              </tr>
-            `).join('')
-            : `
-              <tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-              <tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-              <tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>
-            `
-          }
-        </table>
-      </div>
-     
-      <div class="footer">
-        <p><strong>Reviewed and checked by:</strong> ${utilizationData.ReviewedBy || 'Name and signature of the employee'} <span style="float: right;"><strong>Date:</strong> ${utilizationData.ReviewDate ? formatDate(utilizationData.ReviewDate) : ''}</span></p>
-      </div>
-    </body>
-    </html>
-  `;
- 
-  // Write to the new window and trigger the print dialog
-  printWindow.document.open();
-  printWindow.document.write(htmlContent);
-  printWindow.document.close();
- 
-  // Focus the new window
-  printWindow.focus();
-};
 
 // Make sure to export the function properly
 export { downloadMachineUtilPDF };

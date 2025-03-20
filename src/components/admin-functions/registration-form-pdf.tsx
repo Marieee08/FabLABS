@@ -55,222 +55,84 @@ const generatePrintPDF = (formData: RegistrationFormData): void => {
     alert('Please allow pop-ups to generate the PDF');
     return;
   }
- 
-  // Create the HTML content for printing
-  const htmlContent = `
-    <!DOCTYPE html>
+  
+  // Create HTML content for printing
+  const html = `
     <html>
-    <head>
-      <title>Registration Form</title>
-      <style>
-        body {
-          font-family: Arial, sans-serif;
-          margin: 20px;
-          color: #333;
-        }
-        .header {
-          text-align: center;
-          margin-bottom: 20px;
-          position: relative;
-        }
-        .logo-left {
-          position: absolute;
-          left: 20px;
-          top: 0;
-          width: 60px;
-          height: 60px;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-        }
-        .logo-right {
-          position: absolute;
-          right: 20px;
-          top: 0;
-          width: 60px;
-          height: 60px;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-        }
-        h1 {
-          font-size: 16px;
-          margin-bottom: 5px;
-        }
-        h2 {
-          font-size: 18px;
-          margin-top: 5px;
-          margin-bottom: 15px;
-        }
-        .section-header {
-          background-color: #ddd;
-          padding: 5px;
-          font-weight: bold;
-          margin-top: 15px;
-        }
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-top: 5px;
-        }
-        th, td {
-          border: 1px solid #000;
-          padding: 5px;
-          text-align: left;
-        }
-        @media print {
-          .no-print { display: none; }
-          button { display: none; }
-        }
-      </style>
-    </head>
-    <body>
-      <div class="no-print" style="padding: 10px; background: #f0f0f0; margin-bottom: 20px;">
-        <button onclick="window.print()" style="padding: 8px 12px;">Print PDF</button>
-        <button onclick="window.close()" style="padding: 8px 12px; margin-left: 10px;">Close</button>
-      </div>
-     
-      <div class="header">
-        <div class="logo-left">
-          <img src="/images/logos/fablab_logo.png" alt="FabLab Logo" width="60" height="60">
+      <head>
+        <title>Registration Form</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          h1, h2 { text-align: center; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; font-weight: bold; }
+          .header { display: flex; justify-content: space-between; align-items: center; }
+          .logo { width: 60px; height: 60px; }
+          .section-header { background-color: #e0e0e0; padding: 5px; margin-top: 10px; font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <img class="logo" src="/images/logos/left_logo.png" alt="FabLab Logo">
+          </div>
+          <div>
+            <h1>FABRICATION LABORATORY SHARED SERVICE FACILITY</h1>
+            <h2>REGISTRATION FORM</h2>
+            <p>Philippine Science High School-Eastern Visayas Campus (PSHS-EVC)</p>
+            <p>AH26 Brgy. Pawing, Palo, Leyte 6501</p>
+          </div>
+          <div>
+            <img class="logo" src="/images/logos/dti_logo.png" alt="DTI Logo">
+          </div>
         </div>
-        <div class="logo-right">
-          <img src="/images/logos/dti_logo.png" alt="DTI Logo" width="60" height="60">
-        </div>
-        <h1>FABRICATION LABORATORY SHARED SERVICE FACILITY</h1>
-        <h2>REGISTRATION FORM</h2>
-        <p>Philippine Science High School-Eastern Visayas Campus (PSHS-EVC)<br>AH26 Brgy. Pawing, Palo, Leyte 6501</p>
-      </div>
-     
-      <div class="section-header">BUSINESS INFORMATION</div>
-      <table>
-        <tr>
-          <td width="30%"><strong>Company Name:</strong></td>
-          <td colspan="3">${formData.businessInfo?.CompanyName || ''}</td>
-        </tr>
-        <tr>
-          <td><strong>Company/Business Owner:</strong></td>
-          <td>${formData.businessInfo?.BusinessOwner || ''}</td>
-          <td width="15%"><strong>TIN No.:</strong></td>
-          <td>${formData.businessInfo?.TINNo || ''}</td>
-        </tr>
-        <tr>
-          <td><strong>Business Permit No.:</strong></td>
-          <td>${formData.businessInfo?.BusinessPermitNo || ''}</td>
-          <td><strong>E-mail:</strong></td>
-          <td>${formData.businessInfo?.Email || ''}</td>
-        </tr>
-        <tr>
-          <td><strong>Contact Person:</strong></td>
-          <td>${formData.businessInfo?.ContactPerson || ''}</td>
-          <td><strong>Position/Designation:</strong></td>
-          <td>${formData.businessInfo?.PositionDesignation || ''}</td>
-        </tr>
-        <tr>
-          <td><strong>Company Address:</strong></td>
-          <td colspan="3">${formData.businessInfo?.CompanyAddress || ''}</td>
-        </tr>
-        <tr>
-          <td><strong>City:</strong></td>
-          <td>${formData.businessInfo?.City || ''}</td>
-          <td><strong>Province:</strong></td>
-          <td>${formData.businessInfo?.Province || ''}</td>
-        </tr>
-        <tr>
-          <td><strong>Phone No.:</strong></td>
-          <td>${formData.businessInfo?.PhoneNo || ''}</td>
-          <td><strong>Mobile No.:</strong></td>
-          <td>${formData.businessInfo?.MobileNo || ''}</td>
-        </tr>
-        <tr>
-          <td><strong>Commodity/Products Manufactured:</strong></td>
-          <td colspan="3">${formData.businessInfo?.CommodityManufactured || ''}</td>
-        </tr>
-        <tr>
-          <td><strong>Frequency of Production:<br>(Daily, Weekly, or Monthly)</strong></td>
-          <td colspan="3">${formData.businessInfo?.ProductionFrequency || ''}</td>
-        </tr>
-        <tr>
-          <td><strong>Bulk of Commodity per Production<br>(in volume or weight):</strong></td>
-          <td colspan="3">${formData.businessInfo?.BulkOfCommodity || ''}</td>
-        </tr>
-      </table>
-     
-      <div class="section-header">CLIENT'S INFORMATION</div>
-      <table>
-        <tr>
-          <td width="30%"><strong>Number of Client(s) to Use Facility:</strong></td>
-          <td>${formData.numberOfClients || '0'}</td>
-        </tr>
-      </table>
-     
-      <table>
-        <tr>
-          <td colspan="4" style="background-color: #ddd;"><strong>Name of Client(s) to Use Facility:</strong></td>
-        </tr>
-        ${formData.clientInfoList?.map((client, index) => `
+
+        <div class="section-header">BUSINESS INFORMATION</div>
+        <table>
           <tr>
-            <td width="20%"><strong>${index+1}. Name:</strong></td>
-            <td colspan="3">${client.Name || ''}</td>
+            <th>Company Name:</th>
+            <td colspan="3">${formData.businessInfo.CompanyName}</td>
           </tr>
           <tr>
-            <td><strong>Company ID No.:</strong></td>
-            <td>${client.CompanyIDNo || ''}</td>
-            <td width="15%"><strong>TIN No.:</strong></td>
-            <td>${client.TINNo || ''}</td>
+            <th>Company/Business Owner:</th>
+            <td>${formData.businessInfo.BusinessOwner}</td>
+            <th>TIN No.:</th>
+            <td>${formData.businessInfo.TINNo}</td>
           </tr>
+          <!-- Additional business info fields -->
+        </table>
+
+        <div class="section-header">CLIENT'S INFORMATION</div>
+        <table>
           <tr>
-            <td><strong>Contact No.:</strong></td>
-            <td colspan="3">${client.ContactNo || ''}</td>
+            <th>Number of Client(s) to Use Facility:</th>
+            <td>${formData.numberOfClients}</td>
           </tr>
-          <tr>
-            <td><strong>Address:</strong></td>
-            <td colspan="3">${client.Address || ''}</td>
-          </tr>
-          <tr>
-            <td><strong>City:</strong></td>
-            <td>${client.City || ''}</td>
-            <td><strong>Province:</strong></td>
-            <td>${client.Province || ''}</td>
-          </tr>
-        `).join('') || `
-          <tr>
-            <td width="20%"><strong>1. Name:</strong></td>
-            <td colspan="3"></td>
-          </tr>
-          <tr>
-            <td><strong>Company ID No.:</strong></td>
-            <td></td>
-            <td width="15%"><strong>TIN No.:</strong></td>
-            <td></td>
-          </tr>
-          <tr>
-            <td><strong>Contact No.:</strong></td>
-            <td colspan="3"></td>
-          </tr>
-          <tr>
-            <td><strong>Address:</strong></td>
-            <td colspan="3"></td>
-          </tr>
-          <tr>
-            <td><strong>City:</strong></td>
-            <td></td>
-            <td><strong>Province:</strong></td>
-            <td></td>
-          </tr>
-        `}
-      </table>
-    </body>
+        </table>
+        
+        <div class="section-header">Name of Client(s) to Use Facility:</div>
+        ${formData.clientInfoList.map((client, index) => `
+          <table>
+            <tr>
+              <th>${index + 1}. Name:</th>
+              <td colspan="3">${client.Name}</td>
+            </tr>
+            <!-- Additional client info fields -->
+          </table>
+        `).join('')}
+      </body>
     </html>
   `;
- 
-  // Write to the new window and trigger the print dialog
-  printWindow.document.open();
-  printWindow.document.write(htmlContent);
+  
+  printWindow.document.write(html);
   printWindow.document.close();
- 
-  // Focus the new window
-  printWindow.focus();
+  
+  // Wait for content to load before printing
+  printWindow.onload = () => {
+    printWindow.print();
+    printWindow.close();
+  };
 };
 
 /**
@@ -325,29 +187,7 @@ export const downloadRegistrationFormPDF = (formData: RegistrationFormData): voi
    
     // Add header with logos and title
     try {
-      // Left logo (FabLab logo)
-      try {
-        const leftLogoUrl = '/images/logos/left_logo.png';
-        doc.addImage(leftLogoUrl, 'PNG', margin, 10, 20, 20);
-      } catch (error) {
-        console.error('Error adding left logo:', error);
-        // Fallback to placeholder rectangle
-        doc.rect(margin, 10, 20, 20);
-        doc.text('LOGO', margin + 10, 20, { align: 'center' });
-      }
-     
-      // Right logo (DTI logo)
-      try {
-        const rightLogoUrl = '/images/logos/dti_logo.png';
-        doc.addImage(rightLogoUrl, 'PNG', pageWidth - margin - 20, 10, 20, 20);
-      } catch (error) {
-        console.error('Error adding right logo:', error);
-        // Fallback to placeholder rectangle
-        doc.rect(pageWidth - margin - 20, 10, 20, 20);
-        doc.text('DTI', pageWidth - margin - 10, 20, { align: 'center' });
-      }
-     
-      // Add title
+      // Add title first (no logos yet, to ensure title is visible)
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.text('FABRICATION LABORATORY SHARED SERVICE FACILITY', pageWidth / 2, 15, { align: 'center' });
@@ -360,6 +200,28 @@ export const downloadRegistrationFormPDF = (formData: RegistrationFormData): voi
       doc.setFont('helvetica', 'normal');
       doc.text('Philippine Science High School-Eastern Visayas Campus (PSHS-EVC)', pageWidth / 2, 28, { align: 'center' });
       doc.text('AH26 Brgy. Pawing, Palo, Leyte 6501', pageWidth / 2, 33, { align: 'center' });
+      
+      // Left logo (FabLab logo) - Add with error handling after text to ensure text is visible
+      try {
+        const leftLogoUrl = '/images/logos/left_logo.png';
+        doc.addImage(leftLogoUrl, 'PNG', margin, 10, 20, 20);
+      } catch (error) {
+        console.error('Error adding left logo:', error);
+        // Fallback to a text representation
+        doc.setFontSize(8);
+        doc.text('FABLAB', margin + 10, 20, { align: 'center' });
+      }
+     
+      // Right logo (DTI logo) - Add with error handling
+      try {
+        const rightLogoUrl = '/images/logos/dti_logo.png';
+        doc.addImage(rightLogoUrl, 'PNG', pageWidth - margin - 20, 10, 20, 20);
+      } catch (error) {
+        console.error('Error adding right logo:', error);
+        // Fallback to a text representation
+        doc.setFontSize(8);
+        doc.text('DTI', pageWidth - margin - 10, 20, { align: 'center' });
+      }
     } catch (headerError) {
       console.error('Error creating header:', headerError);
     }
@@ -374,264 +236,170 @@ export const downloadRegistrationFormPDF = (formData: RegistrationFormData): voi
       doc.setFontSize(11);
       doc.text('BUSINESS INFORMATION', margin + 2, yPosition + 5);
      
-      yPosition += 7;
-     
-      // Business Information Tables
+      yPosition += 10; // Increased spacing after section header
+      
+      // Business Information Tables with cell borders
+      const labelWidth = 60;
+      const cellHeight = 7;
+      
+      // Function to draw a bordered cell
+      const drawCell = (x: number, y: number, width: number, height: number, text: string, isHeader: boolean = false) => {
+        // Draw cell border
+        doc.setDrawColor(0);
+        doc.rect(x, y, width, height);
+        
+        // Set text style and add text
+        if (isHeader) {
+          doc.setFont('helvetica', 'bold');
+        } else {
+          doc.setFont('helvetica', 'normal');
+        }
+        
+        // Add text with 2mm padding
+        doc.text(text, x + 2, y + height/2 + 2);
+      };
       
       // Company Name row
-      const companyNameData: AutoTableColumnOption[][] = [
-        [{ content: 'Company Name:', styles: { fontStyle: 'bold' } }, 
-         { content: safeFormData.businessInfo.CompanyName }]
-      ];
-     
-      const companyNameResult = autoTable(doc, {
-        startY: yPosition,
-        head: [],
-        body: companyNameData,
-        theme: 'grid',
-        styles: { fontSize: 9 },
-        margin: { left: margin, right: margin }
-      });
-     
-      yPosition = companyNameResult.finalY || (yPosition + 10);
-     
+      doc.setFontSize(9);
+      drawCell(margin, yPosition, labelWidth, cellHeight, 'Company Name:', true);
+      drawCell(margin + labelWidth, yPosition, contentWidth - labelWidth, cellHeight, safeFormData.businessInfo.CompanyName);
+      
+      yPosition += cellHeight;
+      
       // Business Owner and TIN row
-      const ownerTinData: AutoTableColumnOption[][] = [
-        [{ content: 'Company/Business Owner:', styles: { fontStyle: 'bold' } }, 
-         { content: safeFormData.businessInfo.BusinessOwner },
-         { content: 'TIN No.:', styles: { fontStyle: 'bold' } }, 
-         { content: safeFormData.businessInfo.TINNo }]
-      ];
-     
-      const ownerTinResult = autoTable(doc, {
-        startY: yPosition,
-        head: [],
-        body: ownerTinData,
-        theme: 'grid',
-        styles: { fontSize: 9 },
-        margin: { left: margin, right: margin },
-        columnStyles: {
-          0: { cellWidth: 50 },
-          1: { cellWidth: 'auto' },
-          2: { cellWidth: 25 },
-          3: { cellWidth: 'auto' }
-        }
-      });
-     
-      yPosition = ownerTinResult.finalY || (yPosition + 10);
-     
+      const ownerWidth = 100;
+      const tinLabelWidth = 30;
+      drawCell(margin, yPosition, labelWidth, cellHeight, 'Company/Business Owner:', true);
+      drawCell(margin + labelWidth, yPosition, ownerWidth - labelWidth, cellHeight, safeFormData.businessInfo.BusinessOwner);
+      drawCell(margin + ownerWidth, yPosition, tinLabelWidth, cellHeight, 'TIN No.:', true);
+      drawCell(margin + ownerWidth + tinLabelWidth, yPosition, contentWidth - ownerWidth - tinLabelWidth, cellHeight, safeFormData.businessInfo.TINNo);
+      
+      yPosition += cellHeight;
+      
       // Business Permit and Email row
-      const permitEmailData: AutoTableColumnOption[][] = [
-        [{ content: 'Business Permit No.:', styles: { fontStyle: 'bold' } }, 
-         { content: safeFormData.businessInfo.BusinessPermitNo },
-         { content: 'E-mail:', styles: { fontStyle: 'bold' } }, 
-         { content: safeFormData.businessInfo.Email }]
-      ];
-     
-      const permitEmailResult = autoTable(doc, {
-        startY: yPosition,
-        head: [],
-        body: permitEmailData,
-        theme: 'grid',
-        styles: { fontSize: 9 },
-        margin: { left: margin, right: margin },
-        columnStyles: {
-          0: { cellWidth: 50 },
-          1: { cellWidth: 'auto' },
-          2: { cellWidth: 25 },
-          3: { cellWidth: 'auto' }
-        }
-      });
-     
-      yPosition = permitEmailResult.finalY || (yPosition + 10);
-     
+      const permitWidth = 100;
+      const emailLabelWidth = 30;
+      drawCell(margin, yPosition, labelWidth, cellHeight, 'Business Permit No.:', true);
+      drawCell(margin + labelWidth, yPosition, permitWidth - labelWidth, cellHeight, safeFormData.businessInfo.BusinessPermitNo);
+      drawCell(margin + permitWidth, yPosition, emailLabelWidth, cellHeight, 'E-mail:', true);
+      drawCell(margin + permitWidth + emailLabelWidth, yPosition, contentWidth - permitWidth - emailLabelWidth, cellHeight, safeFormData.businessInfo.Email);
+      
+      yPosition += cellHeight;
+      
       // Contact Person and Position row
-      const contactPositionData: AutoTableColumnOption[][] = [
-        [{ content: 'Contact Person:', styles: { fontStyle: 'bold' } }, 
-         { content: safeFormData.businessInfo.ContactPerson },
-         { content: 'Position/Designation:', styles: { fontStyle: 'bold' } }, 
-         { content: safeFormData.businessInfo.PositionDesignation }]
-      ];
-     
-      const contactPositionResult = autoTable(doc, {
-        startY: yPosition,
-        head: [],
-        body: contactPositionData,
-        theme: 'grid',
-        styles: { fontSize: 9 },
-        margin: { left: margin, right: margin },
-        columnStyles: {
-          0: { cellWidth: 50 },
-          1: { cellWidth: 'auto' },
-          2: { cellWidth: 50 },
-          3: { cellWidth: 'auto' }
-        }
-      });
-     
-      yPosition = contactPositionResult.finalY || (yPosition + 10);
-     
+      const contactWidth = 100;
+      const positionLabelWidth = 50;
+      drawCell(margin, yPosition, labelWidth, cellHeight, 'Contact Person:', true);
+      drawCell(margin + labelWidth, yPosition, contactWidth - labelWidth, cellHeight, safeFormData.businessInfo.ContactPerson);
+      drawCell(margin + contactWidth, yPosition, positionLabelWidth, cellHeight, 'Position/Designation:', true);
+      drawCell(margin + contactWidth + positionLabelWidth, yPosition, contentWidth - contactWidth - positionLabelWidth, cellHeight, safeFormData.businessInfo.PositionDesignation);
+      
+      yPosition += cellHeight;
+      
       // Company Address row
-      const addressData: AutoTableColumnOption[][] = [
-        [{ content: 'Company Address:', styles: { fontStyle: 'bold' } }, 
-         { content: safeFormData.businessInfo.CompanyAddress }]
-      ];
-     
-      const addressResult = autoTable(doc, {
-        startY: yPosition,
-        head: [],
-        body: addressData,
-        theme: 'grid',
-        styles: { fontSize: 9 },
-        margin: { left: margin, right: margin }
-      });
-     
-      yPosition = addressResult.finalY || (yPosition + 10);
-     
+      drawCell(margin, yPosition, labelWidth, cellHeight, 'Company Address:', true);
+      drawCell(margin + labelWidth, yPosition, contentWidth - labelWidth, cellHeight, safeFormData.businessInfo.CompanyAddress);
+      
+      yPosition += cellHeight;
+      
       // City, Province, Zip code row
-      const cityProvinceData: AutoTableColumnOption[][] = [
-        [{ content: 'City:', styles: { fontStyle: 'bold' } }, 
-         { content: safeFormData.businessInfo.City },
-         { content: 'Province:', styles: { fontStyle: 'bold' } }, 
-         { content: safeFormData.businessInfo.Province },
-         { content: 'Zip code:', styles: { fontStyle: 'bold' } }, 
-         { content: safeFormData.businessInfo.ZipCode }]
-      ];
-     
-      const cityProvinceResult = autoTable(doc, {
-        startY: yPosition,
-        head: [],
-        body: cityProvinceData,
-        theme: 'grid',
-        styles: { fontSize: 9 },
-        margin: { left: margin, right: margin },
-        columnStyles: {
-          0: { cellWidth: 20 },
-          1: { cellWidth: 'auto' },
-          2: { cellWidth: 25 },
-          3: { cellWidth: 'auto' },
-          4: { cellWidth: 25 },
-          5: { cellWidth: 'auto' }
-        }
-      });
-     
-      yPosition = cityProvinceResult.finalY || (yPosition + 10);
-     
+      const cityWidth = 60;
+      const provinceWidth = 60;
+      const zipLabelWidth = 30;
+      drawCell(margin, yPosition, 20, cellHeight, 'City:', true);
+      drawCell(margin + 20, yPosition, cityWidth, cellHeight, safeFormData.businessInfo.City);
+      drawCell(margin + 20 + cityWidth, yPosition, 30, cellHeight, 'Province:', true);
+      drawCell(margin + 20 + cityWidth + 30, yPosition, provinceWidth, cellHeight, safeFormData.businessInfo.Province);
+      drawCell(margin + 20 + cityWidth + 30 + provinceWidth, yPosition, zipLabelWidth, cellHeight, 'Zip code:', true);
+      drawCell(margin + 20 + cityWidth + 30 + provinceWidth + zipLabelWidth, yPosition, contentWidth - (20 + cityWidth + 30 + provinceWidth + zipLabelWidth), cellHeight, safeFormData.businessInfo.ZipCode);
+      
+      yPosition += cellHeight;
+      
       // Phone and Mobile row
-      const phoneMobileData: AutoTableColumnOption[][] = [
-        [{ content: 'Phone No.:', styles: { fontStyle: 'bold' } }, 
-         { content: safeFormData.businessInfo.PhoneNo },
-         { content: 'Mobile No.:', styles: { fontStyle: 'bold' } }, 
-         { content: safeFormData.businessInfo.MobileNo }]
-      ];
-     
-      const phoneMobileResult = autoTable(doc, {
-        startY: yPosition,
-        head: [],
-        body: phoneMobileData,
-        theme: 'grid',
-        styles: { fontSize: 9 },
-        margin: { left: margin, right: margin },
-        columnStyles: {
-          0: { cellWidth: 30 },
-          1: { cellWidth: 'auto' },
-          2: { cellWidth: 30 },
-          3: { cellWidth: 'auto' }
-        }
-      });
-     
-      yPosition = phoneMobileResult.finalY || (yPosition + 10);
-     
+      const phoneWidth = 60;
+      const mobileLabelWidth = 35;
+      drawCell(margin, yPosition, 30, cellHeight, 'Phone No.:', true);
+      drawCell(margin + 30, yPosition, phoneWidth, cellHeight, safeFormData.businessInfo.PhoneNo);
+      drawCell(margin + 30 + phoneWidth, yPosition, mobileLabelWidth, cellHeight, 'Mobile No.:', true);
+      drawCell(margin + 30 + phoneWidth + mobileLabelWidth, yPosition, contentWidth - (30 + phoneWidth + mobileLabelWidth), cellHeight, safeFormData.businessInfo.MobileNo);
+      
+      yPosition += cellHeight;
+      
       // Commodity/Products Manufactured row
-      const commodityData: AutoTableColumnOption[][] = [
-        [{ content: 'Commodity/Products Manufactured:', styles: { fontStyle: 'bold' } }, 
-         { content: safeFormData.businessInfo.CommodityManufactured }]
-      ];
-     
-      const commodityResult = autoTable(doc, {
-        startY: yPosition,
-        head: [],
-        body: commodityData,
-        theme: 'grid',
-        styles: { fontSize: 9 },
-        margin: { left: margin, right: margin }
-      });
-     
-      yPosition = commodityResult.finalY || (yPosition + 10);
-     
+      drawCell(margin, yPosition, 80, cellHeight, 'Commodity/Products Manufactured:', true);
+      drawCell(margin + 80, yPosition, contentWidth - 80, cellHeight, safeFormData.businessInfo.CommodityManufactured);
+      
+      yPosition += cellHeight;
+      
       // Frequency of Production row
-      const frequencyData: AutoTableColumnOption[][] = [
-        [{ content: 'Frequency of Production:\n(Daily, Weekly, or Monthly)', styles: { fontStyle: 'bold' } }, 
-         { content: safeFormData.businessInfo.ProductionFrequency }]
-      ];
-     
-      const frequencyResult = autoTable(doc, {
-        startY: yPosition,
-        head: [],
-        body: frequencyData,
-        theme: 'grid',
-        styles: { fontSize: 9 },
-        margin: { left: margin, right: margin }
-      });
-     
-      yPosition = frequencyResult.finalY || (yPosition + 10);
-     
+      const freqLabelHeight = 12; // Taller cell for extra text
+      drawCell(margin, yPosition, 80, freqLabelHeight, 'Frequency of Production:\n(Daily, Weekly, or Monthly)', true);
+      drawCell(margin + 80, yPosition, contentWidth - 80, freqLabelHeight, safeFormData.businessInfo.ProductionFrequency);
+      
+      yPosition += freqLabelHeight;
+      
       // Bulk of Commodity row
-      const bulkData: AutoTableColumnOption[][] = [
-        [{ content: 'Bulk of Commodity per Production\n(in volume or weight):', styles: { fontStyle: 'bold' } }, 
-         { content: safeFormData.businessInfo.BulkOfCommodity }]
-      ];
-     
-      const bulkResult = autoTable(doc, {
-        startY: yPosition,
-        head: [],
-        body: bulkData,
-        theme: 'grid',
-        styles: { fontSize: 9 },
-        margin: { left: margin, right: margin }
-      });
-     
-      yPosition = bulkResult.finalY || (yPosition + 10);
+      const bulkLabelHeight = 12; // Taller cell for extra text
+      drawCell(margin, yPosition, 80, bulkLabelHeight, 'Bulk of Commodity per Production:\n(in volume or weight)', true);
+      drawCell(margin + 80, yPosition, contentWidth - 80, bulkLabelHeight, safeFormData.businessInfo.BulkOfCommodity);
+      
+      yPosition += bulkLabelHeight + 3; // Add a bit of extra spacing
     } catch (businessInfoError) {
       console.error('Error creating business info section:', businessInfoError);
-      yPosition = 150; // Fallback position
+      yPosition += 15; // Move down a bit if there's an error
     }
    
     // Add client information section
     try {
+      // Check if we need to add a new page
+      if (yPosition > 180) {
+        doc.addPage();
+        yPosition = 20;
+      }
+      
       // Section header
       doc.setFillColor(200, 200, 200);
-      doc.rect(margin, yPosition + 5, contentWidth, 7, 'F');
+      doc.rect(margin, yPosition, contentWidth, 7, 'F');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
-      doc.text('CLIENT\'S INFORMATION', margin + 2, yPosition + 10);
+      doc.text('CLIENT\'S INFORMATION', margin + 2, yPosition + 5);
      
       yPosition += 12;
      
+      // Function to draw a bordered cell (reused from business section)
+      const drawCell = (x: number, y: number, width: number, height: number, text: string, isHeader: boolean = false) => {
+        // Draw cell border
+        doc.setDrawColor(0);
+        doc.rect(x, y, width, height);
+        
+        // Set text style and add text
+        if (isHeader) {
+          doc.setFont('helvetica', 'bold');
+        } else {
+          doc.setFont('helvetica', 'normal');
+        }
+        
+        // Add text with 2mm padding
+        doc.text(text, x + 2, y + height/2 + 2);
+      };
+     
       // Number of clients row
-      const clientNumberData: AutoTableColumnOption[][] = [
-        [{ content: 'Number of Client(s) to Use Facility:', styles: { fontStyle: 'bold' } }, 
-         { content: safeFormData.numberOfClients.toString() }]
-      ];
+      const cellHeight = 7;
+      const labelWidth = 80;
+      doc.setFontSize(9);
+      drawCell(margin, yPosition, labelWidth, cellHeight, 'Number of Client(s) to Use Facility:', true);
+      drawCell(margin + labelWidth, yPosition, contentWidth - labelWidth, cellHeight, safeFormData.numberOfClients.toString());
      
-      const clientNumberResult = autoTable(doc, {
-        startY: yPosition,
-        head: [],
-        body: clientNumberData,
-        theme: 'grid',
-        styles: { fontSize: 9 },
-        margin: { left: margin, right: margin }
-      });
+      yPosition += cellHeight + 5;
      
-      yPosition = clientNumberResult.finalY || (yPosition + 8);
-     
-      // Client details header - use direct rectangle fill instead of table fill
+      // Client details header
       doc.setFillColor(220, 220, 220);
       doc.rect(margin, yPosition, contentWidth, 7, 'F');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9);
       doc.text('Name of Client(s) to Use Facility:', margin + 2, yPosition + 5);
      
-      yPosition += 8;
+      yPosition += 12;
      
       // Add client entries (ensure at least 2 entries as in the image)
       const clientsToDisplay = safeFormData.clientInfoList.length > 0 
@@ -651,118 +419,95 @@ export const downloadRegistrationFormPDF = (formData: RegistrationFormData): voi
           ZipCode: ''
         };
         
+        // Check if we need to add a new page for this client
+        if (yPosition > 220) {
+          doc.addPage();
+          yPosition = 20;
+        }
+        
         // Name row
-        const nameData: AutoTableColumnOption[][] = [
-          [{ content: `${i+1}. Name:`, styles: { fontStyle: 'bold' } }, 
-           { content: client.Name }]
-        ];
+        drawCell(margin, yPosition, labelWidth/2, cellHeight, `${i+1}. Name:`, true);
+        drawCell(margin + labelWidth/2, yPosition, contentWidth - labelWidth/2, cellHeight, client.Name);
         
-        const nameResult = autoTable(doc, {
-          startY: yPosition,
-          head: [],
-          body: nameData,
-          theme: 'grid',
-          styles: { fontSize: 9 },
-          margin: { left: margin, right: margin }
-        });
-        
-        yPosition = nameResult.finalY || (yPosition + 7);
+        yPosition += cellHeight;
         
         // Company ID and TIN row
-        const idTinData: AutoTableColumnOption[][] = [
-          [{ content: 'Company ID No.:', styles: { fontStyle: 'bold' } }, 
-           { content: client.CompanyIDNo },
-           { content: 'TIN No.:', styles: { fontStyle: 'bold' } }, 
-           { content: client.TINNo }]
-        ];
+        const idWidth = 40;
+        const idValueWidth = 60;
+        const tinLabelWidth = 30;
+        drawCell(margin, yPosition, idWidth, cellHeight, 'Company ID No.:', true);
+        drawCell(margin + idWidth, yPosition, idValueWidth, cellHeight, client.CompanyIDNo);
+        drawCell(margin + idWidth + idValueWidth, yPosition, tinLabelWidth, cellHeight, 'TIN No.:', true);
+        drawCell(margin + idWidth + idValueWidth + tinLabelWidth, yPosition, contentWidth - (idWidth + idValueWidth + tinLabelWidth), cellHeight, client.TINNo);
         
-        const idTinResult = autoTable(doc, {
-          startY: yPosition,
-          head: [],
-          body: idTinData,
-          theme: 'grid',
-          styles: { fontSize: 9 },
-          margin: { left: margin, right: margin },
-          columnStyles: {
-            0: { cellWidth: 40 },
-            1: { cellWidth: 'auto' },
-            2: { cellWidth: 25 },
-            3: { cellWidth: 'auto' }
-          }
-        });
-        
-        yPosition = idTinResult.finalY || (yPosition + 7);
+        yPosition += cellHeight;
         
         // Contact No row
-        const contactData: AutoTableColumnOption[][] = [
-          [{ content: 'Contact No.:', styles: { fontStyle: 'bold' } }, 
-           { content: client.ContactNo }]
-        ];
+        drawCell(margin, yPosition, idWidth, cellHeight, 'Contact No.:', true);
+        drawCell(margin + idWidth, yPosition, contentWidth - idWidth, cellHeight, client.ContactNo);
         
-        const contactResult = autoTable(doc, {
-          startY: yPosition,
-          head: [],
-          body: contactData,
-          theme: 'grid',
-          styles: { fontSize: 9 },
-          margin: { left: margin, right: margin }
-        });
-        
-        yPosition = contactResult.finalY || (yPosition + 7);
+        yPosition += cellHeight;
         
         // Address row
-        const addressData: AutoTableColumnOption[][] = [
-          [{ content: 'Address:', styles: { fontStyle: 'bold' } }, 
-           { content: client.Address }]
-        ];
+        drawCell(margin, yPosition, idWidth, cellHeight, 'Address:', true);
+        drawCell(margin + idWidth, yPosition, contentWidth - idWidth, cellHeight, client.Address);
         
-        const addressResult = autoTable(doc, {
-          startY: yPosition,
-          head: [],
-          body: addressData,
-          theme: 'grid',
-          styles: { fontSize: 9 },
-          margin: { left: margin, right: margin }
-        });
-        
-        yPosition = addressResult.finalY || (yPosition + 7);
+        yPosition += cellHeight;
         
         // City, Province, Zipcode row
-        const cityProvinceData: AutoTableColumnOption[][] = [
-          [{ content: 'City:', styles: { fontStyle: 'bold' } }, 
-           { content: client.City },
-           { content: 'Province:', styles: { fontStyle: 'bold' } }, 
-           { content: client.Province },
-           { content: 'Zipcode:', styles: { fontStyle: 'bold' } }, 
-           { content: client.ZipCode }]
-        ];
+        const cityLabelWidth = 20;
+        const cityWidth = 50;
+        const provinceLabelWidth = 30;
+        const provinceWidth = 50;
+        const zipLabelWidth = 30;
         
-        const cityProvinceResult = autoTable(doc, {
-          startY: yPosition,
-          head: [],
-          body: cityProvinceData,
-          theme: 'grid',
-          styles: { fontSize: 9 },
-          margin: { left: margin, right: margin },
-          columnStyles: {
-            0: { cellWidth: 20 },
-            1: { cellWidth: 'auto' },
-            2: { cellWidth: 25 },
-            3: { cellWidth: 'auto' },
-            4: { cellWidth: 25 },
-            5: { cellWidth: 'auto' }
-          }
-        });
+        drawCell(margin, yPosition, cityLabelWidth, cellHeight, 'City:', true);
+        drawCell(margin + cityLabelWidth, yPosition, cityWidth, cellHeight, client.City);
         
-        yPosition = cityProvinceResult.finalY || (yPosition + 7);
+        drawCell(margin + cityLabelWidth + cityWidth, yPosition, provinceLabelWidth, cellHeight, 'Province:', true);
+        drawCell(margin + cityLabelWidth + cityWidth + provinceLabelWidth, yPosition, provinceWidth, cellHeight, client.Province);
         
-        // Add some space between client entries
-        if (i < Math.max(2, clientsToDisplay.length) - 1) {
-          yPosition += 2;
-        }
+        drawCell(margin + cityLabelWidth + cityWidth + provinceLabelWidth + provinceWidth, yPosition, zipLabelWidth, cellHeight, 'Zipcode:', true);
+        drawCell(margin + cityLabelWidth + cityWidth + provinceLabelWidth + provinceWidth + zipLabelWidth, yPosition, 
+            contentWidth - (cityLabelWidth + cityWidth + provinceLabelWidth + provinceWidth + zipLabelWidth), cellHeight, client.ZipCode);
+        
+        yPosition += cellHeight + 5; // Add extra space between client entries
       }
     } catch (clientInfoError) {
       console.error('Error creating client info section:', clientInfoError);
+    }
+   
+    // Add signature fields at the bottom if space allows
+    try {
+      // Check if we need a new page for signatures
+      if (yPosition > 230) {
+        doc.addPage();
+        yPosition = 30;
+      } else {
+        yPosition = Math.max(yPosition, 210); // Push signatures to bottom of page if there's room
+      }
+      
+      // Add signature lines and text
+      const signatureWidth = 70;
+      const signatureStartX = pageWidth / 2 - signatureWidth - 10;
+      
+      // Applicant signature
+      doc.setFont('helvetica', 'normal');
+      doc.line(signatureStartX, yPosition, signatureStartX + signatureWidth, yPosition);
+      doc.setFontSize(9);
+      doc.text('Signature of Applicant', signatureStartX + signatureWidth/2, yPosition + 5, { align: 'center' });
+      
+      // PSHS-EVC FabLab Manager signature
+      const managerStartX = pageWidth / 2 + 10;
+      doc.line(managerStartX, yPosition, managerStartX + signatureWidth, yPosition);
+      doc.text('FabLab Manager, PSHS-EVC', managerStartX + signatureWidth/2, yPosition + 5, { align: 'center' });
+      
+      // Date
+      yPosition += 15;
+      doc.line(signatureStartX, yPosition, signatureStartX + signatureWidth, yPosition);
+      doc.text('Date', signatureStartX + signatureWidth/2, yPosition + 5, { align: 'center' });
+    } catch (signatureError) {
+      console.error('Error adding signature section:', signatureError);
     }
    
     // Save the PDF
