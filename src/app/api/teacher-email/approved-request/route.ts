@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     await prisma.eVCReservation.update({
       where: { id: parseInt(reservationId) },
       data: { 
-        EVCStatus: 'Approved',
+        EVCStatus: 'Pending',
         ReceivedDate: new Date()
       }
     });
