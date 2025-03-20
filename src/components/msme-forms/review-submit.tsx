@@ -45,7 +45,6 @@ interface AccInfo {
   BusinessInfo: BusinessInfo | null;
 }
 
-// Day interface
 interface Day {
   date: Date;
   startTime: string | null;

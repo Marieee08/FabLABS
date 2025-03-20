@@ -21,12 +21,19 @@ interface Reservation {
   status: string;
   role: string;
   service: string;
-  machine?: string; // Add machine property
+  machines: string[]; 
   totalAmount: number | null;
   type: 'utilization' | 'evc';
   startTime?: string;
   endTime?: string;
   UtilTimes?: Array<{StartTime: string, EndTime: string}>;
+  timeSlots?: Array<{
+    id: number;
+    dayNum: number;
+    startTime: string | null;
+    endTime: string | null;
+    duration: number | null;
+  }>;
 }
 
 const AdminCalendar: React.FC = () => {
@@ -64,6 +71,13 @@ const AdminCalendar: React.FC = () => {
       const data = await response.json();
       
       const processedReservations = data.map((reservation: any) => {
+        // Ensure machines is always an array
+        const machines = Array.isArray(reservation.machines) 
+          ? reservation.machines 
+          : reservation.machine 
+            ? [reservation.machine] 
+            : ["Not specified"];
+        
         // Check if reservation has timeSlots array
         if (reservation.timeSlots && reservation.timeSlots.length > 0) {
           const firstTimeSlot = reservation.timeSlots[0];
@@ -73,8 +87,8 @@ const AdminCalendar: React.FC = () => {
             endTime: firstTimeSlot.endTime ? formatTimeString(firstTimeSlot.endTime) : undefined,
             // Keep the original UtilTimes for reference if needed
             UtilTimes: reservation.UtilTimes,
-            // Ensure we keep the machine information
-            machine: reservation.machine || "No machine"
+            // Ensure machines is properly set
+            machines: machines
           };
         }
         // Fallback to existing logic for backward compatibility
@@ -83,8 +97,8 @@ const AdminCalendar: React.FC = () => {
             ...reservation,
             startTime: formatTimeString(reservation.startTime),
             endTime: formatTimeString(reservation.endTime),
-            // Ensure we keep the machine information
-            machine: reservation.machine || "No machine"
+            // Ensure machines is properly set
+            machines: machines
           };
         }
         // For UtilReq, use UtilTimes if available
@@ -95,13 +109,14 @@ const AdminCalendar: React.FC = () => {
             ...reservation,
             startTime: startTime ? formatTimeString(startTime) : undefined,
             endTime: endTime ? formatTimeString(endTime) : undefined,
-            // Ensure we keep the machine information
-            machine: reservation.machine || "No machine"
+            // Ensure machines is properly set
+            machines: machines
           };
         }
         return {
           ...reservation,
-          machine: reservation.machine || "No machine"
+          // Ensure machines is properly set
+          machines: machines
         };
       });
       

@@ -14,7 +14,7 @@ interface Reservation {
   status: string;
   role: string;
   service: string;
-  machine?: string; // Add machine property
+  machines: string[]; // Array of machines
   totalAmount: number | null;
   type: 'utilization' | 'evc';
   startTime?: string;
@@ -91,6 +91,19 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
     } else {
       return <span className="text-green-500 mr-1" title="Utilization">🏭</span>;
     }
+  };
+
+  // Format multiple machines for display in the calendar
+  const formatMachines = (machines: string[]): string => {
+    if (!machines || machines.length === 0) return "Not specified";
+    
+    if (machines.length === 1) return machines[0];
+    
+    // If we have 2 machines, show both with a separator
+    if (machines.length === 2) return machines.join(" & ");
+    
+    // If we have more than 2 machines, show the first one + count
+    return `${machines[0]} +${machines.length - 1}`;
   };
 
   return (
@@ -171,23 +184,27 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                                   ${getReservationStatusColor(reservation.status)}`}
                                 onClick={() => handleReservationClick(reservation)}
                               >
+                                {/* Name row with icon */}
                                 <div className="flex items-center text-xs">
                                   {getReservationTypeIcon(reservation.type)}
                                   <span className="truncate font-medium">{reservation.name}</span>
                                 </div>
                                 
-                                {/* Display machine information */}
-                                {reservation.machine && (
-                                  <div className="text-xs flex items-center mt-0.5 opacity-90">
-                                    <Cpu className="h-2.5 w-2.5 mr-0.5 flex-shrink-0" />
-                                    <span className="truncate">{reservation.machine}</span>
+                                {/* Machines row - more compact display */}
+                                {reservation.machines && reservation.machines.length > 0 && (
+                                  <div className="text-xs flex items-start mt-0.5 opacity-90">
+                                    <Cpu className="h-2.5 w-2.5 mr-0.5 flex-shrink-0 mt-0.5" />
+                                    <span className="truncate leading-tight">
+                                      {formatMachines(reservation.machines)}
+                                    </span>
                                   </div>
                                 )}
                                 
+                                {/* Time row */}
                                 {reservation.startTime && (
-                                  <div className="text-xs flex items-center mt-0.5 opacity-90">
-                                    <Clock className="h-2.5 w-2.5 mr-0.5 flex-shrink-0" />
-                                    <span className="truncate">
+                                  <div className="text-xs flex items-start mt-0.5 opacity-90">
+                                    <Clock className="h-2.5 w-2.5 mr-0.5 flex-shrink-0 mt-0.5" />
+                                    <span className="truncate leading-tight">
                                       {formatTime(reservation.startTime)}
                                       {reservation.endTime && ` - ${formatTime(reservation.endTime)}`}
                                     </span>
@@ -199,12 +216,22 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
                               <div className="text-sm">
                                 <div className="font-bold">{reservation.name}</div>
                                 <div className="text-gray-700">{reservation.service}</div>
-                                {reservation.machine && (
-                                  <div className="flex items-center mt-1">
-                                    <Cpu className="h-3 w-3 mr-1" />
-                                    {reservation.machine}
+                                
+                                {/* List all machines in the tooltip */}
+                                {reservation.machines && reservation.machines.length > 0 && (
+                                  <div className="mt-1">
+                                    <div className="flex items-center">
+                                      <Cpu className="h-3 w-3 mr-1" />
+                                      <span className="font-medium">Machines:</span>
+                                    </div>
+                                    <ul className="pl-5 list-disc text-xs mt-0.5">
+                                      {reservation.machines.map((machine, i) => (
+                                        <li key={i}>{machine}</li>
+                                      ))}
+                                    </ul>
                                   </div>
                                 )}
+                                
                                 <div className="flex items-center gap-2 mt-1">
                                   <span>Status:</span>
                                   {getReservationStatusBadge(reservation.status)}
@@ -246,10 +273,23 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
       <style jsx>{`
         .calendar-day {
           aspect-ratio: 1 / 1;
-          min-height: 100px;
+          min-height: 120px;
+          max-height: 180px;
           height: 100%;
           display: flex;
           flex-direction: column;
+          overflow: hidden;
+        }
+        .calendar-reservations {
+          flex: 1;
+          overflow-y: auto;
+          overflow-x: hidden;
+          display: flex;
+          flex-direction: column;
+        }
+        .calendar-event {
+          word-break: keep-all;
+          overflow-wrap: break-word;
         }
         .day-header .block-button {
           opacity: 0;
@@ -262,13 +302,11 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
           display: grid;
           grid-auto-rows: 1fr;
         }
-        .calendar-event {
-          word-break: break-word;
-        }
         /* For tablet and mobile views */
         @media (max-width: 768px) {
           .calendar-day {
-            min-height: 80px;
+            min-height: 100px;
+            max-height: 150px;
             aspect-ratio: auto;
           }
           .day-header .block-button {
@@ -279,6 +317,9 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
         @media (max-width: 640px) {
           .calendar-body .grid {
             gap: 8px;
+          }
+          .calendar-day {
+            min-height: 90px;
           }
         }
       `}</style>
