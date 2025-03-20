@@ -7,6 +7,7 @@ import { useUser } from "@clerk/nextjs";
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
+
 interface EVCReservation {
   id: number;
   EVCStatus: string;
@@ -167,11 +168,11 @@ const DashboardUser = () => {
               <Link href="/" className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300">
                 Home
               </Link>
+              <Link href="/student-dashboard" className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300">
+                Dashboard
+              </Link>
               <Link href="/user-services" className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300">
                 Services
-              </Link>
-              <Link href="/student-dashboard/information" className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300">
-                Information
               </Link>
               <Link href="/contact" className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300">
                 Contact
