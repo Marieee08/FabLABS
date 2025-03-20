@@ -64,10 +64,17 @@ export async function POST(request: Request) {
     
     // Create an array to hold all machines for each service
     const machinesToCreate = [];
+    
+    // Create a map to store machines for each service
+    const serviceMachinesMap = new Map();
 
     // For each service, find all the associated machines
     serviceWithMachines.forEach(service => {
       console.log(`Service: ${service.Service} has ${service.Machines.length} machines`);
+      
+      // Store machine names for this service
+      const machineNames = service.Machines.map(machineService => machineService.machine.Machine);
+      serviceMachinesMap.set(service.Service, machineNames);
       
       // Add each machine for this service to our array
       service.Machines.forEach(machineService => {
@@ -99,18 +106,24 @@ export async function POST(request: Request) {
           }))
         },
 
-        // Create UserService entries
+        // Create UserService entries with associated machines
         UserServices: {
           create: Array.isArray(data.ProductsManufactured) 
-            ? data.ProductsManufactured.map((service: any) => ({
-                ServiceAvail: service,
-                EquipmentAvail: data.Equipment || 'Not Specified',
-                CostsAvail: totalAmountDue / data.ProductsManufactured.length, // Distribute cost evenly
-                MinsAvail: calculateTotalMinutes(data.days)
-              }))
+            ? data.ProductsManufactured.map((service: string) => {
+                // Get machines for this service
+                const machines = serviceMachinesMap.get(service) || [];
+                return {
+                  ServiceAvail: service,
+                  // Store the machines associated with this service as a comma-separated string
+                  EquipmentAvail: machines.length > 0 ? machines.join(', ') : 'No associated machines',
+                  CostsAvail: totalAmountDue / data.ProductsManufactured.length, // Distribute cost evenly
+                  MinsAvail: calculateTotalMinutes(data.days)
+                };
+              })
             : [{
                 ServiceAvail: data.ProductsManufactured,
-                EquipmentAvail: data.Equipment || 'Not Specified',
+                // For a single service, get its machines
+                EquipmentAvail: serviceMachinesMap.get(data.ProductsManufactured)?.join(', ') || 'No associated machines',
                 CostsAvail: totalAmountDue,
                 MinsAvail: calculateTotalMinutes(data.days)
               }]
