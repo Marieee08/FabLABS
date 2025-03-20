@@ -16,7 +16,14 @@ export async function GET(req: NextRequest) {
           },
         },
         UserServices: true,
-        UtilTimes: true,
+        UtilTimes: {
+          select: {
+            id: true,
+            DayNum: true,
+            StartTime: true,
+            EndTime: true
+          }
+        },
       },
       orderBy: {
         RequestDate: 'desc',
@@ -27,7 +34,14 @@ export async function GET(req: NextRequest) {
     const evcReservations = await prisma.eVCReservation.findMany({
       include: {
         accInfo: true,
-        UtilTimes: true,
+        UtilTimes: {
+          select: {
+            id: true,
+            DayNum: true,
+            StartTime: true,
+            EndTime: true
+          }
+        },
       },
       orderBy: {
         DateRequested: 'desc',
@@ -47,6 +61,17 @@ export async function GET(req: NextRequest) {
         ? new Date(firstTime.StartTime).toISOString() 
         : reservation.RequestDate.toISOString();
 
+      // Format all time slots
+      const timeSlots = reservation.UtilTimes.map(time => ({
+        id: time.id,
+        dayNum: time.DayNum,
+        startTime: time.StartTime ? new Date(time.StartTime).toISOString() : null,
+        endTime: time.EndTime ? new Date(time.EndTime).toISOString() : null,
+        duration: time.StartTime && time.EndTime 
+          ? (new Date(time.EndTime).getTime() - new Date(time.StartTime).getTime()) / (1000 * 60) // duration in minutes
+          : null
+      }));
+
       return {
         id: reservation.id.toString(),
         date: date,
@@ -56,7 +81,10 @@ export async function GET(req: NextRequest) {
         role: reservation.accInfo?.Role || "MSME",
         service: serviceName,
         totalAmount: reservation.TotalAmntDue ? Number(reservation.TotalAmntDue) : null,
-        type: 'utilization'
+        type: 'utilization',
+        timeSlots: timeSlots,
+        totalScheduledTime: timeSlots.reduce((total, slot) => 
+          total + (slot.duration || 0), 0) // Total scheduled time in minutes
       };
     });
 
@@ -70,6 +98,17 @@ export async function GET(req: NextRequest) {
           ? reservation.DateRequested.toISOString() 
           : new Date().toISOString();
 
+      // Format all time slots
+      const timeSlots = reservation.UtilTimes.map(time => ({
+        id: time.id,
+        dayNum: time.DayNum,
+        startTime: time.StartTime ? new Date(time.StartTime).toISOString() : null,
+        endTime: time.EndTime ? new Date(time.EndTime).toISOString() : null,
+        duration: time.StartTime && time.EndTime 
+          ? (new Date(time.EndTime).getTime() - new Date(time.StartTime).getTime()) / (1000 * 60) // duration in minutes
+          : null
+      }));
+
       return {
         id: `evc-${reservation.id}`, // Prefixing with 'evc-' to distinguish from utilization reservations
         date: date,
@@ -79,7 +118,10 @@ export async function GET(req: NextRequest) {
         role: reservation.accInfo?.Role || "Student",
         service: "Laboratory Reservation",
         totalAmount: null, // EVC doesn't have a total amount
-        type: 'evc'
+        type: 'evc',
+        timeSlots: timeSlots,
+        totalScheduledTime: timeSlots.reduce((total, slot) => 
+          total + (slot.duration || 0), 0) // Total scheduled time in minutes
       };
     });
 
