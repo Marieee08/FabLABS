@@ -155,7 +155,7 @@ const DashboardAdmin = () => {
       {/* Main Content */}
       <div className="relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden">
         {/* Header */}
-        <header className="sticky top-0 z-999 flex w-full bg-white shadow-md">
+        <header className="sticky top-0 z-[999] flex w-full bg-white shadow-md">
           <div className="flex flex-grow items-center justify-between py-4 px-4 shadow-2 md:px-6 2xl:px-11">
             <div className="flex items-center gap-2 sm:gap-4 lg:hidden">
               <button
