@@ -143,19 +143,25 @@ const DashboardUser = () => {
   // Get status badge color based on status
   const getStatusBadgeClass = (status: string) => {
     switch (status.toLowerCase()) {
+      case 'pending teacher approval':
+        return 'bg-amber-100 text-amber-800';  // Amber for teacher approval
       case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-yellow-100 text-yellow-800'; // Yellow for regular pending
       case 'approved':
-        return 'bg-green-100 text-green-800';
+        return 'bg-green-100 text-green-800';  // Green for approved
       case 'rejected':
-        return 'bg-red-100 text-red-800';
+        return 'bg-red-100 text-red-800';      // Red for rejected
+      case 'ongoing':
+        return 'bg-indigo-100 text-indigo-800'; // Indigo for ongoing
+      case 'cancelled':
+        return 'bg-rose-100 text-rose-800';    // Rose for cancelled
       case 'completed':
-        return 'bg-blue-100 text-blue-800';
+        return 'bg-blue-100 text-blue-800';    // Blue for completed
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-gray-100 text-gray-800';    // Gray for any others
     }
   };
-
+  
   return (
     <div className="flex h-screen overflow-hidden bg-[#f1f5f9]">
       <div className="flex-1 overflow-y-auto">
