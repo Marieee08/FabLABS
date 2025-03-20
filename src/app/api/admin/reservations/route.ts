@@ -47,12 +47,12 @@ export async function GET(req: NextRequest) {
       
       // Get all machine names from UserServices
       const userServiceMachines = reservation.UserServices
-        .filter(service => service.EquipmentAvail)
+        .filter(service => service.EquipmentAvail && service.EquipmentAvail !== "Not Specified")
         .map(service => service.EquipmentAvail);
       
       // Get all machine names from MachineUtilizations
       const machineUtilMachines = reservation.MachineUtilizations
-        ?.filter(machine => machine.Machine)
+        ?.filter(machine => machine.Machine && machine.Machine !== "Not Specified")
         .map(machine => machine.Machine) || [];
       
       // Combine all machine names and remove duplicates
