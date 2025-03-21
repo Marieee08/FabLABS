@@ -1,4 +1,4 @@
-// /user-services/msme-schedule/page.tsx
+// src\app\user-services\msme-schedule\page.tsx
 
 'use client';
 
@@ -10,6 +10,9 @@ import ReviewSubmit from '@/components/msme-forms/review-submit';
 import { toast } from "@/components/ui/use-toast";
 import DateTimeSelection from '@/components/msme-forms/date-time-selection';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import MachineCalendar from '@/components/user/machine-calendar';
+import { Button } from "@/components/ui/button";
+import { CalendarX2, CalendarCheck } from 'lucide-react';
 
 export interface FormData {
   days: {
@@ -27,6 +30,12 @@ export interface FormData {
   Equipment: string;
   Tools: string;
   ToolsQty: number;
+}
+
+interface Machine {
+  id: string;
+  Machine: string;
+  isAvailable: boolean;
 }
 
 type UpdateFormData = (field: keyof FormData, value: FormData[keyof FormData] | number) => void;
@@ -56,6 +65,8 @@ export default function Schedule() {
 
   const [blockedDates, setBlockedDates] = useState<CalendarDate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [machines, setMachines] = useState<Machine[]>([]);
 
   const fetchBlockedDates = async () => {
     setIsLoading(true);
@@ -79,8 +90,23 @@ export default function Schedule() {
     }
   };
 
+  const fetchMachines = async () => {
+    try {
+      const response = await fetch('/api/machines');
+      const data = await response.json();
+      setMachines(data);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch machine data",
+        variant: "destructive",
+      });
+    }
+  };
+
   useEffect(() => {
     fetchBlockedDates();
+    fetchMachines();
   }, []);
 
   const isDateBlocked = (date: Date) => {
@@ -97,6 +123,10 @@ export default function Schedule() {
   
   const nextStep = () => setStep(prevStep => prevStep + 1);
   const prevStep = () => setStep(prevStep => prevStep - 1);
+  
+  const toggleCalendar = () => {
+    setShowCalendar(prev => !prev);
+  };
 
   const getStepTitle = () => {
     switch(step) {
@@ -158,6 +188,46 @@ export default function Schedule() {
           <p className="text-gray-600 mt-2 max-w-3xl mx-auto">Complete the form below to schedule your service appointment</p>
         </div>
         
+        {/* Calendar toggle button */}
+        <div className="mb-4 flex justify-end">
+          <Button 
+            variant={showCalendar ? "secondary" : "outline"}
+            onClick={toggleCalendar}
+            className="flex items-center gap-2 text-sm"
+          >
+            {showCalendar ? (
+              <>
+                <CalendarX2 className="h-4 w-4" />
+                Hide Calendar
+              </>
+            ) : (
+              <>
+                <CalendarCheck className="h-4 w-4" />
+                View Available Dates
+              </>
+            )}
+          </Button>
+        </div>
+        
+        {/* Calendar section */}
+        {showCalendar && (
+          <Card className="shadow-lg border border-gray-200 mb-6 overflow-hidden">
+            <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-gray-50 py-4">
+              <CardTitle className="text-lg text-blue-800">Machine Availability Calendar</CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="h-[500px]">
+                <MachineCalendar 
+                  machines={machines} 
+                  isOpen={showCalendar}
+                  onClose={() => setShowCalendar(false)}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        
+        {/* Main form card */}
         <Card className="shadow-lg border border-gray-200">
           <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-gray-50 py-6">
             <div className="flex items-center justify-between">
@@ -183,7 +253,7 @@ export default function Schedule() {
         </Card>
         
         <div className="mt-6 text-center text-sm text-gray-500">
-          <p>Need help? Contact our support team at ctapales@evc.pshs.edu.ph</p>
+          <p>Need help? Contact our support team at fablab@evc.pshs.edu.ph</p>
         </div>
       </div>
     </div>
