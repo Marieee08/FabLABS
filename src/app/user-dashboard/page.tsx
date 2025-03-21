@@ -380,8 +380,23 @@ const DashboardUser = () => {
                 <p className="text-sm text-[#143370] mb-4">Here are your pending orders!</p>
                 <div className="overflow-x-auto rounded-lg bg-blue-100 shadow-ld">
                   
-                  {isReservationsLoading ? (
-                    <ReservationSkeleton />
+                {isReservationsLoading ? (
+                  <ReservationSkeleton />
+                ) : (
+                  reservations.length === 0 ? (
+                    <div className="bg-blue-50 p-6 rounded-lg text-center">
+                      <p className="text-blue-800">You don't have any pending orders at the moment.</p>
+                      <a 
+                        href="/user-services"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleNavigation('/user-services');
+                        }}
+                        className="mt-4 inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                      >
+                        Create a New Order
+                      </a>
+                    </div>
                   ) : (
                     <table className="min-w-full divide-y divide-gray-200 rounded-xl">
                       <thead className="bg-gray-50">
@@ -454,7 +469,8 @@ const DashboardUser = () => {
                         ))}
                       </tbody>
                     </table>
-                  )}
+                  )
+                )}
                 </div>
               </div>
 
