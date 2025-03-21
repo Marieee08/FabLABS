@@ -50,10 +50,6 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose, is
   const [calendarEvents, setCalendarEvents] = useState<any[]>([]);
   const [selectedMachine, setSelectedMachine] = useState<string>('all');
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [hoveredEvent, setHoveredEvent] = useState<any>(null);
-  const [showTooltip, setShowTooltip] = useState(false);
-  const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
-  const [tooltipContent, setTooltipContent] = useState('');
   const calendarRef = useRef<HTMLDivElement>(null);
 
   // Time slots definitions
@@ -296,23 +292,37 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose, is
     // Check if the date is a weekend
     const isWeekend = date.getDay() === 0 || date.getDay() === 6;
     const isToday = moment(date).isSame(moment(), 'day');
+    // Check if the date is in the past
+    const isPastDate = moment(date).isBefore(moment(), 'day');
+    
+    let className = '';
+    let style = {};
     
     if (isWeekend) {
-      return {
-        style: {
-          backgroundColor: '#F9FAFB'
-        },
-        className: 'weekend-day'
+      style = {
+        ...style,
+        backgroundColor: '#F9FAFB'
       };
+      className += ' weekend-day';
     }
     
     if (isToday) {
-      return {
-        className: 'today-cell'
+      className += ' today-cell';
+    }
+    
+    if (isPastDate) {
+      className += ' past-date';
+      style = {
+        ...style,
+        backgroundColor: '#F1F1F1',
+        opacity: 0.7
       };
     }
     
-    return {};
+    return {
+      style,
+      className: className.trim()
+    };
   };
   
   // Custom toolbar with modern month navigation - more compact
@@ -383,46 +393,10 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose, is
     );
   };
 
-  // Custom event component with tooltip
+  // Custom event component without tooltip functionality
   const EventComponent = ({ event }: { event: any }) => {
-    const handleMouseEnter = (e: React.MouseEvent) => {
-      setHoveredEvent(event);
-      
-      // If it's blocked, set tooltip content
-      if (event.resource?.isBlocked) {
-        setTooltipContent('This date is unavailable for reservations');
-      } else {
-        // For machine reservations
-        const timeSlot = event.resource?.timeSlot || 'unknown';
-        let timeString = '';
-        
-        if (timeSlot === 'morning') {
-          timeString = '8:00 AM - 12:00 PM';
-        } else if (timeSlot === 'afternoon') {
-          timeString = '1:00 PM - 5:00 PM';
-        } else if (timeSlot === 'allday') {
-          timeString = 'All Day';
-        }
-        
-        setTooltipContent(`${event.title} - ${timeString}`);
-      }
-      
-      // Position the tooltip
-      const rect = e.currentTarget.getBoundingClientRect();
-      setTooltipPosition({
-        top: rect.top + window.scrollY - 40,
-        left: rect.left + window.scrollX + (rect.width / 2)
-      });
-      
-      setShowTooltip(true);
-    };
-    
     return (
-      <div
-        className="event-content truncate cursor-pointer px-1 py-0.5 hover:opacity-90"
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={() => setShowTooltip(false)}
-      >
+      <div className="event-content truncate px-1 py-0.5">
         {event.title}
       </div>
     );
@@ -444,7 +418,7 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose, is
           <Info className="text-indigo-500 h-4 w-4 mt-0.5 flex-shrink-0" />
           <p className="text-xs text-gray-700 leading-relaxed">
             This calendar shows machine availability. Reserved time slots are marked.
-            Use the filter to view a specific machine.
+            Use the filter to view a specific machine. Past dates are grayed out.
           </p>
         </div>
       </div>
@@ -467,6 +441,10 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose, is
           <div className="flex items-center">
             <div className="w-3 h-3 bg-[#EF4444] rounded-sm mr-1 shadow-sm"></div>
             <span className="text-xs text-gray-700">Blocked Dates</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-3 h-3 bg-[#F1F1F1] rounded-sm mr-1 shadow-sm border border-gray-200"></div>
+            <span className="text-xs text-gray-700">Past Dates</span>
           </div>
         </div>
       </div>
@@ -503,21 +481,6 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose, is
                 `${moment(start).format('MMMM D')} - ${moment(end).format('MMMM D, YYYY')}`
             }}
           />
-        </div>
-      )}
-      
-      {/* Event Tooltip */}
-      {showTooltip && (
-        <div 
-          className="fixed z-50 bg-gray-900 text-white px-3 py-1.5 rounded shadow-lg text-sm pointer-events-none"
-          style={{
-            top: `${tooltipPosition.top}px`,
-            left: `${tooltipPosition.left}px`,
-            transform: 'translateX(-50%)'
-          }}
-        >
-          {tooltipContent}
-          <div className="absolute w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-t-[6px] border-t-gray-900" style={{ top: '100%', left: '50%', transform: 'translateX(-50%)' }}></div>
         </div>
       )}
       
@@ -618,6 +581,44 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose, is
         /* Active day styling when clicked */
         .rbc-day-bg.rbc-selected-cell {
           background-color: rgba(224, 231, 255, 0.5);
+        }
+        
+        /* Past dates styling */
+        .past-date .rbc-date-cell {
+          color: #94A3B8;
+          text-decoration: line-through;
+          opacity: 0.85;
+        }
+        
+        /* Events on past dates */
+        .past-date .rbc-event {
+          opacity: 0.65 !important;
+        }
+        
+        /* Diagonal striped background for past dates */
+        .past-date:after {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background-image: linear-gradient(45deg, 
+            rgba(203, 213, 225, 0.1) 25%, 
+            transparent 25%, 
+            transparent 50%, 
+            rgba(203, 213, 225, 0.1) 50%, 
+            rgba(203, 213, 225, 0.1) 75%, 
+            transparent 75%, 
+            transparent);
+          background-size: 8px 8px;
+          pointer-events: none;
+          z-index: 2;
+        }
+        
+        /* Add position relative for pseudo-element placement */
+        .rbc-day-bg {
+          position: relative;
         }
         
         /* Ensure borders connect properly */

@@ -45,20 +45,20 @@ export async function GET(req: NextRequest) {
       const userServiceMachines = reservation.UserServices
         .filter(service => service.EquipmentAvail && service.EquipmentAvail !== "Not Specified")
         .map(service => service.EquipmentAvail);
-      
+
       // Get all machine names from MachineUtilizations
       const machineUtilMachines = reservation.MachineUtilizations
         ?.filter(machine => machine.Machine && machine.Machine !== "Not Specified")
         .map(machine => machine.Machine) || [];
-      
+
       // Combine all machine names and remove duplicates
       const allMachines = [...new Set([...userServiceMachines, ...machineUtilMachines])];
-      
+
       // Format machines for display
       const machines = allMachines.length > 0 
         ? allMachines 
         : ["Not specified"];
-      
+
       // Determine the date from UtilTimes if available, otherwise use RequestDate
       const firstTime = reservation.UtilTimes.length > 0 ? reservation.UtilTimes[0] : null;
       const date = firstTime && firstTime.StartTime 
