@@ -372,35 +372,7 @@ const DashboardUser = () => {
               <h2 className="text-[#143370] text-3xl font-bold font-qanelas3">Dashboard</h2>
               <p className="text-sm text-[#143370] mb-4 font-poppins1">{formattedDate}</p>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 mb-4">
-                <Card className="bg-white shadow-sm transform hover:scale-105 transition-all duration-300 border border-[#5e86ca]">
-                  <CardHeader>
-                    <CardTitle>Something</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <h2 className="text-4xl font-bold text-[#143370]">2</h2>
-                    <p className="text-sm text-[#143370]">Next 7 Days</p>
-                  </CardContent>
-                </Card>
 
-                <Card className="bg-white shadow-sm transform hover:scale-105 transition-all duration-300 border border-[#5e86ca]">
-                  <CardHeader>
-                    <CardTitle>Past Reservations</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <h2 className="text-4xl font-bold text-[#143370]">24</h2>
-                    <p className="text-sm text-[#143370]">Last 30 Days</p>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-white shadow-sm transform hover:scale-105 transition-all duration-300 border border-[#5e86ca]">
-                  <CardHeader>
-                    <CardTitle>Something</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <h2 className="text-4xl font-bold text-[#143370]">3</h2>
-                    <p className="text-sm text-[#143370]">Last 30 Days</p>
-                  </CardContent>
-                </Card>
               </div>
 
               <div className="bg-white rounded-lg text-blue-800 px-4 py-4 shadow-md border border-[#5e86ca]">

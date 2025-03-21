@@ -54,6 +54,7 @@
     "formidable": "^3.5.2",
     "input-otp": "^1.2.4",
     "jsonwebtoken": "^9.0.2",
+    "jspdf": "^3.0.1",
     "lucide-react": "^0.408.0",
     "moment": "^2.30.1",
     "next": "^15.1.7",
