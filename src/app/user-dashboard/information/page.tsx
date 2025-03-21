@@ -302,11 +302,15 @@ const DashboardUser = () => {
                   </label>
                )}
 
-                <button
-                  onClick={() => setIsEditModalOpen(true)}
-                  className="ml-4 px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 text-blue-800 bg-blue-100 border border-[#5e86ca]">
-                  Edit Information
-                </button>
+              <button
+                onClick={() => setIsEditModalOpen(true)}
+                className="ml-4 px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 text-blue-800 bg-blue-100 border border-[#5e86ca]">
+                {(!isBusinessView && (!accInfo?.ClientInfo || !accInfo.ClientInfo.ContactNum)) || 
+                (isBusinessView && (!accInfo?.BusinessInfo || 
+                  (!accInfo.BusinessInfo.CompanyName && !accInfo.BusinessInfo.isNotBusinessOwner))) 
+                  ? "Add Information" 
+                  : "Edit Information"}
+              </button>
               </div>
 
 
