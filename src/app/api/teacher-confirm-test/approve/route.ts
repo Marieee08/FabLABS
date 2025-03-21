@@ -163,7 +163,9 @@ export async function GET(request: Request) {
         <h3>FabLAB Request Approved</h3>
         <p>Dear ${studentName},</p>
         <p>Good news! Your teacher has approved your request to use the FabLAB services.</p>
-        <p>You can now proceed with your project. The FabLAB staff will be in touch with you soon with further instructions.</p>
+        <p>Your order is now pending for admin approval. Please note that you'll need to wait for the admin's approval before proceeding with your FabLAB reservation.</p>
+        <p>Once the admin has reviewed and approved your request, you will receive another confirmation email with further instructions on how to proceed.</p>
+
         <p>Thank you,<br>FabLAB Team</p>
       `,
     };
