@@ -164,7 +164,7 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
           days: updatedDays
         };
       } else {
-        // If sync is disabled, update only the selected day
+        // If sync is disabled, update ONLY the selected day
         updatedDays[index] = {
           ...updatedDays[index],
           [field]: time
@@ -446,6 +446,7 @@ export default function DateTimeSelection({ formData, setFormData, nextStep, isD
 }
 
 // TimePicker Component - Improved to prevent cascading validation errors
+// TimePicker Component - Improved to prevent cascading validation errors and fix end time validation
 function TimePicker({
   label,
   value,
@@ -508,16 +509,26 @@ function TimePicker({
     };
   }, []);
 
-  // Validate time order only when relevant
-  const validateTimeOrder = React.useCallback((currentTime: string) => {
-    if (!isEndTime || !startTime) return false;
+  // Validate time order only when relevant - Fixed to properly compare times
+  const validateTimeOrder = React.useCallback(() => {
+    if (!isEndTime || !startTime || startTime === '--:-- AM' || startTime === '--:-- PM') {
+      return false;
+    }
 
+    // Form the current time from local state
+    const currentTime = localHour === '--' || localMinute === '--' 
+      ? null
+      : formatTime(localHour, localMinute);
+    
+    if (!currentTime) return false;
+    
     const startMinutes = timeToMinutes(startTime);
     const endMinutes = timeToMinutes(currentTime);
    
     if (startMinutes === -1 || endMinutes === -1) return false;
+    
     return endMinutes <= startMinutes;
-  }, [isEndTime, startTime]);
+  }, [isEndTime, startTime, localHour, localMinute]);
 
   // Focus handler to indicate which time picker is being edited
   const handleFocus = () => {
@@ -530,6 +541,13 @@ function TimePicker({
       setShowError(required && (localHour === '--' || localMinute === '--'));
     }
   }, [hasAttemptedSubmit, required, localHour, localMinute]);
+
+  // Validate when dependencies change
+  React.useEffect(() => {
+    if (isEndTime) {
+      setIsInvalid(validateTimeOrder());
+    }
+  }, [startTime, localHour, localMinute, isEndTime, validateTimeOrder]);
 
   // Handle hour changes with validation
   const handleHourChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -544,18 +562,14 @@ function TimePicker({
       setLocalMinute(minuteToUse);
       
       const formattedTime = formatTime(newHour, minuteToUse);
-      const newIsInvalid = validateTimeOrder(formattedTime);
-      setIsInvalid(newIsInvalid);
       
-      if (!newIsInvalid) {
-        onChange(formattedTime);
-      }
+      // Always update the time, validation will be handled in the effect
+      onChange(formattedTime);
       
       if (hasAttemptedSubmit) {
         setShowError(false);
       }
     } else {
-      setIsInvalid(false);
       onChange('--:-- AM');
       if (hasAttemptedSubmit) {
         setShowError(true);
@@ -572,18 +586,14 @@ function TimePicker({
     
     if (localHour !== '--' && newMinute !== '--') {
       const formattedTime = formatTime(localHour, newMinute);
-      const newIsInvalid = validateTimeOrder(formattedTime);
-      setIsInvalid(newIsInvalid);
       
-      if (!newIsInvalid) {
-        onChange(formattedTime);
-      }
+      // Always update the time, validation will be handled in the effect
+      onChange(formattedTime);
       
       if (hasAttemptedSubmit) {
         setShowError(false);
       }
     } else if (newMinute === '--') {
-      setIsInvalid(false);
       onChange('--:-- AM');
       if (hasAttemptedSubmit) {
         setShowError(true);
@@ -604,14 +614,6 @@ function TimePicker({
       hasRendered.current = true;
     }
   }, [value, isEditing]);
-
-  // Validate on startTime changes for end time pickers
-  React.useEffect(() => {
-    if (value && startTime && isEndTime) {
-      const newIsInvalid = validateTimeOrder(value);
-      setIsInvalid(newIsInvalid);
-    }
-  }, [startTime, value, isEndTime, validateTimeOrder]);
 
   const hours = [
     '--',
