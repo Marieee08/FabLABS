@@ -239,7 +239,7 @@ export default function Home() {
               </div>
 
 
-              <a href="/services" className="inline-block border border-[#5e86ca] bg-[#193d83] text-white font-qanelas1 text-lg py-1 px-6 rounded-md hover:bg-[#2f61c2] transition duration-300 ml-auto">
+              <a href="/user-services" className="inline-block border border-[#5e86ca] bg-[#193d83] text-white font-qanelas1 text-lg py-1 px-6 rounded-md hover:bg-[#2f61c2] transition duration-300 ml-auto">
                 Learn More About Us
               </a>
             </div>
