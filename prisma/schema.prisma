@@ -132,6 +132,7 @@ model UserService {
   EquipmentAvail String
   CostsAvail     Decimal?
   MinsAvail      Decimal?
+  File           String?
   utilReqId      Int?
   utilReq        UtilReq? @relation("UtilReqToUserService", fields: [utilReqId], references: [id])
 }
