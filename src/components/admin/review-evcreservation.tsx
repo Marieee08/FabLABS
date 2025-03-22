@@ -1,44 +1,4 @@
-const handleStatusUpdateWithApprover = async (
-  reservationId: number, 
-  newStatus: 'Pending' | 'Approved' | 'Rejected' | 'Completed' | 'Cancelled'
-) => {
-  try {
-    // Create the payload
-    const payload: any = { 
-      status: newStatus,
-      adminName: "Admin Name" // Replace this with the actual admin name from your app
-    };
-    
-    const response = await fetch(`/api/admin/evc-reservation-status/${reservationId}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to update EVC status: ${response.status} ${response.statusText}`);
-    }
-
-    // Get the updated reservation data
-    const updatedReservation = await response.json();
-    
-    // Update local state
-    if (selectedReservation) {
-      setSelectedReservation({
-        ...selectedReservation,
-        EVCStatus: updatedReservation.EVCStatus,
-        ApprovedBy: updatedReservation.ApprovedBy
-      });
-    }
-
-    // Call the original handleStatusUpdate to update the parent component's state
-    handleStatusUpdate(reservationId, newStatus);
-  } catch (error: any) {
-    console.error('Error updating EVC reservation status:', error instanceof Error ? error.message : String(error));
-  }
-};// src\components\admin\review-evcreservation.tsx
+// src\components\admin\review-evcreservation.tsx - with status timeline removed
 import React from 'react';
 import {
 Dialog,
@@ -121,6 +81,53 @@ const formatDate = (dateString: string | null): string => {
     month: 'short',
     day: 'numeric'
   });
+};
+
+const handleStatusUpdateWithApprover = async (
+  reservationId: number, 
+  newStatus: 'Pending' | 'Approved' | 'Rejected' | 'Completed' | 'Cancelled'
+) => {
+  try {
+    console.log(`Updating reservation ${reservationId} to status: ${newStatus}`);
+    
+    // REPLACE THIS WITH YOUR ACTUAL NAME
+    const adminName = "Your Name"; 
+    
+    // Create payload with admin name
+    const payload = { 
+      status: newStatus,
+      adminName: adminName
+    };
+    
+    console.log("Sending payload to API:", payload);
+    
+    const response = await fetch(`/api/admin/evc-reservation-status/${reservationId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    console.log("API response status:", response.status);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to update EVC status: ${response.status} ${errorText}`);
+    }
+
+    console.log("Update successful");
+    
+    // First close the modal
+    setIsModalOpen(false);
+    
+    // Then update the parent component's state
+    handleStatusUpdate(reservationId, newStatus);
+    
+  } catch (error: any) {
+    console.error('Error updating EVC reservation status:', error);
+    alert(`Failed to update reservation status: ${error.message}`);
+  }
 };
 
 const formatTime = (timeString: string | null): string => {
@@ -297,60 +304,8 @@ return (
                   <p><span className="text-gray-600">Inspected By:</span> {selectedReservation.InspectedBy || 'Not yet inspected'}</p>
                   <p><span className="text-gray-600">Inspected Date:</span> {selectedReservation.InspectedDate ? formatDate(selectedReservation.InspectedDate) : 'Not yet inspected'}</p>
                 </div>
-
-                <Separator />
-
-                <div>
-                  <h3 className="font-medium text-gray-900 mb-2">Status Timeline</h3>
-                  <div className="space-y-2 pl-4 border-l-2 border-gray-200">
-                    <div className="relative">
-                      <div className="absolute -left-[9px] mt-1 w-4 h-4 rounded-full bg-blue-500"></div>
-                      <p className="ml-4"><span className="font-medium">Request Created</span> - {selectedReservation.DateRequested ? formatDate(selectedReservation.DateRequested) : 'Not available'}</p>
-                    </div>
-                    {selectedReservation.ApprovedBy && (
-                      <div className="relative">
-                        <div className="absolute -left-[9px] mt-1 w-4 h-4 rounded-full bg-green-500"></div>
-                        <p className="ml-4"><span className="font-medium">Approved</span> - By {selectedReservation.ApprovedBy}</p>
-                      </div>
-                    )}
-                    {selectedReservation.ReceivedBy && (
-                      <div className="relative">
-                        <div className="absolute -left-[9px] mt-1 w-4 h-4 rounded-full bg-purple-500"></div>
-                        <p className="ml-4">
-                          <span className="font-medium">Received</span> - By {selectedReservation.ReceivedBy}
-                          {selectedReservation.ReceivedDate ? ' on ' + formatDate(selectedReservation.ReceivedDate) : ''}
-                        </p>
-                      </div>
-                    )}
-                    {selectedReservation.InspectedBy && (
-                      <div className="relative">
-                        <div className="absolute -left-[9px] mt-1 w-4 h-4 rounded-full bg-yellow-500"></div>
-                        <p className="ml-4">
-                          <span className="font-medium">Inspected</span> - By {selectedReservation.InspectedBy}
-                          {selectedReservation.InspectedDate ? ' on ' + formatDate(selectedReservation.InspectedDate) : ''}
-                        </p>
-                      </div>
-                    )}
-                    {selectedReservation.EVCStatus === 'Completed' && (
-                      <div className="relative">
-                        <div className="absolute -left-[9px] mt-1 w-4 h-4 rounded-full bg-indigo-500"></div>
-                        <p className="ml-4"><span className="font-medium">Completed</span></p>
-                      </div>
-                    )}
-                    {selectedReservation.EVCStatus === 'Cancelled' && (
-                      <div className="relative">
-                        <div className="absolute -left-[9px] mt-1 w-4 h-4 rounded-full bg-red-500"></div>
-                        <p className="ml-4"><span className="font-medium">Cancelled</span></p>
-                      </div>
-                    )}
-                    {selectedReservation.EVCStatus === 'Rejected' && (
-                      <div className="relative">
-                        <div className="absolute -left-[9px] mt-1 w-4 h-4 rounded-full bg-red-500"></div>
-                        <p className="ml-4"><span className="font-medium">Rejected</span></p>
-                      </div>
-                    )}
-                  </div>
-                </div>
+                
+                {/* Status Timeline has been removed */}
               </div>
             </TabsContent>
           </Tabs>
@@ -390,9 +345,9 @@ return (
                   </Button>
                   <Button
                     variant="default"
-                    onClick={() => handleStatusUpdateWithApprover(selectedReservation.id, 'Ongoing')}
+                    onClick={() => handleStatusUpdateWithApprover(selectedReservation.id, 'Completed')}
                   >
-                    Mark as Ongoing
+                    Mark as Completed
                   </Button>
                 </>
               )}
