@@ -1,4 +1,6 @@
-import { Plus, Edit, Trash2, X, Info } from 'lucide-react';
+import { Plus, Edit, Trash2, X, Info, Minus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Switch } from "@/components/ui/switch";
 import React, { useState, useEffect } from 'react';
 import { MultiSelect } from "@/components/ui/multi-select";
@@ -17,6 +19,7 @@ interface Machine {
   Machine: string;
   Image: string;
   Desc: string;
+  Number?: number;
   Instructions?: string;
   Link?: string;
   isAvailable: boolean;
@@ -33,6 +36,7 @@ export default function AdminServices() {
     Machine: '',
     Image: '',
     Desc: '',
+    Number: undefined, 
     Instructions: '',
     Link: '',
     isAvailable: true,
@@ -161,6 +165,7 @@ export default function AdminServices() {
         Machine: machine.Machine,
         Image: machine.Image,
         Desc: machine.Desc,
+        Number: machine.Number, // Added Number field
         Instructions: machine.Instructions || '',
         Link: machine.Link || '',
         isAvailable: machine.isAvailable,
@@ -174,6 +179,7 @@ export default function AdminServices() {
         Machine: '',
         Image: '',
         Desc: '',
+        Number: undefined, // Added Number field
         Instructions: '',
         Link: '',
         isAvailable: true,
@@ -193,12 +199,20 @@ export default function AdminServices() {
       Machine: '',
       Image: '',
       Desc: '',
+      Number: undefined, // Added Number field
       Instructions: '',
       Link: '',
       isAvailable: true,
       Services: []
     });
     setSelectedServices([]);
+  };
+
+  const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    // Convert to number or undefined if empty
+    const numValue = value === '' ? undefined : parseInt(value, 10);
+    setFormData(prev => ({ ...prev, Number: numValue }));
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -263,6 +277,7 @@ export default function AdminServices() {
         Machine: formData.Machine,
         Image: imageUrl,
         Desc: formData.Desc,
+        Number: formData.Number, // Added Number field
         Instructions: formData.Instructions || null,
         Link: formData.Link || null,
         isAvailable: formData.isAvailable ?? true,
@@ -371,25 +386,32 @@ export default function AdminServices() {
             {machines.map(machine => (
               <div key={machine.id} className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-100 hover:shadow-md transition-shadow">
                 {/* Machine Header */}
-                <div className="flex justify-between items-center p-4 border-b border-gray-100">
-                  <h2 className="text-lg font-semibold text-gray-800 truncate" title={machine.Machine}>
-                    {machine.Machine}
-                  </h2>
-                  <div className="flex items-center space-x-2">
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                      machine.isAvailable 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {machine.isAvailable ? 'Available' : 'Unavailable'}
-                    </span>
-                    <Switch
-                      checked={machine.isAvailable}
-                      onCheckedChange={() => toggleAvailability(machine.id, machine.isAvailable)}
-                      className="data-[state=checked]:bg-green-600"
-                    />
-                  </div>
-                </div>
+<div className="flex justify-between items-center p-4 border-b border-gray-100">
+  <div className="flex flex-col">
+    <h2 className="text-lg font-semibold text-gray-800 truncate" title={machine.Machine}>
+      {machine.Machine}
+    </h2>
+    {machine.Number !== null && machine.Number !== undefined && (
+      <span className="text-xs text-gray-500">
+        Quantity: {machine.Number}
+      </span>
+    )}
+  </div>
+  <div className="flex items-center space-x-2">
+    <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+      machine.isAvailable 
+        ? 'bg-green-100 text-green-800' 
+        : 'bg-red-100 text-red-800'
+    }`}>
+      {machine.isAvailable ? 'Available' : 'Unavailable'}
+    </span>
+    <Switch
+      checked={machine.isAvailable}
+      onCheckedChange={() => toggleAvailability(machine.id, machine.isAvailable)}
+      className="data-[state=checked]:bg-green-600"
+    />
+  </div>
+</div>
                 
                 {/* Machine Image */}
                 <div className="relative h-56">
@@ -511,6 +533,53 @@ export default function AdminServices() {
                       required
                     />
                   </div>
+
+                      {/* Number Input */}
+<div className="space-y-2">
+  <label htmlFor="Number" className="block text-sm font-medium text-gray-700">
+    Number of Machines
+  </label>
+  <div className="flex items-center space-x-2">
+    <Button 
+      type="button"
+      variant="outline"
+      size="icon"
+      onClick={() => {
+        const currentValue = formData.Number || 1;
+        if (currentValue > 1) {
+          setFormData(prev => ({ ...prev, Number: currentValue - 1 }));
+        }
+      }}
+    >
+      <Minus className="h-4 w-4" />
+    </Button>
+    <Input
+      id="Number"
+      name="Number"
+      type="number"
+      value={formData.Number === undefined ? 1 : formData.Number}
+      onChange={(e) => {
+        const value = e.target.value;
+        const numValue = value === '' || parseInt(value) < 1 ? 1 : parseInt(value);
+        setFormData(prev => ({ ...prev, Number: numValue }));
+      }}
+      className="w-20 text-center"
+      min="1"
+      required
+    />
+    <Button 
+      type="button"
+      variant="outline"
+      size="icon"
+      onClick={() => {
+        const currentValue = formData.Number || 1;
+        setFormData(prev => ({ ...prev, Number: currentValue + 1 }));
+      }}
+    >
+      <Plus className="h-4 w-4" />
+    </Button>
+  </div>
+</div>
   
                   {/* Description Input */}
                   <div>
@@ -542,7 +611,7 @@ export default function AdminServices() {
                       rows={3}
                     />
                   </div>
-                  
+
                   {/* Image Upload */}
 <div>
   <label htmlFor="image" className="block text-sm font-medium text-gray-700 mb-1">

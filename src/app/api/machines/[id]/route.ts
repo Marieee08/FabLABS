@@ -1,3 +1,5 @@
+// src\app\api\machines\[id]\route.ts
+
 import { NextResponse } from 'next/server';
 import { Prisma, PrismaClient } from '@prisma/client';
 
@@ -24,6 +26,13 @@ function validateMachineData(data: any) {
 
   if (data.Instructions !== null && data.Instructions !== undefined && typeof data.Instructions !== 'string') {
     errors.push('Instructions must be a string if provided');
+  }
+
+  // Validate Number field (should be a number or null/undefined)
+  if (data.Number !== null && data.Number !== undefined) {
+    if (typeof data.Number !== 'number' || isNaN(data.Number) || data.Number < 0) {
+      errors.push('Number of machines must be a positive number if provided');
+    }
   }
 
   if (!Array.isArray(data.serviceIds)) {
@@ -55,6 +64,7 @@ export async function PUT(
       Machine: body.Machine,
       Image: body.Image,
       Desc: body.Desc,
+      Number: body.Number !== undefined ? body.Number : null, // Handle Number field
       Instructions: body.Instructions || null,
       Link: body.Link || null,
       isAvailable: body.isAvailable ?? true,
@@ -144,10 +154,30 @@ export async function PATCH(
 ) {
   try {
     const body = await request.json();
+    
+    // Create update data object with only the provided fields
+    const updateData: any = {};
+    
+    // Handle isAvailable field specifically
+    if (body.isAvailable !== undefined) {
+      updateData.isAvailable = body.isAvailable;
+    }
+    
+    // Handle Number field if provided
+    if (body.Number !== undefined) {
+      // Validate Number field
+      if (typeof body.Number !== 'number' && body.Number !== null) {
+        return NextResponse.json(
+          { error: 'Number of machines must be a positive number or null' },
+          { status: 400 }
+        );
+      }
+      updateData.Number = body.Number;
+    }
 
     const updatedMachine = await prisma.machine.update({
       where: { id: params.id },
-      data: { isAvailable: body.isAvailable },
+      data: updateData,
       include: {
         Services: {
           include: {
