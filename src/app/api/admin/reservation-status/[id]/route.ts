@@ -57,7 +57,7 @@ export async function PUT(
     console.log("Updating reservation with data:", updateData);
 
     // Update the reservation
-    const updatedReservation = await prisma.EVCReservation.update({
+    const updatedReservation = await prisma.eVCReservation.update({
       where: { id },
       data: updateData,
     });

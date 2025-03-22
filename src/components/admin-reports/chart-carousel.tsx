@@ -1,5 +1,5 @@
-// src\components\admin-reports\chart-carousel.tsx
-import React, { useState } from 'react';
+// components/admin-reports/chart-carousel.tsx
+import React, { useState, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,20 +24,38 @@ import {
   AreaChart,
   Area
 } from 'recharts';
+import { TimeIntervalSelector, TimeInterval } from './time-interval-selector';
+import { aggregateUtilizationTrends } from './data-aggregation-utils';
 
 // Define the chart data interface based on your dashboard data
 interface ChartCarouselProps {
   dashboardData: any;
   isLoading: boolean;
   error: string | null;
+  timeInterval: TimeInterval;
+  onTimeIntervalChange: (interval: TimeInterval) => void;
 }
 
-const ChartCarousel: React.FC<ChartCarouselProps> = ({ dashboardData, isLoading, error }) => {
+const ChartCarousel: React.FC<ChartCarouselProps> = ({ 
+  dashboardData, 
+  isLoading, 
+  error,
+  timeInterval,
+  onTimeIntervalChange
+}) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   
   // Define the COLORS array
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#ff7300'];
   
+  // Memoized aggregated data based on the selected time interval
+  const aggregatedUtilizationTrends = useMemo(() => {
+    if (!dashboardData.utilizationTrends || dashboardData.utilizationTrends.length === 0) {
+      return [];
+    }
+    return aggregateUtilizationTrends(dashboardData.utilizationTrends, timeInterval);
+  }, [dashboardData.utilizationTrends, timeInterval]);
+
   // Define all the charts you want to include in the carousel
   const charts = [
     {
@@ -164,18 +182,19 @@ const ChartCarousel: React.FC<ChartCarouselProps> = ({ dashboardData, isLoading,
     {
       id: 'reservationsByType',
       title: 'Reservations',
-      description: 'Number of reservations by type',
+      description: 'Number of reservations by time',
+      supportTimeInterval: true,
       component: () => (
         <CardContent className="h-[400px]">
-          {dashboardData.utilizationTrends && dashboardData.utilizationTrends.length > 0 ? (
+          {aggregatedUtilizationTrends && aggregatedUtilizationTrends.length > 0 ? (
             <ResponsiveContainer width="100%" height="100%">
               <LineChart 
-                data={dashboardData.utilizationTrends}
+                data={aggregatedUtilizationTrends}
                 margin={{ top: 20, right: 30, left: 20, bottom: 40 }}
               >
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis 
-                  dataKey="month" 
+                  dataKey="period" 
                   angle={-45} 
                   textAnchor="end" 
                   height={60} 
@@ -250,6 +269,9 @@ const ChartCarousel: React.FC<ChartCarouselProps> = ({ dashboardData, isLoading,
     }
   ];
 
+  // Check if the current chart supports time interval selection
+  const currentChartSupportsTimeInterval = charts[currentIndex]?.supportTimeInterval === true;
+
   // Navigate to the next chart
   const nextChart = () => {
     setCurrentIndex((prevIndex) => (prevIndex + 1) % charts.length);
@@ -280,8 +302,21 @@ const ChartCarousel: React.FC<ChartCarouselProps> = ({ dashboardData, isLoading,
     <div className="w-full">
       <Card className="border border-[#5e86ca]">
         <CardHeader>
-          <CardTitle className="text-[#143370]">{charts[currentIndex].title}</CardTitle>
-          <p className="text-sm text-[#143370]">{charts[currentIndex].description}</p>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
+            <div>
+              <CardTitle className="text-[#143370]">{charts[currentIndex].title}</CardTitle>
+              <p className="text-sm text-[#143370]">{charts[currentIndex].description}</p>
+            </div>
+            
+            {/* Only show time interval selector for charts that support it */}
+            {currentChartSupportsTimeInterval && (
+              <TimeIntervalSelector 
+                value={timeInterval} 
+                onChange={onTimeIntervalChange}
+                className="mt-4 sm:mt-0"
+              />
+            )}
+          </div>
         </CardHeader>
         
         {charts[currentIndex].component()}
