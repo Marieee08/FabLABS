@@ -12,15 +12,15 @@ export async function POST(request: { json: () => PromiseLike<{ name: any; email
     const transporter = nodemailer.createTransport({
       service: 'gmail', // Use Gmail or your preferred service
       auth: {
-        user: process.env.EMAIL_USER, // Your email address
-        pass: process.env.EMAIL_PASS, // Your app password or email password
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
       },
     });
 
     // Email options
     const mailOptions = {
       from: process.env.EMAIL_USER,
-      to: 'fablab@evc.pshs.edu.ph', // fablab@evc.pshs.edu.ph'
+      to: 'fablab@evc.pshs.edu.ph',
       subject: `New FabLABS Inquiry from ${name}`,
       text: `
         Name: ${name}
