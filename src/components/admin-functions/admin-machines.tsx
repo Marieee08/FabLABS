@@ -542,8 +542,7 @@ export default function AdminServices() {
                       rows={3}
                     />
                   </div>
-  
-                  {/* Image Upload */}
+                  
                   {/* Image Upload */}
 <div>
   <label htmlFor="image" className="block text-sm font-medium text-gray-700 mb-1">

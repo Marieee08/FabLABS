@@ -12,6 +12,7 @@ model Machine {
   Machine      String
   Image        String
   Desc         String
+  Number       Int?
   Instructions String?
   Link         String?
   isAvailable  Boolean          @default(true)
