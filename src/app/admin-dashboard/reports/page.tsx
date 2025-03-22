@@ -228,7 +228,7 @@ const DashboardAdmin = () => {
                   </CardHeader>
                   <CardContent>
                     <h2 className="text-4xl font-bold text-[#143370]">{dashboardData?.completedRequestsLastMonth || 0}</h2>
-                    <p className="text-sm text-[#143370]">Last 30 Days</p>
+                    <p className="text-sm text-[#143370]">in the last 30 Days</p>
                   </CardContent>
                 </Card>
 
