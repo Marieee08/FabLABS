@@ -12,7 +12,6 @@ export default authMiddleware({
         '/user-services/student-schedule',
         '/admin-dashboard',
         '/survey',
-        '/cashier-dashboard'
       ];
 
       if (protectedPaths.some(path => req.nextUrl.pathname.startsWith(path))) {
