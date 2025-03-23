@@ -104,7 +104,7 @@ const Navbar = () => {
         <div className="flex justify-between items-center px-4 md:px-10">
           <div className="flex items-center space-x-4">
             <Image src="/images/logos/SSF-logo.png" alt="SSF Logo" width={40} height={40} />
-            <Link href="/" style={{color: textColor}} onClick={() => handleNavigation('/')} className={pathname === '/user-services' ? "text-white text-2xl font-qanelas4" : "text-[#0b1d41] text-2xl font-qanelas4"}>FABLAB</Link>
+            <Link href="/" style={{color: textColor}} onClick={() => handleNavigation('/')} className={pathname === '/user-services' ? "text-white text-2xl font-qanelas4" : "text-[#0b1d41] text-2xl font-qanelas4"}>FABLABS</Link>
           </div>
 
           <button 
