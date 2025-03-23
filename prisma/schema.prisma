@@ -104,6 +104,7 @@ model UtilReq {
   Processedby         String?
   ReceiptNumber       String?
   PaymentDate         DateTime?
+  Remarks             String?
   accInfoId           Int?
   CustomerFeedback    CustomerFeedback?    @relation("UtilReqToCustomerFeedback")
   EmployeeEvaluation  EmployeeEvaluation?  @relation("UtilReqToEmployeeEvaluation")
@@ -132,16 +133,9 @@ model UserService {
   EquipmentAvail String
   CostsAvail     Decimal?
   MinsAvail      Decimal?
-  files          File[]   // Change from single String to an array of related File records
+  Files          String?
   utilReqId      Int?
   utilReq        UtilReq? @relation("UtilReqToUserService", fields: [utilReqId], references: [id])
-}
-
-model File {
-  id             String   @id @default(cuid())
-  url            String   // Store the file path or URL
-  userServiceId  String
-  userService    UserService @relation(fields: [userServiceId], references: [id])
 }
 
 model UtilTime {

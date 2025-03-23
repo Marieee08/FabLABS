@@ -5,7 +5,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Clock, AlertCircle, Briefcase, User, CreditCard } from 'lucide-react';
+import { CheckCircle, Clock, AlertCircle, Briefcase, User, CreditCard, FileText, Link as LinkIcon, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 
 interface ClientInfo {
@@ -57,6 +57,8 @@ interface FormData {
   BulkofCommodity: string;
   Equipment: string;
   Tools: string;
+  serviceLinks?: {[service: string]: string};
+  Remarks?: string;
   NeededMaterials?: Array<{
     Item: string;
     ItemQty: number;
@@ -361,6 +363,16 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
     }
   }, [user, isLoaded]);
 
+  useEffect(() => {
+    // Log formData when it changes to help with debugging
+    console.log("Review submit formData:", {
+      services: formData.ProductsManufactured,
+      hasServiceLinks: !!formData.serviceLinks,
+      serviceLinksKeys: formData.serviceLinks ? Object.keys(formData.serviceLinks) : [],
+      remarks: formData.Remarks
+    });
+  }, [formData]);
+
   const handleCostCalculated = useCallback((cost: number) => {
     setTotalCost(cost);
   }, []);
@@ -371,6 +383,13 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
       setError('');
 
       const token = await getToken();
+      
+      // Log what we're submitting
+      console.log("Submitting reservation with:", {
+        services: formData.ProductsManufactured,
+        hasServiceLinks: !!formData.serviceLinks,
+        remarks: formData.Remarks
+      });
       
       const submissionData = {
         ...formData,
@@ -401,6 +420,9 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
         throw new Error(errorData.error || 'Failed to submit reservation');
       }
 
+      const result = await response.json();
+      console.log("Reservation created successfully:", result);
+
       router.push('/user-dashboard');
       
     } catch (err) {
@@ -424,6 +446,11 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
       </div>
     );
   }
+
+  // Get all selected services
+  const selectedServices = Array.isArray(formData.ProductsManufactured) 
+    ? formData.ProductsManufactured 
+    : [formData.ProductsManufactured].filter(Boolean);
 
   return (
     <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 pt-0 flex flex-col">
@@ -550,9 +577,9 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
                     <p className="text-sm font-medium text-gray-700">Services Availed</p>
-                    {Array.isArray(formData.ProductsManufactured) ? (
+                    {selectedServices.length > 0 ? (
                       <div className="mt-2 flex flex-wrap gap-2">
-                        {formData.ProductsManufactured.map((service, index) => (
+                        {selectedServices.map((service, index) => (
                           <span 
                             key={index} 
                             className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm"
@@ -562,9 +589,30 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
                         ))}
                       </div>
                     ) : (
-                      <p className="mt-1 text-gray-800">{formData.ProductsManufactured || 'Not provided'}</p>
+                      <p className="mt-1 text-gray-800">No services selected</p>
                     )}
                   </div>
+                  
+                  {/* Display resource links for each service */}
+                  {formData.serviceLinks && Object.keys(formData.serviceLinks).length > 0 && (
+                    <div className="md:col-span-2 mt-2">
+                      <p className="text-sm font-medium text-gray-700 mb-2">Resource Links</p>
+                      {selectedServices.map(service => 
+                        formData.serviceLinks && formData.serviceLinks[service] ? (
+                          <div key={service} className="mb-3 p-3 border rounded-md">
+                            <p className="text-sm font-medium text-blue-700">{service}</p>
+                            <div className="mt-2 flex items-start">
+                              <LinkIcon className="h-4 w-4 text-blue-500 mr-2 mt-1 flex-shrink-0" />
+                              <p className="text-sm text-blue-600 break-all">
+                                {formData.serviceLinks[service]}
+                              </p>
+                            </div>
+                          </div>
+                        ) : null
+                      )}
+                    </div>
+                  )}
+                  
                   <div className="md:col-span-2">
                     <p className="text-sm font-medium text-gray-700">Bulk of Commodity</p>
                     <p className="mt-1 text-gray-800">{formData.BulkofCommodity || 'Not provided'}</p>
@@ -589,6 +637,19 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
                       <p className="mt-1 text-gray-800">No tools selected</p>
                     )}
                   </div>
+                  
+                  {/* Display Remarks */}
+                  {formData.Remarks && (
+                    <div className="md:col-span-2 mt-2">
+                      <p className="text-sm font-medium text-gray-700 mb-2">Remarks</p>
+                      <div className="p-3 border rounded-md bg-gray-50">
+                        <div className="flex gap-2">
+                          <MessageSquare className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                          <p className="text-gray-800 whitespace-pre-wrap">{formData.Remarks}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -600,7 +661,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
               <CreditCard className="h-5 w-5 text-blue-600 mr-2" /> Cost Breakdown
             </h3>
             <CostReviewTable
-              selectedServices={Array.isArray(formData.ProductsManufactured) ? formData.ProductsManufactured : [formData.ProductsManufactured].filter(Boolean) as string[]}
+              selectedServices={selectedServices}
               days={formData.days}
               onCostCalculated={handleCostCalculated}
             />
@@ -627,7 +688,12 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
               disabled={isSubmitting || loading}
               className="bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50"
             >
-              {isSubmitting ? 'Submitting...' : 'Submit Request'}
+              {isSubmitting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                  Submitting...
+                </>
+              ) : 'Submit Request'}
             </Button>
           </div>
         </CardContent>
