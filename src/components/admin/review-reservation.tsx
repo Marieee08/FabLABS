@@ -1,5 +1,4 @@
-// src\components\admin\review-reservation.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -90,6 +89,23 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
   selectedReservation,
   handleStatusUpdate
 }) => {
+  const [machines, setMachines] = useState<Array<{id: string, Machine: string}>>([]);
+
+  // Fetch machines when component mounts
+  React.useEffect(() => {
+    const fetchMachines = async () => {
+      try {
+        const response = await fetch('/api/admin/machines');
+        if (!response.ok) throw new Error('Failed to fetch machines');
+        const data = await response.json();
+        setMachines(data);
+      } catch (error) {
+        console.error('Error fetching machines:', error);
+      }
+    };
+    fetchMachines();
+  }, []);
+
   const getStatusColor = (status: string) => {
     const colors = {
       Pending: 'bg-yellow-100 text-yellow-800',
@@ -136,14 +152,65 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
                 <Separator />
 
                 <div>
-                  <h3 className="font-medium text-gray-900 mb-2">Services Information</h3>
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="font-medium text-gray-900">Services Information</h3>
+                  </div>
                   <div className="space-y-2">
                     {selectedReservation.UserServices.map((service, index) => (
                     <div key={index} className="bg-gray-50 p-3 rounded-lg">
-                      <p><span className="text-gray-600">Service:</span> {service.ServiceAvail}</p>
-                      <p><span className="text-gray-600">Equipment:</span> {service.EquipmentAvail}</p>
-                      <p><span className="text-gray-600">Duration:</span> {service.MinsAvail || 0} minutes</p>
-                      <p><span className="text-gray-600">Cost:</span> ₱{service.CostsAvail ? Number(service.CostsAvail).toFixed(2) : '0.00'}</p>
+                      <div className="grid grid-cols-2 gap-4 mb-2">
+                        <div>
+                          <label className="text-sm text-gray-600">Service</label>
+                          <p className="font-medium">{service.ServiceAvail}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm text-gray-600">Equipment</label>
+                          <select 
+                            className="w-full border rounded px-2 py-1"
+                            value={service.EquipmentAvail}
+                            onChange={async (e) => {
+                              try {
+                                const response = await fetch(`/api/admin/reservation-review/${selectedReservation.id}/equipment`, {
+                                  method: 'PATCH',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                  },
+                                  body: JSON.stringify({
+                                    serviceId: service.id,
+                                    equipment: e.target.value
+                                  }),
+                                });
+
+                                if (!response.ok) throw new Error('Failed to update equipment');
+
+                                const updatedData = await response.json();
+                                // Update UI with the new reservation data
+                                setSelectedReservation(updatedData);
+                              } catch (error) {
+                                console.error('Error updating equipment:', error);
+                                alert('Failed to update equipment');
+                              }
+                            }}
+                          >
+                            <option value="">Select Equipment</option>
+                            {machines.map(machine => (
+                              <option key={machine.id} value={machine.Machine}>
+                                {machine.Machine}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-sm text-gray-600">Duration</label>
+                          <p className="font-medium">{service.MinsAvail || 0} minutes</p>
+                        </div>
+                        <div>
+                          <label className="text-sm text-gray-600">Cost</label>
+                          <p className="font-medium">₱{service.CostsAvail ? Number(service.CostsAvail).toFixed(2) : '0.00'}</p>
+                        </div>
+                      </div>
                     </div>
                     ))}
                   </div>
@@ -292,6 +359,28 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
                       onClick={() => handleStatusUpdate(selectedReservation.id, 'Pending payment')}
                     >
                       Mark as To Pay
+                    </Button>
+                  </>
+                )}
+
+                {selectedReservation.Status === 'Pending payment' && (
+                  <>
+                    <Button
+                      variant="default"
+                      onClick={() => handleStatusUpdate(selectedReservation.id, 'Paid')}
+                    >
+                      Mark as Paid
+                    </Button>
+                  </>
+                )}
+
+                {selectedReservation.Status === 'Paid' && (
+                  <>
+                    <Button
+                      variant="default"
+                      onClick={() => handleStatusUpdate(selectedReservation.id, 'Completed')}
+                    >
+                      Mark as Completed
                     </Button>
                   </>
                 )}

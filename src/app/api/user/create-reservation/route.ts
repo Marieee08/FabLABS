@@ -48,8 +48,8 @@ export async function POST(request: Request) {
       
     console.log('Selected services:', selectedServices);
     
-    // Fetch the machines associated with these services
-    const serviceWithMachines = await prisma.service.findMany({
+    // Fetch the machines associated with these services and their costs
+    const servicesWithDetails = await prisma.service.findMany({
       where: {
         Service: {
           in: selectedServices
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     });
     
     // Log for debugging
-    console.log(`Found ${serviceWithMachines.length} services with their machines`);
+    console.log(`Found ${servicesWithDetails.length} services with their machines`);
     
     // Create an array to hold machines for services that have EXACTLY ONE machine
     const machinesToCreate = [];
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
     const serviceMachinesMap = new Map();
 
     // For each service, find all the associated machines
-    serviceWithMachines.forEach(service => {
+    servicesWithDetails.forEach(service => {
       console.log(`Service: ${service.Service} has ${service.Machines.length} machines`);
       
       // Store machine names for this service
@@ -101,6 +101,10 @@ export async function POST(request: Request) {
       `${service}: ${serviceLinks[service] ? 'Provided' : 'Not provided'}`
     ));
 
+    // Get service-specific costs from data
+    const serviceCostsFromClient = extractServiceCostsFromFormData(data);
+    console.log("Service costs:", serviceCostsFromClient);
+
     // Process remarks
     const remarks = data.Remarks || '';
 
@@ -122,35 +126,27 @@ export async function POST(request: Request) {
           }))
         },
 
-        // Create UserService entries with associated links
+        // Create UserService entries with costs and associated links
         UserServices: {
-          create: Array.isArray(data.ProductsManufactured) 
-            ? data.ProductsManufactured.map((service: string) => {
-                // Get machines for this service
-                const machines = serviceMachinesMap.get(service) || [];
-                
-                // Get link for this service (if any)
-                const serviceLink = serviceLinks[service] || '';
-                
-                return {
-                  ServiceAvail: service,
-                  // For services with multiple machines, we'll store the info but no machine will be selected
-                  EquipmentAvail: machines.length === 1 ? machines[0] : 'Waiting for admin approval',
-                  CostsAvail: totalAmountDue / data.ProductsManufactured.length, // Distribute cost evenly
-                  MinsAvail: calculateTotalMinutes(data.days),
-                  Files: serviceLink // Store link in the Files field (repurposing it for links)
-                };
-              })
-            : [{
-                ServiceAvail: data.ProductsManufactured,
-                // For a single service, check if it has exactly one machine
-                EquipmentAvail: serviceMachinesMap.get(data.ProductsManufactured)?.length === 1 
-                  ? serviceMachinesMap.get(data.ProductsManufactured)[0] 
-                  : 'Multiple machines available',
-                CostsAvail: totalAmountDue,
-                MinsAvail: calculateTotalMinutes(data.days),
-                Files: serviceLinks[data.ProductsManufactured] || '' // Store link in the Files field
-              }]
+          create: selectedServices.map((service: string) => {
+            // Get machines for this service
+            const machines = serviceMachinesMap.get(service) || [];
+            
+            // Get link for this service (if any)
+            const serviceLink = serviceLinks[service] || '';
+            
+            // Get the actual cost for this service (or a reasonable default)
+            const serviceCost = serviceCostsFromClient[service] || 0;
+            
+            return {
+              ServiceAvail: service,
+              // For services with multiple machines, we'll store the info but no machine will be selected
+              EquipmentAvail: machines.length === 1 ? machines[0] : 'Waiting for admin approval',
+              CostsAvail: serviceCost, // Use the actual cost for this service
+              MinsAvail: calculateTotalMinutes(data.days),
+              Files: serviceLink // Store link in the Files field (repurposing it for links)
+            };
+          })
         },
 
         // Create UtilTime entries
@@ -198,6 +194,43 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+}
+
+// Extract service costs from the form data
+function extractServiceCostsFromFormData(data: any) {
+  // Create an object to hold the cost for each service
+  const serviceCosts: { [key: string]: number } = {};
+  
+  // Check if groupedServiceData exists in data
+  if (data.groupedServiceData) {
+    // If groupedServiceData is available, extract costs directly
+    Object.keys(data.groupedServiceData).forEach((service) => {
+      serviceCosts[service] = data.groupedServiceData[service].totalServiceCost || 0;
+    });
+  } else {
+    // Fallback: Calculate costs based on the frontend logic
+    // This assumes the frontend's calculation method is also available here
+    const selectedServices = Array.isArray(data.ProductsManufactured) 
+      ? data.ProductsManufactured 
+      : [data.ProductsManufactured].filter(Boolean);
+    
+    // If we have serviceCostDetails, use those
+    if (data.serviceCostDetails && Array.isArray(data.serviceCostDetails)) {
+      data.serviceCostDetails.forEach((detail: any) => {
+        if (detail.serviceName && typeof detail.totalCost === 'number') {
+          serviceCosts[detail.serviceName] = detail.totalCost;
+        }
+      });
+    } else {
+      // If we don't have detailed costs, divide evenly (as before, but only as fallback)
+      const costPerService = data.totalCost / selectedServices.length;
+      selectedServices.forEach((service: string) => {
+        serviceCosts[service] = costPerService;
+      });
+    }
+  }
+  
+  return serviceCosts;
 }
 
 function combineDateAndTime(date: string | Date, time: string | null): Date {
