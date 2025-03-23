@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
         <p><strong>Student Name:</strong> ${studentName}</p>
         <p><strong>Student Email:</strong> ${studentEmail}</p>
         <p><strong>Reservation ID:</strong> ${reservationId}</p>
-        <p>This reservation is now approved. Please coordinate with the student for their scheduled FabLAB use.</p>
+        <p>You have approved this reservation! Feel free to contact the FabLab staff for any questions or concerns.</p>
       `,
     };
     
@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
           <div class="message">
             <p>Thank you for approving ${studentName}'s FabLAB reservation request.</p>
             <p>The student and the FabLAB team have both been notified.</p>
-            <p>The student will now be able to proceed with their project.</p>
+            <p>The student may  now be able to proceed with their project upon admin's approval.</p>
           </div>
         </body>
       </html>`, 
