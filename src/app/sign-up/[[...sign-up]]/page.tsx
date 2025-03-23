@@ -104,28 +104,6 @@ export default function Page() {
                             path="/sign-up" 
                             redirectUrl="/"
                             appearance={{
-                                elements: {
-                                    rootBox: "w-full",
-                                    card: "shadow-none p-6",
-                                    header: "mb-8",
-                                    headerTitle: "text-2xl font-qanelas2 text-[#143370] mb-2",
-                                    headerSubtitle: "text-gray-600 font-poppins1 mb-6",
-                                    formButtonPrimary: "bg-[#1c62b5] hover:bg-[#154c8f] rounded-md shadow-md transform hover:translate-y-[-2px] transition-all duration-200 mt-4",
-                                    formFieldLabel: "font-poppins1 font-medium text-gray-700",
-                                    formFieldInput: "font-poppins1 border-[#5e86ca] focus:border-[#1c62b5] rounded-md py-2.5 px-4 shadow-sm w-full",
-                                    footerActionLink: "text-[#1c62b5] hover:text-[#154c8f] font-medium",
-                                    identityPreviewEditButton: "text-[#1c62b5]",
-                                    formField: "mb-6",
-                                    formFieldLabelRow: "mb-2",
-                                    dividerLine: "bg-gray-200 h-[1px]",
-                                    dividerText: "bg-white text-gray-500 font-medium px-3 py-1",
-                                    socialButtonsIconButton: "border border-gray-300 rounded-md p-2.5 hover:bg-gray-50 transition-all",
-                                    socialButtonsBlockButton: "border border-gray-300 rounded-md p-2.5 hover:bg-gray-50 transition-all w-full flex justify-center items-center",
-                                    footer: "mt-8 text-center",
-                                    main: "mb-0 px-2",
-                                    form: "mb-6",
-                                    alternativeMethods: "mt-6",
-                                },
                                 layout: {
                                     socialButtonsPlacement: "top",
                                     socialButtonsVariant: "blockButton",

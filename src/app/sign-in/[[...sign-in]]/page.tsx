@@ -115,19 +115,6 @@ export default function Page() {
                                 routing="path" 
                                 path="/sign-in" 
                                 redirectUrl="/" 
-                                appearance={{
-                                    elements: {
-                                        rootBox: "w-full",
-                                        card: "shadow-none p-0",
-                                        headerTitle: "text-2xl font-qanelas2 text-[#143370]",
-                                        headerSubtitle: "text-gray-600 font-poppins1",
-                                        formButtonPrimary: "bg-[#1c62b5] hover:bg-[#154c8f]",
-                                        formFieldLabel: "font-poppins1",
-                                        formFieldInput: "font-poppins1 border-[#5e86ca] focus:border-[#1c62b5]",
-                                        footerActionLink: "text-[#1c62b5] hover:text-[#154c8f]",
-                                        identityPreviewEditButton: "text-[#1c62b5]",
-                                    }
-                                }}
                             />
                         </div>
                     )}

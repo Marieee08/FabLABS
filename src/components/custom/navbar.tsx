@@ -171,7 +171,7 @@ const Navbar = () => {
             <div className="flex items-center gap-3 2xsm:gap-7">
               <SignedOut>
                 <SignInButton mode='modal'>
-                  <button style={{color: textColor}} className={linkClassName}>Sign In</button>
+                  <button style={{color: textColor}} className={linkClassName}>Log In</button>
                 </SignInButton>
               </SignedOut>
               <SignedIn>
