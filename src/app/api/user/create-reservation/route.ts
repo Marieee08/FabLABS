@@ -141,7 +141,7 @@ export async function POST(request: Request) {
             return {
               ServiceAvail: service,
               // For services with multiple machines, we'll store the info but no machine will be selected
-              EquipmentAvail: machines.length === 1 ? machines[0] : 'Waiting for admin approval',
+              EquipmentAvail: machines.length === 1 ? machines[0] : null,
               CostsAvail: serviceCost, // Use the actual cost for this service
               MinsAvail: calculateTotalMinutes(data.days),
               Files: serviceLink // Store link in the Files field (repurposing it for links)

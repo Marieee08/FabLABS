@@ -104,7 +104,8 @@ model UtilReq {
   Processedby         String?
   ReceiptNumber       String?
   PaymentDate         DateTime?
-  Remarks             String?
+  Remarks             String?             // by user
+  Comments            String?             // by admin
   accInfoId           Int?
   CustomerFeedback    CustomerFeedback?    @relation("UtilReqToCustomerFeedback")
   EmployeeEvaluation  EmployeeEvaluation?  @relation("UtilReqToEmployeeEvaluation")

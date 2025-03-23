@@ -52,14 +52,16 @@ export async function GET(
   }
 }
 
-// PATCH handler for updating equipment
+// PATCH handler for updating equipment and comments
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const id = parseInt(params.id);
-    const { serviceId, equipment } = await req.json();
+    const url = new URL(req.url);
+    const resourceType = url.searchParams.get('type');
+    const data = await req.json();
 
     if (isNaN(id)) {
       return NextResponse.json(
@@ -68,15 +70,39 @@ export async function PATCH(
       );
     }
 
-    // Update the equipment for the specific service
-    await prisma.userService.update({
-      where: {
-        id: serviceId
-      },
-      data: {
-        EquipmentAvail: equipment
-      }
-    });
+    // Update equipment for a service
+    if (resourceType === 'equipment') {
+      const { serviceId, equipment, cost } = data;
+      
+      await prisma.userService.update({
+        where: {
+          id: serviceId
+        },
+        data: {
+          EquipmentAvail: equipment,
+          CostsAvail: cost !== undefined ? parseFloat(cost) : undefined
+        }
+      });
+    } 
+    // Update comments
+    else if (resourceType === 'comments') {
+      const { comments, totalAmount } = data;
+      
+      await prisma.utilReq.update({
+        where: { id },
+        data: { 
+          Comments: comments,
+          TotalAmntDue: totalAmount !== undefined ? totalAmount : undefined
+        }
+      });
+    }
+    // Unknown resource type
+    else {
+      return NextResponse.json(
+        { error: "Invalid resource type" },
+        { status: 400 }
+      );
+    }
 
     // Fetch updated reservation
     const updatedReservation = await prisma.utilReq.findUnique({
@@ -96,9 +122,9 @@ export async function PATCH(
 
     return NextResponse.json(updatedReservation);
   } catch (error) {
-    console.error("Error updating equipment:", error);
+    console.error("Error updating resource:", error);
     return NextResponse.json(
-      { error: "Failed to update equipment" },
+      { error: "Failed to update resource" },
       { status: 500 }
     );
   } finally {
@@ -106,7 +132,7 @@ export async function PATCH(
   }
 }
 
-// PUT handler for updating status
+// PUT handler for updating reservation status
 export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
