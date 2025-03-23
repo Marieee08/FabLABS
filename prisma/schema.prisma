@@ -12,6 +12,7 @@ model Machine {
   Machine      String
   Image        String
   Desc         String
+  Number       Int?
   Instructions String?
   Link         String?
   isAvailable  Boolean          @default(true)
@@ -131,8 +132,16 @@ model UserService {
   EquipmentAvail String
   CostsAvail     Decimal?
   MinsAvail      Decimal?
+  files          File[]   // Change from single String to an array of related File records
   utilReqId      Int?
   utilReq        UtilReq? @relation("UtilReqToUserService", fields: [utilReqId], references: [id])
+}
+
+model File {
+  id             String   @id @default(cuid())
+  url            String   // Store the file path or URL
+  userServiceId  String
+  userService    UserService @relation(fields: [userServiceId], references: [id])
 }
 
 model UtilTime {

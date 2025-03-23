@@ -1,3 +1,5 @@
+// src\app\api\machines\route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { Prisma } from '@prisma/client';
@@ -14,6 +16,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate Number field if provided
+    if (body.Number !== undefined && body.Number !== null) {
+      if (typeof body.Number !== 'number' || isNaN(body.Number) || body.Number < 0) {
+        return NextResponse.json(
+          { error: 'Number of machines must be a positive number if provided' },
+          { status: 400 }
+        );
+      }
+    }
+
     // Create the machine and its service relationships in a transaction
     const result = await prisma.$transaction(async (tx) => {
       // Create the machine
@@ -22,6 +34,7 @@ export async function POST(request: NextRequest) {
           Machine: body.Machine.trim(),
           Image: body.Image || '',
           Desc: body.Desc.trim(),
+          Number: body.Number !== undefined ? body.Number : null, // Handle Number field
           Instructions: body.Instructions?.trim() || null,
           Link: body.Link?.trim() || null,
           isAvailable: body.isAvailable ?? true,

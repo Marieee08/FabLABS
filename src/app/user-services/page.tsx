@@ -14,6 +14,7 @@ interface Machine {
   Machine: string;
   Image: string;
   Desc: string;
+  Number?: number | null; // Added Number field for machine quantity
   Instructions?: string;
   Link?: string;
   isAvailable: boolean;
@@ -345,12 +346,18 @@ export default function Services() {
                   </div>
                   <div className="flex justify-between items-center mb-2">
                     <h3 className="text-xl font-qanelas2">{machine.Machine}</h3>
+                    
+                    {/* Display quantity badge if Number is defined and greater than 0 */}
+                    {machine.Number && machine.Number > 0 && (
+                      <div className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium font-poppins1">
+                        Qty: {machine.Number}
+                      </div>
+                    )}
                   </div>
                   <p className="text-gray-600 mb-4 line-clamp-3 font-poppins1 text-md">
                     {machine.Desc}
                   </p>
                   <div>
-                    {/* Changed to full-width button without the calendar icon */}
                     <button
                       onClick={() => openModal(machine)}
                       className={`w-full py-3 px-4 rounded-full transition duration-300 flex items-center justify-center gap-2 font-poppins1 ${
@@ -391,7 +398,16 @@ export default function Services() {
               {/* Right column - Content */}
               <div className="w-full md:w-1/2 p-8 flex flex-col">
                 <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold font-qanelas2">{selectedMachine.Machine}</h2>
+                  <div>
+                    <h2 className="text-2xl font-bold font-qanelas2">{selectedMachine.Machine}</h2>
+                    
+                    {/* Display quantity in modal */}
+                    {selectedMachine.Number && selectedMachine.Number > 0 && (
+                      <div className="bg-green-100 text-green-800 px-2 py-1 rounded-md text-sm font-medium inline-block mt-2 font-poppins1">
+                        {selectedMachine.Number} {selectedMachine.Number === 1 ? 'unit' : 'units'} available
+                      </div>
+                    )}
+                  </div>
                   <button
                     onClick={closeModal}
                     className="text-gray-500 hover:text-gray-700 transition duration-300"

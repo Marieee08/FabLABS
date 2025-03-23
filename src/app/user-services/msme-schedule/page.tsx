@@ -1,5 +1,3 @@
-// src\app\user-services\msme-schedule\page.tsx
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -128,56 +126,6 @@ export default function Schedule() {
     setShowCalendar(prev => !prev);
   };
 
-  const getStepTitle = () => {
-    switch(step) {
-      case 1: return "Select Date & Time";
-      case 2: return "Process Information";
-      case 3: return "Review & Submit";
-      default: return "Schedule a Service";
-    }
-  };
-
-  const renderStep = () => {
-    switch(step) {
-      case 1:
-        return (
-          <DateTimeSelection
-            formData={formData}
-            setFormData={setFormData}
-            nextStep={nextStep}
-            isDateBlocked={isDateBlocked}
-          />
-        );
-      case 2:
-        return <ProcessInformation 
-          formData={formData} 
-          updateFormData={updateFormData} 
-          nextStep={nextStep} 
-          prevStep={prevStep} 
-        />;
-      case 3:
-        return <ReviewSubmit 
-          formData={formData} 
-          prevStep={prevStep} 
-          updateFormData={function (field: keyof FormData, value: string | number | { date: Date; startTime: string | null; endTime: string | null; }[]): void {
-            throw new Error('Function not implemented.');
-          }} 
-          nextStep={function (): void {
-            throw new Error('Function not implemented.');
-          }} 
-        />;
-      default:
-        return (
-          <DateTimeSelection
-            formData={formData}
-            setFormData={setFormData}
-            nextStep={nextStep}
-            isDateBlocked={isDateBlocked}
-          />
-        );
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
       <Navbar />
@@ -231,13 +179,13 @@ export default function Schedule() {
         <Card className="shadow-lg border border-gray-200">
           <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-gray-50 py-6">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-xl text-blue-800">{getStepTitle()}</CardTitle>
-              <span className="text-sm font-medium text-gray-500">Step {step} of 3</span>
+              <CardTitle className="text-xl text-blue-800">Service Scheduling</CardTitle>
+              <span className="text-sm font-medium text-gray-500">Step {step} of 2</span>
             </div>
           </CardHeader>
           
           <CardContent className="pt-8 pb-6 px-8">
-            <ProgressBar currentStep={step} totalSteps={3} />
+            <ProgressBar currentStep={step} totalSteps={2} />
             
             <div className="mt-8 w-full">
               {isLoading ? (
@@ -246,7 +194,63 @@ export default function Schedule() {
                   <p className="mt-4 text-gray-600">Loading calendar data...</p>
                 </div>
               ) : (
-                renderStep()
+                step === 1 ? (
+                  <div className="space-y-8">
+                    {/* Process Information Section */}
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-800 mb-4">Process Information</h2>
+                      <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                        <ProcessInformation 
+                          formData={formData} 
+                          updateFormData={updateFormData} 
+                          nextStep={() => {}} // No step change for combined view
+                          prevStep={() => {}} // No step change for combined view
+                          standalonePage={false} // Indicate this is part of a combined form
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* DateTime Selection Section */}
+                    <div>
+                      <h2 className="text-xl font-semibold text-gray-800 mb-4">Select Date & Time</h2>
+                      <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                        <DateTimeSelection
+                          formData={formData}
+                          setFormData={setFormData}
+                          nextStep={() => {}} // No step change for combined view
+                          isDateBlocked={isDateBlocked}
+                          standalonePage={false} // Indicate this is part of a combined form
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Combined Navigation Buttons - Cancel button removed */}
+                    <div className="mt-6 flex justify-end">
+                      <Button 
+                        onClick={nextStep} 
+                        disabled={
+                          formData.days.length === 0 || 
+                          !formData.ProductsManufactured || 
+                          !formData.BulkofCommodity
+                        }
+                      >
+                        Continue to Review
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <ReviewSubmit 
+                    formData={formData} 
+                    prevStep={prevStep}
+                    updateFormData={updateFormData}
+                    nextStep={() => {
+                      toast({
+                        title: "Success",
+                        description: "Your service has been scheduled successfully!",
+                      });
+                    }}
+                  />
+                )
               )}
             </div>
           </CardContent>
