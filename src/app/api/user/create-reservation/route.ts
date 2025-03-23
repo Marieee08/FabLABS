@@ -12,6 +12,12 @@ export async function POST(request: Request) {
     }
     
     const data = await request.json();
+    console.log("Creating reservation with data:", { 
+      services: data.ProductsManufactured,
+      hasServiceLinks: !!data.serviceLinks,
+      serviceLinksKeys: data.serviceLinks ? Object.keys(data.serviceLinks) : [],
+      hasRemarks: !!data.Remarks
+    });
     
     // Validate required data
     if (!data.days?.length) {
@@ -89,6 +95,15 @@ export async function POST(request: Request) {
 
     console.log(`Total machines to create: ${machinesToCreate.length}`);
 
+    // Get service links from the form data (if any)
+    const serviceLinks = data.serviceLinks || {};
+    console.log("Service links:", Object.keys(serviceLinks).map(service => 
+      `${service}: ${serviceLinks[service] ? 'Provided' : 'Not provided'}`
+    ));
+
+    // Process remarks
+    const remarks = data.Remarks || '';
+
     // Create the reservation with all related records
     const utilReq = await prisma.utilReq.create({
       data: {
@@ -97,6 +112,7 @@ export async function POST(request: Request) {
         BulkofCommodity: data.BulkofCommodity,
         accInfoId: userAccount.id,
         TotalAmntDue: totalAmountDue,
+        Remarks: remarks, // Add remarks to the main reservation data
         
         // Create UserTools entries
         UserTools: {
@@ -106,18 +122,23 @@ export async function POST(request: Request) {
           }))
         },
 
-        // Create UserService entries with associated machines
+        // Create UserService entries with associated links
         UserServices: {
           create: Array.isArray(data.ProductsManufactured) 
             ? data.ProductsManufactured.map((service: string) => {
                 // Get machines for this service
                 const machines = serviceMachinesMap.get(service) || [];
+                
+                // Get link for this service (if any)
+                const serviceLink = serviceLinks[service] || '';
+                
                 return {
                   ServiceAvail: service,
                   // For services with multiple machines, we'll store the info but no machine will be selected
                   EquipmentAvail: machines.length === 1 ? machines[0] : 'Waiting for admin approval',
                   CostsAvail: totalAmountDue / data.ProductsManufactured.length, // Distribute cost evenly
-                  MinsAvail: calculateTotalMinutes(data.days)
+                  MinsAvail: calculateTotalMinutes(data.days),
+                  Files: serviceLink // Store link in the Files field (repurposing it for links)
                 };
               })
             : [{
@@ -127,7 +148,8 @@ export async function POST(request: Request) {
                   ? serviceMachinesMap.get(data.ProductsManufactured)[0] 
                   : 'Multiple machines available',
                 CostsAvail: totalAmountDue,
-                MinsAvail: calculateTotalMinutes(data.days)
+                MinsAvail: calculateTotalMinutes(data.days),
+                Files: serviceLinks[data.ProductsManufactured] || '' // Store link in the Files field
               }]
         },
 
@@ -160,6 +182,8 @@ export async function POST(request: Request) {
         ServiceAvailed: true
       }
     });
+
+    console.log(`Created reservation with ID ${utilReq.id}`);
 
     return NextResponse.json({
       success: true,
