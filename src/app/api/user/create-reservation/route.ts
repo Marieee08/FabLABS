@@ -1,4 +1,3 @@
-// src\app\api\user\create-reservation\route.ts
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
@@ -62,7 +61,7 @@ export async function POST(request: Request) {
     // Log for debugging
     console.log(`Found ${serviceWithMachines.length} services with their machines`);
     
-    // Create an array to hold all machines for each service
+    // Create an array to hold machines for services that have EXACTLY ONE machine
     const machinesToCreate = [];
     
     // Create a map to store machines for each service
@@ -76,15 +75,16 @@ export async function POST(request: Request) {
       const machineNames = service.Machines.map(machineService => machineService.machine.Machine);
       serviceMachinesMap.set(service.Service, machineNames);
       
-      // Add each machine for this service to our array
-      service.Machines.forEach(machineService => {
+      // ONLY add machine if service has EXACTLY ONE machine
+      if (service.Machines.length === 1) {
         machinesToCreate.push({
-          Machine: machineService.machine.Machine,
+          Machine: service.Machines[0].machine.Machine,
           MachineApproval: false,
           DateReviewed: null,
           ServiceName: service.Service
         });
-      });
+      }
+      // If service has multiple machines, we don't add any machine entries
     });
 
     console.log(`Total machines to create: ${machinesToCreate.length}`);
@@ -114,16 +114,18 @@ export async function POST(request: Request) {
                 const machines = serviceMachinesMap.get(service) || [];
                 return {
                   ServiceAvail: service,
-                  // Store the machines associated with this service as a comma-separated string
-                  EquipmentAvail: machines.length > 0 ? machines.join(', ') : 'No associated machines',
+                  // For services with multiple machines, we'll store the info but no machine will be selected
+                  EquipmentAvail: machines.length === 1 ? machines[0] : 'Waiting for admin approval',
                   CostsAvail: totalAmountDue / data.ProductsManufactured.length, // Distribute cost evenly
                   MinsAvail: calculateTotalMinutes(data.days)
                 };
               })
             : [{
                 ServiceAvail: data.ProductsManufactured,
-                // For a single service, get its machines
-                EquipmentAvail: serviceMachinesMap.get(data.ProductsManufactured)?.join(', ') || 'No associated machines',
+                // For a single service, check if it has exactly one machine
+                EquipmentAvail: serviceMachinesMap.get(data.ProductsManufactured)?.length === 1 
+                  ? serviceMachinesMap.get(data.ProductsManufactured)[0] 
+                  : 'Multiple machines available',
                 CostsAvail: totalAmountDue,
                 MinsAvail: calculateTotalMinutes(data.days)
               }]
@@ -145,7 +147,7 @@ export async function POST(request: Request) {
           }))
         },
         
-        // Create MachineUtilization entries for all machines associated with selected services
+        // Create MachineUtilization entries ONLY for services with exactly one machine
         MachineUtilizations: {
           create: machinesToCreate
         }
