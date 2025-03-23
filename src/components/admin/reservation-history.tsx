@@ -295,7 +295,7 @@ const ReservationHistory = () => {
   // Add a new function to handle EVC status updates
   const handleEVCStatusUpdate = async (
     reservationId: number,
-    newStatus: 'Pending' | 'Approved' | 'Rejected' | 'Completed' | 'Cancelled'
+    newStatus: 'Pending Admin Appval' | 'Approved' | 'Rejected' | 'Completed' | 'Cancelled' | 'Ongoing'
   ) => {
     try {
       const response = await fetch(`/api/admin/evc-reservation-status/${reservationId}`, {

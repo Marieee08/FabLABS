@@ -1,5 +1,3 @@
-// @/components/student-forms/review-submit.tsx
-
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { useUser } from "@clerk/nextjs";
@@ -98,6 +96,8 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
   const { getToken } = useAuth();
   const [accInfo, setAccInfo] = useState<AccInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  // Add a new state to track submission in progress
+  const [submittingReservation, setSubmittingReservation] = useState(false);
 
   useEffect(() => {
     const fetchUserInfo = async () => {
@@ -120,193 +120,201 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
     }
   }, [user, isLoaded]);
 
-  // Update this part of your ReviewSubmit component's handleSubmit function
+  const handleSubmit = async () => {
+    try {
+      setIsSubmitting(true);
+      setError('');
 
-    const handleSubmit = async () => {
-      try {
-        setIsSubmitting(true);
-        setError('');
-
-        const token = await getToken();
+      const token = await getToken();
+      
+      // Format UtilTimes to match the Prisma model
+      const utilTimes = formData.days.map((day, index) => {
+        // Make sure we have a proper date object
+        const dateObj = day.date instanceof Date ? day.date : new Date(day.date);
         
-        // Format UtilTimes, neededMaterials, and evcStudents as before...
+        // Create ISO strings for the API
+        let startTimeISO = null;
+        let endTimeISO = null;
         
-        // Format UtilTimes to match the Prisma model
-        const utilTimes = formData.days.map((day, index) => {
-          // Make sure we have a proper date object
-          const dateObj = day.date instanceof Date ? day.date : new Date(day.date);
-          
-          // Create ISO strings for the API
-          let startTimeISO = null;
-          let endTimeISO = null;
-          
-          if (day.startTime) {
-            const [hours, minutes] = day.startTime.split(':');
-            const startTimeDate = new Date(dateObj);
-            startTimeDate.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
-            startTimeISO = startTimeDate.toISOString();
-          }
-          
-          if (day.endTime) {
-            const [hours, minutes] = day.endTime.split(':');
-            const endTimeDate = new Date(dateObj);
-            endTimeDate.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
-            endTimeISO = endTimeDate.toISOString();
-          }
-          
-          return {
-            DayNum: index + 1,
-            StartTime: startTimeISO,
-            EndTime: endTimeISO,
-          };
-        });
-
-        // Format needed materials to match the model
-        const neededMaterials = formData.NeededMaterials?.map(material => ({
-          Item: material.Item,
-          ItemQty: Number(material.ItemQty),
-          Description: material.Description,
-        })) || [];
-
-        // Format students to match the API expectations
-        const evcStudents = formData.Students?.map(student => ({
-          Students: student.name
-        })) || [];
-
-        // Get student information for email
-        const studentName = user?.firstName && user?.lastName 
-          ? `${user.firstName} ${user.lastName}` 
-          : accInfo?.Name || 'Student';
+        if (day.startTime) {
+          const [hours, minutes] = day.startTime.split(':');
+          const startTimeDate = new Date(dateObj);
+          startTimeDate.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+          startTimeISO = startTimeDate.toISOString();
+        }
         
-        const studentEmail = user?.emailAddresses[0]?.emailAddress || accInfo?.email || '';
+        if (day.endTime) {
+          const [hours, minutes] = day.endTime.split(':');
+          const endTimeDate = new Date(dateObj);
+          endTimeDate.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+          endTimeISO = endTimeDate.toISOString();
+        }
         
-        // Prepare submission data in the format expected by the API
-        const submissionData = {
-          // EVCReservation base fields
-          ControlNo: formData.ControlNo ? Number(formData.ControlNo) : undefined,
-          LvlSec: formData.LvlSec || undefined,
-          NoofStudents: formData.Students?.length || 0,
-          Subject: formData.Subject || undefined,
-          Teacher: formData.Teacher || undefined,
-          TeacherEmail: formData.TeacherEmail || undefined,
-          Topic: formData.Topic || undefined,
-          SchoolYear: formData.SchoolYear ? Number(formData.SchoolYear) : undefined,
-          EVCStatus: 'Pending Teacher Approval', // Changed from Status to EVCStatus
-          
-          // Related data collections
-          UtilTimes: utilTimes,
-          EVCStudents: evcStudents,
-          NeededMaterials: neededMaterials,
-          
-          // Link to user account
-          accInfoId: accInfo?.id
+        return {
+          DayNum: index + 1,
+          StartTime: startTimeISO,
+          EndTime: endTimeISO,
         };
+      });
 
-        console.log('Sending data to API:', JSON.stringify(submissionData, null, 2));
+      // Format needed materials to match the model
+      const neededMaterials = formData.NeededMaterials?.map(material => ({
+        Item: material.Item,
+        ItemQty: Number(material.ItemQty),
+        Description: material.Description,
+      })) || [];
 
-        // First create the reservation in pending state
-        const response = await fetch('/api/user/create-evc-reservation', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify(submissionData),
-        });
-        
-        // Handle the response
-        if (!response.ok) {
-          const responseText = await response.text();
-          console.log('Raw error response:', responseText);
-          
-          let errorData = null;
-          if (responseText) {
-            try {
-              errorData = JSON.parse(responseText);
-            } catch (e) {
-              console.error('Failed to parse response as JSON:', e);
-            }
-          }
+      // Format students to match the API expectations
+      const evcStudents = formData.Students?.map(student => ({
+        Students: student.name
+      })) || [];
 
-          const errorMessage = errorData?.details || errorData?.error || 'Failed to submit reservation';
-          throw new Error(errorMessage);
-        }
+      // Get student information for email
+      const studentName = user?.firstName && user?.lastName 
+        ? `${user.firstName} ${user.lastName}` 
+        : accInfo?.Name || 'Student';
+      
+      const studentEmail = user?.emailAddresses[0]?.emailAddress || accInfo?.email || '';
+      
+      // Prepare submission data in the format expected by the API
+      const submissionData = {
+        // EVCReservation base fields
+        ControlNo: formData.ControlNo ? Number(formData.ControlNo) : undefined,
+        LvlSec: formData.LvlSec || undefined,
+        NoofStudents: formData.Students?.length || 0,
+        Subject: formData.Subject || undefined,
+        Teacher: formData.Teacher || undefined,
+        TeacherEmail: formData.TeacherEmail || undefined,
+        Topic: formData.Topic || undefined,
+        SchoolYear: formData.SchoolYear ? Number(formData.SchoolYear) : undefined,
+        EVCStatus: 'Pending Teacher Approval', // Changed from Status to EVCStatus
         
-        // Parse the successful response
-        const data = await response.json();
-        console.log('Reservation created:', data);
+        // Related data collections
+        UtilTimes: utilTimes,
+        EVCStudents: evcStudents,
+        NeededMaterials: neededMaterials,
         
-        // Now send the teacher approval email if teacher email is provided
-        if (formData.TeacherEmail) {
+        // Link to user account
+        accInfoId: accInfo?.id
+      };
+
+      console.log('Sending data to API:', JSON.stringify(submissionData, null, 2));
+
+      // First create the reservation in pending state
+      const response = await fetch('/api/user/create-evc-reservation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(submissionData),
+      });
+      
+      // Handle the response
+      if (!response.ok) {
+        const responseText = await response.text();
+        console.log('Raw error response:', responseText);
+        
+        let errorData = null;
+        if (responseText) {
           try {
-            // Send approval request email
-            const approvalResponse = await fetch('/api/teacher-email/approval-request', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`,
-              },
-              body: JSON.stringify({
-                reservationId: data.id, // The created reservation ID
-                studentName,
-                studentEmail,
-                studentGrade: formData.LvlSec || 'Not specified',
-                teacherEmail: formData.TeacherEmail,
-                teacherName: formData.Teacher || 'Teacher',
-                subject: formData.Subject || 'Not specified',
-                topic: formData.Topic || 'Not specified',
-                dates: formData.days.map(day => ({
-                  date: new Date(day.date).toLocaleDateString('en-US', { 
-                    weekday: 'long', 
-                    month: 'long', 
-                    day: 'numeric',
-                    year: 'numeric'
-                  }),
-                  startTime: day.startTime || 'Not specified',
-                  endTime: day.endTime || 'Not specified'
-                })),
-                materials: formData.NeededMaterials || [],
-                students: formData.Students || []
-              }),
-            });
-            
-            if (!approvalResponse.ok) {
-              const approvalError = await approvalResponse.text();
-              console.error('Teacher approval request failed:', approvalError);
-              setError('Reservation created but teacher approval email failed to send');
-            } else {
-              // Display success message with approval info
-              setSuccessMessage('Your reservation request has been submitted and an approval request has been sent to your teacher.');
-            }
-          } catch (emailError) {
-            console.error('Error sending approval email:', emailError);
-            setError('Reservation created but there was an error sending the teacher approval email');
+            errorData = JSON.parse(responseText);
+          } catch (e) {
+            console.error('Failed to parse response as JSON:', e);
           }
-        } else {
-          // No teacher email provided
-          setSuccessMessage('Your reservation request has been submitted successfully.');
         }
-        
-        // Redirect to dashboard after a short delay
-        setTimeout(() => {
-          router.push('/user-dashboard');
-        }, 3000);
-        
-      } catch (err) {
-        console.error('Submission error:', err);
-        // Handle error object properly
-        let errorMessage = 'Failed to submit reservation';
-        if (err instanceof Error) {
-          errorMessage = err.message;
-        } else if (typeof err === 'object' && err !== null) {
-          errorMessage = JSON.stringify(err);
-        }
-        setError(errorMessage);
-      } finally {
-        setIsSubmitting(false);
-      }
-    };
 
+        const errorMessage = errorData?.details || errorData?.error || 'Failed to submit reservation';
+        throw new Error(errorMessage);
+      }
+      
+      // Parse the successful response
+      const data = await response.json();
+      console.log('Reservation created:', data);
+      
+      // Now send the teacher approval email if teacher email is provided
+      if (formData.TeacherEmail) {
+        try {
+          // Send approval request email
+          const approvalResponse = await fetch('/api/teacher-email/approval-request', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              reservationId: data.id, // The created reservation ID
+              studentName,
+              studentEmail,
+              studentGrade: formData.LvlSec || 'Not specified',
+              teacherEmail: formData.TeacherEmail,
+              teacherName: formData.Teacher || 'Teacher',
+              subject: formData.Subject || 'Not specified',
+              topic: formData.Topic || 'Not specified',
+              dates: formData.days.map(day => ({
+                date: new Date(day.date).toLocaleDateString('en-US', { 
+                  weekday: 'long', 
+                  month: 'long', 
+                  day: 'numeric',
+                  year: 'numeric'
+                }),
+                startTime: day.startTime || 'Not specified',
+                endTime: day.endTime || 'Not specified'
+              })),
+              materials: formData.NeededMaterials || [],
+              students: formData.Students || []
+            }),
+          });
+          
+          if (!approvalResponse.ok) {
+            const approvalError = await approvalResponse.text();
+            console.error('Teacher approval request failed:', approvalError);
+            setError('Reservation created but teacher approval email failed to send');
+          } else {
+            // Display success message with approval info
+            setSuccessMessage('Your reservation request has been submitted and an approval request has been sent to your teacher.');
+          }
+        } catch (emailError) {
+          console.error('Error sending approval email:', emailError);
+          setError('Reservation created but there was an error sending the teacher approval email');
+        }
+      } else {
+        // No teacher email provided
+        setSuccessMessage('Your reservation request has been submitted successfully.');
+      }
+      
+      // Redirect to dashboard after a short delay
+      setTimeout(() => {
+        router.push('/student-dashboard');
+      }, 3000);
+      
+    } catch (err) {
+      console.error('Submission error:', err);
+      // Handle error object properly
+      let errorMessage = 'Failed to submit reservation';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (typeof err === 'object' && err !== null) {
+        errorMessage = JSON.stringify(err);
+      }
+      setError(errorMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Update the handleSubmit function to use the new state
+  const handleSubmitWithBuffer = async () => {
+    try {
+      setSubmittingReservation(true);
+      await handleSubmit();
+    } finally {
+      // This will only run if we don't redirect
+      setTimeout(() => {
+        setSubmittingReservation(false);
+      }, 3000);
+    }
+  };
 
   if (loading) {
     return (
@@ -315,6 +323,25 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
           <CardContent className="pt-4">
             <div className="flex items-center justify-center p-8">
               <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"/>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show buffering screen when submitting
+  if (submittingReservation) {
+    return (
+      <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 pt-0 flex flex-col">
+        <Card className="p-6 mt-6 bg-white shadow-sm border border-gray-200">
+          <CardContent className="pt-4">
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-6"/>
+              <h3 className="text-xl font-semibold text-blue-800 mb-2">Processing Your Reservation</h3>
+              <p className="text-gray-600 text-center max-w-md">
+                Please wait while we submit your request and notify your teacher. This may take a few moments.
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -518,7 +545,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
               Previous Step
             </Button>
             <Button
-              onClick={handleSubmit}
+              onClick={handleSubmitWithBuffer}
               disabled={isSubmitting || loading || !formData.TeacherEmail}
               className="bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50"
             >
