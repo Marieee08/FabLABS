@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Menu, X, Loader } from 'lucide-react';
-import { ClerkProvider, SignInButton, SignedIn, SignedOut, UserButton, useUser } from '@clerk/nextjs';
+import { ClerkProvider, SignUpButton, SignedIn, SignedOut, UserButton, useUser } from '@clerk/nextjs';
 import { useRouter, usePathname } from 'next/navigation';
 
 const Navbar = () => {
@@ -169,11 +169,16 @@ const Navbar = () => {
 
           <div className="hidden md:flex items-center space-x-4 mr-8">
             <div className="flex items-center gap-3 2xsm:gap-7">
-              <SignedOut>
-                <SignInButton mode='modal'>
-                  <button style={{color: textColor}} className={linkClassName}>Log In</button>
-                </SignInButton>
-              </SignedOut>
+            <SignedOut>
+            <SignUpButton mode='modal'>
+              <button 
+                style={{color: bgColor === 'transparent' ? 'white' : '#143370'}} 
+                className="bg-[#193d83] hover:bg-[#2f61c2] text-white font-qanelas1 font-medium py-2 px-6 rounded-full transition duration-300 shadow-sm hover:shadow-md flex items-center justify-center"
+              >
+                Sign Up
+              </button>
+            </SignUpButton>
+          </SignedOut>
               <SignedIn>
                 <UserButton showName> </UserButton>
               </SignedIn>

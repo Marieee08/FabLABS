@@ -16,9 +16,9 @@ export default authMiddleware({
       ];
 
       if (protectedPaths.some(path => req.nextUrl.pathname.startsWith(path))) {
-        const signInUrl = new URL('/sign-in', req.url);
-        signInUrl.searchParams.set('redirect_url', req.url);
-        return NextResponse.redirect(signInUrl);
+        const signUpUrl = new URL('/sign-up', req.url);
+        signUpUrl.searchParams.set('redirect_url', req.url);
+        return NextResponse.redirect(signUpUrl);
       }
     }
 
