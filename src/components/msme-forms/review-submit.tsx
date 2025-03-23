@@ -123,11 +123,13 @@ const formatDate = (date: Date): string => {
 const CostReviewTable = ({ 
   selectedServices, 
   days, 
-  onCostCalculated = () => {} 
-}: CostReviewProps) => {
+  onCostCalculated = () => {},
+  onServiceCostsCalculated = () => {} 
+}: CostReviewProps & { onServiceCostsCalculated?: (serviceData: GroupedServiceData) => void }) => {
   const [serviceCosts, setServiceCosts] = useState<ServiceCost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [groupedData, setGroupedData] = useState<GroupedServiceData>({});
 
   const getNumericCost = useCallback((cost: number | string): number => {
     if (typeof cost === 'number') return cost;
@@ -186,28 +188,65 @@ const CostReviewTable = ({
     fetchServiceCosts();
   }, []);
 
-  const calculateTotalCost = useCallback(() => {
-    if (!serviceCosts.length || !selectedServices.length || !days.length) return 0;
+  useEffect(() => {
+    if (!serviceCosts.length || !selectedServices.length || !days.length) {
+      setGroupedData({});
+      return;
+    }
     
-    let total = 0;
-    selectedServices.forEach(serviceName => {
+    // Group data by service for clearer organization
+    const calculatedGroupedData: GroupedServiceData = selectedServices.reduce<GroupedServiceData>((acc, serviceName) => {
       const service = serviceCosts.find(s => s.Service === serviceName);
-      if (!service || !service.Costs) return;
+      if (!service || !service.Costs) return acc;
       
-      const numericCost = getNumericCost(service.Costs);
+      if (!acc[serviceName]) {
+        acc[serviceName] = { 
+          service, 
+          dates: [], 
+          totalServiceCost: 0 
+        };
+      }
+      
+      return acc;
+    }, {});
+
+    // Fill the grouped data with dates and costs
+    Object.keys(calculatedGroupedData).forEach(serviceName => {
+      const { service } = calculatedGroupedData[serviceName];
+      let serviceTotalCost = 0;
+      
       days.forEach(day => {
         const duration = calculateDuration(day.startTime, day.endTime);
         const billableHours = calculateBillableHours(duration);
-        total += billableHours * numericCost;
+        const numericCost = getNumericCost(service.Costs);
+        const cost = billableHours * numericCost;
+        
+        calculatedGroupedData[serviceName].dates.push({
+          day,
+          duration,
+          billableHours,
+          cost
+        });
+        
+        serviceTotalCost += cost;
       });
+      
+      calculatedGroupedData[serviceName].totalServiceCost = serviceTotalCost;
     });
-    return total;
-  }, [serviceCosts, selectedServices, days, getNumericCost, calculateDuration, calculateBillableHours]);
 
-  useEffect(() => {
-    const total = calculateTotalCost();
-    onCostCalculated(total);
-  }, [calculateTotalCost, onCostCalculated]);
+    setGroupedData(calculatedGroupedData);
+    
+    // Call the callback with the calculated data
+    onServiceCostsCalculated(calculatedGroupedData);
+    
+    // Calculate and report the total cost
+    let totalCost = 0;
+    Object.values(calculatedGroupedData).forEach(data => {
+      totalCost += data.totalServiceCost;
+    });
+    onCostCalculated(totalCost);
+    
+  }, [serviceCosts, selectedServices, days, getNumericCost, calculateDuration, calculateBillableHours, onCostCalculated, onServiceCostsCalculated]);
 
   if (isLoading) {
     return (
@@ -221,45 +260,12 @@ const CostReviewTable = ({
     return <div className="text-red-500 text-sm">{error}</div>;
   }
 
-  // Group data by service for clearer organization
-  const groupedData: GroupedServiceData = selectedServices.reduce<GroupedServiceData>((acc, serviceName) => {
-    const service = serviceCosts.find(s => s.Service === serviceName);
-    if (!service || !service.Costs) return acc;
-    
-    if (!acc[serviceName]) {
-      acc[serviceName] = { 
-        service, 
-        dates: [], 
-        totalServiceCost: 0 
-      };
-    }
-    
-    return acc;
-  }, {});
-
-  // Fill the grouped data with dates and costs
-  Object.keys(groupedData).forEach(serviceName => {
-    const { service } = groupedData[serviceName];
-    let serviceTotalCost = 0;
-    
-    days.forEach(day => {
-      const duration = calculateDuration(day.startTime, day.endTime);
-      const billableHours = calculateBillableHours(duration);
-      const numericCost = getNumericCost(service.Costs);
-      const cost = billableHours * numericCost;
-      
-      groupedData[serviceName].dates.push({
-        day,
-        duration,
-        billableHours,
-        cost
-      });
-      
-      serviceTotalCost += cost;
-    });
-    
-    groupedData[serviceName].totalServiceCost = serviceTotalCost;
-  });
+  // Create an array of service cost details for the API
+  const serviceCostDetails = Object.entries(groupedData).map(([serviceName, data]) => ({
+    serviceName,
+    totalCost: data.totalServiceCost,
+    daysCount: data.dates.length
+  }));
 
   return (
     <div className="overflow-x-auto border rounded-lg">
@@ -323,7 +329,7 @@ const CostReviewTable = ({
           <tr className="bg-blue-100 font-bold border-t-2 border-blue-300">
             <td colSpan={4} className="p-3 border text-right">Total Cost</td>
             <td className="p-3 border text-blue-800">
-              ₱{calculateTotalCost().toFixed(2)}
+              ₱{Object.values(groupedData).reduce((total, data) => total + data.totalServiceCost, 0).toFixed(2)}
             </td>
           </tr>
         </tbody>
@@ -341,6 +347,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
   const [accInfo, setAccInfo] = useState<AccInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [totalCost, setTotalCost] = useState(0);
+  const [serviceCostData, setServiceCostData] = useState<GroupedServiceData>({});
 
   useEffect(() => {
     const fetchUserInfo = async () => {
@@ -377,6 +384,10 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
     setTotalCost(cost);
   }, []);
 
+  const handleServiceCostsCalculated = useCallback((serviceData: GroupedServiceData) => {
+    setServiceCostData(serviceData);
+  }, []);
+
   const handleSubmit = async () => {
     try {
       setIsSubmitting(true);
@@ -388,12 +399,27 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
       console.log("Submitting reservation with:", {
         services: formData.ProductsManufactured,
         hasServiceLinks: !!formData.serviceLinks,
-        remarks: formData.Remarks
+        remarks: formData.Remarks,
+        serviceCostData: Object.keys(serviceCostData).map(service => ({
+          service,
+          cost: serviceCostData[service].totalServiceCost
+        }))
       });
+      
+      // Prepare service cost details array for the API
+      const serviceCostDetails = Object.entries(serviceCostData).map(([serviceName, data]) => ({
+        serviceName,
+        totalCost: data.totalServiceCost,
+        daysCount: data.dates.length
+      }));
       
       const submissionData = {
         ...formData,
         totalCost,
+        // Include the grouped service data for accurate cost calculation
+        groupedServiceData: serviceCostData,
+        // Also include a simplified version for easier processing
+        serviceCostDetails,
         days: formData.days.map(day => ({
           ...day,
           date: new Date(day.date)
@@ -664,6 +690,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
               selectedServices={selectedServices}
               days={formData.days}
               onCostCalculated={handleCostCalculated}
+              onServiceCostsCalculated={handleServiceCostsCalculated}
             />
           </div>
 
