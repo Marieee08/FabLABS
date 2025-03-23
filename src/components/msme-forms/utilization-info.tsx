@@ -4,7 +4,30 @@ import React, { useState, useEffect, useCallback, useRef, ChangeEvent } from 're
 import { ChevronDown, ChevronUp, CheckCircle } from 'lucide-react';
 import ToolsSelector from '@/components/msme-forms/tools-selector';
 import ServiceSelector from '@/components/msme-forms/service-selector';
-import { FormData } from './schedule';
+import FileUploader from '@/components/custom/file-uploader'; // Updated import path
+import { uploadFiles } from '../../../utils/fileUpload';
+
+interface Day {
+  date: Date;
+  startTime: string | null;
+  endTime: string | null;
+}
+
+interface FormData {
+  days: Day[];
+  ProductsManufactured: string | string[];
+  BulkofCommodity: string;
+  Equipment: string;
+  Tools: string;
+  serviceFiles?: {[service: string]: string[]};
+  serviceFilePaths?: {[service: string]: string[]};
+  NeededMaterials?: Array<{
+    Item: string;
+    ItemQty: number;
+    Description: string;
+  }>;
+  [key: string]: any; // Add index signature for dynamic access
+}
 
 interface Service {
   id: string;
@@ -22,7 +45,7 @@ interface ProcessInformationProps {
   updateFormData: (field: keyof FormData, value: any) => void;
   nextStep: () => void;
   prevStep: () => void;
-  standalonePage?: boolean; // New prop to determine if this is a standalone page
+  standalonePage?: boolean;
 }
 
 export default function ProcessInformation({ 
@@ -38,6 +61,10 @@ export default function ProcessInformation({
   const [isLoadingServices, setIsLoadingServices] = useState(true);
   const [serviceError, setServiceError] = useState<string | null>(null);
   const [hasMachines, setHasMachines] = useState<boolean>(true);
+  // Add state for file uploads
+  const [files, setFiles] = useState<{[service: string]: File[]}>({});
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   
   useEffect(() => {
     const fetchServices = async () => {
@@ -118,34 +145,20 @@ export default function ProcessInformation({
     validateField(fieldName, formData[fieldName]);
   }, [formData]);
 
-  const handleNext = useCallback(() => {
-    if (validateForm()) {
-      nextStep();
-    }
-  }, [nextStep]);
+  // Add handler for file uploads
+  const handleFileUpload = useCallback((service: string, uploadedFiles: File[]) => {
+    setFiles(prev => ({
+      ...prev,
+      [service]: uploadedFiles
+    }));
+    
+    // Update form data to include the files information
+    updateFormData('serviceFiles', {
+      ...formData.serviceFiles,
+      [service]: uploadedFiles.map(file => file.name)
+    });
+  }, [formData.serviceFiles, updateFormData]);
 
-  const getInputClassName = useCallback((fieldName: keyof FormData) => {
-    const baseClasses = "mt-1 block w-full border rounded-md shadow-sm p-3";
-    const errorClasses = touchedFields.has(fieldName) && errors[fieldName] 
-      ? "border-red-500 focus:ring-red-500 focus:border-red-500" 
-      : "border-gray=-300 focus:ring-blue-500 focus:border-blue-500";
-    const disabledClasses = isFieldDisabled(fieldName) ? "bg-gray-100 cursor-not-allowed" : "";
-    return `${baseClasses} ${errorClasses} ${disabledClasses}`;
-  }, [touchedFields, errors, isFieldDisabled]);
-
-  const handleServiceChange = useCallback((services: string[]) => {
-    updateFormData('ProductsManufactured', services);
-
-    // Reset dependent fields when services change
-    if (services.length === 0 || services.includes('Benchmarking')) {
-      updateFormData('BulkofCommodity', '');
-      updateFormData('Tools', '');
-    }
-
-    validateField('ProductsManufactured', services);
-  }, [updateFormData]);
-
-  // Create validateField function with memoization to avoid recreating on every render
   const validateField = useCallback((fieldName: keyof FormData, value: string | string[]) => {
     let error = '';
 
@@ -213,6 +226,80 @@ export default function ProcessInformation({
     return isValid;
   }, [formData, hasMachines]);
 
+  // Now define handleNext after validateForm
+  const handleNext = useCallback(async () => {
+    if (validateForm()) {
+      // Check if there are files to upload
+      const hasFiles = Object.values(files).some(serviceFiles => serviceFiles.length > 0);
+      
+      if (hasFiles) {
+        setIsUploading(true);
+        setUploadError(null);
+        
+        try {
+          // Upload files for each service
+          const filePromises = Object.entries(files).map(([service, serviceFiles]) => {
+            if (serviceFiles.length === 0) return Promise.resolve();
+            
+            return uploadFiles(
+              serviceFiles, 
+              service, 
+              undefined, // serviceId will be assigned later
+              undefined  // reservationId will be assigned later
+            );
+          });
+          
+          const results = await Promise.all(filePromises);
+          
+          // Store file paths in form data for future reference
+          const filePaths: {[service: string]: string[]} = {};
+          
+          results.forEach((result, index) => {
+            if (result && result.files) {
+              const service = Object.keys(files)[index];
+              filePaths[service] = result.files.map((file: any) => file.path);
+            }
+          });
+          
+          // Update form data with file paths
+          updateFormData('serviceFilePaths', filePaths);
+          
+          // Proceed to next step
+          nextStep();
+        } catch (error) {
+          console.error('Error uploading files:', error);
+          setUploadError('Failed to upload files. Please try again.');
+        } finally {
+          setIsUploading(false);
+        }
+      } else {
+        // No files to upload, just proceed
+        nextStep();
+      }
+    }
+  }, [nextStep, files, updateFormData, validateForm]);
+
+  const getInputClassName = useCallback((fieldName: keyof FormData) => {
+    const baseClasses = "mt-1 block w-full border rounded-md shadow-sm p-3";
+    const errorClasses = touchedFields.has(fieldName) && errors[fieldName] 
+      ? "border-red-500 focus:ring-red-500 focus:border-red-500" 
+      : "border-gray=-300 focus:ring-blue-500 focus:border-blue-500";
+    const disabledClasses = isFieldDisabled(fieldName) ? "bg-gray-100 cursor-not-allowed" : "";
+    return `${baseClasses} ${errorClasses} ${disabledClasses}`;
+  }, [touchedFields, errors, isFieldDisabled]);
+
+  const handleServiceChange = useCallback((services: string[]) => {
+    updateFormData('ProductsManufactured', services);
+
+    // Reset dependent fields when services change
+    if (services.length === 0 || services.includes('Benchmarking')) {
+      updateFormData('BulkofCommodity', '');
+      updateFormData('Tools', '');
+    }
+
+    validateField('ProductsManufactured', services);
+  }, [updateFormData]);
+
   return (
     <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 pt-1">
       <div className="space-y-4 md:space-y-6 h-full">
@@ -231,6 +318,43 @@ export default function ProcessInformation({
               errorMessage={errors.ProductsManufactured}
             />
           </div>
+
+          {/* File Upload for selected services that have machines */}
+          {formData.ProductsManufactured && 
+           formData.ProductsManufactured.length > 0 && 
+           hasMachines && (
+            <div className="mt-4 space-y-4">
+              <h3 className="text-sm font-medium text-gray-700">Upload Files</h3>
+              <p className="text-xs text-gray-500">Upload any relevant files for your selected services with machines</p>
+              
+              {Array.isArray(formData.ProductsManufactured) && formData.ProductsManufactured.map((service) => {
+                // Find the service in the services array
+                const serviceInfo = servicesRef.current.find(s => s.Service === service);
+                
+                // Check if this service has machines
+                const serviceHasMachines = serviceInfo?.Machines && serviceInfo.Machines.length > 0;
+                
+                // Only render if the service has machines
+                return serviceHasMachines ? (
+                  <div key={service} className="p-4 border rounded-md bg-gray-50">
+                    <h4 className="text-sm font-medium mb-2">{service}</h4>
+                    <FileUploader
+                      serviceName={service}
+                      onFileUpload={(uploadedFiles) => handleFileUpload(service, uploadedFiles)}
+                      maxFiles={5}
+                      acceptedFileTypes="*/*"
+                    />
+                  </div>
+                ) : null;
+              })}
+              
+              {uploadError && (
+                <div className="text-red-500 text-sm mt-2">
+                  {uploadError}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Bulk of Commodity */}
           <div className={`transition-opacity duration-300 ${isFieldDisabled('BulkofCommodity') ? 'opacity-50' : 'opacity-100'}`}>
@@ -284,6 +408,7 @@ export default function ProcessInformation({
           <button 
             onClick={prevStep} 
             className="bg-gray-100 text-gray-800 px-6 py-3 rounded-md hover:bg-gray-200 transition-colors flex items-center"
+            disabled={isUploading}
           >
             <ChevronDown className="rotate-90 mr-2" size={18} />
             Previous
@@ -291,9 +416,19 @@ export default function ProcessInformation({
           <button 
             onClick={handleNext} 
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-md font-medium flex items-center"
+            disabled={isUploading}
           >
-            Continue to Next Step
-            <ChevronDown className="-rotate-90 ml-2" size={18} />
+            {isUploading ? (
+              <>
+                <span className="mr-2">Uploading...</span>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              </>
+            ) : (
+              <>
+                Continue to Next Step
+                <ChevronDown className="-rotate-90 ml-2" size={18} />
+              </>
+            )}
           </button>
         </div>
       )}
