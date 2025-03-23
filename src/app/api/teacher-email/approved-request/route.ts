@@ -49,12 +49,13 @@ export async function GET(request: NextRequest) {
       to: studentEmail,
       subject: `Your FabLAB Reservation Has Been Approved`,
       html: `
-        <h3>FabLAB Reservation Approved</h3>
-        <p>Dear ${studentName},</p>
-        <p>Good news! Your teacher has approved your FabLAB reservation request.</p>
-        <p>You can now proceed with your project. The FabLAB staff will be in touch with you soon with further instructions.</p>
-        <p>Thank you,<br>FabLAB Team</p>
-      `,
+      <h3>FabLAB Reservation - Teacher Approved</h3>
+      <p>Dear ${studentName},</p>
+      <p>Good news! Your teacher has approved your FabLAB reservation request.</p>
+      <p>Your request will now be reviewed by the FabLAB admin staff for final approval. This is a two-step process to ensure all reservations can be properly accommodated.</p>
+      <p>You will receive another email once your reservation has been fully approved by the admin staff. Please wait for this confirmation before proceeding with your project.</p>
+      <p>Thank you,<br>FabLAB Team</p>
+    `,
     };
     
     // Send notification to FabLAB admin that teacher has approved

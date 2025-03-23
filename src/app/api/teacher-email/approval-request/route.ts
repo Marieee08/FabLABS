@@ -157,19 +157,31 @@ export async function POST(request: NextRequest) {
         ${studentsHtml}
         ${materialsHtml}
         
-        <p>Please review this reservation request and approve or deny it.</p>
+        <p>Please review this reservation request and approve or reject it.</p>
         
         <div style="text-align: center; margin: 30px 0;">
-          <a href="${approvalUrl}" style="background-color: #10539b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-            Approve Reservation
-          </a>
-        </div>
+        <table style="margin: 0 auto; border-collapse: separate; border-spacing: 25px 0;">
+          <tr>
+            <td>
+              <a href="${approvalUrl}" style="display: inline-block; background-color: #10539b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; min-width: 160px; text-align: center;">
+                Approve Reservation
+              </a>
+            </td>
+            <td>
+              <a href="${baseUrl}/api/teacher-email/rejected-request?token=${approvalToken}&reservationId=${reservationId}&studentEmail=${encodeURIComponent(studentEmail)}&studentName=${encodeURIComponent(studentName)}" style="display: inline-block; background-color: #dc3545; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; font-weight: bold; min-width: 160px; text-align: center;">
+                Reject Reservation
+              </a>
+            </td>
+          </tr>
+        </table>
+      </div>
         
         <p>If you have any questions, please contact the FabLAB team.</p>
         
         <p>Thank you,<br>FabLAB Team</p>
       `,
     };
+
 
     // Send emails with better error handling
     let adminEmailSent = false;

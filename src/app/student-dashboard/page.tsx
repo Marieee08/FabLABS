@@ -542,30 +542,49 @@ const DashboardUser = () => {
                 )}
               </div>
 
-              {/* Approval Information */}
-              {selectedEVCReservation.EVCStatus !== 'Pending' && (
-                <div className="border-t pt-4">
-                  <h3 className="font-medium text-gray-900 mb-2">Processing Information</h3>
-                  <div className="bg-gray-50 p-3 rounded grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="font-medium">Approved By:</p>
-                      <p className="text-gray-700">{selectedEVCReservation.ApprovedBy || 'Not yet approved'}</p>
-                    </div>
-                    <div>
-                      <p className="font-medium">Received By:</p>
-                      <p className="text-gray-700">{selectedEVCReservation.ReceivedBy || 'Not yet received'}</p>
-                    </div>
-                    <div>
-                      <p className="font-medium">Received Date:</p>
-                      <p className="text-gray-700">{formatDate(selectedEVCReservation.ReceivedDate) || 'Not yet received'}</p>
-                    </div>
-                    <div>
-                      <p className="font-medium">Inspected By:</p>
-                      <p className="text-gray-700">{selectedEVCReservation.InspectedBy || 'Not yet inspected'}</p>
-                    </div>
+          
+          {/* Rejection Notice */}
+          {selectedEVCReservation.EVCStatus === 'Rejected' && (
+            <div className="mt-4 mb-2">
+              <div className="bg-red-50 border-l-4 border-red-500 p-4">
+                <div className="flex items-start">
+                  <div className="ml-3">
+                    <p className="text-sm text-red-700 font-medium">
+                      This reservation was rejected by your teacher.
+                    </p>
+                    <p className="text-sm text-red-600 mt-1">
+                      You may want to contact your teacher for more details and consider submitting a new request with any requested changes.
+                    </p>
                   </div>
                 </div>
-              )}
+              </div>
+            </div>
+          )}
+
+          {/* Approval Information */}
+          {selectedEVCReservation.EVCStatus !== 'Pending' && (
+            <div className="border-t pt-4">
+              <h3 className="font-medium text-gray-900 mb-2">Processing Information</h3>
+              <div className="bg-gray-50 p-3 rounded grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="font-medium">Teacher's Approved By:</p>
+                  <p className="text-gray-700">{selectedEVCReservation.ApprovedBy || 'Not yet approved'}</p>
+                </div>
+                <div>
+                  <p className="font-medium">Teacher Approval Date:</p>
+                  <p className="text-gray-700">{formatDate(selectedEVCReservation.ReceivedDate) || 'Not yet approved'}</p>
+                </div>
+                <div>
+                  <p className="font-medium">Admin Approved By:</p>
+                  <p className="text-gray-700">{selectedEVCReservation.ReceivedBy || 'Not yet approved'}</p>
+                </div>
+                <div>
+                  <p className="font-medium">Admin Approval Date:</p>
+                  <p className="text-gray-700">{formatDate(selectedEVCReservation.InspectedDate) || 'Not yet approved'}</p>
+                </div>
+              </div>
+            </div>
+          )}
             </div>
           )}
         </DialogContent>
