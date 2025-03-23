@@ -62,6 +62,7 @@ export default function Services() {
   const [isMissingInfoModalOpen, setIsMissingInfoModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isMachinesLoading, setIsMachinesLoading] = useState(true);
+  const [isUserInfoLoaded, setIsUserInfoLoaded] = useState(false);
   const pricingRef = useRef<HTMLElement>(null);
   
   // Only use one state for calendar modal
@@ -117,83 +118,107 @@ export default function Services() {
     };
   
     // Fetch user info to get role and check business info
-    const fetchUserInfo = async () => {
-      if (!userId) {
-        setUserRole("");
-        return;
-      }
+    // Modify the fetchUserInfo function to set the loaded flag
+const fetchUserInfo = async () => {
+  if (!userId) {
+    setUserRole("");
+    setIsUserInfoLoaded(true); // Mark as loaded even if no user
+    return;
+  }
 
-      try {
-        const response = await fetch(`/api/account/${userId}`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch user account');
-        }
-        
-        const data = await response.json();
-        
-        if (data && data.Role) {
-          setUserRole(data.Role);
+  try {
+    const response = await fetch(`/api/account/${userId}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch user account');
+    }
+    
+    const data = await response.json();
+    
+    if (data && data.Role) {
+      setUserRole(data.Role);
+      
+      // If user is MSME, check if business info is missing
+      if (data.Role === "MSME") {
+        // Check if the user has indicated they are not a business owner
+        if (data.BusinessInfo?.isNotBusinessOwner === true) {
+          setIsBusinessInfoMissing(false);
+        } else {
+          // Check for required business fields
+          const hasCompleteBusinessInfo = 
+            data.BusinessInfo && 
+            data.BusinessInfo.CompanyName && 
+            data.BusinessInfo.CompanyName !== "Not applicable" &&
+            data.BusinessInfo.BusinessOwner && 
+            data.BusinessInfo.BusinessOwner !== "Not applicable" &&
+            data.BusinessInfo.CompanyAddress && 
+            data.BusinessInfo.CompanyAddress !== "Not applicable" &&
+            data.BusinessInfo.CompanyCity && 
+            data.BusinessInfo.CompanyCity !== "Not applicable" &&
+            data.BusinessInfo.CompanyProvince && 
+            data.BusinessInfo.CompanyProvince !== "Not applicable" &&
+            data.BusinessInfo.CompanyPhoneNum && 
+            data.BusinessInfo.CompanyPhoneNum !== "Not applicable";
           
-          // If user is MSME, check if business info is missing
-          if (data.Role === "MSME") {
-            // Check if the user has indicated they are not a business owner
-            if (data.BusinessInfo?.isNotBusinessOwner === true) {
-              setIsBusinessInfoMissing(false);
-              return;
-            }
-            
-            // Check for required business fields
-            const hasCompleteBusinessInfo = 
-              data.BusinessInfo && 
-              data.BusinessInfo.CompanyName && 
-              data.BusinessInfo.CompanyName !== "Not applicable" &&
-              data.BusinessInfo.BusinessOwner && 
-              data.BusinessInfo.BusinessOwner !== "Not applicable" &&
-              data.BusinessInfo.CompanyAddress && 
-              data.BusinessInfo.CompanyAddress !== "Not applicable" &&
-              data.BusinessInfo.CompanyCity && 
-              data.BusinessInfo.CompanyCity !== "Not applicable" &&
-              data.BusinessInfo.CompanyProvince && 
-              data.BusinessInfo.CompanyProvince !== "Not applicable" &&
-              data.BusinessInfo.CompanyPhoneNum && 
-              data.BusinessInfo.CompanyPhoneNum !== "Not applicable";
-            
-            setIsBusinessInfoMissing(!hasCompleteBusinessInfo);
-          }
+          setIsBusinessInfoMissing(!hasCompleteBusinessInfo);
         }
-      } catch (error) {
-        console.error('Error fetching user info:', error);
-        // Default to empty if there's an error
-        setUserRole("");
       }
-    };
+    }
+    
+    // Mark user info as fully loaded after all checks are complete
+    setIsUserInfoLoaded(true);
+  } catch (error) {
+    console.error('Error fetching user info:', error);
+    // Default to empty if there's an error
+    setUserRole("");
+    setIsUserInfoLoaded(true); // Mark as loaded even on error
+  }
+};
 
     fetchMachines();
     fetchUserInfo();
   }, [userId]);
 
-  const handleScheduleClick = () => {
-    // If user is not logged in, redirect to login
-    if (!userId || !userRole) {
-      setIsLoading(true);
-      router.push('/sign-in');
-      return;
-    }
-    
-    // Check if user is MSME and business info is missing
-    if (userRole === "MSME" && isBusinessInfoMissing) {
-      setIsMissingInfoModalOpen(true);
-      return;
-    }
-    
-    // If all good, navigate to the appropriate scheduling page
+  
+  // Update the handleScheduleClick function to check if user info is loaded
+const handleScheduleClick = async () => {
+  // If user info isn't loaded yet, show loading state and wait
+  if (!isUserInfoLoaded) {
     setIsLoading(true);
-    if (userRole === "STUDENT") {
-      router.push('/user-services/student-schedule');
-    } else {
-      router.push('/user-services/msme-schedule');
-    }
-  };
+    // Wait for the user info to be fully loaded first
+    await new Promise(resolve => {
+      const checkLoaded = () => {
+        if (isUserInfoLoaded) {
+          resolve(true);
+        } else {
+          setTimeout(checkLoaded, 100); // Check again in 100ms
+        }
+      };
+      checkLoaded();
+    });
+    setIsLoading(false);
+  }
+  
+  // If user is not logged in, redirect to login
+  if (!userId || !userRole) {
+    setIsLoading(true);
+    router.push('/sign-in');
+    return;
+  }
+  
+  // Now that we're sure user info is loaded, check business info
+  if (userRole === "MSME" && isBusinessInfoMissing) {
+    setIsMissingInfoModalOpen(true);
+    return;
+  }
+  
+  // If all good, navigate to the appropriate scheduling page
+  setIsLoading(true);
+  if (userRole === "STUDENT") {
+    router.push('/user-services/student-schedule');
+  } else {
+    router.push('/user-services/msme-schedule');
+  }
+};
 
   const redirectToInformation = () => {
     setIsLoading(true);
@@ -291,21 +316,27 @@ export default function Services() {
             </div>
 
             {isModalOpen && (
-              <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-                <div className="bg-white rounded-lg shadow-lg p-6 max-w-[150vh] w-full max-h-[90vh] overflow-y-auto">
-                  <div className="flex items-center justify-between mb-4">
-                    <h2 className="text-2xl font-bold mr-4 font-qanelas2">Pricing Details</h2>
-                    <button
-                      onClick={handleCloseModal}
-                      className="text-gray-500 hover:text-gray-700 transition duration-300"
-                    >
-                      <X className="w-6 h-6" />
-                    </button>
-                  </div>
-                  <PricingTable />
+            <div 
+              className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50"
+              onClick={handleCloseModal} // Add this onClick handler to the backdrop
+            >
+              <div 
+                className="bg-white rounded-lg shadow-lg p-6 max-w-[150vh] w-full max-h-[90vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()} // Add this to prevent clicks inside the modal from closing it
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-2xl font-bold mr-4 font-qanelas2">Pricing Details</h2>
+                  <button
+                    onClick={handleCloseModal}
+                    className="text-gray-500 hover:text-gray-700 transition duration-300"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
                 </div>
+                <PricingTable />
               </div>
-            )}
+            </div>
+          )}
           </div>
           
           {isMachinesLoading ? (
