@@ -390,90 +390,100 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
   }, []);
 
   
-const handleSubmit = async (e: React.FormEvent) => {
-  try {
-    setIsSubmitting(true);
-    setError('');
 
-    const token = await getToken();
-    
-    // Log what we're submitting
-    console.log("Submitting reservation with:", {
-      services: formData.ProductsManufactured,
-      hasServiceLinks: !!formData.serviceLinks,
-      remarks: formData.Remarks,
-      serviceCostData: Object.keys(serviceCostData).map(service => ({
-        service,
-        cost: serviceCostData[service].totalServiceCost
-      }))
-    });
-    
-    // Prepare service cost details array for the API
-    const serviceCostDetails = Object.entries(serviceCostData).map(([serviceName, data]) => ({
-      serviceName,
-      totalCost: data.totalServiceCost,
-      daysCount: data.dates.length
-    }));
-    
-    // Create a clean copy of the form data to avoid circular references
-    const cleanFormData = {
-      ...formData,
-      days: formData.days.map(day => ({
-        date: new Date(day.date),
-        startTime: day.startTime,
-        endTime: day.endTime
-      })),
-      ProductsManufactured: Array.isArray(formData.ProductsManufactured) 
-        ? formData.ProductsManufactured 
-        : [formData.ProductsManufactured],
-      totalCost,
-      serviceCostDetails,
-      groupedServiceData: JSON.parse(JSON.stringify(serviceCostData)) // Ensure it's JSON-serializable
-    };
-
-    const response = await fetch('/api/user/create-reservation', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        ...cleanFormData,
-        userInfo: {
-          clientInfo: accInfo?.ClientInfo,
-          businessInfo: accInfo?.BusinessInfo
-        }
-      }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to submit reservation');
+  const handleSubmit = async () => {
+    try {
+      setIsSubmitting(true);
+      setError('');
+  
+      const token = await getToken();
+      
+      // Create a clean version of the service cost data to avoid circular references
+      const simplifiedServiceData = {};
+      Object.entries(serviceCostData).forEach(([service, data]) => {
+        simplifiedServiceData[service] = {
+          totalServiceCost: data.totalServiceCost,
+          dates: data.dates.map(date => ({
+            day: {
+              date: date.day.date,
+              startTime: date.day.startTime,
+              endTime: date.day.endTime
+            },
+            duration: date.duration,
+            billableHours: date.billableHours,
+            cost: date.cost
+          }))
+        };
+      });
+      
+      // Prepare service cost details array for the API
+      const serviceCostDetails = Object.entries(serviceCostData).map(([serviceName, data]) => ({
+        serviceName,
+        totalCost: data.totalServiceCost,
+        daysCount: data.dates.length
+      }));
+      
+      // Remove any circular references from form data
+      const cleanedFormData = {
+        ...formData,
+        days: formData.days.map(day => ({
+          date: day.date instanceof Date ? day.date.toISOString() : day.date,
+          startTime: day.startTime,
+          endTime: day.endTime
+        })),
+        ProductsManufactured: Array.isArray(formData.ProductsManufactured) 
+          ? formData.ProductsManufactured 
+          : [formData.ProductsManufactured],
+        totalCost,
+        serviceCostDetails,
+        groupedServiceData: simplifiedServiceData
+      };
+  
+      console.log("Submitting reservation with cleaned data:", cleanedFormData);
+  
+      const response = await fetch('/api/user/create-reservation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          ...cleanedFormData,
+          userInfo: {
+            clientInfo: accInfo?.ClientInfo,
+            businessInfo: accInfo?.BusinessInfo
+          }
+        }),
+      });
+  
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || errorData.details || 'Failed to submit reservation');
+      }
+  
+      const result = await response.json();
+      console.log("Reservation created successfully:", result);
+  
+      toast({
+        title: "Success!",
+        description: "Your service has been scheduled successfully!",
+      });
+  
+      router.push('/user-dashboard');
+      
+    } catch (err) {
+      console.error('Submission error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to submit reservation');
+      
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : 'Failed to submit reservation',
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
-
-    const result = await response.json();
-    console.log("Reservation created successfully:", result);
-
-    toast({
-      title: "Success!",
-      description: "Your service has been scheduled successfully!",
-    });
-
-    router.push('/user-dashboard');
-    
-  } catch (err) {
-    console.error('Submission error:', err);
-    setError(err instanceof Error ? err.message : 'Failed to submit reservation');
-    
-    toast({
-      title: "Error",
-      description: err instanceof Error ? err.message : 'Failed to submit reservation',
-      variant: "destructive",
-    });
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  };
 
   if (loading) {
     return (
