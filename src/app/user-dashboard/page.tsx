@@ -4,7 +4,7 @@
 import Link from "next/link";
 import React, { useEffect, useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { useUser } from "@clerk/nextjs";
+import { UserButton, useUser } from "@clerk/nextjs";
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import RoleGuard from '@/components/auth/role-guard';
@@ -336,34 +336,7 @@ const DashboardUser = () => {
                   Contact
                 </a>
               </div>
-              <div className="hidden sm:block">
-                <form action="#" method="POST">
-                  <input
-                    type="text"
-                    placeholder="Type to search..."
-                    className="w-full bg-transparent pr-4 pl-9 focus:outline-none"
-                  />
-                </form>
-              </div>
-              <div className="flex items-center gap-3 2xsm:gap-7">
-                <div className="flex items-center gap-4">
-                  <span className="hidden text-right lg:block">
-                    <span className="block text-sm font-medium text-black">
-                      {user?.firstName} {user?.lastName || ''}
-                    </span>
-                    <span className="block text-xs">{userRole}</span>
-                  </span>
-                  {user?.imageUrl ? (
-                    <img 
-                      src={user.imageUrl} 
-                      alt="Profile" 
-                      className="h-12 w-12 rounded-full object-cover"
-                    />
-                  ) : (
-                    <span className="h-12 w-12 rounded-full bg-gray-300"></span>
-                  )}
-                </div>
-              </div>
+              <UserButton showName />
             </div>
           </header>
 

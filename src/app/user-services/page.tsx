@@ -501,7 +501,7 @@ const handleScheduleClick = async () => {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center">
                   <Info className="w-6 h-6 text-amber-500 mr-2" />
-                  <h2 className="text-xl font-bold font-qanelas2">Business Information Required</h2>
+                  <h2 className="text-xl font-bold font-qanelas2">Personal and Business Information Required</h2>
                 </div>
                 <button
                   onClick={handleCloseMissingInfoModal}
@@ -513,7 +513,7 @@ const handleScheduleClick = async () => {
               
               <div className="mb-6">
                 <p className="text-gray-700 font-poppins1 mb-4">
-                  Looks like you haven't filled out all the necessary business information yet. To schedule a service, you need to complete your business profile first.
+                  Looks like you haven't filled out all the necessary personal or business information yet. To schedule a service, you need to complete your profile first.
                 </p>
                 <div className="bg-amber-50 border-l-4 border-amber-500 p-4 text-amber-700">
                   <p className="font-poppins1">Would you like to proceed to your information page first before scheduling?</p>

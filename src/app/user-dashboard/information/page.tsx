@@ -4,7 +4,7 @@
 
 import Link from "next/link";
 import React, { useState, useEffect } from 'react';
-import { useUser } from "@clerk/nextjs";
+import { UserButton, useUser } from "@clerk/nextjs";
 import { format } from 'date-fns';
 import InfoEditModal from './components/InfoEditModal';
 
@@ -236,33 +236,9 @@ const DashboardUser = () => {
               Contact
             </Link>
             </div>
-            <div className="hidden sm:block">
-              <form action="#" method="POST">
-                <input
-                  type="text"
-                  placeholder="Type to search..."
-                  className="w-full bg-transparent pr-4 pl-9 focus:outline-none"
-                />
-              </form>
-            </div>
+      
             <div className="flex items-center gap-3 2xsm:gap-7">
-              <Link href="#" className="flex items-center gap-4">
-                <span className="hidden text-right lg:block">
-                  <span className="block text-sm font-medium text-black">
-                    {user?.firstName} {user?.lastName || ''}
-                  </span>
-                  <span className="block text-xs">{userRole}</span>
-                </span>
-                {user?.imageUrl ? (
-                  <img 
-                    src={user.imageUrl} 
-                    alt="Profile" 
-                    className="h-12 w-12 rounded-full object-cover"
-                  />
-                ) : (
-                  <span className="h-12 w-12 rounded-full bg-gray-300"></span>
-                )}
-              </Link>
+              <UserButton showName />
             </div>
           </div>
         </header>
