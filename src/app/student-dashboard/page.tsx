@@ -61,6 +61,8 @@ const DashboardUser = () => {
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   const today = new Date();
   const formattedDate = format(today, 'EEEE, dd MMMM yyyy');
+  const [isCreatingReservation, setIsCreatingReservation] = useState(false);
+
 
   // useEffect to fetch EVC reservations for the current user
   useEffect(() => {
@@ -168,7 +170,7 @@ const DashboardUser = () => {
       <div className="flex-1 overflow-y-auto">
         <Navbar />
 
-        <main className="px-4 py-6 md:px-8 lg:px-12 xl:px-20">
+        <main className="px-4 py-6 md:px-8 lg:px-12 xl:px-20 mt-24">
           <div className="max-w-7xl mx-auto">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
               <div>
@@ -211,8 +213,22 @@ const DashboardUser = () => {
                 evcReservations.length === 0 ? (
                   <div className="bg-blue-50 p-6 rounded-lg text-center">
                     <p className="text-blue-800">You don't have any pending EVC reservations at the moment.</p>
-                    <Link href="/services/student-schedule" className="mt-4 inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
-                      Create a New Reservation
+                    <Link
+                      href="/student-schedule"
+                      className="mt-4 inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                      onClick={() => setIsCreatingReservation(true)}
+                    >
+                      {isCreatingReservation ? (
+                        <>
+                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Creating...
+                        </>
+                      ) : (
+                        "Create a New Reservation"
+                      )}
                     </Link>
                   </div>
                 ) : (
