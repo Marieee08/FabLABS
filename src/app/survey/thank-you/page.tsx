@@ -1,9 +1,8 @@
-// /survey/questionnaire/page.tsx
-
+// /survey/thank-you/page.tsx
 
 "use client";
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
@@ -11,6 +10,11 @@ import { CheckCircle2 } from 'lucide-react';
 
 const ThankYouPage = () => {
   const router = useRouter();
+
+  // Memoize callback
+  const handleReturnClick = useCallback(() => {
+    router.push('/survey');
+  }, [router]);
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 flex justify-center items-center">
@@ -29,7 +33,7 @@ const ThankYouPage = () => {
           </p>
           
           <Button 
-            onClick={() => router.push('/survey')} 
+            onClick={handleReturnClick} 
             className="bg-[#193d83] text-white hover:bg-[#2f61c2] font-qanelas1 px-6"
           >
             Return to Dashboard

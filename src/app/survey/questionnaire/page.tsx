@@ -1,29 +1,16 @@
 // /survey/questionnaire/page.tsx
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { Card, CardHeader, CardContent, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useRouter } from 'next/navigation';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from '@/components/ui/use-toast';
 
-interface DemographicData {
-  clientType: string | undefined;
-  sex: string | undefined;
-  age: string;
-  region: string;
-  office: string;
-  serviceAvailed: string[];
-  otherService: string;
-  CC1: string | undefined;
-  CC2: string | undefined;
-  CC3: string | undefined;
-}
-
+// Constants moved outside component to prevent re-creation on each render
 const PHILIPPINE_REGIONS = [
   "NCR - National Capital Region",
   "CAR - Cordillera Administrative Region",
@@ -108,6 +95,105 @@ const CC3_OPTIONS = [
   "4. N/A"
 ];
 
+interface DemographicData {
+  clientType: string | undefined;
+  sex: string | undefined;
+  age: string;
+  region: string;
+  office: string;
+  serviceAvailed: string[];
+  otherService: string;
+  CC1: string | undefined;
+  CC2: string | undefined;
+  CC3: string | undefined;
+}
+
+// Memoized component for radio options
+const RadioOption = memo(({ 
+  id, 
+  value, 
+  label 
+}: { 
+  id: string, 
+  value: string, 
+  label: string 
+}) => (
+  <div className="flex items-center space-x-2">
+    <RadioGroupItem value={value} id={id} className="text-[#193d83] border-[#5e86ca]" />
+    <Label htmlFor={id} className="font-poppins1 text-gray-600">{label}</Label>
+  </div>
+));
+
+RadioOption.displayName = 'RadioOption';
+
+// Memoized RatingScale component
+const RatingScale = memo(({ 
+  question, 
+  questionKey, 
+  value, 
+  options, 
+  onChange 
+}: { 
+  question: React.ReactNode, 
+  questionKey: string, 
+  value: string | undefined, 
+  options: string[], 
+  onChange: (key: string, value: string) => void 
+}) => {
+  const handleChange = useCallback((val: string) => {
+    onChange(questionKey, val);
+  }, [onChange, questionKey]);
+
+  return (
+    <div className="mb-8 bg-white p-6 rounded-xl shadow-lg hover:shadow-blue-300/50 transition-all duration-300">
+      <Label className="block mb-4 font-qanelas2 text-lg text-gray-700">{question}</Label>
+      <RadioGroup className="flex space-x-6" value={value} onValueChange={handleChange}>
+        {options.map((option) => (
+          <RadioOption 
+            key={option} 
+            id={`${questionKey}-${option}`} 
+            value={option} 
+            label={option} 
+          />
+        ))}
+      </RadioGroup>
+    </div>
+  );
+});
+
+RatingScale.displayName = 'RatingScale';
+
+// Checkbox option component
+const CheckboxOption = memo(({ 
+  id, 
+  label, 
+  checked, 
+  onChange 
+}: { 
+  id: string, 
+  label: string, 
+  checked: boolean, 
+  onChange: (checked: boolean) => void 
+}) => {
+  const handleChange = useCallback((checked: boolean) => {
+    onChange(checked === true);
+  }, [onChange]);
+
+  return (
+    <div className="flex items-start space-x-2">
+      <Checkbox 
+        id={id} 
+        checked={checked}
+        onCheckedChange={handleChange}
+        className="mt-1 text-[#193d83] border-[#5e86ca]"
+      />
+      <Label htmlFor={id} className="font-poppins1 text-gray-600">{label}</Label>
+    </div>
+  );
+});
+
+CheckboxOption.displayName = 'CheckboxOption';
+
 const SurveyForm = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -131,13 +217,16 @@ const SurveyForm = () => {
     CC3: undefined
   });
   
-  const [customerFormData, setCustomerFormData] = useState(
+  // Initialize form data with undefined values
+  const [customerFormData, setCustomerFormData] = useState<Record<string, string | undefined>>(
     Object.fromEntries(SURVEY_QUESTIONS.customer.map((_, i) => [`Q${i + 1}`, undefined]))
   );
-  const [employeeFormData, setEmployeeFormData] = useState(
+  
+  const [employeeFormData, setEmployeeFormData] = useState<Record<string, string | undefined>>(
     Object.fromEntries(SURVEY_QUESTIONS.employee.map((_, i) => [`E${i + 1}`, undefined]))
   );
 
+  // Fetch user role only once on mount
   useEffect(() => {
     if (!reservationId) {
       toast({
@@ -149,9 +238,18 @@ const SurveyForm = () => {
       return;
     }
     
+    const abortController = new AbortController();
+    
     const fetchUserRole = async () => {
       try {
-        const response = await fetch('/api/auth/check-roles');
+        const response = await fetch('/api/auth/check-roles', {
+          signal: abortController.signal
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch user role');
+        }
+        
         const data = await response.json();
         
         if (data.role !== 'SURVEY') {
@@ -165,22 +263,30 @@ const SurveyForm = () => {
         }
         
         setUserRole('SURVEY');
-        setIsLoading(false);
       } catch (error) {
-        console.error('Error fetching user role:', error);
-        setUserRole('SURVEY');
+        if (!(error instanceof DOMException && error.name === 'AbortError')) {
+          console.error('Error fetching user role:', error);
+          // Fallback for development
+          setUserRole('SURVEY');
+        }
+      } finally {
         setIsLoading(false);
       }
     };
   
     fetchUserRole();
+    
+    return () => {
+      abortController.abort();
+    };
   }, [reservationId, router]);
 
-  const handleInputChange = (question: string, value: string) => {
+  // Memoized handlers to prevent unnecessary re-renders
+  const handleInputChange = useCallback((question: string, value: string) => {
     setDemographicData(prev => ({ ...prev, [question]: value }));
-  };
+  }, []);
 
-  const handleCheckboxChange = (service: string, checked: boolean) => {
+  const handleCheckboxChange = useCallback((service: string, checked: boolean) => {
     setDemographicData(prev => {
       if (checked) {
         return { ...prev, serviceAvailed: [...prev.serviceAvailed, service] };
@@ -188,23 +294,53 @@ const SurveyForm = () => {
         return { ...prev, serviceAvailed: prev.serviceAvailed.filter(s => s !== service) };
       }
     });
-  };
+  }, []);
 
-  const handleQuestionChange = (question: any, value: string) => {
+  const handleQuestionChange = useCallback((question: string, value: string) => {
     if (formType === 'customer') {
       setCustomerFormData(prev => ({ ...prev, [question]: value }));
     } else if (formType === 'employee') {
       setEmployeeFormData(prev => ({ ...prev, [question]: value }));
     }
-  };
+  }, [formType]);
 
-  const changeFormType = (newType: string) => {
+  const changeFormType = useCallback((newType: string) => {
     setFormType(newType);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
+  }, []);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Memoized validation check
+  const preliminaryComplete = useMemo(() => Boolean(
+    demographicData.clientType && 
+    demographicData.sex && 
+    demographicData.age && 
+    demographicData.age !== '0' &&
+    demographicData.region && 
+    demographicData.office && 
+    demographicData.office.trim() !== '' &&
+    demographicData.serviceAvailed.length > 0 &&
+    !(demographicData.serviceAvailed.includes("Others") && (!demographicData.otherService || demographicData.otherService.trim() === '')) &&
+    demographicData.CC1 &&
+    (demographicData.CC1 === CC1_OPTIONS[3] || (demographicData.CC2 && demographicData.CC3))
+  ), [demographicData]);
+
+  // Check if all customer questions are answered
+  const allCustomerQuestionsAnswered = useMemo(() => 
+    Object.values(customerFormData).every(value => value !== undefined),
+  [customerFormData]);
+
+  const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!reservationId) {
+      toast({
+        title: "Error",
+        description: "No reservation ID provided.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsSubmitting(true);
     
     if (formType === 'employee') {
@@ -228,7 +364,6 @@ const SurveyForm = () => {
       customer: Object.fromEntries(
         Object.entries(customerFormData).map(([key, value]) => {
           const sqKey = key.replace('Q', 'SQD');
-          const index = parseInt(key.substring(1)) - 1;
           return [sqKey, value];
         })
       ),
@@ -263,26 +398,10 @@ const SurveyForm = () => {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [demographicData, customerFormData, employeeFormData, formType, reservationId, router]);
 
-  const renderRatingScale = (question: React.ReactNode, questionKey: string, value: string | undefined) => {
-    const options = formType === 'customer' ? CUSTOMER_RATING_OPTIONS : EMPLOYEE_RATING_OPTIONS;
-    return (
-      <div key={questionKey} className="mb-8 bg-white p-6 rounded-xl shadow-lg hover:shadow-blue-300/50 transition-all duration-300">
-        <Label className="block mb-4 font-qanelas2 text-lg text-gray-700">{question}</Label>
-        <RadioGroup className="flex space-x-6" value={value} onValueChange={(val) => handleQuestionChange(questionKey, val)}>
-          {options.map((option) => (
-            <div key={option} className="flex items-center space-x-2">
-              <RadioGroupItem value={option} id={`${questionKey}-${option}`} className="text-[#193d83] border-[#5e86ca]" />
-              <Label htmlFor={`${questionKey}-${option}`} className="font-poppins1 text-gray-600">{option}</Label>
-            </div>
-          ))}
-        </RadioGroup>
-      </div>
-    );
-  };
-
-  const renderPreliminarySection = () => {
+  // Memoized section renderers
+  const renderPreliminarySection = useCallback(() => {
     return (
       <>
         <div className="mb-8 bg-white p-6 rounded-xl shadow-lg hover:shadow-blue-300/50 transition-all duration-300">
@@ -301,10 +420,12 @@ const SurveyForm = () => {
               onValueChange={(val) => handleInputChange('clientType', val)}
             >
               {CLIENT_TYPE_OPTIONS.map((option) => (
-                <div key={option} className="flex items-center space-x-2">
-                  <RadioGroupItem value={option} id={`clientType-${option}`} className="text-[#193d83] border-[#5e86ca]" />
-                  <Label htmlFor={`clientType-${option}`} className="font-poppins1 text-gray-600">{option}</Label>
-                </div>
+                <RadioOption 
+                  key={option}
+                  id={`clientType-${option}`}
+                  value={option}
+                  label={option}
+                />
               ))}
             </RadioGroup>
           </div>
@@ -317,10 +438,12 @@ const SurveyForm = () => {
               onValueChange={(val) => handleInputChange('sex', val)}
             >
               {SEX_OPTIONS.map((option) => (
-                <div key={option} className="flex items-center space-x-2">
-                  <RadioGroupItem value={option} id={`sex-${option}`} className="text-[#193d83] border-[#5e86ca]" />
-                  <Label htmlFor={`sex-${option}`} className="font-poppins1 text-gray-600">{option}</Label>
-                </div>
+                <RadioOption 
+                  key={option}
+                  id={`sex-${option}`}
+                  value={option}
+                  label={option}
+                />
               ))}
             </RadioGroup>
           </div>
@@ -373,15 +496,13 @@ const SurveyForm = () => {
             <Label className="block mb-3 font-qanelas2 text-lg text-gray-700">Service Availed (please check):</Label>
             <div className="space-y-2">
               {SERVICE_OPTIONS.slice(0, -1).map((service) => (
-                <div key={service} className="flex items-start space-x-2">
-                  <Checkbox 
-                    id={`service-${service}`} 
-                    checked={demographicData.serviceAvailed.includes(service)}
-                    onCheckedChange={(checked) => handleCheckboxChange(service, checked === true)}
-                    className="mt-1 text-[#193d83] border-[#5e86ca]"
-                  />
-                  <Label htmlFor={`service-${service}`} className="font-poppins1 text-gray-600">{service}</Label>
-                </div>
+                <CheckboxOption
+                  key={service}
+                  id={`service-${service}`}
+                  label={service}
+                  checked={demographicData.serviceAvailed.includes(service)}
+                  onChange={(checked) => handleCheckboxChange(service, checked)}
+                />
               ))}
               
               <div className="flex items-start space-x-2">
@@ -426,10 +547,12 @@ const SurveyForm = () => {
               onValueChange={(val) => handleInputChange('CC1', val)}
             >
               {CC1_OPTIONS.map((option) => (
-                <div key={option} className="flex items-start space-x-2">
-                  <RadioGroupItem value={option} id={`msme-CC1-${option}`} className="mt-1 text-[#193d83] border-[#5e86ca]" />
-                  <Label htmlFor={`msme-CC1-${option}`} className="font-poppins1 text-gray-600">{option}</Label>
-                </div>
+                <RadioOption
+                  key={option}
+                  id={`msme-CC1-${option}`}
+                  value={option}
+                  label={option}
+                />
               ))}
             </RadioGroup>
           </div>
@@ -442,10 +565,12 @@ const SurveyForm = () => {
               onValueChange={(val) => handleInputChange('CC2', val)}
             >
               {CC2_OPTIONS.map((option) => (
-                <div key={option} className="flex items-center space-x-2">
-                  <RadioGroupItem value={option} id={`msme-CC2-${option}`} className="text-[#193d83] border-[#5e86ca]" />
-                  <Label htmlFor={`msme-CC2-${option}`} className="font-poppins1 text-gray-600">{option}</Label>
-                </div>
+                <RadioOption
+                  key={option}
+                  id={`msme-CC2-${option}`}
+                  value={option}
+                  label={option}
+                />
               ))}
             </RadioGroup>
           </div>
@@ -458,19 +583,21 @@ const SurveyForm = () => {
               onValueChange={(val) => handleInputChange('CC3', val)}
             >
               {CC3_OPTIONS.map((option) => (
-                <div key={option} className="flex items-center space-x-2">
-                  <RadioGroupItem value={option} id={`msme-CC3-${option}`} className="text-[#193d83] border-[#5e86ca]" />
-                  <Label htmlFor={`msme-CC3-${option}`} className="font-poppins1 text-gray-600">{option}</Label>
-                </div>
+                <RadioOption
+                  key={option}
+                  id={`msme-CC3-${option}`}
+                  value={option}
+                  label={option}
+                />
               ))}
             </RadioGroup>
           </div>
         </div>
       </>
     );
-  };
+  }, [demographicData, handleInputChange, handleCheckboxChange]);
 
-  const renderCustomerSection = () => {
+  const renderCustomerSection = useCallback(() => {
     return (
       <>
         <div className="mb-6 p-4 bg-gray-50 rounded border border-gray-200">
@@ -480,11 +607,33 @@ const SurveyForm = () => {
         </div>
         
         {SURVEY_QUESTIONS.customer.map((question, index) => (
-          renderRatingScale(question, `Q${index + 1}`, customerFormData[`Q${index + 1}`])
+          <RatingScale
+            key={`Q${index + 1}`}
+            question={question}
+            questionKey={`Q${index + 1}`}
+            value={customerFormData[`Q${index + 1}`]}
+            options={CUSTOMER_RATING_OPTIONS}
+            onChange={handleQuestionChange}
+          />
         ))}
       </>
     );
-  };
+  }, [customerFormData, handleQuestionChange]);
+
+  const renderEmployeeSection = useCallback(() => {
+    return (
+      SURVEY_QUESTIONS.employee.map((question, index) => (
+        <RatingScale
+          key={`E${index + 1}`}
+          question={question}
+          questionKey={`E${index + 1}`}
+          value={employeeFormData[`E${index + 1}`]}
+          options={EMPLOYEE_RATING_OPTIONS}
+          onChange={handleQuestionChange}
+        />
+      ))
+    );
+  }, [employeeFormData, handleQuestionChange]);
 
   if (isLoading) {
     return (
@@ -493,27 +642,6 @@ const SurveyForm = () => {
       </div>
     );
   }
-
-  // Check if all required fields are filled in preliminary section
-  const preliminaryComplete = Boolean(
-    demographicData.clientType && 
-    demographicData.sex && 
-    demographicData.age && 
-    demographicData.age !== '0' &&
-    demographicData.region && 
-    demographicData.office && 
-    demographicData.office.trim() !== '' &&
-    demographicData.serviceAvailed.length > 0 &&
-    !(demographicData.serviceAvailed.includes("Others") && (!demographicData.otherService || demographicData.otherService.trim() === '')) &&
-    demographicData.CC1 &&
-    (demographicData.CC1 === CC1_OPTIONS[3] || (demographicData.CC2 && demographicData.CC3))
-  );
-
-  // Check if all customer questions are answered
-  const allCustomerQuestionsAnswered = Object.values(customerFormData).every(value => value !== undefined);
-
-  console.log("Preliminary complete:", preliminaryComplete);
-  console.log("Form data:", demographicData);
 
   return (
     <div className="py-8 px-4">
@@ -531,9 +659,7 @@ const SurveyForm = () => {
           <form onSubmit={handleSubmit} className="space-y-6">
             {formType === 'preliminary' && renderPreliminarySection()}
             {formType === 'customer' && renderCustomerSection()}
-            {formType === 'employee' && SURVEY_QUESTIONS.employee.map((question, index) => (
-              renderRatingScale(question, `E${index + 1}`, employeeFormData[`E${index + 1}`])
-            ))}
+            {formType === 'employee' && renderEmployeeSection()}
     
             <div className="flex justify-between mt-8">
               {/* Back buttons */}
@@ -590,7 +716,7 @@ const SurveyForm = () => {
                 </Button>
               )}
 
-              {/* Debugging info - remove in production */}
+              {/* Show a message if preliminary form is incomplete */}
               {formType === 'preliminary' && !preliminaryComplete && (
                 <div className="text-red-500 text-sm mt-2">
                   Please complete all required fields
