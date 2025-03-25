@@ -32,6 +32,7 @@ import { downloadJobPaymentPDF } from "@/components/admin-functions/job-payment-
 import { downloadMachineUtilPDF } from "@/components/admin-functions/machine-utilization-pdf";
 import { downloadRegistrationFormPDF } from "@/components/admin-functions/registration-form-pdf";
 import { downloadLabRequestFormPDF } from "@/components/admin-functions/lab-request-form-pdf";
+import {downloadLabReservationFormPDF} from "@/components/admin-functions/lab-reservation-form-pdf";
 
 
 interface UserService {
@@ -380,7 +381,7 @@ const handleGeneratePDF = async (
       console.log('EVC Reservation details for PDF generation:', detailedData);
      
       // For lab-request form specifically, we'll use the EVC data
-      if (formType === 'lab-request') {
+      if (formType === 'lab-request' || formType === 'lab-reservation') {
         // Format the needed materials into the required format
         const materialItems = Array.isArray(detailedData.NeededMaterials)
           ? detailedData.NeededMaterials.map((material: any) => ({
@@ -437,11 +438,16 @@ const handleGeneratePDF = async (
         };
          
         try {
-          console.log('Generating lab request PDF with data:', labRequestData);
-          await downloadLabRequestFormPDF(labRequestData);
+          if (formType === 'lab-request') {
+            console.log('Generating lab request PDF with data:', labRequestData);
+            await downloadLabRequestFormPDF(labRequestData);
+          } else if (formType === 'lab-reservation') {
+            console.log('Generating lab reservation PDF with data:', labRequestData);
+            await downloadLabReservationFormPDF(labRequestData);
+          }
         } catch (error) {
-          console.error('Error in lab request PDF generation:', error);
-          alert(`Error generating lab request PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          console.error(`Error in ${formType} PDF generation:`, error);
+          alert(`Error generating ${formType} PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
        
         // After generating, close modal and trigger scroll fix
@@ -711,6 +717,74 @@ const handleGeneratePDF = async (
           alert(`Error generating lab request PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
         break;
+
+        case 'lab-reservation':
+          // For normal utilization reservations, create a basic lab reservation form
+          try {
+            // Format time from UtilTimes if available
+            let inclusiveTime = '';
+            if (Array.isArray(detailedData.UtilTimes) && detailedData.UtilTimes.length > 0) {
+              const firstTime = detailedData.UtilTimes[0];
+              if (firstTime.StartTime && firstTime.EndTime) {
+                const startTime = new Date(firstTime.StartTime);
+                const endTime = new Date(firstTime.EndTime);
+                inclusiveTime = `${startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+              }
+            }
+           
+            // Create material items from UserServices and UserTools
+            const materialItems = [
+              // Convert services to materials
+              ...detailedData.UserServices.map((service: any) => ({
+                quantity: '1',
+                item: service.ServiceAvail || '',
+                description: service.EquipmentAvail || '',
+                issuedCondition: '',
+                returnedCondition: ''
+              })),
+              // Add tools as materials
+              ...detailedData.UserTools.map((tool: any) => ({
+                quantity: tool.ToolQuantity?.toString() || '1',
+                item: tool.ToolUser || '',
+                description: '',
+                issuedCondition: '',
+                returnedCondition: ''
+              }))
+            ];
+           
+            // Create a basic lab reservation form for non-EVC reservations
+            const labReservationData = {
+              campus: 'Eastern Visayas Campus', // Default value
+              controlNo: `S-${detailedData.id}`,
+              schoolYear: new Date().getFullYear().toString(),
+              gradeLevel: '', // Not applicable for regular utilization
+              numberOfStudents: '1', // Default to 1 for regular utilization
+              subject: '', // Not applicable for regular utilization
+              concurrentTopic: '', // Not applicable for regular utilization
+              unit: '', // Not applicable for regular utilization
+              teacherInCharge: '', // Not applicable for regular utilization
+              venue: 'Fabrication Laboratory',
+              inclusiveTimeOfUse: inclusiveTime,
+              date: new Date(detailedData.RequestDate).toLocaleDateString(),
+              materials: materialItems,
+              receivedBy: '',
+              receivedAndInspectedBy: '',
+              receivedDate: '',
+              inspectedDate: '',
+              requestedBy: detailedData.accInfo?.Name || '',
+              dateRequested: new Date(detailedData.RequestDate).toLocaleDateString(),
+              students: [{ name: detailedData.accInfo?.Name || '' }],
+              endorsedBy: '',
+              approvedBy: ''
+            };
+           
+            console.log('Lab reservation data for regular utilization:', labReservationData);
+            await downloadLabReservationFormPDF(labReservationData);
+          } catch (error) {
+            console.error('Error in lab reservation PDF generation for regular utilization:', error);
+            alert(`Error generating lab reservation PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+          break;
        
       default:
         console.error('Unknown form type:', formType);
@@ -1083,18 +1157,32 @@ const handleGeneratePDF = async (
             if (isStudent) {
               // Only show Laboratory Request Form for students
               return (
-                <TableRow>
-                  <TableCell className="font-medium">Laboratory Request Form</TableCell>
-                  <TableCell className="text-right">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => selectedReservationId && handleGeneratePDF(selectedReservationId, 'lab-request')}
-                    >
-                      Generate PDF
-                    </Button>
-                  </TableCell>
-                </TableRow>
+                <>
+                  <TableRow>
+                    <TableCell className="font-medium">Laboratory Request Form</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => selectedReservationId && handleGeneratePDF(selectedReservationId, 'lab-request')}
+                      >
+                        Generate PDF
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="font-medium">Laboratory Reservation Form</TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => selectedReservationId && handleGeneratePDF(selectedReservationId, 'lab-reservation')}
+                      >
+                        Generate PDF
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                </>
               );
             } else {
               // Show all other forms for non-students

@@ -1,78 +1,48 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import {
-  AutoTableResult,
-  AutoTableColumnOption
-} from "@/components/admin-functions/pdf-types";
 
-// Define interfaces for DetailedReservation
-interface UserService {
+// Define interfaces for JobPayment data
+interface ServiceItem {
   id: string;
-  ServiceAvail: string;
-  EquipmentAvail: string;
-  CostsAvail: number | string | null;
-  MinsAvail: number | null;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  totalPrice: number;
+  description?: string;
+  minutes?: number;
+  costPerMinute?: number; // Added for clarity
 }
 
-interface UserTool {
-  id: string;
-  ToolUser: string;
-  ToolQuantity: number;
-}
-
-interface UtilTime {
-  id: number;
-  DayNum: number | null;
-  StartTime: string | null;
-  EndTime: string | null;
-}
-
-interface ClientInfo {
-  ContactNum: string;
-  Address: string;
-  City: string;
-  Province: string;
-  Zipcode: number;
-}
-
-interface BusinessInfo {
-  CompanyName: string;
-  BusinessOwner: string;
-  BusinessPermitNum: string;
-  TINNum: string;
-  CompanyIDNum: string;
-  CompanyEmail: string;
-  ContactPerson: string;
-  Designation: string;
-  CompanyAddress: string;
-  CompanyCity: string;
-  CompanyProvince: string;
-  CompanyZipcode: number;
-  CompanyPhoneNum: string;
-  CompanyMobileNum: string;
-  Manufactured: string;
-  ProductionFrequency: string;
-  Bulk: string;
-}
-
-interface AccountInfo {
-  Name: string;
+interface Client {
+  name: string;
   email: string;
-  Role: string;
-  ClientInfo?: ClientInfo;
-  BusinessInfo?: BusinessInfo;
+  phone?: string;
+  address?: string;
+  role: string;
+  type?: 'Student' | 'MSME' | 'Others';
+  otherSpecify?: string;
 }
 
-interface DetailedReservation {
+interface JobPayment {
   id: number;
-  Status: string;
-  RequestDate: string;
-  TotalAmntDue: number | string | null;
-  BulkofCommodity: string | null;
-  UserServices: UserService[];
-  UserTools: UserTool[];
-  UtilTimes: UtilTime[];
-  accInfo: AccountInfo;
+  orderNumber: string;
+  dateIssued: string;
+  datePaid?: string;
+  completionDate?: string;
+  paymentStatus: string;
+  items: ServiceItem[];
+  subtotal: number;
+  taxRate?: number;
+  taxAmount?: number;
+  totalAmount: number;
+  amountPaid?: number;
+  balanceDue?: number;
+  notes?: string;
+  client: Client;
+  evaluatedBy?: string;
+  approvedBy?: string;
+  paymentReceivedBy?: string;
+  orNumber?: string;
 }
 
 /**
@@ -95,35 +65,6 @@ const formatDate = (dateString: string | null): string => {
   if (!dateString) return '';
   const date = new Date(dateString);
   return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-};
-
-/**
- * Format time for display
- * @param timeString - Time string to format
- * @returns Formatted time string
- */
-const formatTime = (timeString: string | null | undefined): string => {
-  if (!timeString) return '';
-  try {
-    const date = new Date(timeString);
-    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-  } catch (error) {
-    console.error('Error formatting time:', error);
-    return '';
-  }
-};
-
-/**
- * Format day number to day name
- * @param dayNum - Day number (0-6, where 0 is Sunday)
- * @returns Day name
- */
-const formatDayName = (dayNum: number | null): string => {
-  // Format day number to day name
-  if (dayNum === null || dayNum === undefined) return '';
-  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const index = typeof dayNum === 'number' ? dayNum % 7 : 0;
-  return days[index]; // Ensure value is within 0-6 range
 };
 
 /**
@@ -164,7 +105,7 @@ const drawCell = (
   const textY = y + height / 2 + fontSize / 4;
   
   // Add the text
-  doc.text(text, textX, textY, { align });
+  doc.text(text, textX, textY, align);
 };
 
 /**
@@ -204,220 +145,17 @@ const drawUnderline = (
 };
 
 /**
- * Generates a PDF for a job payment using browser print capabilities
- * This is a fallback method that uses HTML and browser printing
- * @param reservationData - The detailed reservation data
+ * Generate a PDF for a job payment order
+ * @param paymentData - The job payment data
  */
-const generatePrintPDF = (reservationData: DetailedReservation): void => {
-  // Create a new window for printing
-  const printWindow = window.open('', '_blank', 'width=800,height=600');
- 
-  if (!printWindow) {
-    alert('Please allow pop-ups to generate the PDF');
-    return;
-  }
-  
-  // Create content for the print window
-  printWindow.document.write(`
-    <html>
-      <head>
-        <title>Job Order - ${reservationData.id}</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 20px; }
-          h1, h2 { text-align: center; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
-          th, td { border: 1px solid #000; padding: 8px; }
-          th { background-color: #f2f2f2; }
-          .header { text-align: center; margin-bottom: 20px; }
-          .section { margin-top: 20px; font-weight: bold; }
-          .signature-line { border-top: 1px solid #000; margin-top: 50px; padding-top: 5px; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>PHILIPPINE SCIENCE HIGH SCHOOL - EASTERN VISAYAS CAMPUS</h1>
-          <p>Arl26 Brgy. Pawing, Palo, Leyte</p>
-          <h2>PSHS-EVC Fabrication Laboratory</h2>
-          <h2>JOB AND PAYMENT ORDER</h2>
-        </div>
-        
-        <p><strong>No.:</strong> ${reservationData.id}</p>
-        <p><strong>Date:</strong> ${formatDate(reservationData.RequestDate)}</p>
-        
-        <p><strong>Client's Name:</strong> ${reservationData.accInfo.Name}</p>
-        <p><strong>Address:</strong> ${reservationData.accInfo.ClientInfo ? 
-          `${reservationData.accInfo.ClientInfo.Address}, ${reservationData.accInfo.ClientInfo.City}, ${reservationData.accInfo.ClientInfo.Province}, ${reservationData.accInfo.ClientInfo.Zipcode}` : 
-          reservationData.accInfo.BusinessInfo ? 
-          `${reservationData.accInfo.BusinessInfo.CompanyAddress}, ${reservationData.accInfo.BusinessInfo.CompanyCity}, ${reservationData.accInfo.BusinessInfo.CompanyProvince}, ${reservationData.accInfo.BusinessInfo.CompanyZipcode}` : 
-          ''}
-        </p>
-        
-        <div class="section">Client Profile</div>
-        <p>
-          ${reservationData.accInfo.Role.toLowerCase().includes('student') ? '☑' : '☐'} Student<br>
-          ${reservationData.accInfo.BusinessInfo ? '☑' : '☐'} MSME<br>
-          ${!reservationData.accInfo.Role.toLowerCase().includes('student') && !reservationData.accInfo.BusinessInfo ? '☑' : '☐'} Others, specify: ${reservationData.accInfo.Role}
-        </p>
-        
-        <div class="section">Description of Project</div>
-        <p>${reservationData.BulkofCommodity || ''}</p>
-        
-        <div class="section">Details of the Services to be rendered</div>
-        <table>
-          <tr>
-            <th>Services</th>
-            <th>Minutes/Cost per minute</th>
-            <th>Total Cost</th>
-          </tr>
-          ${reservationData.UserServices && reservationData.UserServices.length > 0 ? 
-            reservationData.UserServices.map(service => `
-              <tr>
-                <td>${service.ServiceAvail} ${service.EquipmentAvail ? `(${service.EquipmentAvail})` : ''}</td>
-                <td>${service.MinsAvail || 0}</td>
-                <td>${formatCurrency(service.CostsAvail)}</td>
-              </tr>
-            `).join('') : 
-            '<tr><td colspan="3">No services selected</td></tr>'
-          }
-          ${reservationData.UserTools && reservationData.UserTools.length > 0 ? 
-            reservationData.UserTools.map(tool => `
-              <tr>
-                <td>Tool: ${tool.ToolUser} (Qty: ${tool.ToolQuantity})</td>
-                <td></td>
-                <td></td>
-              </tr>
-            `).join('') : ''
-          }
-          <tr>
-            <th colspan="2">Total Amount Due</th>
-            <td>${formatCurrency(reservationData.TotalAmntDue)}</td>
-          </tr>
-        </table>
-        
-        <p><strong>Reservation Times:</strong></p>
-        <ul>
-          ${reservationData.UtilTimes && reservationData.UtilTimes.length > 0 ? 
-            reservationData.UtilTimes.map(time => `
-              <li>${formatDayName(time.DayNum)}: ${formatTime(time.StartTime)} - ${formatTime(time.EndTime)}</li>
-            `).join('') : 
-            '<li>No times specified</li>'
-          }
-        </ul>
-        
-        <p>I, hereby understand and agree to the terms and conditions set forth by PSHS-EVC FabLab.</p>
-        
-        <table>
-          <tr>
-            <td width="50%">
-              <div class="signature-line">
-                <p style="text-align: center;">(Signature over printed name of Client)</p>
-                <p>Date: ____________________</p>
-              </div>
-            </td>
-            <td width="50%">
-              <div class="signature-line">
-                <p style="text-align: center;">Cyril D. Tapales</p>
-                <p style="text-align: center;">PSHS-EVC FabLab SRA</p>
-                <p>Date: ____________________</p>
-              </div>
-            </td>
-          </tr>
-        </table>
-        
-        <table>
-          <tr>
-            <th>Order of Payment</th>
-            <th>Payment</th>
-          </tr>
-          <tr>
-            <td>
-              <p>Please issue an Official Receipt in favor of</p>
-              <p>${reservationData.accInfo.Name}</p>
-              <p>for the amount of</p>
-              <p>${formatCurrency(reservationData.TotalAmntDue)}</p>
-              <br>
-              <p>Approved by:</p>
-              <div class="signature-line">
-                <p style="text-align: center;">Cynthia C. Ocaña, D.M.</p>
-                <p style="text-align: center;">FAD Chief</p>
-              </div>
-              <p>Date: ____________________</p>
-            </td>
-            <td>
-              <p>OR No. ____________________</p>
-              <p>Date: ____________________</p>
-              <p>Payment Received by:</p>
-              <div class="signature-line">
-                <p style="text-align: center;">Leah I. Loteyro</p>
-                <p style="text-align: center;">Cashier</p>
-              </div>
-              <p>Receipt of Completed Work</p>
-              <p>Received by:</p>
-              <div class="signature-line">
-                <p style="text-align: center;">(Signature over printed name of Client)</p>
-              </div>
-              <p>Date: ____________________</p>
-            </td>
-          </tr>
-        </table>
-      </body>
-    </html>
-  `);
-  
-  // Close the document and trigger print
-  printWindow.document.close();
-  printWindow.setTimeout(() => {
-    printWindow.print();
-  }, 500);
-};
-
-/**
- * Main function to generate and download a PDF for a job payment order
- * @param reservationData - The detailed reservation data
- */
-export const downloadJobPaymentPDF = (reservationData: DetailedReservation): void => {
+export const downloadJobPaymentPDF = (paymentData: JobPayment): void => {
   try {
-    console.log('Starting job payment PDF generation with data:', reservationData);
-    
-    // Robust validation
-    if (!reservationData) {
-      console.error('Missing reservation data object');
-      alert('Cannot generate PDF: No reservation data found');
-      return;
-    }
-    
-    if (!reservationData.accInfo) {
-      console.error('Missing accInfo in reservation data');
-      alert('Cannot generate PDF: Missing essential reservation data');
-      return;
-    }
-    
-    // Create safe objects with defaults
-    const safeAccInfo = {
-      Name: reservationData.accInfo.Name || 'Name Not Available',
-      email: reservationData.accInfo.email || 'Email Not Available',
-      Role: reservationData.accInfo.Role || 'Role Not Specified',
-      ClientInfo: reservationData.accInfo.ClientInfo || {},
-      BusinessInfo: reservationData.accInfo.BusinessInfo || {}
-    };
-    
-    const safeServices = Array.isArray(reservationData.UserServices) ? reservationData.UserServices : [];
-    const safeTools = Array.isArray(reservationData.UserTools) ? reservationData.UserTools : [];
-    const safeTimes = Array.isArray(reservationData.UtilTimes) ? reservationData.UtilTimes : [];
-    
     // Initialize jsPDF
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
       format: 'a4'
     });
-    
-    // Check if autoTable is available
-    if (typeof autoTable !== 'function') {
-      console.warn('jspdf-autotable function not available, falling back to browser print');
-      generatePrintPDF(reservationData);
-      return;
-    }
     
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
@@ -443,54 +181,25 @@ export const downloadJobPaymentPDF = (reservationData: DetailedReservation): voi
     doc.setFont('helvetica', 'normal');
     doc.text('No.:', pageWidth - margin - 20, 35);
     drawUnderline(doc, pageWidth - margin - 15, 35, 15);
-    doc.text(reservationData.id.toString() || '', pageWidth - margin - 15, 35);
+    doc.text(paymentData.orderNumber || '', pageWidth - margin - 15, 35);
     
-    doc.text('Date:', pageWidth - margin - 20, 40);
+    doc.text('Date:', pageWidth - margin - 25, 40);
     drawUnderline(doc, pageWidth - margin - 15, 40, 15);
-    doc.text(formatDate(reservationData.RequestDate) || '', pageWidth - margin - 15, 40);
+    doc.text(formatDate(paymentData.dateIssued) || '', pageWidth - margin - 15, 40);
     
     // Client information
     doc.setFontSize(10);
     doc.text('Client\'s Name:', margin, 50);
     drawUnderline(doc, margin + 25, 50, contentWidth - 25);
-    doc.text(safeAccInfo.Name || '', margin + 25, 50);
+    doc.text(paymentData.client.name || '', margin + 25, 50);
     
     doc.text('Address:', margin, 55);
-    
-    // Safely access nested properties
-    let address = '';
-    try {
-      if (safeAccInfo.ClientInfo) {
-        const clientInfo = safeAccInfo.ClientInfo;
-        const addressParts = [];
-        if (typeof clientInfo === 'object') {
-          if ('Address' in clientInfo) addressParts.push(clientInfo.Address);
-          if ('City' in clientInfo) addressParts.push(clientInfo.City);
-          if ('Province' in clientInfo) addressParts.push(clientInfo.Province);
-          if ('Zipcode' in clientInfo) addressParts.push(String(clientInfo.Zipcode));
-        }
-        address = addressParts.join(', ');
-      } else if (safeAccInfo.BusinessInfo) {
-        const businessInfo = safeAccInfo.BusinessInfo;
-        const addressParts = [];
-        if (typeof businessInfo === 'object') {
-          if ('CompanyAddress' in businessInfo) addressParts.push(businessInfo.CompanyAddress);
-          if ('CompanyCity' in businessInfo) addressParts.push(businessInfo.CompanyCity);
-          if ('CompanyProvince' in businessInfo) addressParts.push(businessInfo.CompanyProvince);
-          if ('CompanyZipcode' in businessInfo) addressParts.push(String(businessInfo.CompanyZipcode));
-        }
-        address = addressParts.join(', ');
-      }
-    } catch (error) {
-      console.error('Error formatting address:', error);
-    }
-    
     drawUnderline(doc, margin + 18, 55, contentWidth - 18);
-    doc.text(address, margin + 18, 55);
+    doc.text(paymentData.client.address || '', margin + 18, 55);
     
     // Client profile and project description sections
     const sectionY = 65;
-    const sectionHeight = 25;
+    const sectionHeight = 35;
     
     // Section headers
     drawCell(doc, 'Client Profile', margin, sectionY, contentWidth / 2, 7, 'center', true, [240, 240, 240], 10, 'bold');
@@ -501,57 +210,20 @@ export const downloadJobPaymentPDF = (reservationData: DetailedReservation): voi
     
     // Draw checkboxes
     const checkboxX = margin + 5;
-    const isStudent = safeAccInfo.Role.toLowerCase().includes('student');
-    const isBusiness = safeAccInfo.BusinessInfo && Object.keys(safeAccInfo.BusinessInfo).length > 0;
-    const isOther = !isStudent && !isBusiness;
-    
-    drawCheckbox(doc, checkboxX, sectionY + 12, 3, isStudent);
+    drawCheckbox(doc, checkboxX, sectionY + 12, 3, paymentData.client.type === 'Student');
     doc.text('Student', checkboxX + 5, sectionY + 13.5);
     
-    drawCheckbox(doc, checkboxX, sectionY + 18, 3, isBusiness);
+    drawCheckbox(doc, checkboxX, sectionY + 18, 3, paymentData.client.type === 'MSME');
     doc.text('MSME', checkboxX + 5, sectionY + 19.5);
     
-    drawCheckbox(doc, checkboxX, sectionY + 24, 3, isOther);
+    drawCheckbox(doc, checkboxX, sectionY + 24, 3, paymentData.client.type === 'Others');
     doc.text('Others, specify:', checkboxX + 5, sectionY + 25.5);
     
     drawUnderline(doc, checkboxX + 28, sectionY + 25.5, contentWidth / 2 - 33);
-    if (isOther) {
-      doc.text(safeAccInfo.Role || '', checkboxX + 28, sectionY + 25.5);
-    }
+    doc.text(paymentData.client.otherSpecify || '', checkboxX + 28, sectionY + 25.5);
     
     // Project description section
     drawCell(doc, '', margin + contentWidth / 2, sectionY + 7, contentWidth / 2, sectionHeight - 7, 'left', false);
-    
-    // Add commodity information if available
-    if (reservationData.BulkofCommodity) {
-      doc.setFontSize(9);
-      doc.text('Commodity: ' + (reservationData.BulkofCommodity || ''), margin + contentWidth / 2 + 3, sectionY + 13);
-    }
-    
-    // If it's a business, add manufacturing details
-    if (safeAccInfo.BusinessInfo && Object.keys(safeAccInfo.BusinessInfo).length > 0) {
-      doc.setFontSize(9);
-      try {
-        const businessInfo = safeAccInfo.BusinessInfo;
-        if (typeof businessInfo === 'object') {
-          // Safe access to Manufactured property
-          let product = '';
-          if ('Manufactured' in businessInfo && businessInfo.Manufactured !== undefined) {
-            product = businessInfo.Manufactured;
-          }
-          doc.text('Product: ' + product, margin + contentWidth / 2 + 3, sectionY + 18);
-          
-          // Safe access to ProductionFrequency property
-          let frequency = '';
-          if ('ProductionFrequency' in businessInfo && businessInfo.ProductionFrequency !== undefined) {
-            frequency = businessInfo.ProductionFrequency;
-          }
-          doc.text('Production: ' + frequency, margin + contentWidth / 2 + 3, sectionY + 23);
-        }
-      } catch (error) {
-        console.error('Error displaying business info:', error);
-      }
-    }
     
     // Services section
     const servicesY = sectionY + sectionHeight + 5;
@@ -559,85 +231,46 @@ export const downloadJobPaymentPDF = (reservationData: DetailedReservation): voi
     // Services header
     drawCell(doc, 'Details of the Services to be rendered', margin, servicesY, contentWidth, 7, 'center', true, [240, 240, 240], 10, 'bold');
     
-    // Services table headers
-    drawCell(doc, 'Services', margin, servicesY + 7, contentWidth * 0.5, 7, 'center', true, [240, 240, 240], 10, 'normal');
-    drawCell(doc, 'Minutes/', margin + contentWidth * 0.5, servicesY + 7, contentWidth * 0.2, 7, 'center', true, [240, 240, 240], 10, 'normal');
-    drawCell(doc, 'Cost per', margin + contentWidth * 0.5, servicesY + 10, contentWidth * 0.2, 4, 'center', true, [240, 240, 240], 10, 'normal');
-    drawCell(doc, 'minute', margin + contentWidth * 0.5, servicesY + 13, contentWidth * 0.2, 1, 'center', true, [240, 240, 240], 10, 'normal');
+    // Services table headers - Modified to separate minute/s and cost per minute into distinct columns
+    drawCell(doc, 'Services', margin, servicesY + 7, contentWidth * 0.4, 7, 'center', true, [240, 240, 240], 10, 'normal');
+    drawCell(doc, 'Minute/s', margin + contentWidth * 0.4, servicesY + 7, contentWidth * 0.15, 7, 'center', true, [240, 240, 240], 10, 'normal');
+    drawCell(doc, 'Cost per minute', margin + contentWidth * 0.55, servicesY + 7, contentWidth * 0.15, 7, 'center', true, [240, 240, 240], 10, 'normal');
     drawCell(doc, 'Total Cost', margin + contentWidth * 0.7, servicesY + 7, contentWidth * 0.3, 7, 'center', true, [240, 240, 240], 10, 'normal');
     
-    // Services rows
+    // Services rows (dynamic based on items)
     const rowHeight = 8;
     let currentY = servicesY + 14;
     
     // Draw empty row if no items
-    if (safeServices.length === 0) {
-      drawCell(doc, '', margin, currentY, contentWidth * 0.5, rowHeight, 'left');
-      drawCell(doc, '', margin + contentWidth * 0.5, currentY, contentWidth * 0.2, rowHeight, 'center');
+    if (!paymentData.items || paymentData.items.length === 0) {
+      drawCell(doc, '', margin, currentY, contentWidth * 0.4, rowHeight, 'left');
+      drawCell(doc, '', margin + contentWidth * 0.4, currentY, contentWidth * 0.15, rowHeight, 'center');
+      drawCell(doc, '', margin + contentWidth * 0.55, currentY, contentWidth * 0.15, rowHeight, 'center');
       drawCell(doc, '', margin + contentWidth * 0.7, currentY, contentWidth * 0.3, rowHeight, 'right');
       currentY += rowHeight;
     } else {
-      // Draw service rows
-      safeServices.forEach((service) => {
-        const serviceDisplay = service.EquipmentAvail 
-          ? `${service.ServiceAvail} (${service.EquipmentAvail})`
-          : service.ServiceAvail;
-          
-        drawCell(doc, serviceDisplay, margin, currentY, contentWidth * 0.5, rowHeight, 'left');
-        drawCell(doc, service.MinsAvail?.toString() || '', margin + contentWidth * 0.5, currentY, contentWidth * 0.2, rowHeight, 'center');
-        drawCell(doc, formatCurrency(service.CostsAvail), margin + contentWidth * 0.7, currentY, contentWidth * 0.3, rowHeight, 'right');
-        currentY += rowHeight;
-      });
-    }
-    
-    // Add tools if available
-    if (safeTools.length > 0) {
-      safeTools.forEach((tool) => {
-        const toolDisplay = `Tool: ${tool.ToolUser} (Qty: ${tool.ToolQuantity})`;
-        drawCell(doc, toolDisplay, margin, currentY, contentWidth * 0.5, rowHeight, 'left');
-        drawCell(doc, '', margin + contentWidth * 0.5, currentY, contentWidth * 0.2, rowHeight, 'center');
+      // Draw item rows
+      paymentData.items.forEach((item, index) => {
+        drawCell(doc, item.name, margin, currentY, contentWidth * 0.4, rowHeight, 'left');
+        drawCell(doc, item.minutes?.toString() || '', margin + contentWidth * 0.4, currentY, contentWidth * 0.15, rowHeight, 'center');
+        drawCell(doc, item.costPerMinute ? formatCurrency(item.costPerMinute) : '', margin + contentWidth * 0.55, currentY, contentWidth * 0.15, rowHeight, 'center');
+        // Keep the cell but don't display the total cost value
         drawCell(doc, '', margin + contentWidth * 0.7, currentY, contentWidth * 0.3, rowHeight, 'right');
         currentY += rowHeight;
       });
     }
     
-    // Total amount due row
+    // Total amount due row - Keep the cell but don't display the total amount value
     drawCell(doc, 'Total Amount Due', margin, currentY, contentWidth * 0.7, rowHeight, 'center', true, [240, 240, 240], 10, 'bold');
-    drawCell(doc, formatCurrency(reservationData.TotalAmntDue), margin + contentWidth * 0.7, currentY, contentWidth * 0.3, rowHeight, 'right');
+    drawCell(doc, '', margin + contentWidth * 0.7, currentY, contentWidth * 0.3, rowHeight, 'left');
     
     currentY += rowHeight + 10;
     
-    // Reservation times
-    if (safeTimes.length > 0) {
-      doc.text('Reservation Times:', margin, currentY);
-      currentY += 5;
-      
-      safeTimes.forEach((time, index) => {
-        try {
-          const dayName = formatDayName(time.DayNum);
-          const startTime = formatTime(time.StartTime || '');
-          const endTime = formatTime(time.EndTime || '');
-          const timeText = `${dayName}: ${startTime} - ${endTime}`;
-          doc.text(timeText, margin + 5, currentY);
-          currentY += 5;
-        } catch (error) {
-          console.error('Error displaying time:', error);
-        }
-      });
-      
-      currentY += 5;
-    } else {
-      // Completion date placeholder
-      doc.text('Completion Date:', margin, currentY);
-      drawUnderline(doc, margin + 30, currentY, contentWidth - 30);
-      currentY += 10;
-    }
+    // Completion date
+    doc.text('Completion Date:', margin, currentY);
+    drawUnderline(doc, margin + 30, currentY, contentWidth - 30);
     
-    // Check if we need to add a new page for signatures
-    if (currentY > pageHeight - 80) {
-      doc.addPage();
-      currentY = 20;
-    }
+    currentY += 10;
     
     // Terms and conditions acceptance
     doc.setFontSize(9);
@@ -650,30 +283,32 @@ export const downloadJobPaymentPDF = (reservationData: DetailedReservation): voi
     
     doc.text('conditions set forth by PSHS-EVC FabLab.', margin, currentY);
     
-    drawUnderline(doc, margin + contentWidth - 40, currentY, 40);
+    // Position name above the line
     doc.setFontSize(8);
-    doc.text('Cyril D. Tapales', margin + contentWidth - 40, currentY + 3, { align: 'center' });
-    doc.text('PSHS-EVC FabLab SRA', margin + contentWidth - 40, currentY + 7, { align: 'center' });
+    doc.text('Cyril D. Tapales', margin + contentWidth - 20, currentY-1, { align: 'center' });
+    drawUnderline(doc, margin + contentWidth - 40, currentY, 40);
+    // Position job title below the line
+    doc.text('PSHS-EVC FabLab SRA', margin + contentWidth - 20, currentY + 4, { align: 'center' });
     
     currentY += 15;
     
-    // Client signature line
-    drawUnderline(doc, margin, currentY, contentWidth / 2 - 10);
+    // Modified signature line - move text inside the cell
+    const signatureLineX = margin + (contentWidth / 4); // Center the signature line
+    const signatureLineWidth = contentWidth / 2 - 20;
+    
+    // Draw signature line in client section but keep the text inside
+    drawUnderline(doc, signatureLineX - signatureLineWidth/2, currentY, signatureLineWidth);
     doc.setFontSize(8);
-    doc.text('(Signature over printed name of Client)', margin, currentY + 3, { align: 'center' });
-    doc.text('Date:', margin, currentY + 7);
-    drawUnderline(doc, margin + 10, currentY + 7, contentWidth / 2 - 20);
+    doc.text('(Signature over printed name of Client)', signatureLineX, currentY + 3, { align: 'center' });
+    
+    // Date alignment fix - text remains within client section area
+    doc.text('Date:', margin + 5, currentY + 7);
+    drawUnderline(doc, margin + 15, currentY + 7, contentWidth / 4 - 15);
     
     doc.text('Date:', margin + contentWidth - 40, currentY + 7);
     drawUnderline(doc, margin + contentWidth - 30, currentY + 7, 30);
     
     currentY += 15;
-    
-    // Check if we need to add a new page for payment section
-    if (currentY > pageHeight - 65) {
-      doc.addPage();
-      currentY = 20;
-    }
     
     // Payment section
     const paymentBoxY = currentY;
@@ -684,80 +319,72 @@ export const downloadJobPaymentPDF = (reservationData: DetailedReservation): voi
     drawCell(doc, 'Payment', margin + contentWidth / 2, paymentBoxY, contentWidth / 2, 7, 'center', true, [240, 240, 240], 10, 'bold');
     
     // Payment order section
-    drawCell(doc, '', margin, paymentBoxY + 7, contentWidth / 2, paymentBoxHeight - 7, 'left');
+    drawCell(doc, '', margin, paymentBoxY + 7, contentWidth / 2, paymentBoxHeight, 'left');
     
     // Payment details section
-    drawCell(doc, '', margin + contentWidth / 2, paymentBoxY + 7, contentWidth / 2, paymentBoxHeight - 7, 'left');
+    drawCell(doc, '', margin + contentWidth / 2, paymentBoxY + 7, contentWidth / 2, paymentBoxHeight, 'left');
     
-    // Payment order content
+    // Payment order content - moved inside the cell
     doc.setFontSize(9);
-    doc.text('Please issue an Official Receipt in favor of', margin + 3, paymentBoxY + 12);
     
-    drawUnderline(doc, margin + 3, paymentBoxY + 17, contentWidth / 2 - 6);
-    doc.text(safeAccInfo.Name, margin + 3, paymentBoxY + 17);
+    // Content positioned inside the Order of Payment cell
+    doc.text('Please issue an Official Receipt in favor of', margin + 5, paymentBoxY + 15);
     
-    doc.text('for the amount of', margin + 3, paymentBoxY + 22);
+    drawUnderline(doc, margin + 5, paymentBoxY + 20, contentWidth / 2 - 10);
     
-    drawUnderline(doc, margin + 3, paymentBoxY + 27, contentWidth / 2 - 6);
-    doc.text(formatCurrency(reservationData.TotalAmntDue), margin + 3, paymentBoxY + 27);
+    doc.text('for the amount of', margin + 5, paymentBoxY + 25);
     
-    drawUnderline(doc, margin + 3, paymentBoxY + 32, contentWidth / 2 - 6);
+    drawUnderline(doc, margin + 5, paymentBoxY + 30, contentWidth / 2 - 10);
     
     // Approval section
-    doc.text('Approved by:', margin + 3, paymentBoxY + 40);
+    doc.text('Approved by:', margin + 5, paymentBoxY + 40);
     
-    drawUnderline(doc, margin + 30, paymentBoxY + 40, contentWidth / 2 - 33);
+    // Position name above the line
     doc.setFontSize(8);
-    doc.text('Cynthia C. Ocaña, D.M.', margin + (contentWidth / 4), paymentBoxY + 43, { align: 'center' });
-    doc.text('FAD Chief', margin + (contentWidth / 4), paymentBoxY + 47, { align: 'center' });
+    doc.text('Cynthia C. Ocaña, D.M.', margin + (contentWidth / 4), paymentBoxY + 39, { align: 'center' });
+    drawUnderline(doc, margin + 30, paymentBoxY + 40, contentWidth / 2 - 35);
+    // Position job title below the line
+    doc.text('FAD Chief', margin + (contentWidth / 4), paymentBoxY + 44, { align: 'center' });
     
-    doc.text('Date:', margin + 3, paymentBoxY + 52);
-    drawUnderline(doc, margin + 15, paymentBoxY + 52, contentWidth / 2 - 18);
+    doc.text('Date:', margin + 5, paymentBoxY + 50);
+    drawUnderline(doc, margin + 15, paymentBoxY + 50, contentWidth / 2 - 20);
     
-    // Payment section content
+    // Payment section content - moved inside the cell
     doc.setFontSize(9);
-    doc.text('OR No.', margin + contentWidth / 2 + 3, paymentBoxY + 12);
-    drawUnderline(doc, margin + contentWidth / 2 + 20, paymentBoxY + 12, contentWidth / 2 - 23);
     
-    doc.text('Date:', margin + contentWidth / 2 + 3, paymentBoxY + 17);
-    drawUnderline(doc, margin + contentWidth / 2 + 20, paymentBoxY + 17, contentWidth / 2 - 23);
+    // Content positioned inside the Payment cell
+    doc.text('OR No.', margin + contentWidth / 2 + 5, paymentBoxY + 15);
+    drawUnderline(doc, margin + contentWidth / 2 + 20, paymentBoxY + 15, contentWidth / 2 - 25);
     
-    doc.text('Payment Received by:', margin + contentWidth / 2 + 3, paymentBoxY + 22);
+    doc.text('Date:', margin + contentWidth / 2 + 5, paymentBoxY + 20);
+    drawUnderline(doc, margin + contentWidth / 2 + 20, paymentBoxY + 20, contentWidth / 2 - 25);
     
-    drawUnderline(doc, margin + contentWidth / 2 + 3, paymentBoxY + 27, contentWidth / 2 - 6);
+    doc.text('Payment Received by:', margin + contentWidth / 2 + 5, paymentBoxY + 25);
+    
+    // Position name above the line
     doc.setFontSize(8);
-    doc.text('Leah I. Loteyro', margin + contentWidth * 0.75, paymentBoxY + 30, { align: 'center' });
-    doc.text('Cashier', margin + contentWidth * 0.75, paymentBoxY + 34, { align: 'center' });
+    doc.text('Leah I. Loteyro', margin + contentWidth * 0.75, paymentBoxY + 27.5, { align: 'center' });
+    drawUnderline(doc, margin + contentWidth / 2 + 5, paymentBoxY + 29, contentWidth / 2 - 10);
+    // Position job title below the line
+    doc.text('Cashier', margin + contentWidth * 0.75, paymentBoxY + 31, { align: 'center' });
     
     // Receipt of completed work
     doc.setFontSize(9);
-    doc.text('Receipt of Completed Work', margin + contentWidth / 2 + 3, paymentBoxY + 40);
-    doc.text('Received by:', margin + contentWidth / 2 + 3, paymentBoxY + 45);
+    doc.text('Receipt of Completed Work', margin + contentWidth / 2 + 5, paymentBoxY + 37);
+    doc.text('Received by:', margin + contentWidth / 2 + 5, paymentBoxY + 42);
     
-    drawUnderline(doc, margin + contentWidth / 2 + 3, paymentBoxY + 50, contentWidth / 2 - 6);
+    drawUnderline(doc, margin + contentWidth / 2 + 5, paymentBoxY + 45, contentWidth / 2 - 10);
     doc.setFontSize(8);
-    doc.text('(Signature over printed name of Client)', margin + contentWidth * 0.75, paymentBoxY + 53, { align: 'center' });
+    doc.text('(Signature over printed name of Client)', margin + contentWidth * 0.75, paymentBoxY + 48, { align: 'center' });
     
-    doc.text('Date:', margin + contentWidth / 2 + 3, paymentBoxY + 57);
-    drawUnderline(doc, margin + contentWidth / 2 + 15, paymentBoxY + 57, contentWidth / 2 - 18);
+    doc.text('Date:', margin + contentWidth / 2 + 5, paymentBoxY + 52);
+    drawUnderline(doc, margin + contentWidth / 2 + 17, paymentBoxY + 52, contentWidth / 2 - 22);
     
     // Save the PDF
-    try {
-      doc.save(`Job_Order_${reservationData.id || 'New'}.pdf`);
-      console.log('Job payment PDF saved successfully');
-    } catch (saveError) {
-      console.error('Error saving PDF:', saveError);
-      alert('Error saving PDF. Please try again.');
-    }
+    doc.save(`Job_Order_${paymentData.orderNumber || 'New'}.pdf`);
   } catch (error) {
     console.error('Error generating PDF:', error);
-    // Fall back to browser print method if any error occurs
-    try {
-      generatePrintPDF(reservationData);
-    } catch (printError) {
-      console.error('Even fallback print failed:', printError);
-      alert(`Unable to generate PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
+    alert('An error occurred while generating the PDF. Please try again.');
   }
 };
 

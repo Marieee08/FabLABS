@@ -328,11 +328,8 @@ export const downloadLabRequestFormPDF = (formData: LabRequestFormData): void =>
       doc.line(margin + venueWidth + 2, y, margin + halfWidth, y);
       
       // Add venue value if available
-      const defaultVenue = 'Fabrication Laboratory';
       if (safeFormData.venue) {
         doc.text(safeFormData.venue, margin + venueWidth + 4, y);
-      } else {
-        doc.text(defaultVenue, margin + venueWidth + 4, y);
       }
       
       // Draw Inclusive Time of Use field
@@ -454,15 +451,11 @@ export const downloadLabRequestFormPDF = (formData: LabRequestFormData): void =>
         // Get data for the current row
         const rowData = materialsData[i] || { quantity: '', item: '', description: '', issuedCondition: '', returnedCondition: '' };
         
-        // For the first row, set default values if empty
-        const itemText = i === 0 && !rowData.item ? 'Availed Service Name' : rowData.item;
-        const quantityText = i === 0 && !rowData.quantity ? 'Quantity' : rowData.quantity;
-        
         // Add cells for this row
-        addCell(quantityText, currentX, colQuantity, rowHeight, 'center', 9, i === 0 && !rowData.quantity);
+        addCell(rowData.quantity, currentX, colQuantity, rowHeight, 'center', 9, false);
         currentX += colQuantity;
         
-        addCell(itemText, currentX, colItem, rowHeight, 'left', 9, i === 0 && !rowData.item);
+        addCell(rowData.item, currentX, colItem, rowHeight, 'left', 9, false);
         currentX += colItem;
         
         addCell(rowData.description, currentX, colDesc, rowHeight, 'left', 9, false);
