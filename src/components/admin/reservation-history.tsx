@@ -27,12 +27,12 @@ import {
   DialogTitle,
   DialogFooter
 } from "@/components/ui/dialog";
-import { downloadPDF } from "@/components/admin-functions/utilization-request-pdf";
-import { downloadJobPaymentPDF } from "@/components/admin-functions/job-payment-pdf";
-import { downloadMachineUtilPDF } from "@/components/admin-functions/machine-utilization-pdf";
-import { downloadRegistrationFormPDF } from "@/components/admin-functions/registration-form-pdf";
-import { downloadLabRequestFormPDF } from "@/components/admin-functions/lab-request-form-pdf";
-import {downloadLabReservationFormPDF} from "@/components/admin-functions/lab-reservation-form-pdf";
+import { downloadPDF } from "@/components/admin-functions/pdf/utilization-request-pdf";
+import { downloadJobPaymentPDF } from "@/components/admin-functions/pdf/job-payment-pdf";
+import { downloadMachineUtilPDF } from "@/components/admin-functions/pdf/machine-utilization-pdf";
+import { downloadRegistrationFormPDF } from "@/components/admin-functions/pdf/registration-form-pdf";
+import { downloadLabRequestFormPDF } from "@/components/admin-functions/pdf/lab-request-form-pdf";
+import {downloadLabReservationFormPDF} from "@/components/admin-functions/pdf/lab-reservation-form-pdf";
 
 
 
