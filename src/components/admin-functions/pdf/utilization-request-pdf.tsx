@@ -1,63 +1,11 @@
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import {
+  AutoTableResult,
+  AutoTableColumnOption
+} from "@/components/admin-functions/pdf-types";
 
 
-// Create proper TypeScript definitions for jspdf-autotable
-interface AutoTableResult {
-  finalY: number;
-  pageNumber?: number;
-}
-
-
-interface AutoTableStyles {
-  fontSize?: number;
-  fontStyle?: 'normal' | 'bold' | 'italic' | 'bolditalic';
-  cellWidth?: number | 'auto' | 'wrap';
-  cellPadding?: number;
-  font?: string;
-  textColor?: string;
-  fillColor?: string;
-  lineColor?: string;
-  lineWidth?: number;
-  halign?: 'left' | 'center' | 'right';
-  valign?: 'top' | 'middle' | 'bottom';
-}
-
-
-interface AutoTableColumnStyles {
-  [key: number]: Partial<AutoTableStyles>;
-}
-
-
-interface AutoTableColumnOption {
-  content?: string;
-  styles?: Partial<AutoTableStyles>;
-}
-
-
-interface AutoTableSettings {
-  head?: Array<string[] | AutoTableColumnOption[]>;
-  body?: Array<string[] | AutoTableColumnOption[]>;
-  foot?: Array<string[] | AutoTableColumnOption[]>;
-  startY?: number;
-  margin?: { top?: number; right?: number; bottom?: number; left?: number };
-  pageBreak?: 'auto' | 'avoid' | 'always';
-  rowPageBreak?: 'auto' | 'avoid';
-  showHead?: 'everyPage' | 'firstPage' | 'never';
-  showFoot?: 'everyPage' | 'lastPage' | 'never';
-  theme?: 'striped' | 'grid' | 'plain';
-  styles?: Partial<AutoTableStyles>;
-  columnStyles?: AutoTableColumnStyles;
-  didDrawPage?: (data: any) => void;
-}
-
-
-declare module 'jspdf-autotable' {
-  export default function autoTable(
-    doc: jsPDF,
-    options: AutoTableSettings
-  ): AutoTableResult;
-}
 
 
 // Define interfaces for DetailedReservation
@@ -70,11 +18,15 @@ interface UserService {
 }
 
 
+
+
 interface UserTool {
   id: string;
   ToolUser: string;
   ToolQuantity: number;
 }
+
+
 
 
 interface UtilTime {
@@ -85,6 +37,8 @@ interface UtilTime {
 }
 
 
+
+
 interface ClientInfo {
   ContactNum: string;
   Address: string;
@@ -92,6 +46,8 @@ interface ClientInfo {
   Province: string;
   Zipcode: number;
 }
+
+
 
 
 interface BusinessInfo {
@@ -115,6 +71,8 @@ interface BusinessInfo {
 }
 
 
+
+
 interface AccountInfo {
   Name: string;
   email: string;
@@ -122,6 +80,8 @@ interface AccountInfo {
   ClientInfo?: ClientInfo;
   BusinessInfo?: BusinessInfo;
 }
+
+
 
 
 interface DetailedReservation {
@@ -137,6 +97,8 @@ interface DetailedReservation {
 }
 
 
+
+
 /**
  * Format currency values
  * @param amount - The amount to format
@@ -147,6 +109,8 @@ const formatCurrency = (amount: number | string | null): string => {
   const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
   return Number(numAmount).toFixed(2);
 };
+
+
 
 
 /**
@@ -161,6 +125,8 @@ const formatDate = (dateString: string | null): string => {
 };
 
 
+
+
 /**
  * Format time for display in the form
  * @param timeString - Time string to format
@@ -173,8 +139,10 @@ const formatTime = (timeString: string | null): string => {
 };
 
 
+
+
 /**
- * Generate a string with all service details
+ * Generate a string with service details - WITHOUT cost information
  * @param services - Array of UserService objects
  * @returns Formatted service details string
  */
@@ -185,9 +153,11 @@ const getServiceDetailsString = (services: UserService[]): string => {
  
   return services.map(service =>
     `Service: ${service.ServiceAvail}, Equipment: ${service.EquipmentAvail}, ` +
-    `Duration: ${service.MinsAvail || 0} min, Cost: ₱${formatCurrency(service.CostsAvail)}`
+    `Duration: ${service.MinsAvail || 0} min`
   ).join('\n');
 };
+
+
 
 
 /**
@@ -197,7 +167,7 @@ const getServiceDetailsString = (services: UserService[]): string => {
  */
 const generatePrintPDF = (reservationData: DetailedReservation): void => {
   // Create service details string
-  const serviceDetails = getServiceDetailsString(reservationData.UserServices);
+  const serviceDetails = getServiceDetailsString(reservationData.UserServices || []);
  
   // Create a new window for printing
   const printWindow = window.open('', '_blank', 'width=800,height=600');
@@ -206,218 +176,9 @@ const generatePrintPDF = (reservationData: DetailedReservation): void => {
     alert('Please allow pop-ups to generate the PDF');
     return;
   }
- 
-  // Create the HTML content for printing
-  const htmlContent = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Utilization Request Form</title>
-      <style>
-        body {
-          font-family: Arial, sans-serif;
-          margin: 20px;
-          color: #333;
-        }
-        .header {
-          text-align: center;
-          margin-bottom: 20px;
-          position: relative;
-        }
-        .logo-left {
-          position: absolute;
-          left: 20px;
-          top: 0;
-          width: 60px;
-          height: 60px;
-          border: 1px solid #000;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-        }
-        .logo-right {
-          position: absolute;
-          right: 20px;
-          top: 0;
-          width: 60px;
-          height: 60px;
-          border: 1px solid #000;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-        }
-        h1 {
-          font-size: 16px;
-          margin-bottom: 5px;
-        }
-        h2 {
-          font-size: 14px;
-          margin-top: 5px;
-          margin-bottom: 5px;
-        }
-        h3 {
-          font-size: 12px;
-          margin-top: 5px;
-          margin-bottom: 15px;
-          font-weight: normal;
-        }
-        .section-header {
-          background-color: #ddd;
-          padding: 5px;
-          font-weight: bold;
-          margin-top: 15px;
-        }
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-top: 0;
-        }
-        th, td {
-          border: 1px solid #000;
-          padding: 5px;
-          text-align: left;
-        }
-        .footer {
-          margin-top: 30px;
-          font-size: 12px;
-        }
-        @media print {
-          .no-print { display: none; }
-          button { display: none; }
-        }
-      </style>
-    </head>
-    <body>
-      <div class="no-print" style="padding: 10px; background: #f0f0f0; margin-bottom: 20px;">
-        <button onclick="window.print()" style="padding: 8px 12px;">Print PDF</button>
-        <button onclick="window.close()" style="padding: 8px 12px; margin-left: 10px;">Close</button>
-      </div>
-     
-      <div class="header">
-        <div class="logo-left">LOGO</div>
-        <div class="logo-right">DOST</div>
-        <h1>FABRICATION LABORATORY SHARED SERVICE FACILITY</h1>
-        <h2>UTILIZATION REQUEST FORM</h2>
-        <h3>Philippine Science High School-Eastern Visayas Campus (PSHS-EVC)<br>AH26 Brgy. Pawing, Palo, Leyte 6501</h3>
-      </div>
-     
-      <div class="section-header">BASIC INFORMATION</div>
-      <table>
-        <tr>
-          <td width="50%"><strong>Name of Client(s) to Use Facility:</strong></td>
-          <td width="50%"><strong>Position/Designation:</strong></td>
-        </tr>
-        <tr>
-          <td>1. ${reservationData.accInfo.Name}</td>
-          <td>${reservationData.accInfo.Role}</td>
-        </tr>
-        <tr>
-          <td>2.</td>
-          <td></td>
-        </tr>
-        <tr>
-          <td>3.</td>
-          <td></td>
-        </tr>
-        <tr>
-          <td>4.</td>
-          <td></td>
-        </tr>
-      </table>
-     
-      <div class="section-header">PROCESSING INFORMATION</div>
-      <table>
-        <tr>
-          <td><strong>Service Type:</strong></td>
-        </tr>
-        <tr>
-          <td>${serviceDetails}</td>
-        </tr>
-      </table>
-     
-      <table>
-        <tr>
-          <td><strong>Bulk of Commodity to be Processed<br>(in volume or weight):</strong></td>
-        </tr>
-        <tr>
-          <td>${reservationData.BulkofCommodity || ''}</td>
-        </tr>
-      </table>
-     
-      <table>
-        <tr>
-          <td><strong>Tools to Use, Qty, & no. of hours:</strong></td>
-        </tr>
-        <tr>
-          <td>${reservationData.UserTools.map(tool =>
-            `${tool.ToolUser} (Qty: ${tool.ToolQuantity})`
-          ).join(', ') || ''}</td>
-        </tr>
-      </table>
-     
-      <table>
-        <tr>
-          <td width="50%"><strong>Request Date:</strong></td>
-          <td width="50%"><strong>End Date:</strong></td>
-        </tr>
-        <tr>
-          <td>${formatDate(reservationData.RequestDate)}</td>
-          <td></td>
-        </tr>
-      </table>
-     
-      <table>
-        <tr>
-          <td width="50%"><strong>Day 1</strong></td>
-          <td width="50%"><strong>Day 2</strong></td>
-        </tr>
-        <tr>
-          <td>Start Time: ${formatTime(reservationData.UtilTimes.find(t => t.DayNum === 1)?.StartTime || null)}
-              End Time: ${formatTime(reservationData.UtilTimes.find(t => t.DayNum === 1)?.EndTime || null)}</td>
-          <td>Start Time: ${formatTime(reservationData.UtilTimes.find(t => t.DayNum === 2)?.StartTime || null)}
-              End Time: ${formatTime(reservationData.UtilTimes.find(t => t.DayNum === 2)?.EndTime || null)}</td>
-        </tr>
-      </table>
-     
-      <table>
-        <tr>
-          <td width="50%"><strong>Day 3</strong></td>
-          <td width="50%"><strong>Day 4</strong></td>
-        </tr>
-        <tr>
-          <td>Start Time: ${formatTime(reservationData.UtilTimes.find(t => t.DayNum === 3)?.StartTime || null)}
-              End Time: ${formatTime(reservationData.UtilTimes.find(t => t.DayNum === 3)?.EndTime || null)}</td>
-          <td>Start Time: ${formatTime(reservationData.UtilTimes.find(t => t.DayNum === 4)?.StartTime || null)}
-              End Time: ${formatTime(reservationData.UtilTimes.find(t => t.DayNum === 4)?.EndTime || null)}</td>
-        </tr>
-      </table>
-     
-      <table>
-        <tr>
-          <td width="50%"><strong>Date the processing of request was done:<br>Request processed by:</strong></td>
-          <td width="50%"><strong>Name and Signature of employee:</strong></td>
-        </tr>
-        <tr>
-          <td>${new Date().toLocaleDateString()}<br>${reservationData.accInfo.Name}</td>
-          <td>&nbsp;<br>&nbsp;</td>
-        </tr>
-      </table>
-     
-      <div class="footer">
-        Generated on: ${new Date().toLocaleString()}
-      </div>
-    </body>
-    </html>
-  `;
- 
-  // Write to the new window and trigger the print dialog
-  printWindow.document.open();
-  printWindow.document.write(htmlContent);
-  printWindow.document.close();
- 
-  // Focus the new window
-  printWindow.focus();
 };
+
+
 
 
 /**
@@ -426,14 +187,46 @@ const generatePrintPDF = (reservationData: DetailedReservation): void => {
  */
 export const downloadPDF = (reservationData: DetailedReservation): void => {
   try {
-    // First try to use jsPDF
+    console.log('Starting utilization request PDF generation with data:', reservationData);
+   
+    // Robust validation - check if reservationData exists and has minimum required fields
+    if (!reservationData) {
+      console.error('Missing entire reservation data object');
+      alert('Cannot generate PDF: No reservation data found');
+      return;
+    }
+   
+    // Check if accInfo exists at all
+    if (!reservationData.accInfo) {
+      console.error('Missing accInfo in reservation data');
+      alert('Cannot generate PDF: Missing essential reservation data or account info');
+      return;
+    }
+   
+    // Create safe accInfo with defaults for all potentially missing properties
+    const safeAccInfo = {
+      Name: reservationData.accInfo.Name || 'Name Not Available',
+      email: reservationData.accInfo.email || 'Email Not Available',
+      Role: reservationData.accInfo.Role || 'Role Not Specified',
+      ClientInfo: reservationData.accInfo.ClientInfo || {},
+      BusinessInfo: reservationData.accInfo.BusinessInfo || {}
+    };
+   
+    console.log('Using safe accInfo with defaults:', safeAccInfo);
+   
+    // Safe access to services, tools, and times
+    const safeServices = Array.isArray(reservationData.UserServices) ? reservationData.UserServices : [];
+    const safeTools = Array.isArray(reservationData.UserTools) ? reservationData.UserTools : [];
+    const safeTimes = Array.isArray(reservationData.UtilTimes) ? reservationData.UtilTimes : [];
+   
+    // Initialize jsPDF
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
       format: 'a4'
     });
    
-    // Test if autoTable is available
+    // Check if autoTable is available
     if (typeof autoTable !== 'function') {
       console.warn('jspdf-autotable function not available, falling back to browser print');
       generatePrintPDF(reservationData);
@@ -490,7 +283,7 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
     const clientTableData: AutoTableColumnOption[][] = [
       [{ content: 'Name of Client(s) to Use Facility:', styles: { fontStyle: 'bold' } },
        { content: 'Position/Designation:', styles: { fontStyle: 'bold' } }],
-      [{ content: '1. ' + reservationData.accInfo.Name }, { content: reservationData.accInfo.Role }],
+      [{ content: '1. ' + safeAccInfo.Name }, { content: safeAccInfo.Role }],
       [{ content: '2.' }, { content: '' }],
       [{ content: '3.' }, { content: '' }],
       [{ content: '4.' }, { content: '' }]
@@ -502,7 +295,7 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
       const result = autoTable(doc, {
         startY: yPosition,
         head: [],
-        body: clientTableData,
+        body: clientTableData as any,
         theme: 'grid',
         styles: { fontSize: 10 },
         margin: { left: margin, right: margin },
@@ -510,8 +303,8 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
           0: { cellWidth: contentWidth / 2 },
           1: { cellWidth: contentWidth / 2 }
         }
-      });
-      yPosition = result.finalY || 70;
+      }) as AutoTableResult;
+      yPosition = result && typeof result.finalY === 'number' ? result.finalY : 70;
     } catch (error) {
       console.error('Error in first autoTable:', error);
       yPosition = 70;
@@ -523,24 +316,60 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
     doc.setFont('helvetica', 'bold');
     doc.text('PROCESSING INFORMATION', margin + 2, yPosition + 5);
    
-    // Service type - using our helper function
-    const serviceDetails = getServiceDetailsString(reservationData.UserServices);
-   
-    const serviceTableData: AutoTableColumnOption[][] = [
-      [{ content: 'Service Type:', styles: { fontStyle: 'bold' } }],
-      [{ content: serviceDetails }]
+    // Create completely separate tables for the service type header and each service
+    // First, add just the header
+    const serviceHeaderRows = [
+      [{ content: 'Service Type:', styles: { fontStyle: 'bold' } }]
     ];
    
     try {
-      const result = autoTable(doc, {
+      const headerResult = autoTable(doc, {
         startY: yPosition + 8,
         head: [],
-        body: serviceTableData,
+        body: serviceHeaderRows as any,
         theme: 'grid',
         styles: { fontSize: 10 },
         margin: { left: margin, right: margin }
+      }) as AutoTableResult;
+     
+      yPosition = headerResult && typeof headerResult.finalY === 'number' ? headerResult.finalY : (yPosition + 15);
+    } catch (error) {
+      console.error('Error in service header table:', error);
+      yPosition += 15;
+    }
+   
+    // Now add each service as a separate table row for better formatting
+    const serviceTableRows = [];
+   
+    if (safeServices.length === 0) {
+      serviceTableRows.push([{ content: 'No services selected' }]);
+    } else {
+      safeServices.forEach(service => {
+        serviceTableRows.push([{
+          content: `Service: ${service.ServiceAvail}, Equipment: ${service.EquipmentAvail}, Duration: ${service.MinsAvail || 0} min`
+        }]);
       });
-      yPosition = result.finalY || (yPosition + 15);
+    }
+   
+    // Now add the service details in a separate table
+    try {
+      const result = autoTable(doc, {
+        startY: yPosition,
+        head: [],
+        body: serviceTableRows as any,
+        theme: 'grid',
+        styles: { fontSize: 10 },
+        margin: { left: margin, right: margin, bottom: 0 },
+        willDrawCell: function(data) {
+          // Ensure text fits within cell by allowing wrapping
+          if (data.column.index === 0) {
+            data.cell.styles.cellPadding = 3;
+            data.cell.styles.overflow = 'linebreak';
+            data.cell.styles.cellWidth = 'wrap';
+          }
+        }
+      }) as AutoTableResult;
+      yPosition = result && typeof result.finalY === 'number' ? result.finalY : (yPosition + 15);
     } catch (error) {
       console.error('Error in service type table:', error);
       yPosition += 15;
@@ -556,21 +385,21 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
       const result = autoTable(doc, {
         startY: yPosition,
         head: [],
-        body: bulkTableData,
+        body: bulkTableData as any,
         theme: 'grid',
         styles: { fontSize: 10 },
         margin: { left: margin, right: margin }
-      });
-      yPosition = result.finalY || (yPosition + 20);
+      }) as AutoTableResult;
+      yPosition = result && typeof result.finalY === 'number' ? result.finalY : (yPosition + 20);
     } catch (error) {
       console.error('Error in bulk table:', error);
-      yPosition += 20;
+      yPosition += 10;
     }
    
     // Tools information
     let toolsText = '';
-    if (reservationData.UserTools && reservationData.UserTools.length > 0) {
-      toolsText = reservationData.UserTools.map(tool =>
+    if (safeTools.length > 0) {
+      toolsText = safeTools.map(tool =>
         `${tool.ToolUser} (Qty: ${tool.ToolQuantity})`
       ).join(', ');
     }
@@ -584,12 +413,12 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
       const result = autoTable(doc, {
         startY: yPosition,
         head: [],
-        body: toolsTableData,
+        body: toolsTableData as any,
         theme: 'grid',
         styles: { fontSize: 10 },
         margin: { left: margin, right: margin }
-      });
-      yPosition = result.finalY || (yPosition + 20);
+      }) as AutoTableResult;
+      yPosition = result && typeof result.finalY === 'number' ? result.finalY : (yPosition + 20);
     } catch (error) {
       console.error('Error in tools table:', error);
       yPosition += 20;
@@ -606,7 +435,7 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
       const result = autoTable(doc, {
         startY: yPosition,
         head: [],
-        body: requestDateTableData,
+        body: requestDateTableData as any,
         theme: 'grid',
         styles: { fontSize: 10 },
         margin: { left: margin, right: margin },
@@ -614,19 +443,19 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
           0: { cellWidth: contentWidth / 2 },
           1: { cellWidth: contentWidth / 2 }
         }
-      });
-      yPosition = result.finalY || (yPosition + 15);
+      }) as AutoTableResult;
+      yPosition = result && typeof result.finalY === 'number' ? result.finalY : (yPosition + 15);
     } catch (error) {
       console.error('Error in request date table:', error);
       yPosition += 15;
     }
    
     // Days and times
-    // Find time entries for each day
-    const day1Time = reservationData.UtilTimes.find(t => t.DayNum === 1);
-    const day2Time = reservationData.UtilTimes.find(t => t.DayNum === 2);
-    const day3Time = reservationData.UtilTimes.find(t => t.DayNum === 3);
-    const day4Time = reservationData.UtilTimes.find(t => t.DayNum === 4);
+    // Find time entries for each day - safely accessing with defaults
+    const day1Time = safeTimes.find(t => t.DayNum === 1);
+    const day2Time = safeTimes.find(t => t.DayNum === 2);
+    const day3Time = safeTimes.find(t => t.DayNum === 3);
+    const day4Time = safeTimes.find(t => t.DayNum === 4);
    
     // Day 1-2 row
     const day12TableData: AutoTableColumnOption[][] = [
@@ -642,7 +471,7 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
       const result = autoTable(doc, {
         startY: yPosition,
         head: [],
-        body: day12TableData,
+        body: day12TableData as any,
         theme: 'grid',
         styles: { fontSize: 10 },
         margin: { left: margin, right: margin },
@@ -650,8 +479,8 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
           0: { cellWidth: contentWidth / 2 },
           1: { cellWidth: contentWidth / 2 }
         }
-      });
-      yPosition = result.finalY ?? (yPosition + 15);
+      }) as AutoTableResult;
+      yPosition = result && typeof result.finalY === 'number' ? result.finalY : (yPosition + 15);
     } catch (error) {
       console.error('Error in day12 table:', error);
       yPosition += 15;
@@ -671,7 +500,7 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
       const result = autoTable(doc, {
         startY: yPosition,
         head: [],
-        body: day34TableData,
+        body: day34TableData as any,
         theme: 'grid',
         styles: { fontSize: 10 },
         margin: { left: margin, right: margin },
@@ -679,8 +508,8 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
           0: { cellWidth: contentWidth / 2 },
           1: { cellWidth: contentWidth / 2 }
         }
-      });
-      yPosition = result.finalY || (yPosition + 15);
+      }) as AutoTableResult;
+      yPosition = result && typeof result.finalY === 'number' ? result.finalY : (yPosition + 15);
     } catch (error) {
       console.error('Error in day34 table:', error);
       yPosition += 15;
@@ -690,17 +519,17 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
     const currentDate = formatDate(new Date().toISOString());
     const processingTableData: AutoTableColumnOption[][] = [
       [
-        { content: 'Date the processing of request was done:\nRequest processed by:', styles: { fontStyle: 'bold' } },
-        { content: 'Name and Signature of employee:', styles: { fontStyle: 'bold' } }
+        { content: 'Date the processing of request was done:\nRequest processed by:', styles: { fontStyle: 'bold', halign: 'left' } },
+        { content: 'Name and Signature of employee:', styles: { fontStyle: 'bold', halign: 'left' } }
       ],
-      [{ content: `${currentDate}\n${reservationData.accInfo.Name}` }, { content: '' }]
+      [{ content: `${currentDate}\n${safeAccInfo.Name}` }, { content: '' }]
     ];
    
     try {
       autoTable(doc, {
         startY: yPosition,
         head: [],
-        body: processingTableData,
+        body: processingTableData as any,
         theme: 'grid',
         styles: { fontSize: 10 },
         margin: { left: margin, right: margin },
@@ -714,11 +543,19 @@ export const downloadPDF = (reservationData: DetailedReservation): void => {
     }
    
     // Save the PDF with a name based on the reservation ID
-    doc.save(`Utilization_Request_Form_${reservationData.id}.pdf`);
+    doc.save(`Utilization_Request_Form_${reservationData.id || 'Unknown'}.pdf`);
+    console.log('Utilization request PDF saved successfully');
   } catch (error) {
-    console.error('Error generating PDF:', error);
+    console.error('Error generating utilization request PDF:', error);
     // Fall back to browser print method
-    generatePrintPDF(reservationData);
+    try {
+      generatePrintPDF(reservationData);
+    } catch (printError) {
+      console.error('Even fallback print failed:', printError);
+      alert(`Unable to generate PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 };
 
+
+export default generatePrintPDF;

@@ -707,4 +707,3 @@ export const downloadLabRequestFormPDF = (formData: LabRequestFormData): void =>
 export default downloadLabRequestFormPDF;
 
 
-

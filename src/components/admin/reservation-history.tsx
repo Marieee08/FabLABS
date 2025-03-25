@@ -27,12 +27,12 @@ import {
   DialogTitle,
   DialogFooter
 } from "@/components/ui/dialog";
-import { downloadPDF } from "@/components/admin-functions/pdf/utilization-request-pdf";
-import { downloadJobPaymentPDF } from "@/components/admin-functions/pdf/job-payment-pdf";
-import { downloadRegistrationFormPDF } from "@/components/admin-functions/pdf/registration-form-pdf";
-import {downloadLabReservationFormPDF} from "@/components/admin-functions/pdf/lab-reservation-form-pdf";
-import { downloadLabRequestFormPDF } from "@/components/admin-functions/pdf/lab-request-form-pdf";
-
+import { downloadPDF } from "@/components/admin-functions/utilization-request-pdf";
+import { downloadJobPaymentPDF } from "@/components/admin-functions/job-payment-pdf";
+import { downloadMachineUtilPDF } from "@/components/admin-functions/machine-utilization-pdf";
+import { downloadRegistrationFormPDF } from "@/components/admin-functions/registration-form-pdf";
+import { downloadLabRequestFormPDF } from "@/components/admin-functions/lab-request-form-pdf";
+import {downloadLabReservationFormPDF} from "@/components/admin-functions/lab-reservation-form-pdf";
 
 
 
@@ -1022,6 +1022,13 @@ const handleGeneratePDF = async (
     }
   };
 
+
+
+
+
+
+
+
   const filteredReservations = reservations.filter(reservation => {
     const matchesTab = activeTab === 'all' || reservation.role.toLowerCase() === activeTab.toLowerCase();
    
@@ -1037,15 +1044,36 @@ const handleGeneratePDF = async (
            reservationDate.getMonth() === filterMonth - 1;
   });
 
+
+
+
+
+
+
+
   if (isLoading) {
     return <div className="flex items-center justify-center p-12">Loading...</div>;
   }
+
+
+
+
+
+
+
 
   const formatCurrency = (amount: number | string | null): string => {
     if (amount === null || amount === undefined) return '0.00';
     const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
     return Number(numAmount).toFixed(2);
   };
+
+
+
+
+
+
+
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-sm">
@@ -1070,6 +1098,13 @@ const handleGeneratePDF = async (
               : `${months[selectedMonth]} ${selectedYear}`
             }
           </Button>
+
+
+
+
+
+
+
 
           {isCustomSelectOpen && (
             <div className="absolute top-full mt-2 right-0 w-[280px] rounded-md border bg-white shadow-lg z-50">
@@ -1127,6 +1162,13 @@ const handleGeneratePDF = async (
         </div>
       </div>
 
+
+
+
+
+
+
+
       <Table>
         <TableHeader>
           <TableRow>
@@ -1179,6 +1221,13 @@ const handleGeneratePDF = async (
         </TableBody>
       </Table>
 
+
+
+
+
+
+
+
       {/* Regular Utilization Reservation Review Modal */}
       <ReviewReservation
         isModalOpen={isModalOpen}
@@ -1187,6 +1236,13 @@ const handleGeneratePDF = async (
         handleStatusUpdate={handleStatusUpdate}
       />
 
+
+
+
+
+
+
+
       {/* EVC Reservation Review Modal */}
       <ReviewEVCReservation
         isModalOpen={isEVCModalOpen}
@@ -1194,6 +1250,13 @@ const handleGeneratePDF = async (
         selectedReservation={selectedEVCReservation}
         handleStatusUpdate={handleEVCStatusUpdate}
       />
+
+
+
+
+
+
+
 
 {/* PDF Generation Modal - UPDATED */}
 <Dialog
@@ -1346,5 +1409,12 @@ const handleGeneratePDF = async (
     </div>
   );
 };
+
+
+
+
+
+
+
 
 export default ReservationHistory;
