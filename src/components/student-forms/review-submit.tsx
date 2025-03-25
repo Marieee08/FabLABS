@@ -5,7 +5,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Clock, School, Book, User, CreditCard, FileText } from 'lucide-react';
+import { CheckCircle, Clock, School, Book, User, CreditCard, FileText, Settings, Tools } from 'lucide-react';
 import Link from 'next/link';
 
 interface ClientInfo {
@@ -48,11 +48,9 @@ interface FormData {
   syncTimes?: boolean;
   unifiedStartTime?: string | null;
   unifiedEndTime?: string | null;
-  ProductsManufactured?: string;
-  BulkofCommodity?: string;
-  Equipment?: string;
-  Tools?: string;
-  ToolsQty?: number;
+  ProductsManufactured: string | string[];
+  Equipment: string[] | string;
+  Tools: string;
   ControlNo?: number;
   LvlSec?: string;
   NoofStudents?: number;
@@ -124,7 +122,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
     try {
       setIsSubmitting(true);
       setError('');
-
+  
       const token = await getToken();
       
       // Format UtilTimes to match the Prisma model
@@ -156,25 +154,118 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
           EndTime: endTimeISO,
         };
       });
-
+  
       // Format needed materials to match the model
       const neededMaterials = formData.NeededMaterials?.map(material => ({
         Item: material.Item,
         ItemQty: Number(material.ItemQty),
         Description: material.Description,
       })) || [];
-
+      
+      // Add tools to the needed materials with blank description
+      if (formData.Tools) {
+        console.log('Adding tools to NeededMaterials:', formData.Tools);
+        
+        try {
+          // First, check if it's a JSON string and try to parse it
+          let toolsArray = [];
+          
+          if (typeof formData.Tools === 'string') {
+            // Check if it's a JSON string
+            if (formData.Tools.startsWith('[') && formData.Tools.includes('Tool')) {
+              try {
+                toolsArray = JSON.parse(formData.Tools);
+                console.log('Successfully parsed Tools JSON:', toolsArray);
+              } catch (e) {
+                console.error('Error parsing Tools JSON:', e);
+                toolsArray = [formData.Tools]; // Fallback to treating it as a plain string
+              }
+            } else {
+              toolsArray = [formData.Tools]; // It's a plain string
+            }
+          } else if (Array.isArray(formData.Tools)) {
+            toolsArray = formData.Tools;
+          } else {
+            toolsArray = [String(formData.Tools)];
+          }
+          
+          console.log('Tools array after processing:', toolsArray);
+          
+          // Process the array of tools
+          toolsArray.forEach(tool => {
+            // Check if the tool is an object with a Tool property (from JSON)
+            if (typeof tool === 'object' && tool !== null && 'Tool' in tool) {
+              const toolItem = {
+                Item: tool.Tool,
+                ItemQty: tool.Quantity || 1,
+                Description: ''
+              };
+              console.log('Adding structured tool to NeededMaterials:', toolItem);
+              neededMaterials.push(toolItem);
+            } 
+            // Otherwise handle it as a simple string
+            else if (tool && typeof tool === 'string' && tool.trim() !== '') {
+              const toolItem = {
+                Item: tool,
+                ItemQty: 1,
+                Description: ''
+              };
+              console.log('Adding string tool to NeededMaterials:', toolItem);
+              neededMaterials.push(toolItem);
+            }
+          });
+        } catch (toolsError) {
+          console.error('Error processing tools:', toolsError);
+        }
+      }
+      
+      console.log('Final NeededMaterials array:', neededMaterials);
+  
       // Format students to match the API expectations
       const evcStudents = formData.Students?.map(student => ({
         Students: student.name
       })) || [];
-
+  
       // Get student information for email
       const studentName = user?.firstName && user?.lastName 
         ? `${user.firstName} ${user.lastName}` 
         : accInfo?.Name || 'Student';
       
       const studentEmail = user?.emailAddresses[0]?.emailAddress || accInfo?.email || '';
+      
+      // Create user services for the selected services
+      const userServices = [];
+      
+      // Handle ProductsManufactured (services to be availed)
+      const products = Array.isArray(formData.ProductsManufactured) 
+        ? formData.ProductsManufactured 
+        : formData.ProductsManufactured ? [formData.ProductsManufactured] : [];
+        
+      // Handle Equipment - assuming each service corresponds to a specific equipment
+      const equipment = Array.isArray(formData.Equipment)
+        ? formData.Equipment
+        : formData.Equipment ? [formData.Equipment] : [];
+      
+      // Create user services by matching services with equipment
+      // Assuming there's a one-to-one relationship or we use the first equipment for all services
+      if (products.length > 0) {
+        // If we have more services than equipment, use the first equipment for additional services
+        const defaultEquipment = equipment.length > 0 ? equipment[0] : '';
+        
+        products.forEach((product, index) => {
+          if (product) {
+            // Use the corresponding equipment if available, otherwise use the default
+            const equip = index < equipment.length ? equipment[index] : defaultEquipment;
+            
+            userServices.push({
+              ServiceAvail: product,
+              EquipmentAvail: equip,
+              CostsAvail: 0, // Default values
+              MinsAvail: 0,  // Default values
+            });
+          }
+        });
+      }
       
       // Prepare submission data in the format expected by the API
       const submissionData = {
@@ -187,19 +278,24 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
         TeacherEmail: formData.TeacherEmail || undefined,
         Topic: formData.Topic || undefined,
         SchoolYear: formData.SchoolYear ? Number(formData.SchoolYear) : undefined,
-        EVCStatus: 'Pending Teacher Approval', // Changed from Status to EVCStatus
+        EVCStatus: 'Pending Teacher Approval',
         
         // Related data collections
         UtilTimes: utilTimes,
         EVCStudents: evcStudents,
         NeededMaterials: neededMaterials,
+        UserServices: userServices,
+        
+        // Utilization information
+        ProductsManufactured: formData.ProductsManufactured,
+        Equipment: formData.Equipment,
         
         // Link to user account
         accInfoId: accInfo?.id
       };
-
+  
       console.log('Sending data to API:', JSON.stringify(submissionData, null, 2));
-
+  
       // First create the reservation in pending state
       const response = await fetch('/api/user/create-evc-reservation', {
         method: 'POST',
@@ -223,7 +319,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
             console.error('Failed to parse response as JSON:', e);
           }
         }
-
+  
         const errorMessage = errorData?.details || errorData?.error || 'Failed to submit reservation';
         throw new Error(errorMessage);
       }
@@ -354,6 +450,95 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
       <Card className="bg-white shadow-sm border border-gray-200 mt-6">
         
         <CardContent className="pt-0">
+          {/* Utilization Information - Added Section */}
+          <div className="mb-6">
+            <h3 className="text-lg font-medium mb-3 flex items-center">
+              <Settings className="h-5 w-5 text-blue-600 mr-2" /> Service Information
+            </h3>
+            <Card className="border-gray-200 shadow-none">
+              <CardContent className="p-4">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Services to be Availed</p>
+                    <div className="mt-1">
+                      {Array.isArray(formData.ProductsManufactured) && formData.ProductsManufactured.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {formData.ProductsManufactured.map((service, idx) => (
+                            <span key={idx} className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm">
+                              {service}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500">No services selected</p>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Equipment</p>
+                    {Array.isArray(formData.Equipment) && formData.Equipment.length > 0 ? (
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        {formData.Equipment.map((equipment, idx) => (
+                          <span key={idx} className="bg-green-50 text-green-700 px-3 py-1 rounded-full text-sm">
+                            {equipment}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-gray-800">Not selected</p>
+                    )}
+                  </div>
+                  <div>
+  <p className="text-sm font-medium text-gray-700">Tools</p>
+  {formData.Tools ? (
+    <div className="mt-1 flex flex-wrap gap-2">
+      {(() => {
+        // Try to parse the tools if it's a JSON string
+        let toolsArray = [];
+        try {
+          if (typeof formData.Tools === 'string' && 
+              (formData.Tools.startsWith('[') && formData.Tools.includes('Tool'))) {
+            toolsArray = JSON.parse(formData.Tools);
+          } else if (Array.isArray(formData.Tools)) {
+            toolsArray = formData.Tools;
+          } else {
+            toolsArray = [formData.Tools];
+          }
+        } catch (e) {
+          // If parsing fails, treat as a single string
+          toolsArray = [String(formData.Tools)];
+        }
+
+        // Display the tools
+        return toolsArray.map((tool, idx) => {
+          let toolName = '';
+          let quantity = 1;
+          
+          // Check if the tool is an object with a Tool property
+          if (typeof tool === 'object' && tool !== null && 'Tool' in tool) {
+            toolName = tool.Tool;
+            quantity = tool.Quantity || 1;
+          } else {
+            toolName = String(tool);
+          }
+          
+          return (
+            <span key={idx} className="bg-amber-50 text-amber-700 px-3 py-1 rounded-full text-sm">
+              {toolName} {quantity > 1 ? `(${quantity})` : ''}
+            </span>
+          );
+        });
+      })()}
+    </div>
+  ) : (
+    <p className="mt-1 text-gray-800">No tools selected</p>
+  )}
+</div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
           {/* Dates and Times */}
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-3 flex items-center">

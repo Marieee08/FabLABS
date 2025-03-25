@@ -10,9 +10,11 @@ datasource db {
 model Machine {
   id           String           @id @default(cuid())
   Machine      String
+  GenName      String?
   Image        String
   Desc         String
   Number       Int?
+  NeedLink     Boolean          @default(false)
   Instructions String?
   Link         String?
   isAvailable  Boolean          @default(true)
@@ -129,14 +131,16 @@ model UserTool {
 }
 
 model UserService {
-  id             String   @id @default(cuid())
+  id             String          @id @default(cuid())
   ServiceAvail   String
   EquipmentAvail String
   CostsAvail     Decimal?
   MinsAvail      Decimal?
   Files          String?
   utilReqId      Int?
-  utilReq        UtilReq? @relation("UtilReqToUserService", fields: [utilReqId], references: [id])
+  evcId          Int?
+  utilReq        UtilReq?        @relation("UtilReqToUserService", fields: [utilReqId], references: [id])
+  evc            EVCReservation? @relation("EVCReservationToUserService", fields: [evcId], references: [id])
 }
 
 model UtilTime {
@@ -181,6 +185,7 @@ model EVCReservation {
   EVCStudents     EVCStudent[]     @relation("EVCReservationtoEVCStudent")
   NeededMaterials NeededMaterial[] @relation("EVCReservationtoNeededMaterial")
   UtilTimes       UtilTime[]       @relation("EVCReservationtoUtilTime")
+  userService     UserService[]     @relation("EVCReservationToUserService")
 }
 
 model EVCStudent {

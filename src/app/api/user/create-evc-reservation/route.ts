@@ -15,7 +15,8 @@ export async function POST(request: Request) {
     }
     
     const data = await request.json();
-    console.log('Received data:', data);
+    console.log('Received data:', JSON.stringify(data, null, 2));
+    console.log('NeededMaterials received:', JSON.stringify(data.NeededMaterials, null, 2));
     
     // Validate required data
     if (!data.UtilTimes?.length) {
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
         TeacherEmail: data.TeacherEmail || null, 
         Topic: data.Topic || null,
         SchoolYear: data.SchoolYear || null,
-        EVCStatus: data.EVCStatus || "Pending Teacher Approval", // Accept the EVCStatus from the client
+        EVCStatus: data.EVCStatus || "Pending Teacher Approval",
         DateRequested: new Date(),
         
         // Link to the user account
@@ -70,14 +71,22 @@ export async function POST(request: Request) {
     
     // Create NeededMaterial entries if provided
     if (data.NeededMaterials?.length > 0) {
-      await prisma.neededMaterial.createMany({
-        data: data.NeededMaterials.map((material: any) => ({
-          Item: material.Item || '',
-          ItemQty: material.ItemQty || 0,
-          Description: material.Description || '',
-          evcId: evcReservation.id
-        }))
-      });
+      console.log('Creating NeededMaterial entries:', JSON.stringify(data.NeededMaterials, null, 2));
+      
+      try {
+        await prisma.neededMaterial.createMany({
+          data: data.NeededMaterials.map((material: any) => ({
+            Item: material.Item || '',
+            ItemQty: material.ItemQty || 0,
+            Description: material.Description || '',
+            evcId: evcReservation.id
+          }))
+        });
+        console.log('NeededMaterial entries created successfully');
+      } catch (materialError) {
+        console.error('Error creating NeededMaterial entries:', materialError);
+        throw materialError;
+      }
     }
 
     // Create the UtilTime entries
@@ -92,6 +101,19 @@ export async function POST(request: Request) {
       });
     }
 
+    // Create UserService entries if provided
+    if (data.UserServices?.length > 0) {
+      await prisma.userService.createMany({
+        data: data.UserServices.map((service: any) => ({
+          ServiceAvail: service.ServiceAvail || '',
+          EquipmentAvail: service.EquipmentAvail || '',
+          CostsAvail: service.CostsAvail || null,
+          MinsAvail: service.MinsAvail || null,
+          evcId: evcReservation.id
+        }))
+      });
+    }
+
     // Fetch the complete reservation with related data
     const completeReservation = await prisma.eVCReservation.findUnique({
       where: { id: evcReservation.id },
@@ -99,13 +121,14 @@ export async function POST(request: Request) {
         UtilTimes: true,
         NeededMaterials: true,
         EVCStudents: true,
+        userService: true,
       }
     });
 
     return NextResponse.json({
       success: true,
       message: 'EVC reservation created successfully',
-      id: evcReservation.id, // Make sure to include the ID in the response
+      id: evcReservation.id,
       reservation: completeReservation
     });
   } catch (error: any) {
