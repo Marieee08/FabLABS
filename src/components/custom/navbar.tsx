@@ -32,7 +32,7 @@ const Navbar = () => {
 
   useEffect(() => {
     const handleScroll = () => {
-      if (pathname === '/user-services') {
+      if (pathname === '/services') {
         if (window.scrollY > 50) {
           setBgColor('white');
           setTextColor('black');
@@ -82,7 +82,7 @@ const Navbar = () => {
   };
 
   const linkClassName = `font-qanelas1 px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300 ${
-    pathname === '/user-services' ? 'text-white hover:text-black' : 'text-black'
+    pathname === '/services' ? 'text-white hover:text-black' : 'text-black'
   }`;
 
   return (
@@ -104,11 +104,11 @@ const Navbar = () => {
         <div className="flex justify-between items-center px-4 md:px-10">
           <div className="flex items-center space-x-4">
             <Image src="/images/logos/SSF-logo.png" alt="SSF Logo" width={40} height={40} />
-            <Link href="/" style={{color: textColor}} onClick={() => handleNavigation('/')} className={pathname === '/user-services' ? "text-white text-2xl font-qanelas4" : "text-[#0b1d41] text-2xl font-qanelas4"}>FABLABS</Link>
+            <Link href="/" style={{color: textColor}} onClick={() => handleNavigation('/')} className={pathname === '/services' ? "text-white text-2xl font-qanelas4" : "text-[#0b1d41] text-2xl font-qanelas4"}>FABLABS</Link>
           </div>
 
           <button 
-            className={`md:hidden ${pathname === '/user-services' ? "text-white" : "text-[#0e4579]"}`}
+            className={`md:hidden ${pathname === '/services' ? "text-white" : "text-[#0e4579]"}`}
             onClick={toggleMenu}
           >
             {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
@@ -143,10 +143,10 @@ const Navbar = () => {
               </SignedIn>
               
               <a 
-                href="/user-services" 
+                href="/services" 
                 onClick={(e) => {
                   e.preventDefault();
-                  handleNavigation('/user-services');
+                  handleNavigation('/services');
                 }} 
                 className={linkClassName} 
                 style={{color: textColor}}
@@ -211,10 +211,10 @@ const Navbar = () => {
               Dashboard
             </a>
             <a 
-              href="/user-services" 
+              href="/services" 
               onClick={(e) => {
                 e.preventDefault();
-                handleNavigation('/user-services');
+                handleNavigation('/services');
                 setIsMenuOpen(false);
               }} 
               className="block font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300"

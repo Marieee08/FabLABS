@@ -1,6 +1,6 @@
 // @/components/student-forms/lab-reservation
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useUser } from "@clerk/nextjs";
 
 // Modified interface to handle school year range
@@ -54,6 +54,10 @@ export function LabReservation({ formData, updateFormData, nextStep, prevStep }:
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
+  const [newStudentAdded, setNewStudentAdded] = useState(false);
+  const newStudentInputRef = useRef<HTMLInputElement>(null);
+  const [newMaterialAdded, setNewMaterialAdded] = useState(false);
+  const newMaterialInputRef = useRef<HTMLInputElement>(null);
   
   const [materials, setMaterials] = useState<Material[]>(() => 
     (formData.NeededMaterials || []).map(material => ({
@@ -62,6 +66,20 @@ export function LabReservation({ formData, updateFormData, nextStep, prevStep }:
     }))
   );
   
+  useEffect(() => {
+    if (newStudentAdded && newStudentInputRef.current) {
+      newStudentInputRef.current.focus();
+      setNewStudentAdded(false);
+    }
+  }, [newStudentAdded]);
+
+  useEffect(() => {
+    if (newMaterialAdded && newMaterialInputRef.current) {
+      newMaterialInputRef.current.focus();
+      setNewMaterialAdded(false);
+    }
+  }, [newMaterialAdded]);
+
   const [students, setStudents] = useState<Student[]>(formData.Students || []);
   const currentYear = new Date().getFullYear();
   
@@ -164,6 +182,7 @@ export function LabReservation({ formData, updateFormData, nextStep, prevStep }:
     const updatedMaterials = [...materials, newMaterial];
     setMaterials(updatedMaterials);
     updateFormData('NeededMaterials', updatedMaterials);
+    setNewMaterialAdded(true); // Set flag to trigger focus
   };
 
   const updateMaterial = (id: string, field: keyof Material, value: string | number) => {
@@ -191,7 +210,9 @@ export function LabReservation({ formData, updateFormData, nextStep, prevStep }:
     
     setStudents(updatedStudents);
     updateFormData('Students', updatedStudents);
+    setNewStudentAdded(true); // Set flag to trigger focus
   };
+  
 
   const updateStudentName = (index: number, name: string) => {
     const updatedStudents = students.map((student, i) => 
@@ -407,7 +428,7 @@ return (
                   <div key={index} className="flex items-center bg-white p-3 rounded-lg shadow-sm">
                     <span className="text-sm font-bold w-8 h-8 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center">{index + 1}</span>
                     <div className="flex-1 mx-3">
-                      <input
+                    <input
                         type="text"
                         placeholder={`Student ${index + 1} name`}
                         className={`w-full border ${errors.Students && errors.Students[index] ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition`}
@@ -415,6 +436,7 @@ return (
                         onChange={(e) => updateStudentName(index, e.target.value)}
                         aria-invalid={!!(errors.Students && errors.Students[index])}
                         disabled={index === 0 && user && student.name === `${user.firstName || ''} ${user.lastName || ''}`.trim()}
+                        ref={index === students.length - 1 && newStudentAdded ? newStudentInputRef : null}
                       />
                       {errors.Students && errors.Students[index] && (
                         <p className="mt-1 text-sm text-red-500">{errors.Students[index]}</p>
@@ -483,14 +505,15 @@ return (
               {materials.map((material) => (
                 <div key={material.id} className="grid grid-cols-12 gap-4 bg-white p-4 rounded-lg shadow-sm">
                   <div className="col-span-5">
-                    <input
-                      type="text"
-                      placeholder="Item name"
-                      className={`w-full border ${errors.NeededMaterials && errors.NeededMaterials[material.id]?.Item ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition`}
-                      value={material.Item}
-                      onChange={(e) => updateMaterial(material.id, 'Item', e.target.value)}
-                      aria-invalid={!!(errors.NeededMaterials && errors.NeededMaterials[material.id]?.Item)}
-                    />
+                  <input
+                    type="text"
+                    placeholder="Item name"
+                    className={`w-full border ${errors.NeededMaterials && errors.NeededMaterials[material.id]?.Item ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition`}
+                    value={material.Item}
+                    onChange={(e) => updateMaterial(material.id, 'Item', e.target.value)}
+                    aria-invalid={!!(errors.NeededMaterials && errors.NeededMaterials[material.id]?.Item)}
+                    ref={material.id === materials[materials.length - 1]?.id && newMaterialAdded ? newMaterialInputRef : null}
+                  />
                     {errors.NeededMaterials && errors.NeededMaterials[material.id]?.Item && (
                       <p className="mt-1 text-sm text-red-500">{errors.NeededMaterials[material.id].Item}</p>
                     )}

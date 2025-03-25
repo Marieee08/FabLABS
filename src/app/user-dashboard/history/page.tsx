@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import RoleGuard from '@/components/auth/role-guard';
 import Link from 'next/link';
 import { UserButton, useUser } from "@clerk/nextjs";
 import { format } from 'date-fns';
@@ -54,7 +53,8 @@ const HistoryPage = () => {
   const [orderDropdownOpen, setOrderDropdownOpen] = useState(true); // Open by default since we're on the history page
   const today = new Date();
   const formattedDate = format(today, 'EEEE, dd MMMM yyyy');
-
+  const [informationDropdownOpen, setInformationDropdownOpen] = useState(true);
+  
   // Order history states and functionality
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
@@ -156,8 +156,11 @@ const HistoryPage = () => {
     setIsModalOpen(true);
   };
 
+  function handleNavigation(arg0: string) {
+    throw new Error('Function not implemented.');
+  }
+
   return (
-    <RoleGuard allowedRoles={['MSME']}>
       <div className="flex h-screen overflow-hidden bg-[#f1f5f9]">
         <aside className={`absolute left-0 top-0 z-50 flex h-screen w-72 flex-col overflow-y-hidden bg-white duration-300 ease-linear lg:static lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
           <div className="flex items-center justify-between gap-2 px-6 py-5.5 lg:py-6.5">
@@ -192,7 +195,7 @@ const HistoryPage = () => {
                     onClick={() => setOrderDropdownOpen(!orderDropdownOpen)}
                     className="group relative flex w-full items-center justify-between gap-2.5 rounded-full py-2 px-4 font-medium text-[#0d172c] text-blue-800 bg-blue-100 border border-[#5e86ca]"
                   >
-                    <span>Orders</span>
+                    <span>Reservations</span>
                     <svg
                       className={`w-4 h-4 transform transition-transform duration-300 ${orderDropdownOpen ? 'rotate-180' : ''}`}
                       xmlns="http://www.w3.org/2000/svg"
@@ -222,10 +225,49 @@ const HistoryPage = () => {
                   </>
                 )}
                 <li>
-                  <Link href="/user-dashboard/information" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-[#0d172c] border border-transparent hover:text-blue-800 hover:bg-blue-100 hover:border-[#5e86ca]">
-                    Information
+                <button
+                  onClick={() => setInformationDropdownOpen(!informationDropdownOpen)}
+                  className="group relative flex w-full items-center justify-between gap-2.5 rounded-full py-2 px-4 font-medium text-[#0d172c] border border-transparent hover:text-blue-800 hover:bg-blue-100 hover:border-[#5e86ca]"
+                >
+                  <span>Information</span>
+                  <svg
+                    className={`w-4 h-4 transform transition-transform duration-300 ${informationDropdownOpen ? 'rotate-180' : ''}`}
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+              </li>
+              {informationDropdownOpen && (
+                <div className="ml-6 mt-2 space-y-2">
+                  <Link 
+                    href="/user-dashboard/information" 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleNavigation('/user-dashboard/information');
+                    }}
+                    className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]"
+                  >
+                    Personal Info
                   </Link>
-                </li>
+                  <Link 
+                    href="/user-dashboard/information/business" 
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleNavigation('/user-dashboard/information/business');
+                    }}
+                    className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]"
+                  >
+                    Business Info
+                  </Link>
+                </div>
+              )}
               </ul>
             </div>
           </nav>
@@ -246,7 +288,7 @@ const HistoryPage = () => {
                 <Link href="/" className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300">
                   Home
                 </Link>
-                <Link href="/user-services" className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300">
+                <Link href="/services" className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300">
                   Services
                 </Link>
                 <Link href="/contact" className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300">
@@ -266,7 +308,7 @@ const HistoryPage = () => {
                   <h2 className="text-[#143370] text-3xl font-bold font-qanelas3">Order History</h2>
                   <p className="text-sm text-[#143370] font-poppins1">{formattedDate}</p>
                 </div>
-                <Link href="/user-services" className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md transition-colors">
+                <Link href="/services" className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md transition-colors">
                   New Order
                 </Link>
               </div>
@@ -288,7 +330,7 @@ const HistoryPage = () => {
                         onChange={(e) => setFilterStatus(e.target.value)}
                         className="w-full md:w-64 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                       >
-                        <option value="all">All Orders</option>
+                        <option value="all">All Reservations</option>
                         <option value="completed">Completed</option>
                         <option value="approved">Approved</option>
                         <option value="pending">Pending</option>
@@ -303,7 +345,7 @@ const HistoryPage = () => {
                       </div>
                     ) : filteredReservations.length === 0 ? (
                       <div className="text-center py-8 bg-gray-50 rounded-lg">
-                        <p className="text-gray-500">No orders found with the selected filter.</p>
+                        <p className="text-gray-500">No reservations found with the selected filter.</p>
                       </div>
                     ) : (
                       <div className="overflow-x-auto">
@@ -486,7 +528,6 @@ const HistoryPage = () => {
           </main>
         </div>
       </div>
-    </RoleGuard>
   );
 };
 

@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { useUser } from "@clerk/nextjs";
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import Navbar from "@/components/custom/navbar";
 
 
 interface EVCReservation {
@@ -145,7 +146,7 @@ const DashboardUser = () => {
     switch (status.toLowerCase()) {
       case 'pending teacher approval':
         return 'bg-amber-100 text-amber-800';  // Amber for teacher approval
-      case 'pending':
+      case 'pending admin approval':
         return 'bg-yellow-100 text-yellow-800'; // Yellow for regular pending
       case 'approved':
         return 'bg-green-100 text-green-800';  // Green for approved
@@ -165,46 +166,7 @@ const DashboardUser = () => {
   return (
     <div className="flex h-screen overflow-hidden bg-[#f1f5f9]">
       <div className="flex-1 overflow-y-auto">
-        <header className="sticky top-0 z-999 flex w-full bg-white shadow-sm">
-          <div className="flex flex-grow items-center justify-between py-4 px-6 shadow-2 md:px-8">
-            <div className="flex items-center">
-              <Link href="/" className="text-[#143370] text-2xl font-bold font-qanelas4">FABLAB</Link>
-            </div>
-            <div className="flex space-x-6 lg:space-x-10">
-              <Link href="/" className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300">
-                Home
-              </Link>
-              <Link href="/student-dashboard" className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300">
-                Dashboard
-              </Link>
-              <Link href="/user-services" className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300">
-                Services
-              </Link>
-              <Link href="/contact" className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300">
-                Contact
-              </Link>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="hidden md:flex items-center gap-4">
-                <span className="text-right">
-                  <span className="block text-sm font-medium text-black">
-                    {user?.firstName} {user?.lastName || ''}
-                  </span>
-                  <span className="block text-xs">{userRole}</span>
-                </span>
-                {user?.imageUrl ? (
-                  <img 
-                    src={user.imageUrl} 
-                    alt="Profile" 
-                    className="h-12 w-12 rounded-full object-cover"
-                  />
-                ) : (
-                  <span className="h-12 w-12 rounded-full bg-gray-300"></span>
-                )}
-              </div>
-            </div>
-          </div>
-        </header>
+        <Navbar />
 
         <main className="px-4 py-6 md:px-8 lg:px-12 xl:px-20">
           <div className="max-w-7xl mx-auto">
@@ -235,8 +197,8 @@ const DashboardUser = () => {
             <div className="bg-white rounded-lg text-blue-800 px-6 py-6 shadow-md border border-[#5e86ca] mb-6">
               <div className="flex justify-between items-center mb-4">
                 <div>
-                  <p className="text-xl font-bold text-[#143370]">Pending Orders</p>
-                  <p className="text-sm text-[#143370]">Here are your Pending Orders!</p>
+                  <p className="text-xl font-bold text-[#143370]">Pending Reservations</p>
+                  <p className="text-sm text-[#143370]">Here are your Pending Reservations!</p>
                 </div>
               </div>
               
@@ -249,7 +211,7 @@ const DashboardUser = () => {
                 evcReservations.length === 0 ? (
                   <div className="bg-blue-50 p-6 rounded-lg text-center">
                     <p className="text-blue-800">You don't have any pending EVC reservations at the moment.</p>
-                    <Link href="/user-services/student-schedule" className="mt-4 inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
+                    <Link href="/services/student-schedule" className="mt-4 inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition">
                       Create a New Reservation
                     </Link>
                   </div>

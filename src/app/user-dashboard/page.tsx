@@ -66,13 +66,16 @@ const DashboardUser = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isReservationsLoading, setIsReservationsLoading] = useState(true);
-  
+  const [informationDropdownOpen, setInformationDropdownOpen] = useState(true);
+
   const today = new Date();
   const formattedDate = format(today, 'EEEE, dd MMMM yyyy');
 
+
+
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Pending':
+      case 'Pending Admin Approval':
         return 'bg-yellow-100 text-yellow-800';
       case 'Approved':
         return 'bg-blue-100 text-blue-800';
@@ -233,7 +236,7 @@ const DashboardUser = () => {
                     onClick={() => setOrderDropdownOpen(!orderDropdownOpen)}
                     className="group relative flex w-full items-center justify-between gap-2.5 rounded-full py-2 px-4 font-medium text-blue-800 bg-blue-100 border border-[#5e86ca]"
                   >
-                    <span>Orders</span>
+                    <span>Reservations</span>
                     <svg
                       className={`w-4 h-4 transform transition-transform duration-300 ${orderDropdownOpen ? 'rotate-180' : ''}`}
                       xmlns="http://www.w3.org/2000/svg"
@@ -277,17 +280,49 @@ const DashboardUser = () => {
                   </>
                 )}
                 <li>
-                  <a 
-                    href="/user-dashboard/information"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleNavigation('/user-dashboard/information');
-                    }}
-                    className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-[#0d172c] border border-transparent hover:text-blue-800 hover:bg-blue-100 hover:border-[#5e86ca]"
+                  <button
+                    onClick={() => setInformationDropdownOpen(!informationDropdownOpen)}
+                    className="group relative flex w-full items-center justify-between gap-2.5 rounded-full py-2 px-4 font-medium text-[#0d172c] border border-transparent hover:text-blue-800 hover:bg-blue-100 hover:border-[#5e86ca]"
                   >
-                    Information
-                  </a>
+                    <span>Information</span>
+                    <svg
+                      className={`w-4 h-4 transform transition-transform duration-300 ${informationDropdownOpen ? 'rotate-180' : ''}`}
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
                 </li>
+                {informationDropdownOpen && (
+                  <div className="ml-6 mt-2 space-y-2">
+                    <Link 
+                      href="/user-dashboard/information" 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleNavigation('/user-dashboard/information');
+                      }}
+                      className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]"
+                    >
+                      Personal Info
+                    </Link>
+                    <Link 
+                      href="/user-dashboard/information/business" 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleNavigation('/user-dashboard/information/business');
+                      }}
+                      className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]"
+                    >
+                      Business Info
+                    </Link>
+                  </div>
+                )}
               </ul>
             </div>
           </nav>
@@ -316,10 +351,10 @@ const DashboardUser = () => {
                   Home
                 </a>
                 <a 
-                  href="/user-services"
+                  href="/services"
                   onClick={(e) => {
                     e.preventDefault();
-                    handleNavigation('/user-services');
+                    handleNavigation('/services');
                   }}
                   className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300"
                 >
@@ -349,8 +384,8 @@ const DashboardUser = () => {
               </div>
 
               <div className="bg-white rounded-lg text-blue-800 px-4 py-4 shadow-md border border-[#5e86ca]">
-                <p className="text-xl font-bold text-[#143370]">Pending Orders</p>
-                <p className="text-sm text-[#143370] mb-4">Here are your pending orders!</p>
+                <p className="text-xl font-bold text-[#143370]">Pending Reservations</p>
+                <p className="text-sm text-[#143370] mb-4">Here are your pending reservations!</p>
                 <div className="overflow-x-auto rounded-lg bg-blue-100 shadow-ld">
                   
                 {isReservationsLoading ? (
@@ -358,12 +393,12 @@ const DashboardUser = () => {
                 ) : (
                   reservations.length === 0 ? (
                     <div className="bg-blue-50 p-6 rounded-lg text-center">
-                      <p className="text-blue-800">You don't have any pending orders at the moment.</p>
+                      <p className="text-blue-800">You don't have any pending Reservations at the moment.</p>
                       <a 
-                        href="/user-services"
+                        href="/services"
                         onClick={(e) => {
                           e.preventDefault();
-                          handleNavigation('/user-services');
+                          handleNavigation('/services');
                         }}
                         className="mt-4 inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                       >

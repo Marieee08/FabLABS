@@ -6,7 +6,9 @@ import Link from "next/link";
 import React, { useState, useEffect } from 'react';
 import { UserButton, useUser } from "@clerk/nextjs";
 import { format } from 'date-fns';
-import InfoEditModal from './components/InfoEditModal';
+import PersonalInfoEditModal from '@/components/user/personal-info-edit-modal';
+import { Loader } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 interface ClientInfo {
   ContactNum: string;
@@ -16,28 +18,6 @@ interface ClientInfo {
   Zipcode: number | null;
 }
 
-interface BusinessInfo {
-  id: number;
-  CompanyName: string | null;
-  BusinessOwner: string | null;
-  BusinessPermitNum: string | null;
-  TINNum: string | null;
-  CompanyIDNum: string | null;
-  CompanyEmail: string | null;
-  ContactPerson: string | null;
-  Designation: string | null;
-  CompanyAddress: string | null;
-  CompanyCity: string | null;
-  CompanyProvince: string | null;
-  CompanyZipcode: number | null;
-  CompanyPhoneNum: string | null;
-  CompanyMobileNum: string | null;
-  Manufactured: string | null;
-  ProductionFrequency: string | null;
-  Bulk: string | null;
-  isNotBusinessOwner?: boolean;
-}
-
 interface AccInfo {
   id: number;
   clerkId: string;
@@ -45,33 +25,31 @@ interface AccInfo {
   email: string;
   Role: string;
   ClientInfo: ClientInfo | null;
-  BusinessInfo: BusinessInfo | null;
 }
 
-
-const DashboardUser = () => {
+const PersonalInformationPage = () => {
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isBusinessView, setIsBusinessView] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [orderDropdownOpen, setOrderDropdownOpen] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
 
   const { user, isLoaded } = useUser();
   const [userRole, setUserRole] = useState<string>("Loading...");
   const [accInfo, setAccInfo] = useState<AccInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  const [isNotBusinessOwner, setIsNotBusinessOwner] = useState(false);
-  useEffect(() => {
-    if (accInfo?.BusinessInfo?.isNotBusinessOwner !== undefined) {
-      setIsNotBusinessOwner(accInfo.BusinessInfo.isNotBusinessOwner);
-    }
-  }, [accInfo]);
-
-  
 
   const today = new Date();
   const formattedDate = format(today, 'EEEE, dd MMMM yyyy');
 
+  // Navigation handler with loading state
+  const handleNavigation = (href: string) => {
+    setIsLoading(true);
+    router.push(href);
+  };
+
+  // Fetch user role and account info
   useEffect(() => {
     const fetchAllData = async () => {
       if (!user) {
@@ -100,85 +78,36 @@ const DashboardUser = () => {
         setLoading(false);
       }
     };
+
     if (isLoaded) {
       fetchAllData();
     }
   }, [user, isLoaded]);
 
-
-  const handleCheckboxChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.checked;
-    setIsNotBusinessOwner(newValue);
-    
-    try {
-      const response = await fetch('/api/user/update-info', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: user?.id,
-          type: 'business',
-          data: {
-            isNotBusinessOwner: newValue,
-            // If checked, set all business fields to "Not applicable"
-            ...(newValue ? {
-              CompanyName: "Not applicable",
-              BusinessOwner: "Not applicable",
-              BusinessPermitNum: "Not applicable",
-              TINNum: "Not applicable",
-              CompanyIDNum: "Not applicable",
-              CompanyEmail: "Not applicable",
-              ContactPerson: "Not applicable",
-              Designation: "Not applicable",
-              CompanyAddress: "Not applicable",
-              CompanyCity: "Not applicable",
-              CompanyProvince: "Not applicable",
-              CompanyZipcode: null,
-              CompanyPhoneNum: "Not applicable",
-              CompanyMobileNum: "Not applicable",
-              Manufactured: "Not applicable",
-              ProductionFrequency: "Not applicable",
-              Bulk: "Not applicable"
-            } : {})
-          }
-        }),
-      });
-  
-      if (!response.ok) {
-        throw new Error('Failed to update business owner status');
-      }
-  
-      // After successful update, fetch fresh data
-      const refreshResponse = await fetch(`/api/account/${user?.id}`);
-      if (!refreshResponse.ok) {
-        throw new Error('Failed to refresh data');
-      }
-      const refreshedData = await refreshResponse.json();
-      setAccInfo(refreshedData);
-  
-    } catch (error) {
-      console.error('Error updating business owner status:', error);
-      setIsNotBusinessOwner(!newValue); // Revert on error
-    }
-  };
-
-
   return (
-  <div className="flex h-screen overflow-hidden bg-[#f1f5f9]">
-  {/* Sidebar */}
-  <aside className={`absolute left-0 top-0 z-50 flex h-screen w-72 flex-col overflow-y-hidden bg-white duration-300 ease-linear lg:static lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-    <div className="flex items-center justify-between gap-2 px-6 py-5.5 lg:py-6.5">
-      <Link href="/" className="mt-5">
-        <span className="text-[#143370] text-2xl font-bold font-qanelas4 pl-4">FABLAB</span>
-      </Link>
-      <button onClick={() => setSidebarOpen(false)} className="block text-[#0d172c] lg:hidden">
-        X
-      </button>
-    </div>
-    <nav className="mt-5 py-4 px-4 lg:mt-9 lg:px-6">
+    <div className="flex h-screen overflow-hidden bg-[#f1f5f9]">
+      {/* Loading Overlay */}
+      {isLoading && (
+        <div className="fixed inset-0 bg-white bg-opacity-70 z-50 flex items-center justify-center">
+          <div className="flex flex-col items-center">
+            <Loader className="h-8 w-8 animate-spin text-blue-600" />
+            <p className="mt-2 text-sm font-medium text-blue-600">Loading...</p>
+          </div>
+        </div>
+      )}
 
-    <div className="flex flex-col items-center py-8">
+      {/* Sidebar */}
+      <aside className={`absolute left-0 top-0 z-50 flex h-screen w-72 flex-col overflow-y-hidden bg-white duration-300 ease-linear lg:static lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <div className="flex items-center justify-between gap-2 px-6 py-5.5 lg:py-6.5">
+          <Link href="/" className="mt-5">
+            <span className="text-[#143370] text-2xl font-bold font-qanelas4 pl-4">FABLAB</span>
+          </Link>
+          <button onClick={() => setSidebarOpen(false)} className="block text-[#0d172c] lg:hidden">
+            X
+          </button>
+        </div>
+        <nav className="mt-5 py-4 px-4 lg:mt-9 lg:px-6">
+          <div className="flex flex-col items-center py-8">
             {user?.imageUrl ? (
               <img 
                 src={user.imageUrl} 
@@ -193,24 +122,74 @@ const DashboardUser = () => {
             </h2>
             <p className="text-[#1c62b5]">{userRole}</p>
           </div>
-      <div>
-        <h3 className="mb-4 ml-4 text-sm font-semibold text-gray-600">MENU</h3>
-        <ul className="mb-6 flex flex-col gap-1.5">
-          <li>
-            <Link href="/user-dashboard" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-[#0d172c] border border-transparent hover:text-blue-800 hover:bg-blue-100 hover:border-[#5e86ca]">
-              Orders
-            </Link>
-          </li>
-          <li>
-            <Link href="/user-dashboard/information" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-blue-800 bg-blue-100 border border-[#5e86ca]">
-              Information
-            </Link>
-          </li>
-        </ul>
-      </div>
-    </nav>
-  </aside>
-
+          <div>
+            <h3 className="mb-4 ml-4 text-sm font-semibold text-gray-600">MENU</h3>
+            <ul className="mb-6 flex flex-col gap-1.5">
+              <li>
+                <button
+                  onClick={() => setOrderDropdownOpen(!orderDropdownOpen)}
+                  className="group relative flex w-full items-center justify-between gap-2.5 rounded-full py-2 px-4 font-medium text-[#0d172c] text-blue-800 bg-blue-100 border border-[#5e86ca]"
+                >
+                  <span>Reservations</span>
+                  <svg
+                    className={`w-4 h-4 transform transition-transform duration-300 ${orderDropdownOpen ? 'rotate-180' : ''}`}
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </svg>
+                </button>
+              </li>
+              {orderDropdownOpen && (
+                <>
+                  <li className="ml-6">
+                    <Link 
+                      href="/user-dashboard" 
+                      className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]"
+                    >
+                      General
+                    </Link>
+                  </li>
+                  <li className="ml-6">
+                    <Link 
+                      href="/user-dashboard/history" 
+                      className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]"
+                    >
+                      History
+                    </Link>
+                  </li>
+                </>
+              )}
+              <li>
+                <button
+                  className="group relative flex w-full items-center gap-2.5 rounded-full py-2 px-4 font-medium text-blue-800 bg-blue-100 border border-[#5e86ca]"
+                >
+                  Information
+                </button>
+                <div className="ml-6 mt-2 space-y-2">
+                  <Link 
+                    href="/user-dashboard/information/personal" 
+                    className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-blue-800 bg-blue-100 border border-[#5e86ca]"
+                  >
+                    Personal Info
+                  </Link>
+                  <Link 
+                    href="/user-dashboard/information/business" 
+                    className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]"
+                  >
+                    Business Info
+                  </Link>
+                </div>
+              </li>
+            </ul>
+          </div>
+        </nav>
+      </aside>
 
       {/* Main Content */}
       <div className="relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden">
@@ -226,15 +205,36 @@ const DashboardUser = () => {
               </button>
             </div>
             <div className="flex space-x-6 lg:space-x-10">
-            <Link href="/" className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300">
-              Home
-            </Link>
-            <Link href="/user-services" className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300">
-              Services
-            </Link>
-            <Link href="/contact" className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300">
-              Contact
-            </Link>
+              <Link 
+                href="/" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNavigation('/');
+                }}
+                className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300"
+              >
+                Home
+              </Link>
+              <Link 
+                href="/services" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNavigation('/services');
+                }}
+                className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300"
+              >
+                Services
+              </Link>
+              <Link 
+                href="/contact" 
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleNavigation('/contact');
+                }}
+                className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300"
+              >
+                Contact
+              </Link>
             </div>
       
             <div className="flex items-center gap-3 2xsm:gap-7">
@@ -243,296 +243,113 @@ const DashboardUser = () => {
           </div>
         </header>
 
-
-      <main>
-        <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
-          <h2 className="text-[#143370] text-3xl font-bold font-qanelas3">Account Information</h2>
-          <p className="text-sm text-[#143370] mb-4 font-poppins1">{formattedDate}</p>
+        <main>
+          <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
+            <h2 className="text-[#143370] text-3xl font-bold font-qanelas3">Personal Information</h2>
+            <p className="text-sm text-[#143370] mb-4 font-poppins1">{formattedDate}</p>
          
-          <section className="flex-1">
-            <div className="py-4 border-b border-gray-200">
-              <div className="flex justify-left">
-                <div className="inline-flex bg-white rounded-full p-1 border border-[#5e86ca]">
-                  <button
-                    className={`px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 ${!isBusinessView ? 'text-blue-800 bg-blue-100 border border-[#5e86ca]' : 'text-gray-600 hover:bg-gray-300'}`}
-                    onClick={() => setIsBusinessView(false)}
-                  >
-                    Personal Info
-                  </button>
-                  <button
-                    className={`px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 ${isBusinessView ? 'text-blue-800 bg-blue-100 border border-[#5e86ca]' : 'text-gray-600 hover:bg-gray-300'}`}
-                    onClick={() => setIsBusinessView(true)}
-                  >
-                    Business Info
-                  </button>
+            <section className="flex-1">
+              <div className="py-4 border-b border-gray-200">
+                <button
+                  onClick={() => setIsEditModalOpen(true)}
+                  className="px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 text-blue-800 bg-blue-100 border border-[#5e86ca]"
+                >
+                  {!accInfo?.ClientInfo || !accInfo.ClientInfo.ContactNum 
+                    ? "Add Information" 
+                    : "Edit Information"}
+                </button>
+              </div>
+
+              {/* Personal Information Display */}
+              <div className="pt-8 space-y-8">
+                {/* Personal Information Section */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-700 mb-4">Personal Details</h3>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="md:col-span-2">
+                      <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
+                        <h3 className="text-sm text-gray-500 mb-1">Full Name</h3>
+                        <div className="text-lg font-qanelas1 text-gray-800">
+                          {user?.firstName} {user?.lastName}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
+                      <h3 className="text-sm text-gray-500 mb-1">Contact Number</h3>
+                      <div className="text-lg font-qanelas1 text-gray-800">
+                        {loading ? (
+                          <div className="animate-pulse bg-gray-200 h-7 w-3/4 rounded"/>
+                        ) : (
+                          accInfo?.ClientInfo?.ContactNum || "Not provided"
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                {isBusinessView && (
-                  <label className="flex items-center ml-4 text-sm text-gray-600">
-                        <input
-                          type="checkbox"
-                          checked={isNotBusinessOwner}
-                          onChange={handleCheckboxChange}
-                          className="form-checkbox h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                        />
-                    <span className="ml-2">I do not own/operate a business</span>
-                  </label>
-               )}
 
-              <button
-                onClick={() => setIsEditModalOpen(true)}
-                className="ml-4 px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 text-blue-800 bg-blue-100 border border-[#5e86ca]">
-                {(!isBusinessView && (!accInfo?.ClientInfo || !accInfo.ClientInfo.ContactNum)) || 
-                (isBusinessView && (!accInfo?.BusinessInfo || 
-                  (!accInfo.BusinessInfo.CompanyName && !accInfo.BusinessInfo.isNotBusinessOwner))) 
-                  ? "Add Information" 
-                  : "Edit Information"}
-              </button>
-              </div>
+                {/* Address Section */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-700 mb-4">Address Information</h3>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="md:col-span-2">
+                      <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
+                        <h3 className="text-sm text-gray-500 mb-1">Street Address</h3>
+                        <div className="text-lg font-qanelas1 text-gray-800">
+                          {loading ? (
+                            <div className="animate-pulse bg-gray-200 h-7 w-3/4 rounded"/>
+                          ) : (
+                            accInfo?.ClientInfo?.Address || "Not provided"
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
+                      <h3 className="text-sm text-gray-500 mb-1">City/Municipality</h3>
+                      <div className="text-lg font-qanelas1 text-gray-800">
+                        {loading ? (
+                          <div className="animate-pulse bg-gray-200 h-7 w-3/4 rounded"/>
+                        ) : (
+                          accInfo?.ClientInfo?.City || "Not provided"
+                        )}
+                      </div>
+                    </div>
+                    <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
+                      <h3 className="text-sm text-gray-500 mb-1">Province</h3>
+                      <div className="text-lg font-qanelas1 text-gray-800">
+                        {loading ? (
+                          <div className="animate-pulse bg-gray-200 h-7 w-3/4 rounded"/>
+                        ) : (
+                          accInfo?.ClientInfo?.Province || "Not provided"
+                        )}
+                      </div>
+                    </div>
 
-
-{/* Information Display */}
-<div className="pt-8">
-    {!isBusinessView ? (
-      <div className="space-y-8">
-        {/* Personal Information Section */}
-        <div>
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">Personal Information</h3>
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="md:col-span-2">
-              <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
-                <h3 className="text-sm text-gray-500 mb-1">Full Name</h3>
-                <div className="text-lg font-qanelas1 text-gray-800">
-                  {user?.firstName} {user?.lastName}
+                    <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
+                      <h3 className="text-sm text-gray-500 mb-1">Zip Code</h3>
+                      <div className="text-lg font-qanelas1 text-gray-800">
+                        {loading ? (
+                          <div className="animate-pulse bg-gray-200 h-7 w-3/4 rounded"/>
+                        ) : (
+                          accInfo?.ClientInfo?.Zipcode || "Not provided"
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
-              <h3 className="text-sm text-gray-500 mb-1">Contact Number</h3>
-              <div className="text-lg font-qanelas1 text-gray-800">
-                {loading ? (
-                  <div className="animate-pulse bg-gray-200 h-7 w-3/4 rounded"/>
-                ) : (
-                  accInfo?.ClientInfo?.ContactNum || "Not provided"
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-    
-      {/* Address Section */}
-      <div>
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">Address Information</h3>
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="md:col-span-2">
-              <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
-                <h3 className="text-sm text-gray-500 mb-1">Street Address</h3>
-                <div className="text-lg font-qanelas1 text-gray-800">
-                  {loading ? (
-                    <div className="animate-pulse bg-gray-200 h-7 w-3/4 rounded"/>
-                  ) : (
-                    accInfo?.ClientInfo?.Address || "Not provided"
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
-              <h3 className="text-sm text-gray-500 mb-1">City/Municipality</h3>
-              <div className="text-lg font-qanelas1 text-gray-800">
-                {loading ? (
-                  <div className="animate-pulse bg-gray-200 h-7 w-3/4 rounded"/>
-                ) : (
-                  accInfo?.ClientInfo?.City || "Not provided"
-                )}
-              </div>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
-              <h3 className="text-sm text-gray-500 mb-1">Province</h3>
-              <div className="text-lg font-qanelas1 text-gray-800">
-                {loading ? (
-                  <div className="animate-pulse bg-gray-200 h-7 w-3/4 rounded"/>
-                ) : (
-                  accInfo?.ClientInfo?.Province || "Not provided"
-                )}
-              </div>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
-              <h3 className="text-sm text-gray-500 mb-1">Zip Code</h3>
-              <div className="text-lg font-qanelas1 text-gray-800">
-                {loading ? (
-                  <div className="animate-pulse bg-gray-200 h-7 w-3/4 rounded"/>
-                ) : (
-                  accInfo?.ClientInfo?.Zipcode || "Not provided"
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    ) : (
-      <div className="space-y-8">
-        {/* Company Identity Section */}
-        <div>
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">Company Identity</h3>
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="md:col-span-2">
-              <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
-                <h3 className="text-sm text-gray-500 mb-1">Company Name</h3>
-                <p className="text-lg font-qanelas1 text-gray-800">
-                  {accInfo?.BusinessInfo?.CompanyName || "Not provided"}
-                </p>
-              </div>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
-              <h3 className="text-sm text-gray-500 mb-1">Business Owner</h3>
-              <p className="text-lg font-qanelas1 text-gray-800">
-                {accInfo?.BusinessInfo?.BusinessOwner || "Not provided"}
-              </p>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
-              <h3 className="text-sm text-gray-500 mb-1">Company ID Number</h3>
-              <p className="text-lg font-qanelas1 text-gray-800">
-                {accInfo?.BusinessInfo?.CompanyIDNum || "Not provided"}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Legal Information Section */}
-        <div>
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">Legal Information</h3>
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
-              <h3 className="text-sm text-gray-500 mb-1">Business Permit No.</h3>
-              <p className="text-lg font-qanelas1 text-gray-800">
-                {accInfo?.BusinessInfo?.BusinessPermitNum || "Not provided"}
-              </p>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
-              <h3 className="text-sm text-gray-500 mb-1">TIN No.</h3>
-              <p className="text-lg font-qanelas1 text-gray-800">
-                {accInfo?.BusinessInfo?.TINNum || "Not provided"}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Address Section */}
-        <div>
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">Company Address</h3>
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="md:col-span-2">
-              <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
-                <h3 className="text-sm text-gray-500 mb-1">Street Address</h3>
-                <p className="text-lg font-qanelas1 text-gray-800">
-                  {accInfo?.BusinessInfo?.CompanyAddress || "Not provided"}
-                </p>
-              </div>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
-              <h3 className="text-sm text-gray-500 mb-1">City</h3>
-              <p className="text-lg font-qanelas1 text-gray-800">
-                {accInfo?.BusinessInfo?.CompanyCity || "Not provided"}
-              </p>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
-              <h3 className="text-sm text-gray-500 mb-1">Province</h3>
-              <p className="text-lg font-qanelas1 text-gray-800">
-                {accInfo?.BusinessInfo?.CompanyProvince || "Not provided"}
-              </p>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
-              <h3 className="text-sm text-gray-500 mb-1">Zipcode</h3>
-              <p className="text-lg font-qanelas1 text-gray-800">
-                {accInfo?.BusinessInfo?.CompanyZipcode || "Not provided"}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Contact Section */}
-        <div>
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">Contact Information</h3>
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
-              <h3 className="text-sm text-gray-500 mb-1">Contact Person</h3>
-              <p className="text-lg font-qanelas1 text-gray-800">
-                {accInfo?.BusinessInfo?.ContactPerson || "Not provided"}
-              </p>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
-              <h3 className="text-sm text-gray-500 mb-1">Position/Designation</h3>
-              <p className="text-lg font-qanelas1 text-gray-800">
-                {accInfo?.BusinessInfo?.Designation || "Not provided"}
-              </p>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
-              <h3 className="text-sm text-gray-500 mb-1">Company Email</h3>
-              <p className="text-lg font-qanelas1 text-gray-800">
-                {accInfo?.BusinessInfo?.CompanyEmail || "Not provided"}
-              </p>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
-              <h3 className="text-sm text-gray-500 mb-1">Company Phone Number</h3>
-              <p className="text-lg font-qanelas1 text-gray-800">
-                {accInfo?.BusinessInfo?.CompanyPhoneNum || "Not provided"}
-              </p>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
-              <h3 className="text-sm text-gray-500 mb-1">Company Mobile Number</h3>
-              <p className="text-lg font-qanelas1 text-gray-800">
-                {accInfo?.BusinessInfo?.CompanyMobileNum || "Not provided"}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Production Details Section */}
-        <div>
-          <h3 className="text-lg font-semibold text-gray-700 mb-4">Production Information</h3>
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
-              <h3 className="text-sm text-gray-500 mb-1">Products Manufactured</h3>
-              <p className="text-lg font-qanelas1 text-gray-800">
-                {accInfo?.BusinessInfo?.Manufactured || "Not provided"}
-              </p>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
-              <h3 className="text-sm text-gray-500 mb-1">Production Frequency</h3>
-              <p className="text-lg font-qanelas1 text-gray-800">
-                {accInfo?.BusinessInfo?.ProductionFrequency || "Not provided"}
-              </p>
-            </div>
-            <div className="bg-white p-4 rounded-xl border border-[#5e86ca]">
-              <h3 className="text-sm text-gray-500 mb-1">Bulk</h3>
-              <p className="text-lg font-qanelas1 text-gray-800">
-                {accInfo?.BusinessInfo?.Bulk || "Not provided"}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    )}
-
-        </div>
-      </div>
-          </section>
+            </section>
           </div>
         </main>
 
-
-        <InfoEditModal
+        <PersonalInfoEditModal
           isOpen={isEditModalOpen}
           onClose={() => setIsEditModalOpen(false)}
-          currentInfo={isBusinessView ? accInfo?.BusinessInfo : accInfo?.ClientInfo}
-          isBusinessView={isBusinessView}
+          currentInfo={accInfo?.ClientInfo}
           userId={user?.id ?? ''}
-          isNotBusinessOwner={isNotBusinessOwner} 
         />
-
       </div>
     </div>
   );
 };
 
-
-export default DashboardUser;
+export default PersonalInformationPage;

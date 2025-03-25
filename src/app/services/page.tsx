@@ -89,93 +89,64 @@ export default function Services() {
     setIsCalendarModalOpen(false);
   };
   
+
   useEffect(() => {
-    // Fetch machines
-    const fetchMachines = async () => {
+    const fetchData = async () => {
       setIsMachinesLoading(true);
       try {
-        const response = await fetch('/api/machines');
-        const data = await response.json();
-        
-        const customSort = (a: Machine, b: Machine) => {
-          if (a.isAvailable && !b.isAvailable) return -1;
-          if (!a.isAvailable && b.isAvailable) return 1;
-          
-          if (a.isAvailable && b.isAvailable) {
-            return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-          }
-          
-          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
-        };
-        
-        const sortedMachines = [...data].sort(customSort);
+        // Use Promise.all to fetch in parallel
+        const [machinesResponse, userInfoResponse] = await Promise.all([
+          fetch('/api/machines'),
+          userId ? fetch(`/api/account/${userId}`) : Promise.resolve(null)
+        ]);
+  
+        const machinesData = await machinesResponse.json();
+        const userData = userInfoResponse ? await userInfoResponse.json() : null;
+  
+        // Process machines with more efficient sorting
+        const sortedMachines = machinesData.sort((a: { isAvailable: any; createdAt: string | number | Date; }, b: { isAvailable: any; createdAt: string | number | Date; }) => 
+          Number(b.isAvailable) - Number(a.isAvailable) || 
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+  
         setMachines(sortedMachines);
+  
+        // Process user info
+        if (userData && userData.Role) {
+          setUserRole(userData.Role);
+          setIsBusinessInfoMissing(checkBusinessInfoCompleteness(userData.BusinessInfo));
+        }
+  
+        setIsUserInfoLoaded(true);
       } catch (error) {
-        console.error('Error fetching machines:', error);
+        console.error('Error fetching data:', error);
       } finally {
         setIsMachinesLoading(false);
       }
     };
   
-    // Fetch user info to get role and check business info
-    // Modify the fetchUserInfo function to set the loaded flag
-const fetchUserInfo = async () => {
-  if (!userId) {
-    setUserRole("");
-    setIsUserInfoLoaded(true); // Mark as loaded even if no user
-    return;
-  }
-
-  try {
-    const response = await fetch(`/api/account/${userId}`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch user account');
-    }
-    
-    const data = await response.json();
-    
-    if (data && data.Role) {
-      setUserRole(data.Role);
-      
-      // If user is MSME, check if business info is missing
-      if (data.Role === "MSME") {
-        // Check if the user has indicated they are not a business owner
-        if (data.BusinessInfo?.isNotBusinessOwner === true) {
-          setIsBusinessInfoMissing(false);
-        } else {
-          // Check for required business fields
-          const hasCompleteBusinessInfo = 
-            data.BusinessInfo && 
-            data.BusinessInfo.CompanyName && 
-            data.BusinessInfo.CompanyName !== "Not applicable" &&
-            data.BusinessInfo.BusinessOwner && 
-            data.BusinessInfo.BusinessOwner !== "Not applicable" &&
-            data.BusinessInfo.CompanyAddress && 
-            data.BusinessInfo.CompanyAddress !== "Not applicable" &&
-            data.BusinessInfo.CompanyCity && 
-            data.BusinessInfo.CompanyCity !== "Not applicable" &&
-            data.BusinessInfo.CompanyProvince && 
-            data.BusinessInfo.CompanyProvince !== "Not applicable" &&
-            data.BusinessInfo.CompanyPhoneNum && 
-            data.BusinessInfo.CompanyPhoneNum !== "Not applicable";
-          
-          setIsBusinessInfoMissing(!hasCompleteBusinessInfo);
-        }
-      }
-    }
-    
-    // Mark user info as fully loaded after all checks are complete
-    setIsUserInfoLoaded(true);
-  } catch (error) {
-    console.error('Error fetching user info:', error);
-    // Default to empty if there's an error
-    setUserRole("");
-    setIsUserInfoLoaded(true); // Mark as loaded even on error
-  }
-};
-
-    fetchMachines();
-    fetchUserInfo();
+    // Extract business info check to a separate function
+    const checkBusinessInfoCompleteness = (businessInfo: { [x: string]: string; isNotBusinessOwner: any; }) => {
+      const requiredFields = [
+        'CompanyName', 
+        'BusinessOwner', 
+        'CompanyAddress', 
+        'CompanyCity', 
+        'CompanyProvince', 
+        'CompanyPhoneNum'
+      ];
+  
+      // If user explicitly marked as not a business owner
+      if (businessInfo?.isNotBusinessOwner) return false;
+  
+      // Check if all required fields are present and not "Not applicable"
+      return requiredFields.some(field => 
+        !businessInfo?.[field] || 
+        businessInfo[field] === "Not applicable"
+      );
+    };
+  
+    fetchData();
   }, [userId]);
 
   
@@ -214,9 +185,9 @@ const handleScheduleClick = async () => {
   // If all good, navigate to the appropriate scheduling page
   setIsLoading(true);
   if (userRole === "STUDENT") {
-    router.push('/user-services/student-schedule');
+    router.push('/student-schedule');
   } else {
-    router.push('/user-services/msme-schedule');
+    router.push('/msme-schedule');
   }
 };
 

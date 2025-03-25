@@ -34,7 +34,7 @@ export default function Home() {
           computer-controlled tools that cover several different length scales and various materials with the aim to <span className="font-poppins2">make "almost anything".</span>
         </p>
         <div className="flex flex-col md:flex-row gap-4 items-end md:items-center">
-          <a href="/user-services" className="border border-[#5e86ca] bg-[#193d83] text-white font-qanelas1 text-lg py-1 px-6 rounded-md hover:bg-[#2f61c2] transition duration-300 ml-auto">
+          <a href="/services" className="border border-[#5e86ca] bg-[#193d83] text-white font-qanelas1 text-lg py-1 px-6 rounded-md hover:bg-[#2f61c2] transition duration-300 ml-auto">
             Get Started
           </a>
           <a href="https://www.facebook.com/fablabeasternvisayas" className="text-[#1c62b5] font-qanelas1 text-lg py-1 px-6 rounded-md transition-all duration-300 flex items-center justify-end transform hover:scale-105">
@@ -148,7 +148,7 @@ export default function Home() {
                 <p className="text-ms py-1 px-3 rounded bg-[#fef0db] rounded-full border border-[#f5a237] rounded-full text-[#ee8b1a]">Cut Materials</p>
               </div>
               <h3 className="text-2xl font-qanelas3">Laser Cutter</h3>
-            <a href="/user-services" className="text-[#145da0] hover:underline mb-2">Learn More</a>
+            <a href="/services" className="text-[#145da0] hover:underline mb-2">Learn More</a>
             </div>
 
 
@@ -165,7 +165,7 @@ export default function Home() {
                 <p className="text-ms py-1 px-3 rounded bg-[#fef0db] rounded-full border border-[#f5a237] rounded-full text-[#ee8b1a]">Create 3D Models</p>
               </div>
               <h3 className="text-2xl font-qanelas3">3D Printer</h3>
-            <a href="/user-services" className="text-[#145da0] hover:underline mb-2">Learn More</a>
+            <a href="/services" className="text-[#145da0] hover:underline mb-2">Learn More</a>
             </div>
 
 
@@ -182,7 +182,7 @@ export default function Home() {
                 <p className="text-ms py-1 px-3 rounded bg-[#fef0db] rounded-full border border-[#f5a237] rounded-full text-[#ee8b1a]">Carve Structures</p>
               </div>
               <h3 className="text-2xl font-qanelas3">CNC Mill</h3>
-            <a href="/user-services" className="text-[#145da0] hover:underline mb-2">Learn More</a>
+            <a href="/services" className="text-[#145da0] hover:underline mb-2">Learn More</a>
             </div>
 
 
@@ -197,7 +197,7 @@ export default function Home() {
             <h3 className="text-3xl font-qanelas3 mb-1 text-[#0e4579]">Machines and Services</h3>
             <p className="text-lg mb-4 font-figtree4">Visit our Machines and Services Page</p>
             <p className="text-md mb-10 font-poppins1 px-10">Our FabLab is equipped with state-of-the-art tools and resources to support a wide range of projects and initiatives. Whether you are an entrepreneur, student, or hobbyist, we provide the support and expertise to bring your ideas to life.</p>
-            <a href="/user-services" className="border border-[#5e86ca] bg-[#193d83] text-white font-qanelas1 text-lg py-1 px-6 rounded-md hover:bg-[#2f61c2] transition duration-300 ml-auto">Services</a>
+            <a href="/services" className="border border-[#5e86ca] bg-[#193d83] text-white font-qanelas1 text-lg py-1 px-6 rounded-md hover:bg-[#2f61c2] transition duration-300 ml-auto">Services</a>
           </div>
         </div>
     </section>
@@ -239,7 +239,7 @@ export default function Home() {
               </div>
 
 
-              <a href="/user-services" className="inline-block border border-[#5e86ca] bg-[#193d83] text-white font-qanelas1 text-lg py-1 px-6 rounded-md hover:bg-[#2f61c2] transition duration-300 ml-auto">
+              <a href="/services" className="inline-block border border-[#5e86ca] bg-[#193d83] text-white font-qanelas1 text-lg py-1 px-6 rounded-md hover:bg-[#2f61c2] transition duration-300 ml-auto">
                 Learn More About Us
               </a>
             </div>

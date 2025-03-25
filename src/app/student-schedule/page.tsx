@@ -2,7 +2,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import ProgressBar from '@/components/msme-forms/progress-bar';
 import Navbar from '@/components/custom/navbar';
 import ProcessInformation from '@/components/msme-forms/utilization-info';
@@ -57,9 +57,17 @@ interface FormData {
 // Fixed UpdateFormData type
 type UpdateFormData = <K extends keyof FormData>(field: K, value: FormData[K]) => void;
 
+// Interface for blocked dates data structure
+interface BlockedDate {
+  id: string;
+  date: string;
+}
+
+interface CalendarDate extends Date {}
+
 export default function Schedule() {
-  const [step, setStep] = React.useState(1);
-  const [formData, setFormData] = React.useState<FormData>({
+  // Use memoized initial state to avoid re-creating on each render
+  const initialFormData = useMemo<FormData>(() => ({
     days: [],
     syncTimes: false,
     unifiedStartTime: null,
@@ -80,30 +88,39 @@ export default function Schedule() {
     Topic: '',
     SchoolYear: new Date().getFullYear(),
     NeededMaterials: []
-  });
-  
-  interface BlockedDate {
-    id: string;
-    date: string;
-  }
+  }), []);
 
-  interface CalendarDate extends Date {}
-
+  const [step, setStep] = useState(1);
+  const [formData, setFormData] = useState<FormData>(initialFormData);
   const [blockedDates, setBlockedDates] = useState<CalendarDate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const fetchBlockedDates = async () => {
+  // Use useCallback to memoize the fetching function
+  const fetchBlockedDates = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await fetch('/api/blocked-dates');
+      if (!response.ok) {
+        throw new Error(`Failed to fetch blocked dates: ${response.status}`);
+      }
+      
       const data = await response.json();
-      const dates = data.map((item: BlockedDate) => {
-        // Create date at noon to avoid timezone issues
+      
+      // Process dates efficiently in a single operation
+      const processedDates = data.map((item: BlockedDate) => {
         const date = new Date(item.date);
-        return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0);
+        // Create dates at noon to avoid timezone issues
+        return new Date(
+          date.getFullYear(), 
+          date.getMonth(), 
+          date.getDate(), 
+          12, 0, 0
+        );
       });
-      setBlockedDates(dates);
+      
+      setBlockedDates(processedDates);
     } catch (error) {
+      console.error('Error fetching blocked dates:', error);
       toast({
         title: "Error",
         description: "Failed to fetch blocked dates",
@@ -112,38 +129,74 @@ export default function Schedule() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchBlockedDates();
   }, []);
 
-  const isDateBlocked = (date: Date) => {
+  // Load blocked dates on component mount
+  useEffect(() => {
+    fetchBlockedDates();
+  }, [fetchBlockedDates]);
+
+  // Memoize the date checking function for better performance
+  const isDateBlocked = useCallback((date: Date) => {
+    // Early exit for empty array to avoid unnecessary loops
+    if (!blockedDates.length) return false;
+    
+    // Get date components once for comparison
+    const year = date.getFullYear();
+    const month = date.getMonth();
+    const day = date.getDate();
+    
+    // Use some for better performance as it exits early on first match
     return blockedDates.some(blockedDate => 
-      date.getFullYear() === blockedDate.getFullYear() &&
-      date.getMonth() === blockedDate.getMonth() &&
-      date.getDate() === blockedDate.getDate()
+      year === blockedDate.getFullYear() &&
+      month === blockedDate.getMonth() &&
+      day === blockedDate.getDate()
     );
-  };
+  }, [blockedDates]);
 
-  // Fixed updateFormData function with proper typing
-  const updateFormData: UpdateFormData = (field, value) => {
+  // Memoized update function to avoid re-creation
+  const updateFormData = useCallback<UpdateFormData>((field, value) => {
     setFormData(prevData => ({ ...prevData, [field]: value }));
-  };
+  }, []);
   
-  const nextStep = () => setStep(prevStep => prevStep + 1);
-  const prevStep = () => setStep(prevStep => prevStep - 1);
+  // Navigation functions with scrolling
+  const nextStep = useCallback(() => {
+    setStep(prevStep => prevStep + 1);
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  }, []);
+  
+  const prevStep = useCallback(() => {
+    setStep(prevStep => prevStep - 1);
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
+  }, []);
 
-  const getStepTitle = () => {
+  // Memoize the step title to avoid recalculation
+  const getStepTitle = useCallback(() => {
     switch(step) {
       case 1: return "Select Date & Time";
       case 2: return "Lab Reservation";
       case 3: return "Review & Submit";
       default: return "Schedule a Service";
     }
-  };
+  }, [step]);
 
-  const renderStep = () => {
+  // Memoize the step component to prevent unnecessary re-renders
+  const currentStep = useMemo(() => {
+    if (isLoading) {
+      return (
+        <div className="flex flex-col items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <p className="mt-4 text-gray-600">Loading calendar data...</p>
+        </div>
+      );
+    }
+
     switch(step) {
       case 1:
         return (
@@ -156,19 +209,23 @@ export default function Schedule() {
           />
         );
       case 2:
-        return <LabReservation 
-          formData={formData} 
-          updateFormData={updateFormData} 
-          nextStep={nextStep} 
-          prevStep={prevStep} 
-        />;
+        return (
+          <LabReservation 
+            formData={formData} 
+            updateFormData={updateFormData} 
+            nextStep={nextStep} 
+            prevStep={prevStep} 
+          />
+        );
       case 3:
-        return <ReviewSubmit 
-          formData={formData} 
-          prevStep={prevStep} 
-          updateFormData={updateFormData} 
-          nextStep={nextStep} 
-        />;
+        return (
+          <ReviewSubmit 
+            formData={formData} 
+            prevStep={prevStep} 
+            updateFormData={updateFormData} 
+            nextStep={nextStep} 
+          />
+        );
       default:
         return (
           <DateTimeSelection
@@ -180,7 +237,7 @@ export default function Schedule() {
           />
         );
     }
-  };
+  }, [step, isLoading, formData, nextStep, prevStep, updateFormData, isDateBlocked]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
@@ -204,14 +261,7 @@ export default function Schedule() {
             <ProgressBar currentStep={step} totalSteps={3} />
             
             <div className="mt-8 w-full">
-              {isLoading ? (
-                <div className="flex flex-col items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                  <p className="mt-4 text-gray-600">Loading calendar data...</p>
-                </div>
-              ) : (
-                renderStep()
-              )}
+              {currentStep}
             </div>
           </CardContent>
         </Card>

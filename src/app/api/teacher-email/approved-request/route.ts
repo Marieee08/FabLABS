@@ -22,12 +22,11 @@ export async function GET(request: NextRequest) {
   
   try {
     console.log('Processing approval request for reservation:', reservationId);
-    
-    // Update reservation EVCStatus to 'Approved'
+ 
     await prisma.eVCReservation.update({
       where: { id: parseInt(reservationId) },
       data: { 
-        EVCStatus: 'Pending',
+        EVCStatus: 'Pending Admin Approval',
         ReceivedDate: new Date()
       }
     });

@@ -96,8 +96,15 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
   const { getToken } = useAuth();
   const [accInfo, setAccInfo] = useState<AccInfo | null>(null);
   const [loading, setLoading] = useState(true);
-  // Add a new state to track submission in progress
   const [submittingReservation, setSubmittingReservation] = useState(false);
+
+    // NEW: Add this useEffect to scroll to top of the page when component mounts
+    useEffect(() => {
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      });
+    }, []);
 
   useEffect(() => {
     const fetchUserInfo = async () => {
