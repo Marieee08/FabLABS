@@ -29,10 +29,10 @@ import {
 } from "@/components/ui/dialog";
 import { downloadPDF } from "@/components/admin-functions/pdf/utilization-request-pdf";
 import { downloadJobPaymentPDF } from "@/components/admin-functions/pdf/job-payment-pdf";
-import { downloadMachineUtilPDF } from "@/components/admin-functions/pdf/machine-utilization-pdf";
 import { downloadRegistrationFormPDF } from "@/components/admin-functions/pdf/registration-form-pdf";
+import {downloadLabReservationFormPDF} from "@/components/admin-functions/pdf/lab-reservation-form-pdf";
 import { downloadLabRequestFormPDF } from "@/components/admin-functions/pdf/lab-request-form-pdf";
-import {downloadLabReservationFormPDF} from "@/components/admin-functions/lab-reservation-form-pdf";
+
 
 
 
