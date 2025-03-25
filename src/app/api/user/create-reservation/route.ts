@@ -1,3 +1,5 @@
+// src/app/api/user/create-reservation/route.ts - Updated handler with better error handling
+
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
@@ -14,6 +16,7 @@ export async function POST(request: Request) {
     }
     
     const data = await request.json();
+    console.log("API received data:", JSON.stringify(data, null, 2));
     
     // Validate required data - fail fast before expensive DB operations
     if (!data.days?.length) {
@@ -86,24 +89,55 @@ export async function POST(request: Request) {
     // Process service links
     const serviceLinks = data.serviceLinks || {};
     
-    // Get service costs
-    const serviceCosts = extractServiceCostsFromFormData(data);
+    // Extract service costs
+    const serviceCosts = {};
+    
+    // Get service costs from the data
+    if (data.groupedServiceData) {
+      Object.entries(data.groupedServiceData).forEach(([service, serviceData]) => {
+        // @ts-ignore
+        serviceCosts[service] = serviceData.totalServiceCost || 0;
+      });
+    } else if (data.serviceCostDetails && Array.isArray(data.serviceCostDetails)) {
+      data.serviceCostDetails.forEach(detail => {
+        if (detail.serviceName && typeof detail.totalCost === 'number') {
+          serviceCosts[detail.serviceName] = detail.totalCost;
+        }
+      });
+    }
     
     // Process tools
-    const userTools = parseToolString(data.Tools).map((tool: { Tool: any; Quantity: any; }) => ({
-      ToolUser: tool.Tool,
-      ToolQuantity: tool.Quantity
-    }));
+    let userTools: { ToolUser: any; ToolQuantity: number; }[] = [];
+    try {
+      if (data.Tools) {
+        const toolsData = typeof data.Tools === 'string' ? JSON.parse(data.Tools) : data.Tools;
+        userTools = Array.isArray(toolsData) ? toolsData.map(tool => ({
+          ToolUser: tool.Tool,
+          ToolQuantity: parseInt(tool.Quantity) || 1
+        })) : [];
+      }
+    } catch (e) {
+      console.warn('Error parsing tools data:', e);
+      // Continue without tools if there's an error
+    }
 
     // Process times
-    const utilTimes = data.days.map((day: { date: any; startTime: any; endTime: any; }, index: number) => ({
-      DayNum: index + 1,
-      StartTime: combineDateAndTime(day.date, day.startTime),
-      EndTime: combineDateAndTime(day.date, day.endTime),
-    }));
+    const utilTimes = data.days.map((day, index) => {
+      const startTime = day.startTime ? new Date(day.startTime) : 
+                       combineDateAndTime(day.date, day.startTime);
+      
+      const endTime = day.endTime ? new Date(day.endTime) : 
+                     combineDateAndTime(day.date, day.endTime);
+                     
+      return {
+        DayNum: index + 1,
+        StartTime: startTime,
+        EndTime: endTime,
+      };
+    });
 
     // Process user services
-    const userServices = selectedServices.map((service: string | number) => {
+    const userServices = selectedServices.map(service => {
       const machines = serviceMachinesMap.get(service) || [];
       const serviceLink = serviceLinks[service] || '';
       const serviceCost = serviceCosts[service] || 0;
@@ -118,7 +152,7 @@ export async function POST(request: Request) {
     });
 
     // Process service availed
-    const serviceAvailed = selectedServices.map((service: any) => ({
+    const serviceAvailed = selectedServices.map(service => ({
       service
     }));
 
@@ -164,45 +198,17 @@ export async function POST(request: Request) {
   }
 }
 
-// Optimized helper functions
-
-// Cache RegExp for better performance
-const timeRegex = /^(\d+):(\d+)\s+(AM|PM)$/;
-
-function extractServiceCostsFromFormData(data: { groupedServiceData: { [x: string]: { totalServiceCost: number; }; }; serviceCostDetails: any; ProductsManufactured: any; totalCost: number; }) {
-  const serviceCosts = {};
-  
-  if (data.groupedServiceData) {
-    // Fast path: extract costs directly
-    for (const service in data.groupedServiceData) {
-      serviceCosts[service] = data.groupedServiceData[service].totalServiceCost || 0;
-    }
-  } else if (data.serviceCostDetails && Array.isArray(data.serviceCostDetails)) {
-    // Use service cost details
-    for (const detail of data.serviceCostDetails) {
-      if (detail.serviceName && typeof detail.totalCost === 'number') {
-        serviceCosts[detail.serviceName] = detail.totalCost;
-      }
-    }
-  } else {
-    // Fallback: divide evenly
-    const selectedServices = Array.isArray(data.ProductsManufactured) 
-      ? data.ProductsManufactured 
-      : [data.ProductsManufactured].filter(Boolean);
-    
-    const costPerService = data.totalCost / selectedServices.length;
-    for (const service of selectedServices) {
-      serviceCosts[service] = costPerService;
-    }
-  }
-  
-  return serviceCosts;
-}
+// Helper functions
 
 function combineDateAndTime(date: string | number | Date, time: string) {
   if (!time) return new Date(date);
   
   const baseDate = new Date(date);
+  
+  if (typeof time !== 'string') return baseDate;
+  
+  // Handle format like "09:00 AM"
+  const timeRegex = /^(\d+):(\d+)\s+(AM|PM)$/;
   const matches = time.match(timeRegex);
   
   if (!matches) return baseDate;
@@ -217,45 +223,52 @@ function combineDateAndTime(date: string | number | Date, time: string) {
   return baseDate;
 }
 
-function parseToolString(toolString: string) {
-  if (!toolString || toolString === 'NOT APPLICABLE') return [];
-  try {
-    return JSON.parse(toolString);
-  } catch {
-    return [];
-  }
-}
-
-// Use a more efficient algorithm for calculating minutes
 function calculateTotalMinutes(days: any) {
   let totalMinutes = 0;
-  const baseDate = new Date(0); // Use a fixed date for time calculations
   
   for (const day of days) {
     if (!day.startTime || !day.endTime) continue;
     
-    const startMatches = day.startTime.match(timeRegex);
-    const endMatches = day.endTime.match(timeRegex);
+    const start = new Date(day.startTime);
+    const end = new Date(day.endTime);
     
-    if (!startMatches || !endMatches) continue;
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      // Try to parse startTime and endTime as string formats
+      if (typeof day.startTime === 'string' && typeof day.endTime === 'string') {
+        // Handle format like "09:00 AM"
+        const timeRegex = /^(\d+):(\d+)\s+(AM|PM)$/;
+        const startMatches = day.startTime.match(timeRegex);
+        const endMatches = day.endTime.match(timeRegex);
+        
+        if (startMatches && endMatches) {
+          let [, startHours, startMinutes, startPeriod] = startMatches;
+          let [, endHours, endMinutes, endPeriod] = endMatches;
+          
+          let startHour = parseInt(startHours, 10);
+          let endHour = parseInt(endHours, 10);
+          
+          if (startPeriod === 'PM' && startHour !== 12) startHour += 12;
+          if (startPeriod === 'AM' && startHour === 12) startHour = 0;
+          
+          if (endPeriod === 'PM' && endHour !== 12) endHour += 12;
+          if (endPeriod === 'AM' && endHour === 12) endHour = 0;
+          
+          const startTimeMinutes = startHour * 60 + parseInt(startMinutes, 10);
+          const endTimeMinutes = endHour * 60 + parseInt(endMinutes, 10);
+          
+          if (endTimeMinutes > startTimeMinutes) {
+            totalMinutes += endTimeMinutes - startTimeMinutes;
+          }
+        }
+      }
+      continue;
+    }
     
-    let [, startHours, startMinutes, startPeriod] = startMatches;
-    let [, endHours, endMinutes, endPeriod] = endMatches;
+    // Calculate difference in minutes
+    const diffMinutes = (end.getTime() - start.getTime()) / (1000 * 60);
     
-    let startHour = parseInt(startHours, 10);
-    let endHour = parseInt(endHours, 10);
-    
-    if (startPeriod === 'PM' && startHour !== 12) startHour += 12;
-    if (startPeriod === 'AM' && startHour === 12) startHour = 0;
-    
-    if (endPeriod === 'PM' && endHour !== 12) endHour += 12;
-    if (endPeriod === 'AM' && endHour === 12) endHour = 0;
-    
-    const startTimeMinutes = startHour * 60 + parseInt(startMinutes, 10);
-    const endTimeMinutes = endHour * 60 + parseInt(endMinutes, 10);
-    
-    if (endTimeMinutes > startTimeMinutes) {
-      totalMinutes += endTimeMinutes - startTimeMinutes;
+    if (diffMinutes > 0) {
+      totalMinutes += diffMinutes;
     }
   }
   
