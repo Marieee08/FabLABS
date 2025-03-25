@@ -1,11 +1,9 @@
-// /user-services/student-schedule/page.tsx
-
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import ProgressBar from '@/components/msme-forms/progress-bar';
 import Navbar from '@/components/custom/navbar';
-import ProcessInformation from '@/components/msme-forms/utilization-info';
+import UtilizationInfo from '@/components/student-forms/utilization-info';
 import ReviewSubmit from '@/components/student-forms/review-submit';
 import { toast } from "@/components/ui/use-toast";
 import DateTimeSelection from '@/components/msme-forms/date-time-selection';
@@ -35,11 +33,12 @@ interface FormData {
   unifiedEndTime: string | null;
 
   // UtilizationInfo fields
-  ProductsManufactured: string;
+  ProductsManufactured: string | string[];
   BulkofCommodity: string;
-  Equipment: string;
+  Equipment: string[] | string;
   Tools: string;
-  ToolsQty: number;
+  serviceLinks?: {[service: string]: string};
+  Remarks?: string;
 
   ControlNo?: number;
   LvlSec: string;
@@ -73,12 +72,13 @@ export default function Schedule() {
     unifiedStartTime: null,
     unifiedEndTime: null,
 
-    // Initialize ProcessInfo fields
-    ProductsManufactured: '',
+    // Initialize UtilizationInfo fields
+    ProductsManufactured: [],
     BulkofCommodity: '',
-    Equipment: '',
+    Equipment: [],
     Tools: '',
-    ToolsQty: 0,
+    serviceLinks: {},
+    Remarks: '',
 
     LvlSec: '',
     NoofStudents: 0,
@@ -179,7 +179,7 @@ export default function Schedule() {
   // Memoize the step title to avoid recalculation
   const getStepTitle = useCallback(() => {
     switch(step) {
-      case 1: return "Select Date & Time";
+      case 1: return "Service Information & Date Selection";
       case 2: return "Lab Reservation";
       case 3: return "Review & Submit";
       default: return "Schedule a Service";
@@ -200,13 +200,31 @@ export default function Schedule() {
     switch(step) {
       case 1:
         return (
-          <DateTimeSelection
-            formData={formData}
-            setFormData={setFormData}
-            nextStep={nextStep}
-            isDateBlocked={isDateBlocked}
-            maxDates={MAX_DATES}
-          />
+          <div className="space-y-12">
+            {/* Utilization Info comes first */}
+            <div className="border rounded-lg bg-white p-6 shadow-sm">
+              <h2 className="text-xl font-semibold text-blue-700 mb-6">Utilization Information</h2>
+              <UtilizationInfo 
+                formData={formData} 
+                updateFormData={updateFormData} 
+                nextStep={() => {}} // No-op since we're on the same page
+                prevStep={() => {}} // No-op since we're on the same page
+                standalonePage={false} // Hide navigation buttons
+              />
+            </div>
+            
+            {/* Calendar Selection comes after */}
+            <div className="border rounded-lg bg-white p-6 shadow-sm">
+              <h2 className="text-xl font-semibold text-blue-700 mb-6">Select Date & Time</h2>
+              <DateTimeSelection
+                formData={formData}
+                setFormData={setFormData}
+                nextStep={nextStep}
+                isDateBlocked={isDateBlocked}
+                maxDates={MAX_DATES}
+              />
+            </div>
+          </div>
         );
       case 2:
         return (
@@ -228,13 +246,31 @@ export default function Schedule() {
         );
       default:
         return (
-          <DateTimeSelection
-            formData={formData}
-            setFormData={setFormData}
-            nextStep={nextStep}
-            isDateBlocked={isDateBlocked}
-            maxDates={MAX_DATES}
-          />
+          <div className="space-y-12">
+            {/* Utilization Info comes first */}
+            <div className="border rounded-lg bg-white p-6 shadow-sm">
+              <h2 className="text-xl font-semibold text-blue-700 mb-6">Utilization Information</h2>
+              <UtilizationInfo 
+                formData={formData} 
+                updateFormData={updateFormData} 
+                nextStep={() => {}} // No-op since we're on the same page
+                prevStep={() => {}} // No-op since we're on the same page
+                standalonePage={false} // Hide navigation buttons
+              />
+            </div>
+            
+            {/* Calendar Selection comes after */}
+            <div className="border rounded-lg bg-white p-6 shadow-sm">
+              <h2 className="text-xl font-semibold text-blue-700 mb-6">Select Date & Time</h2>
+              <DateTimeSelection
+                formData={formData}
+                setFormData={setFormData}
+                nextStep={nextStep}
+                isDateBlocked={isDateBlocked}
+                maxDates={MAX_DATES}
+              />
+            </div>
+          </div>
         );
     }
   }, [step, isLoading, formData, nextStep, prevStep, updateFormData, isDateBlocked]);
@@ -267,7 +303,7 @@ export default function Schedule() {
         </Card>
         
         <div className="mt-6 text-center text-sm text-gray-500">
-          <p>Need help? Contact our support team at ctapales@evc.pshs.edu.ph</p>
+          <p>Need help? Contact our support team at fablab@evc.pshs.edu.ph</p>
         </div>
       </div>
     </div>

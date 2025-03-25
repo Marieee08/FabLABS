@@ -1,3 +1,5 @@
+// src/app/api/user/create-reservation/route.ts
+
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
@@ -7,15 +9,17 @@ const prisma = new PrismaClient();
 
 export async function POST(request: Request) {
   try {
-    // Check authentication first to fail fast
-    const { userId } = auth();
+    // IMPORTANT: Use await with auth() to fix the headers error
+    const { userId } = await auth();
+    
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
     const data = await request.json();
+    console.log("API received data:", JSON.stringify(data, null, 2));
     
-    // Validate required data - fail fast before expensive DB operations
+    // Validate required data
     if (!data.days?.length) {
       return NextResponse.json(
         { error: 'At least one day must be selected' },
@@ -26,7 +30,7 @@ export async function POST(request: Request) {
     // Fetch user data
     const userAccount = await prisma.accInfo.findUnique({
       where: { clerkId: userId },
-      select: { id: true } // Only select what we need
+      select: { id: true }
     });
 
     if (!userAccount) {
@@ -36,15 +40,17 @@ export async function POST(request: Request) {
       );
     }
 
-    // Parse the total cost
-    const totalAmountDue = parseFloat(data.totalCost) || 0;
+    // Parse the total cost (safely)
+    const totalAmountDue = typeof data.totalCost === 'number' 
+      ? data.totalCost 
+      : parseFloat(data.totalCost || '0') || 0;
 
     // Normalize selected services
     const selectedServices = Array.isArray(data.ProductsManufactured) 
       ? data.ProductsManufactured 
       : [data.ProductsManufactured].filter(Boolean);
     
-    // Optimize DB query to fetch only what we need
+    // Fetch service details
     const servicesWithDetails = await prisma.service.findMany({
       where: {
         Service: {
@@ -65,8 +71,8 @@ export async function POST(request: Request) {
       }
     });
     
-    // Prepare data for creation - move processing out of the DB operation
-    const machinesToCreate: { Machine: string; MachineApproval: boolean; DateReviewed: null; ServiceName: string; }[] = [];
+    // Prepare machine utilizations data
+    const machinesToCreate = [];
     const serviceMachinesMap = new Map();
 
     servicesWithDetails.forEach(service => {
@@ -83,64 +89,114 @@ export async function POST(request: Request) {
       }
     });
 
+    // Process tools - parse JSON if needed
+    let userTools = [];
+    try {
+      if (data.Tools) {
+        const toolsData = typeof data.Tools === 'string' ? JSON.parse(data.Tools) : data.Tools;
+        userTools = Array.isArray(toolsData) ? toolsData.map(tool => ({
+          ToolUser: tool.Tool,
+          ToolQuantity: parseInt(tool.Quantity) || 1
+        })) : [];
+      }
+    } catch (e) {
+      console.warn('Error parsing tools data:', e);
+    }
+
     // Process service links
     const serviceLinks = data.serviceLinks || {};
     
-    // Get service costs
-    const serviceCosts = extractServiceCostsFromFormData(data);
+    // Process time slots - FIX DATE PARSING ISSUE
+    const utilTimes = data.days.map((day, index) => {
+      // Get the base date (handle both string and Date objects)
+      const dateValue = typeof day.date === 'string' ? new Date(day.date) : day.date;
+      
+      if (!(dateValue instanceof Date) || isNaN(dateValue.getTime())) {
+        console.error('Invalid date value:', day.date);
+        return {
+          DayNum: index + 1,
+          StartTime: null,
+          EndTime: null
+        };
+      }
+      
+      // Create proper Date objects for start and end times
+      const startTime = parseTimeString(day.startTime, dateValue);
+      const endTime = parseTimeString(day.endTime, dateValue);
+      
+      return {
+        DayNum: index + 1,
+        StartTime: startTime,
+        EndTime: endTime
+      };
+    });
     
-    // Process tools
-    const userTools = parseToolString(data.Tools).map((tool: { Tool: any; Quantity: any; }) => ({
-      ToolUser: tool.Tool,
-      ToolQuantity: tool.Quantity
-    }));
-
-    // Process times
-    const utilTimes = data.days.map((day: { date: any; startTime: any; endTime: any; }, index: number) => ({
-      DayNum: index + 1,
-      StartTime: combineDateAndTime(day.date, day.startTime),
-      EndTime: combineDateAndTime(day.date, day.endTime),
-    }));
+    // Calculate total minutes for all valid time slots
+    const totalMinutes = utilTimes.reduce((total, time) => {
+      if (time.StartTime && time.EndTime) {
+        const diffMs = time.EndTime.getTime() - time.StartTime.getTime();
+        const diffMinutes = diffMs / (1000 * 60);
+        return total + (diffMinutes > 0 ? diffMinutes : 0);
+      }
+      return total;
+    }, 0);
 
     // Process user services
-    const userServices = selectedServices.map((service: string | number) => {
+    const userServices = selectedServices.map(service => {
       const machines = serviceMachinesMap.get(service) || [];
       const serviceLink = serviceLinks[service] || '';
-      const serviceCost = serviceCosts[service] || 0;
+      
+      // Find cost for this service from provided data
+      let serviceCost = 0;
+      if (data.groupedServiceData && data.groupedServiceData[service]) {
+        serviceCost = data.groupedServiceData[service].totalServiceCost || 0;
+      } else if (data.serviceCostDetails) {
+        const costDetail = data.serviceCostDetails.find(d => d.serviceName === service);
+        if (costDetail) serviceCost = costDetail.totalCost || 0;
+      }
       
       return {
         ServiceAvail: service,
-        EquipmentAvail: machines.length === 1 ? machines[0] : null,
+        EquipmentAvail: machines.length === 1 ? machines[0] : 'Not Specified',
         CostsAvail: serviceCost,
-        MinsAvail: calculateTotalMinutes(data.days),
+        MinsAvail: totalMinutes,
         Files: serviceLink
       };
     });
 
     // Process service availed
-    const serviceAvailed = selectedServices.map((service: any) => ({
+    const serviceAvailed = selectedServices.map(service => ({
       service
     }));
 
-    // Create the reservation in a single transaction
+    // Create the reservation in a transaction
     const utilReq = await prisma.$transaction(async (tx) => {
       return tx.utilReq.create({
         data: {
           Status: "Pending Admin Approval",
           RequestDate: new Date(),
-          BulkofCommodity: data.BulkofCommodity,
+          BulkofCommodity: data.BulkofCommodity || 'Not Specified',
           accInfoId: userAccount.id,
           TotalAmntDue: totalAmountDue,
           Remarks: data.Remarks || '',
           
           // Create all related records
-          UserTools: { create: userTools },
-          UserServices: { create: userServices },
-          UtilTimes: { create: utilTimes },
-          ServiceAvailed: { create: serviceAvailed },
-          MachineUtilizations: { create: machinesToCreate }
+          UserTools: { 
+            create: userTools.length > 0 ? userTools : undefined 
+          },
+          UserServices: { 
+            create: userServices 
+          },
+          UtilTimes: { 
+            create: utilTimes.filter(time => time.StartTime && time.EndTime)
+          },
+          ServiceAvailed: { 
+            create: serviceAvailed 
+          },
+          MachineUtilizations: { 
+            create: machinesToCreate.length > 0 ? machinesToCreate : undefined
+          }
         },
-        // Only select what we need for the response
         select: {
           id: true,
           Status: true,
@@ -149,6 +205,8 @@ export async function POST(request: Request) {
       });
     });
 
+    console.log("Reservation created successfully:", utilReq);
+    
     return NextResponse.json({
       success: true,
       message: 'Reservation created successfully',
@@ -158,106 +216,52 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Error creating reservation:', error);
     return NextResponse.json(
-      { error: 'Failed to create reservation', details: error instanceof Error ? error.message : 'Unknown error' },
+      { 
+        error: 'Failed to create reservation', 
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }
 }
 
-// Optimized helper functions
-
-// Cache RegExp for better performance
-const timeRegex = /^(\d+):(\d+)\s+(AM|PM)$/;
-
-function extractServiceCostsFromFormData(data: { groupedServiceData: { [x: string]: { totalServiceCost: number; }; }; serviceCostDetails: any; ProductsManufactured: any; totalCost: number; }) {
-  const serviceCosts = {};
-  
-  if (data.groupedServiceData) {
-    // Fast path: extract costs directly
-    for (const service in data.groupedServiceData) {
-      serviceCosts[service] = data.groupedServiceData[service].totalServiceCost || 0;
-    }
-  } else if (data.serviceCostDetails && Array.isArray(data.serviceCostDetails)) {
-    // Use service cost details
-    for (const detail of data.serviceCostDetails) {
-      if (detail.serviceName && typeof detail.totalCost === 'number') {
-        serviceCosts[detail.serviceName] = detail.totalCost;
-      }
-    }
-  } else {
-    // Fallback: divide evenly
-    const selectedServices = Array.isArray(data.ProductsManufactured) 
-      ? data.ProductsManufactured 
-      : [data.ProductsManufactured].filter(Boolean);
-    
-    const costPerService = data.totalCost / selectedServices.length;
-    for (const service of selectedServices) {
-      serviceCosts[service] = costPerService;
-    }
+// Helper function to properly parse time strings like "09:00 AM"
+function parseTimeString(timeString: string, baseDate: Date): Date | null {
+  if (!timeString || typeof timeString !== 'string') {
+    return null;
   }
   
-  return serviceCosts;
-}
-
-function combineDateAndTime(date: string | number | Date, time: string) {
-  if (!time) return new Date(date);
-  
-  const baseDate = new Date(date);
-  const matches = time.match(timeRegex);
-  
-  if (!matches) return baseDate;
-  
-  let [, hours, minutes, period] = matches;
-  let hour = parseInt(hours, 10);
-  
-  if (period === 'PM' && hour !== 12) hour += 12;
-  if (period === 'AM' && hour === 12) hour = 0;
-  
-  baseDate.setHours(hour, parseInt(minutes, 10), 0, 0);
-  return baseDate;
-}
-
-function parseToolString(toolString: string) {
-  if (!toolString || toolString === 'NOT APPLICABLE') return [];
   try {
-    return JSON.parse(toolString);
-  } catch {
-    return [];
-  }
-}
-
-// Use a more efficient algorithm for calculating minutes
-function calculateTotalMinutes(days: any) {
-  let totalMinutes = 0;
-  const baseDate = new Date(0); // Use a fixed date for time calculations
-  
-  for (const day of days) {
-    if (!day.startTime || !day.endTime) continue;
+    // Clone the base date to avoid modifying it
+    const resultDate = new Date(baseDate);
     
-    const startMatches = day.startTime.match(timeRegex);
-    const endMatches = day.endTime.match(timeRegex);
+    // Handle time format like "09:00 AM"
+    const timeRegex = /^(\d+):(\d+)\s+(AM|PM)$/;
+    const matches = timeString.match(timeRegex);
     
-    if (!startMatches || !endMatches) continue;
-    
-    let [, startHours, startMinutes, startPeriod] = startMatches;
-    let [, endHours, endMinutes, endPeriod] = endMatches;
-    
-    let startHour = parseInt(startHours, 10);
-    let endHour = parseInt(endHours, 10);
-    
-    if (startPeriod === 'PM' && startHour !== 12) startHour += 12;
-    if (startPeriod === 'AM' && startHour === 12) startHour = 0;
-    
-    if (endPeriod === 'PM' && endHour !== 12) endHour += 12;
-    if (endPeriod === 'AM' && endHour === 12) endHour = 0;
-    
-    const startTimeMinutes = startHour * 60 + parseInt(startMinutes, 10);
-    const endTimeMinutes = endHour * 60 + parseInt(endMinutes, 10);
-    
-    if (endTimeMinutes > startTimeMinutes) {
-      totalMinutes += endTimeMinutes - startTimeMinutes;
+    if (!matches) {
+      console.warn(`Time string '${timeString}' doesn't match expected format`);
+      return null;
     }
+    
+    let [_, hours, minutes, period] = matches;
+    let hour = parseInt(hours, 10);
+    
+    // Convert to 24-hour format
+    if (period === 'PM' && hour !== 12) hour += 12;
+    if (period === 'AM' && hour === 12) hour = 0;
+    
+    resultDate.setHours(hour, parseInt(minutes, 10), 0, 0);
+    
+    // Validate the resulting date
+    if (isNaN(resultDate.getTime())) {
+      console.warn('Resulting date is invalid after parsing time');
+      return null;
+    }
+    
+    return resultDate;
+  } catch (error) {
+    console.error('Error parsing time string:', error);
+    return null;
   }
-  
-  return totalMinutes;
 }
