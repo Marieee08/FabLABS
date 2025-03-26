@@ -6,6 +6,8 @@ import {
 } from '@/components/admin-functions/pdf-types';
 
 
+
+
 // Define interfaces for the registration form data
 interface BusinessInfo {
   CompanyName: string;
@@ -27,6 +29,8 @@ interface BusinessInfo {
 }
 
 
+
+
 interface ClientInfo {
   Name: string;
   CompanyIDNo: string;
@@ -39,11 +43,15 @@ interface ClientInfo {
 }
 
 
+
+
 interface RegistrationFormData {
   businessInfo: BusinessInfo;
   clientInfoList: ClientInfo[];
   numberOfClients: number;
 }
+
+
 
 
 /**
@@ -60,86 +68,14 @@ const generatePrintPDF = (formData: RegistrationFormData): void => {
     return;
   }
  
-  // Create HTML content for printing
-  const html = `
-    <html>
-      <head>
-        <title>Registration Form</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 20px; }
-          h1, h2 { text-align: center; }
-          table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-          th { background-color: #f2f2f2; font-weight: bold; }
-          .header { display: flex; justify-content: space-between; align-items: center; }
-          .logo { width: 60px; height: 60px; }
-          .section-header { background-color: #e0e0e0; padding: 5px; margin-top: 10px; font-weight: bold; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <div>
-            <img class="logo" src="/images/logos/left_logo.png" alt="FabLab Logo">
-          </div>
-          <div>
-            <h1>FABRICATION LABORATORY SHARED SERVICE FACILITY</h1>
-            <h2>REGISTRATION FORM</h2>
-            <p>Philippine Science High School-Eastern Visayas Campus (PSHS-EVC)</p>
-            <p>AH26 Brgy. Pawing, Palo, Leyte 6501</p>
-          </div>
-          <div>
-            <img class="logo" src="/images/logos/dti_logo.png" alt="DTI Logo">
-          </div>
-        </div>
-
-
-        <div class="section-header">BUSINESS INFORMATION</div>
-        <table>
-          <tr>
-            <th>Company Name:</th>
-            <td colspan="3">${formData.businessInfo.CompanyName}</td>
-          </tr>
-          <tr>
-            <th>Company/Business Owner:</th>
-            <td>${formData.businessInfo.BusinessOwner}</td>
-            <th>TIN No.:</th>
-            <td>${formData.businessInfo.TINNo}</td>
-          </tr>
-          <!-- Additional business info fields -->
-        </table>
-
-
-        <div class="section-header">CLIENT'S INFORMATION</div>
-        <table>
-          <tr>
-            <th>Number of Client(s) to Use Facility:</th>
-            <td>${formData.numberOfClients}</td>
-          </tr>
-        </table>
-       
-        <div class="section-header">Name of Client(s) to Use Facility:</div>
-        ${formData.clientInfoList.map((client, index) => `
-          <table>
-            <tr>
-              <th>${index + 1}. Name:</th>
-              <td colspan="3">${client.Name}</td>
-            </tr>
-            <!-- Additional client info fields -->
-          </table>
-        `).join('')}
-      </body>
-    </html>
-  `;
- 
-  printWindow.document.write(html);
-  printWindow.document.close();
- 
   // Wait for content to load before printing
   printWindow.onload = () => {
     printWindow.print();
     printWindow.close();
   };
 };
+
+
 
 
 /**
@@ -238,12 +174,12 @@ export const downloadRegistrationFormPDF = (formData: RegistrationFormData): voi
     try {
       // Section header
       doc.setFillColor(200, 200, 200);
-      doc.rect(margin, yPosition, contentWidth, 7, 'F');
+      doc.rect(margin, yPosition, contentWidth, 7, 'FD');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
       doc.text('BUSINESS INFORMATION', margin + 2, yPosition + 5);
      
-      yPosition += 10; // Increased spacing after section header
+      yPosition += 7; // Increased spacing after section header
      
       // Business Information Tables with cell borders
       const labelWidth = 60;
@@ -310,15 +246,16 @@ export const downloadRegistrationFormPDF = (formData: RegistrationFormData): voi
       yPosition += cellHeight;
      
       // City, Province, Zip code row
-      const cityWidth = 60;
-      const provinceWidth = 60;
-      const zipLabelWidth = 30;
+      const cityWidth = 50;
+      const provinceWidth = 50;
+      const zipLabelWidth = 25;
+      const zipValueWidth = 15;
       drawCell(margin, yPosition, 20, cellHeight, 'City:', true);
       drawCell(margin + 20, yPosition, cityWidth, cellHeight, safeFormData.businessInfo.City);
       drawCell(margin + 20 + cityWidth, yPosition, 30, cellHeight, 'Province:', true);
       drawCell(margin + 20 + cityWidth + 30, yPosition, provinceWidth, cellHeight, safeFormData.businessInfo.Province);
       drawCell(margin + 20 + cityWidth + 30 + provinceWidth, yPosition, zipLabelWidth, cellHeight, 'Zip code:', true);
-      drawCell(margin + 20 + cityWidth + 30 + provinceWidth + zipLabelWidth, yPosition, contentWidth - (20 + cityWidth + 30 + provinceWidth + zipLabelWidth), cellHeight, safeFormData.businessInfo.ZipCode);
+      drawCell(margin + 20 + cityWidth + 30 + provinceWidth + zipLabelWidth, yPosition, zipValueWidth, cellHeight, safeFormData.businessInfo.ZipCode);
      
       yPosition += cellHeight;
      
@@ -366,12 +303,12 @@ export const downloadRegistrationFormPDF = (formData: RegistrationFormData): voi
      
       // Section header
       doc.setFillColor(200, 200, 200);
-      doc.rect(margin, yPosition, contentWidth, 7, 'F');
+      doc.rect(margin, yPosition, contentWidth, 7, 'FD');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
       doc.text('CLIENT\'S INFORMATION', margin + 2, yPosition + 5);
      
-      yPosition += 12;
+      yPosition += 7;
      
       // Function to draw a bordered cell (reused from business section)
       const drawCell = (x: number, y: number, width: number, height: number, text: string, isHeader: boolean = false) => {
@@ -397,16 +334,16 @@ export const downloadRegistrationFormPDF = (formData: RegistrationFormData): voi
       drawCell(margin, yPosition, labelWidth, cellHeight, 'Number of Client(s) to Use Facility:', true);
       drawCell(margin + labelWidth, yPosition, contentWidth - labelWidth, cellHeight, safeFormData.numberOfClients.toString());
      
-      yPosition += cellHeight + 5;
+      yPosition += cellHeight;
      
       // Client details header
       doc.setFillColor(220, 220, 220);
-      doc.rect(margin, yPosition, contentWidth, 7, 'F');
+      doc.rect(margin, yPosition, contentWidth, 7, 'FD');
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9);
       doc.text('Name of Client(s) to Use Facility:', margin + 2, yPosition + 5);
      
-      yPosition += 12;
+      yPosition += cellHeight;
      
       // Add client entries (ensure at least 2 entries as in the image)
       const clientsToDisplay = safeFormData.clientInfoList.length > 0
@@ -484,39 +421,6 @@ export const downloadRegistrationFormPDF = (formData: RegistrationFormData): voi
       console.error('Error creating client info section:', clientInfoError);
     }
    
-    // Add signature fields at the bottom if space allows
-    try {
-      // Check if we need a new page for signatures
-      if (yPosition > 230) {
-        doc.addPage();
-        yPosition = 30;
-      } else {
-        yPosition = Math.max(yPosition, 210); // Push signatures to bottom of page if there's room
-      }
-     
-      // Add signature lines and text
-      const signatureWidth = 70;
-      const signatureStartX = pageWidth / 2 - signatureWidth - 10;
-     
-      // Applicant signature
-      doc.setFont('helvetica', 'normal');
-      doc.line(signatureStartX, yPosition, signatureStartX + signatureWidth, yPosition);
-      doc.setFontSize(9);
-      doc.text('Signature of Applicant', signatureStartX + signatureWidth/2, yPosition + 5, { align: 'center' });
-     
-      // PSHS-EVC FabLab Manager signature
-      const managerStartX = pageWidth / 2 + 10;
-      doc.line(managerStartX, yPosition, managerStartX + signatureWidth, yPosition);
-      doc.text('FabLab Manager, PSHS-EVC', managerStartX + signatureWidth/2, yPosition + 5, { align: 'center' });
-     
-      // Date
-      yPosition += 15;
-      doc.line(signatureStartX, yPosition, signatureStartX + signatureWidth, yPosition);
-      doc.text('Date', signatureStartX + signatureWidth/2, yPosition + 5, { align: 'center' });
-    } catch (signatureError) {
-      console.error('Error adding signature section:', signatureError);
-    }
-   
     // Save the PDF
     doc.save(`Registration_Form.pdf`);
     console.log('Registration form PDF saved successfully');
@@ -531,4 +435,3 @@ export const downloadRegistrationFormPDF = (formData: RegistrationFormData): voi
     }
   }
 };
-

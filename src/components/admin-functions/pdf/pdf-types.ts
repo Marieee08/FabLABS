@@ -74,4 +74,3 @@ declare module 'jspdf-autotable' {
     options: AutoTableSettings
   ): AutoTableResult;
 }
-

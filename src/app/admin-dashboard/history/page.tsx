@@ -166,7 +166,7 @@ const DashboardAdmin = () => {
               </div>
               <div className="flex items-center gap-3 2xsm:gap-7">
                 <Link href="#" className="flex items-center gap-4">
-                  <UserButton showName> </UserButton>
+                  <UserButton />
                 </Link>
               </div>
             </div>
