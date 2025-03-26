@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, ChevronUp, ChevronDown } from 'lucide-react';
+import { AlertCircle, ChevronUp, ChevronDown, CheckCircle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, addMinutes, parse, parseISO } from 'date-fns';
 
@@ -11,14 +11,37 @@ interface UtilTime {
   DayNum: number | null;
   StartTime: string | null;
   EndTime: string | null;
+  DateStatus?: string | null;
 }
 
 interface TimeEditorProps {
   utilTimes: UtilTime[];
-  serviceRates: Map<string, number>; // Service ID to rate per minute
-  onSave: (updatedTimes: UtilTime[], updatedCost: number) => Promise<void>;
+  serviceRates: Map<string, number>;
+  onSave: (updatedTimes: UtilTime[], updatedCost: number, totalDuration: number) => void;
   onCancel: () => void;
 }
+
+// Simple inline status badge component
+const StatusBadge = ({ status }: { status: string | null | undefined }) => {
+  // Determine badge styling based on status
+  const getBadgeStyle = (): string => {
+    switch (status) {
+      case "Completed":
+        return "bg-green-100 text-green-800 border-green-200";
+      case "Cancelled":
+        return "bg-red-100 text-red-800 border-red-200";
+      case "Ongoing":
+      default:
+        return "bg-blue-100 text-blue-800 border-blue-200";
+    }
+  };
+
+  return (
+    <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getBadgeStyle()}`}>
+      {status || "Ongoing"}
+    </span>
+  );
+};
 
 const TimeEditor: React.FC<TimeEditorProps> = ({
   utilTimes,
@@ -32,11 +55,19 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
       ...time,
       // Keep the original date but format for display
       StartTime: time.StartTime ? time.StartTime : null,
-      EndTime: time.EndTime ? time.EndTime : null
+      EndTime: time.EndTime ? time.EndTime : null,
+      DateStatus: time.DateStatus || "Ongoing"
     }))
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Time status options
+  const statusOptions = [
+    { value: "Ongoing", label: "Ongoing" },
+    { value: "Completed", label: "Completed" },
+    { value: "Cancelled", label: "Cancelled" }
+  ];
 
   // Generate time options in 15-minute increments for a 24-hour period
   const generateTimeOptions = () => {
@@ -56,18 +87,6 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
   };
 
   const timeOptions = generateTimeOptions();
-
-  // Format a date string to just show the time part in 12-hour format
-  const formatTimeForDisplay = (dateString: string | null): string => {
-    if (!dateString) return '';
-    try {
-      const date = new Date(dateString);
-      return format(date, 'h:mm a');
-    } catch (error) {
-      console.error("Error formatting time:", error);
-      return '';
-    }
-  };
 
   // Extract just the time part (HH:mm) from a date string
   const getTimePartFromDate = (dateString: string | null): string => {
@@ -109,9 +128,11 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
     }
   };
 
-  // Calculate the total minutes between start and end times
+  // Calculate the total minutes between start and end times for active time slots
   const calculateTotalMinutes = (times: UtilTime[]): number => {
     return times.reduce((total, time) => {
+      // Don't count cancelled time slots in the total time calculation
+      if (time.DateStatus === "Cancelled") return total;
       if (!time.StartTime || !time.EndTime) return total;
       
       const startTime = new Date(time.StartTime);
@@ -167,10 +188,28 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
     setError(null);
   };
 
+  // Handle status change for a time slot
+  const handleStatusChange = (index: number, newStatus: string) => {
+    setEditedTimes(prev => {
+      const newTimes = [...prev];
+      newTimes[index] = {
+        ...newTimes[index],
+        DateStatus: newStatus
+      };
+      return newTimes;
+    });
+    
+    // Clear any previous errors
+    setError(null);
+  };
+
   const validateTimes = (): boolean => {
     for (const time of editedTimes) {
+      // Skip validation for cancelled time slots
+      if (time.DateStatus === "Cancelled") continue;
+      
       if (!time.StartTime || !time.EndTime) {
-        setError("All start and end times must be set");
+        setError("All active time slots must have start and end times set");
         return false;
       }
       
@@ -200,7 +239,6 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
       // Calculate the updated cost
       const updatedCost = calculateUpdatedCost();
       
-      // Format dates back to ISO strings (no changes needed since we're keeping them as ISO strings)
       // Call the parent's save handler
       await onSave(editedTimes, updatedCost);
     } catch (err) {
@@ -213,6 +251,7 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
 
   // Calculate duration for a specific time slot
   const calculateDuration = (time: UtilTime): number => {
+    if (time.DateStatus === "Cancelled") return 0;
     if (!time.StartTime || !time.EndTime) return 0;
     
     const startTime = new Date(time.StartTime);
@@ -228,6 +267,50 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
   // Calculate and display the estimated updated cost
   const updatedCost = calculateUpdatedCost();
 
+  const renderTimeSlotSummary = () => {
+    const ongoingCount = editedTimes.filter(time => 
+      time.DateStatus === "Ongoing" || time.DateStatus === null || time.DateStatus === undefined
+    ).length;
+    
+    const completedCount = editedTimes.filter(time => time.DateStatus === "Completed").length;
+    const cancelledCount = editedTimes.filter(time => time.DateStatus === "Cancelled").length;
+    
+    return (
+      <div className="my-4 p-3 rounded-lg border">
+        <h4 className="font-medium mb-2">Time Slot Summary</h4>
+        <div className="grid grid-cols-3 gap-4 text-center">
+          <div className={`p-2 rounded-lg ${ongoingCount > 0 ? 'bg-blue-100' : 'bg-gray-100'}`}>
+            <p className="font-medium">{ongoingCount}</p>
+            <p className="text-sm">Ongoing</p>
+          </div>
+          <div className="p-2 rounded-lg bg-green-100">
+            <p className="font-medium">{completedCount}</p>
+            <p className="text-sm">Completed</p>
+          </div>
+          <div className="p-2 rounded-lg bg-red-100">
+            <p className="font-medium">{cancelledCount}</p>
+            <p className="text-sm">Cancelled</p>
+          </div>
+        </div>
+        
+        {ongoingCount > 0 && (
+          <div className="mt-3 p-2 bg-yellow-50 border border-yellow-100 rounded text-sm">
+            <AlertCircle className="h-4 w-4 inline mr-1 text-yellow-500" />
+            <span>All time slots must be marked as Completed or Cancelled before proceeding to payment.</span>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const markAllSlotsCompleted = () => {
+    setEditedTimes(prev => prev.map(time => ({
+      ...time,
+      DateStatus: time.DateStatus === "Cancelled" ? "Cancelled" : "Completed"
+    })));
+    setError(null);
+  };
+
   return (
     <div className="space-y-4 p-4 border rounded-lg bg-gray-50">
       <h3 className="font-medium text-lg">Update Actual Usage Times</h3>
@@ -239,6 +322,8 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
         </Alert>
       )}
       
+      {renderTimeSlotSummary()}
+      
       <div className="space-y-4">
         {editedTimes.map((time, index) => {
           const duration = calculateDuration(time);
@@ -248,19 +333,25 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
             
           return (
             <div key={index} className="p-3 bg-white rounded-lg border">
-              <div className="mb-2">
-                <h4 className="font-medium">Time Slot {index + 1} - {formattedDate}</h4>
-                <p className="text-sm text-gray-500">
-                  Duration: {formatDuration(duration)}
-                </p>
+              <div className="mb-2 flex justify-between items-center">
+                <div>
+                  <h4 className="font-medium">Time Slot {index + 1} - {formattedDate}</h4>
+                  <p className="text-sm text-gray-500">
+                    Duration: {formatDuration(duration)}
+                  </p>
+                </div>
+                <div>
+                  <StatusBadge status={time.DateStatus} />
+                </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Actual Start Time</label>
                   <Select
                     value={getTimePartFromDate(time.StartTime)}
                     onValueChange={(value) => handleTimeChange(index, 'StartTime', value)}
+                    disabled={time.DateStatus === "Cancelled"}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select start time" />
@@ -280,6 +371,7 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
                   <Select
                     value={getTimePartFromDate(time.EndTime)}
                     onValueChange={(value) => handleTimeChange(index, 'EndTime', value)}
+                    disabled={time.DateStatus === "Cancelled"}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select end time" />
@@ -293,31 +385,67 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
                     </SelectContent>
                   </Select>
                 </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Status</label>
+                  <Select
+                    value={time.DateStatus || "Ongoing"}
+                    onValueChange={(value) => handleStatusChange(index, value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {statusOptions.map(option => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           );
         })}
       </div>
       
-      <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
-        <p className="font-medium">Updated Cost Estimate: ₱{updatedCost.toFixed(2)}</p>
-        <p className="text-sm text-gray-600">Based on actual usage time</p>
-      </div>
-      
-      <div className="flex justify-end gap-2">
-        <Button 
-          variant="outline" 
-          onClick={onCancel}
-          disabled={isSubmitting}
-        >
-          Cancel
-        </Button>
-        <Button 
-          onClick={handleSubmit}
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? 'Saving...' : 'Save & Update Cost'}
-        </Button>
+      <div className="flex flex-col gap-4">
+        {/* Add a warning if there are ongoing time slots */}
+        {editedTimes.some(time => time.DateStatus === "Ongoing" || time.DateStatus === null || time.DateStatus === undefined) && (
+          <Alert className="bg-amber-50 border-amber-200">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-700 flex justify-between items-center">
+              <span>Some time slots are still marked as Ongoing</span>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={markAllSlotsCompleted}
+                disabled={isSubmitting}
+                className="ml-4 border-amber-300 text-amber-700 hover:bg-amber-100"
+              >
+                <CheckCircle className="h-3 w-3 mr-1" />
+                Mark All as Completed
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        <div className="flex justify-end gap-2">
+          <Button 
+            variant="outline" 
+            onClick={onCancel}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? 'Saving...' : 'Save & Update Cost'}
+          </Button>
+        </div>
       </div>
     </div>
   );

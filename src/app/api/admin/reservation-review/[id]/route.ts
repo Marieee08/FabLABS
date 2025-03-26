@@ -81,31 +81,27 @@ export async function PATCH(
 
     // Update equipment for a service
     if (resourceType === 'equipment') {
-      const { serviceId, equipment, cost } = data;
+      const { serviceId, equipment } = data;
       
-      // Update the existing UserService
+      // FIX #1 & #2: Only update the equipment field, not the cost
       await prisma.userService.update({
         where: {
           id: serviceId
         },
         data: {
-          EquipmentAvail: equipment,
-          CostsAvail: cost !== undefined ? parseFloat(cost) : undefined
+          EquipmentAvail: equipment
+          // Removed CostsAvail update to prevent cost changes
         }
       });
-      
-      // Machine utilization creation is removed from here
-      // Now it will only be created during the approval process
     } 
     // Update comments
     else if (resourceType === 'comments') {
-      const { comments, totalAmount } = data;
+      const { comments } = data;
       
       await prisma.utilReq.update({
         where: { id },
         data: { 
-          Comments: comments,
-          TotalAmntDue: totalAmount !== undefined ? totalAmount : undefined
+          Comments: comments
         }
       });
     }
