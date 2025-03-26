@@ -148,7 +148,6 @@ export default function Home() {
                 <p className="text-ms py-1 px-3 rounded bg-[#fef0db] rounded-full border border-[#f5a237] rounded-full text-[#ee8b1a]">Cut Materials</p>
               </div>
               <h3 className="text-2xl font-qanelas3">Laser Cutter</h3>
-            <a href="/services" className="text-[#145da0] hover:underline mb-2">Learn More</a>
             </div>
 
 
@@ -165,7 +164,6 @@ export default function Home() {
                 <p className="text-ms py-1 px-3 rounded bg-[#fef0db] rounded-full border border-[#f5a237] rounded-full text-[#ee8b1a]">Create 3D Models</p>
               </div>
               <h3 className="text-2xl font-qanelas3">3D Printer</h3>
-            <a href="/services" className="text-[#145da0] hover:underline mb-2">Learn More</a>
             </div>
 
 
@@ -182,7 +180,6 @@ export default function Home() {
                 <p className="text-ms py-1 px-3 rounded bg-[#fef0db] rounded-full border border-[#f5a237] rounded-full text-[#ee8b1a]">Carve Structures</p>
               </div>
               <h3 className="text-2xl font-qanelas3">CNC Mill</h3>
-            <a href="/services" className="text-[#145da0] hover:underline mb-2">Learn More</a>
             </div>
 
 
