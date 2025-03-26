@@ -15,6 +15,7 @@ import { EditIcon, Save, X, Clock, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import ReservationDetailsTab from './review-reservation-details';
 import TimeEditor from './time-editor';
+import { toast } from 'sonner';
 
 // Interface definitions remain the same
 interface UserService {
@@ -439,15 +440,57 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
   };
 
   // Custom approve function that validates machine requirements
-  const handleApproveReservation = () => {
-    if (!localReservation) return;
+  // Modified handleApproveReservation function in review-reservation.tsx
+
+const handleApproveReservation = async () => {
+  if (!localReservation) return;
+  
+  if (!validateRequiredMachines()) {
+    return;
+  }
+
+  try {
+    // First update the reservation status to Approved
+    await handleStatusUpdate(localReservation.id, 'Approved');
     
-    if (!validateRequiredMachines()) {
-      return;
+    // Then send the approval email notification
+    const response = await fetch('/api/admin-email/approved-request', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        reservationId: localReservation.id,
+        reservationType: 'utilization'
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Failed to send approval email:', errorData);
+      // Don't throw an error here, as the status update was successful
+      // Just log the error and maybe show a toast notification
+      toast({
+        title: 'Status Updated',
+        description: 'Reservation approved, but email notification failed to send.',
+        variant: 'warning',
+      });
+    } else {
+      toast({
+        title: 'Success',
+        description: 'Reservation approved and notification email sent!',
+        variant: 'success',
+      });
     }
-    
-    handleStatusUpdate(localReservation.id, 'Approved');
-  };
+  } catch (error) {
+    console.error('Error in approval process:', error);
+    toast({
+      title: 'Error',
+      description: 'Failed to approve reservation. Please try again.',
+      variant: 'destructive',
+    });
+  }
+};
 
   return (
     <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
