@@ -1,37 +1,45 @@
-// src\app\admin-dashboard\reports\page.tsx
+// src/app/admin-dashboard/reports/page.tsx
+"use client";
 
-"use client"
-
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useUser, UserButton } from "@clerk/nextjs";
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import RoleGuard from '@/components/auth/role-guard';
+import { useUser, UserButton } from "@clerk/nextjs";
+import { DateRange } from 'react-day-picker';
+
 import { DateRangeSelector } from '@/components/admin-reports/date-range-selector';
 import { useDashboardData } from '@/components/admin-reports/use-dashboard-data';
-import { DateRange } from 'react-day-picker';
-import ChartCarousel from '@/components/admin-reports/chart-carousel'; // Import the new component
+import ChartCarousel from '@/components/admin-reports/chart-carousel';
+import { TimeInterval } from '@/components/admin-reports/time-interval-selector';
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import RoleGuard from '@/components/auth/role-guard';
 
-const DashboardAdmin = () => {
+const ReportsPage: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [orderDropdownOpen, setOrderDropdownOpen] = useState(false);
   const today = new Date();
   const formattedDate = format(today, 'EEEE, dd MMMM yyyy');
   const { user, isLoaded } = useUser();
-  const [userRole, setUserRole] = useState("Loading...");
+  const [userRole, setUserRole] = useState<string>("Loading...");
+
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: new Date(new Date().setMonth(new Date().getMonth() - 1)),
     to: new Date(),
   });
+  const [timeInterval, setTimeInterval] = useState<TimeInterval>('month');
 
-  // Use our custom hook for dashboard data
-  const { data: dashboardData, isLoading, error, refreshData, lastUpdated } = useDashboardData();
+  // Use the custom hook to fetch dashboard data
+  const { 
+    data: dashboardData, 
+    isLoading, 
+    error, 
+    refreshData, 
+    lastUpdated,
+  } = useDashboardData();
 
-  // useEffect to get user role
+  // useEffect to fetch user role
   useEffect(() => {
-    // ... existing code for fetchUserRole ...
     const fetchUserRole = async () => {
       if (!isLoaded || !user) {
         setUserRole("Not logged in");
@@ -60,12 +68,16 @@ const DashboardAdmin = () => {
     refreshData(range);
   };
 
+  // Handle time interval change
+  const handleTimeIntervalChange = (interval: TimeInterval) => {
+    setTimeInterval(interval);
+  };
+
   return (
     <RoleGuard allowedRoles={['ADMIN']}>
       <div className="flex h-screen overflow-hidden bg-[#f1f5f9]">
-        {/* Sidebar - Keep existing sidebar code */}
+        {/* Sidebar */}
         <aside className={`absolute left-0 top-0 z-50 flex h-screen w-72 flex-col overflow-y-hidden bg-[#0d172c] duration-300 ease-linear lg:static lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-          {/* ... existing sidebar code ... */}
           <div className="flex items-center justify-between gap-2 px-6 py-5.5 lg:py-6.5">
             <Link href="/" className="mt-5">
               <span className="text-white text-2xl font-bold font-qanelas4">FABLAB</span>
@@ -75,7 +87,7 @@ const DashboardAdmin = () => {
             </button>
           </div>
           <nav className="mt-5 py-4 px-4 lg:mt-9 lg:px-6">
-          <div className="flex flex-col items-center py-8">
+            <div className="flex flex-col items-center py-8">
               {user?.imageUrl ? (
                 <img 
                   src={user.imageUrl} 
@@ -89,7 +101,7 @@ const DashboardAdmin = () => {
                 {user?.firstName} {user?.lastName}
               </h2>
               <p className="text-[#5e86ca]">{userRole}</p>
-          </div>
+            </div>
             <div>
               <h3 className="mb-4 ml-4 text-sm font-semibold text-gray-400">MENU</h3>
               <ul className="mb-6 flex flex-col gap-1.5">
@@ -149,7 +161,7 @@ const DashboardAdmin = () => {
 
         {/* Main Content */}
         <div className="relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden">
-          {/* Header - Keep existing header code */}
+          {/* Header */}
           <header className="sticky top-0 z-[999] flex w-full bg-white shadow-md">
             <div className="flex flex-grow items-center justify-between py-4 px-4 shadow-2 md:px-6 2xl:px-11">
               <div className="flex items-center gap-2 sm:gap-4 lg:hidden">
@@ -161,15 +173,15 @@ const DashboardAdmin = () => {
                 </button>
               </div>
               <div className="flex space-x-6 lg:space-x-10">
-              <Link href="/" className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300">
-                Home
-              </Link>
-              <Link href="/services" className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300">
-                Services
-              </Link>
-              <Link href="/contact" className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300">
-                Contact
-              </Link>
+                <Link href="/" className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300">
+                  Home
+                </Link>
+                <Link href="/services" className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300">
+                  Services
+                </Link>
+                <Link href="/contact" className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300">
+                  Contact
+                </Link>
               </div>
               <div className="hidden sm:block">
                 <form action="#" method="POST">
@@ -210,7 +222,7 @@ const DashboardAdmin = () => {
               {/* Date Range Selector */}
               <DateRangeSelector onRangeChange={handleDateRangeChange} />
               
-              {/* Key Metrics - Keep this section */}
+              {/* Key Metrics */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3 mb-6">
                 <Card className="bg-white shadow-sm transform hover:scale-105 transition-all duration-300 border border-[#5e86ca]">
                   <CardHeader>
@@ -243,11 +255,13 @@ const DashboardAdmin = () => {
                 </Card>
               </div>
               
-              {/* Chart Carousel - Replace all the chart sections with this carousel */}
+              {/* Chart Carousel */}
               <ChartCarousel 
                 dashboardData={dashboardData || {}} 
                 isLoading={isLoading} 
                 error={error} 
+                timeInterval={timeInterval}
+                onTimeIntervalChange={handleTimeIntervalChange}
               />
               
               {/* Last updated information */}
@@ -264,4 +278,4 @@ const DashboardAdmin = () => {
   );
 };
 
-export default DashboardAdmin;
+export default ReportsPage;
