@@ -148,6 +148,7 @@ model UtilTime {
   DayNum    Int?
   StartTime DateTime?
   EndTime   DateTime?
+  DateStatus  String?               @default("Approved")
   utilReqId Int?
   evcId     Int?
   evc       EVCReservation? @relation("EVCReservationtoUtilTime", fields: [evcId], references: [id])

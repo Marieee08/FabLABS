@@ -85,12 +85,14 @@ const DashboardUser = () => {
         // Filter into pending/active and history (completed or rejected)
         const pendingReservations = evcData.filter((reservation: EVCReservation) => 
           reservation.EVCStatus.toLowerCase() !== 'completed' && 
-          reservation.EVCStatus.toLowerCase() !== 'rejected'
+          reservation.EVCStatus.toLowerCase() !== 'rejected' && 
+          reservation.EVCStatus.toLowerCase() !== 'cancelled'
         );
         
         const completedReservations = evcData.filter((reservation: EVCReservation) => 
           reservation.EVCStatus.toLowerCase() === 'completed' || 
-          reservation.EVCStatus.toLowerCase() === 'rejected'
+          reservation.EVCStatus.toLowerCase() === 'rejected'|| 
+          reservation.EVCStatus.toLowerCase() === 'cancelled'
         );
         
         setEvcReservations(pendingReservations);
