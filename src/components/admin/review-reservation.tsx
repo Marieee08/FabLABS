@@ -580,7 +580,8 @@ useEffect(() => {
     setHasUnsavedChanges(true);
   };
 
-// Custom approve function with reliable MachineUtilization creation
+  // Fixed handleApproveReservation function that works with the existing API
+
 const handleApproveReservation = async () => {
   if (!localReservation) return;
   
@@ -593,62 +594,35 @@ const handleApproveReservation = async () => {
     // 2. Set up loading state for better UX
     setIsLoading(true);
     
-    // 3. For each UserService, ensure we create a MachineUtilization record
-    // We'll work with what's in the database rather than local state to be safe
-    const servicesResponse = await fetch(`/api/admin/reservation-review/${localReservation.id}`);
-    if (!servicesResponse.ok) {
-      throw new Error('Failed to fetch current reservation data');
-    }
+    // 3. For each UserService with equipment, prepare MachineUtilization records
+    const machineUtilizations = editedServices
+      .filter(service => service.selectedMachines.length > 0)
+      .flatMap(service => 
+        service.selectedMachines.map(machine => ({
+          Machine: machine.name,
+          ReviewedBy: null,  // This will be filled in later when reviewed
+          MachineApproval: false,
+          DateReviewed: null,
+          ServiceName: service.ServiceAvail,
+          OperatingTimes: [],  // Empty arrays for now, will be filled later
+          DownTimes: [],
+          RepairChecks: []
+        }))
+      );
     
-    const currentReservation = await servicesResponse.json();
-    const userServices = currentReservation.UserServices || [];
-    
-    // 4. Create MachineUtilization records for each UserService with a machine
-    const creationPromises = userServices.map(async (service: UserService) => {
-      // Skip if no equipment
-      if (!service.EquipmentAvail || service.EquipmentAvail.trim() === '') {
-        return null;
-      }
-      
-      // Extract machine name from EquipmentAvail (format: "MachineName:Quantity")
-      const machineName = service.EquipmentAvail.split(':')[0].trim();
-      
-      // Skip if no machine name
-      if (!machineName) {
-        return null;
-      }
-      
-      // Create the MachineUtilization record
-      try {
-        const createResponse = await fetch(`/api/admin/machine-utilization/${localReservation.id}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            machine: machineName,
-            serviceName: service.ServiceAvail,
-            machineApproval: false
-          }),
-        });
-        
-        if (!createResponse.ok) {
-          const errorData = await createResponse.json();
-          console.warn('Skipping machine utilization creation:', errorData.error);
-          // We'll continue even if this fails - might be a duplicate
-          return null;
-        }
-        
-        return await createResponse.json();
-      } catch (error) {
-        console.error(`Error creating machine utilization for ${machineName}:`, error);
-        // Continue with others even if one fails
-        return null;
-      }
+    // 4. Create all machine utilization records in a single API call
+    const response = await fetch(`/api/admin/machine-utilization/${localReservation.id}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(machineUtilizations)
     });
     
-    // Wait for all creation operations to complete
-    await Promise.all(creationPromises);
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to create machine utilization records');
+    }
     
     // 5. Now update the status to Approved
     await handleStatusUpdate(localReservation.id, 'Approved');
@@ -678,6 +652,21 @@ const handleApproveReservation = async () => {
   }
     
 
+    
+    // 6. Fetch the updated reservation data to ensure we have the latest MachineUtilizations
+    const updatedResponse = await fetch(`/api/admin/reservation-review/${localReservation.id}`);
+    if (updatedResponse.ok) {
+      const updatedReservation = await updatedResponse.json();
+      setLocalReservation(updatedReservation);
+      
+      // Update the edited services with the latest data
+      const updatedServices = updatedReservation.UserServices.map((service) => ({
+        ...service,
+        selectedMachines: parseMachines(service.EquipmentAvail || '')
+      }));
+      
+      setEditedServices(updatedServices);
+    }
     
     alert('Reservation approved successfully with machine utilization records');
   } catch (error) {
