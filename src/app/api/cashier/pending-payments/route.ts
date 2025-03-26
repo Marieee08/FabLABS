@@ -15,7 +15,7 @@ export async function GET() {
     // Fetch reservations that are pending payment
     const reservations = await prisma.utilReq.findMany({
       where: {
-        Status: 'Pending payment'
+        Status: 'Pending Payment'
       },
       include: {
         accInfo: {
