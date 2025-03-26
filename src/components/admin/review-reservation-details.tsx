@@ -1,3 +1,5 @@
+// src\components\admin\review-reservation-details.tsx
+
 import React, { useState, useEffect } from 'react';
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
@@ -17,7 +19,6 @@ interface UtilTime {
   DayNum: number | null;
   StartTime: string | null;
   EndTime: string | null;
-  DateStatus?: string | null;
 }
 
 interface DetailedReservation {
@@ -66,55 +67,32 @@ interface ReservationDetailsTabProps {
   editMode: boolean;
   validationError: string | null;
   onUpdateService: (updatedService: UserServiceWithMachines) => void;
-  hideRequiresEquipment?: boolean; // Added prop to hide "requires equipment" label
 }
-
-// Simple time status badge component
-const TimeStatusBadge = ({ status }: { status: string | null | undefined }) => {
-  const getStatusBadgeStyle = (): string => {
-    switch (status) {
-      case "Completed":
-        return "bg-green-100 text-green-800 border-green-200";
-      case "Cancelled":
-        return "bg-red-100 text-red-800 border-red-200";
-      case "Ongoing":
-      default:
-        return "bg-blue-100 text-blue-800 border-blue-200";
-    }
-  };
-
-  return (
-    <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusBadgeStyle()}`}>
-      {status || "Ongoing"}
-    </span>
-  );
-};
 
 const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
   reservation,
   machines,
   editMode,
   validationError,
-  onUpdateService,
-  hideRequiresEquipment = false // Default to false for backward compatibility
+  onUpdateService
 }) => {
   const [servicesWithMachines, setServicesWithMachines] = useState<UserServiceWithMachines[]>([]);
-  // New state for tracking equipment text input for direct editing
-  const [equipmentTexts, setEquipmentTexts] = useState<{[serviceId: string]: string}>({});
 
+  // Parse the EquipmentAvail string into an array of machine objects with names and quantities
   const parseMachines = (equipmentStr: string): SelectedMachine[] => {
     if (!equipmentStr) return [];
     
     return equipmentStr.split(',').map(machine => {
       const parts = machine.trim().split(':');
       const name = parts[0].trim();
-      // Always use quantity of 1
-      const quantity = 1;
+      // If quantity is specified with :, use it, otherwise default to 1
+      const quantity = parts.length > 1 ? parseInt(parts[1].trim()) || 1 : 1;
       
       return { name, quantity };
     }).filter(m => m.name !== '');
   };
-  
+
+  // Convert the array of machine objects back to a comma-separated string
   const stringifyMachines = (machines: SelectedMachine[]): string => {
     return machines.map(m => `${m.name}:${m.quantity}`).join(', ');
   };
@@ -128,13 +106,6 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
       }));
       
       setServicesWithMachines(servicesWithMachines);
-      
-      // Initialize the equipment text inputs
-      const initialTexts: {[serviceId: string]: string} = {};
-      servicesWithMachines.forEach(service => {
-        initialTexts[service.id] = service.EquipmentAvail || '';
-      });
-      setEquipmentTexts(initialTexts);
     }
   }, [reservation]);
 
@@ -150,9 +121,6 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
 
   // Check if a service requires machines (has associated machines in the database)
   const serviceRequiresMachines = (serviceName: string) => {
-    // Return false if we're hiding the "requires equipment" label
-    if (hideRequiresEquipment) return false;
-    
     return getMachinesForService(serviceName).length > 0;
   };
 
@@ -169,29 +137,22 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
       const machineObj = machines.find(m => m.Machine === machineName);
       const defaultQuantity = 1; // Start with 1 by default
       
-      const updatedMachines = [
-        ...service.selectedMachines, 
-        { name: machineName, quantity: defaultQuantity }
-      ];
-      
-      const equipmentStr = stringifyMachines(updatedMachines);
-      
       const updatedService = {
         ...service,
-        selectedMachines: updatedMachines,
-        EquipmentAvail: equipmentStr
+        selectedMachines: [
+          ...service.selectedMachines, 
+          { name: machineName, quantity: defaultQuantity }
+        ],
+        EquipmentAvail: stringifyMachines([
+          ...service.selectedMachines, 
+          { name: machineName, quantity: defaultQuantity }
+        ])
       };
       
       // Update local state
       setServicesWithMachines(prev => 
         prev.map(s => s.id === service.id ? updatedService : s)
       );
-      
-      // Update equipment text state
-      setEquipmentTexts(prev => ({
-        ...prev,
-        [service.id]: equipmentStr
-      }));
       
       // Propagate changes to parent component
       onUpdateService(updatedService);
@@ -201,24 +162,17 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
   // Remove a machine from a service's selected machines
   const handleRemoveMachine = (service: UserServiceWithMachines, machineName: string) => {
     const updatedMachines = service.selectedMachines.filter(m => m.name !== machineName);
-    const equipmentStr = stringifyMachines(updatedMachines);
     
     const updatedService = {
       ...service,
       selectedMachines: updatedMachines,
-      EquipmentAvail: equipmentStr
+      EquipmentAvail: stringifyMachines(updatedMachines)
     };
     
     // Update local state
     setServicesWithMachines(prev => 
       prev.map(s => s.id === service.id ? updatedService : s)
     );
-    
-    // Update equipment text state
-    setEquipmentTexts(prev => ({
-      ...prev,
-      [service.id]: equipmentStr
-    }));
     
     // Propagate changes to parent component
     onUpdateService(updatedService);
@@ -236,12 +190,10 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
       m.name === machineName ? { ...m, quantity: validatedQuantity } : m
     );
     
-    const equipmentStr = stringifyMachines(updatedMachines);
-    
     const updatedService = {
       ...service,
       selectedMachines: updatedMachines,
-      EquipmentAvail: equipmentStr
+      EquipmentAvail: stringifyMachines(updatedMachines)
     };
     
     // Update local state
@@ -249,32 +201,14 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
       prev.map(s => s.id === service.id ? updatedService : s)
     );
     
-    // Update equipment text state
-    setEquipmentTexts(prev => ({
-      ...prev,
-      [service.id]: equipmentStr
-    }));
-    
     // Propagate changes to parent component
     onUpdateService(updatedService);
   };
 
-  // FIX #2: Handle direct equipment text editing
-  const handleEquipmentTextChange = (service: UserServiceWithMachines, text: string) => {
-    // Update the equipment text state
-    setEquipmentTexts(prev => ({
-      ...prev,
-      [service.id]: text
-    }));
-    
-    // Parse the text to get the machines array
-    const machines = parseMachines(text);
-    
-    // Create the updated service
+  const handleCostChange = (service: UserServiceWithMachines, cost: string) => {
     const updatedService = {
       ...service,
-      selectedMachines: machines,
-      EquipmentAvail: text
+      CostsAvail: cost
     };
     
     // Update local state
@@ -285,8 +219,6 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
     // Propagate changes to parent component
     onUpdateService(updatedService);
   };
-
-  // FIX #1: Removed handleCostChange function to prevent cost modifications
 
   const getStatusColor = (status: string) => {
     const colors = {
@@ -300,17 +232,6 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
       Ongoing: 'bg-indigo-100 text-indigo-800'
     };
     return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
-  };
-
-  // Format date for display
-  const formatDateTime = (dateTimeStr: string | null): string => {
-    if (!dateTimeStr) return 'Not set';
-    try {
-      const date = new Date(dateTimeStr);
-      return date.toLocaleString();
-    } catch (error) {
-      return 'Invalid date';
-    }
   };
 
   return (
@@ -347,14 +268,13 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
         </div>
         <div className="space-y-4">
           {servicesWithMachines.map((service, index) => (
-            <div key={index} className="p-3 rounded-lg bg-gray-50">
+            <div key={index} className={`p-3 rounded-lg ${serviceRequiresMachines(service.ServiceAvail) && service.selectedMachines.length === 0 ? 'bg-red-50 border border-red-200' : 'bg-gray-50'}`}>
               <div className="grid grid-cols-2 gap-4 mb-2">
                 <div>
                   <label className="text-sm text-gray-600">Service</label>
                   <p className="font-medium flex items-center">
                     {service.ServiceAvail}
-                    {/* FIX #3: Only show "requires equipment" if hideRequiresEquipment is false */}
-                    {!hideRequiresEquipment && serviceRequiresMachines(service.ServiceAvail) && (
+                    {serviceRequiresMachines(service.ServiceAvail) && (
                       <span className="ml-2 text-xs px-2 py-0.5 bg-orange-100 text-orange-800 rounded-full">
                         Requires Equipment
                       </span>
@@ -402,8 +322,10 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
                           })}
                         </div>
                       ) : (
-                        <p className="italic text-sm mb-2 text-gray-500">
-                          No equipment assigned
+                        <p className={`italic text-sm mb-2 ${serviceRequiresMachines(service.ServiceAvail) ? 'text-red-500' : 'text-gray-500'}`}>
+                          {serviceRequiresMachines(service.ServiceAvail) 
+                            ? 'Equipment required for this service' 
+                            : 'No equipment assigned'}
                         </p>
                       )}
                       
@@ -434,18 +356,20 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
                   ) : (
                     <div>
                       {service.selectedMachines.length > 0 ? (
-  <div className="flex flex-wrap gap-2">
-    {service.selectedMachines.map((machine, idx) => (
-      <span key={idx} className="bg-blue-50 px-2 py-1 rounded-lg text-sm">
-        {machine.name}
-      </span>
-    ))}
-  </div>
-) : (
-  <p className="italic text-gray-500">
-    Not assigned
-  </p>
-)}
+                        <div className="flex flex-wrap gap-2">
+                          {service.selectedMachines.map((machine, idx) => (
+                            <span key={idx} className="bg-blue-50 px-2 py-1 rounded-lg text-sm">
+                              {machine.name} × {machine.quantity}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className={`italic ${serviceRequiresMachines(service.ServiceAvail) ? 'text-red-500' : 'text-gray-500'}`}>
+                          {serviceRequiresMachines(service.ServiceAvail) 
+                            ? 'Equipment required for this service' 
+                            : 'Not assigned'}
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -457,8 +381,18 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
                 </div>
                 <div>
                   <label className="text-sm text-gray-600">Cost</label>
-                  {/* FIX #1: Changed to display the cost as read-only, even in edit mode */}
-                  <p className="font-medium">₱{service.CostsAvail ? Number(service.CostsAvail).toFixed(2) : '0.00'}</p>
+                  {editMode ? (
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={service.CostsAvail?.toString() || '0'}
+                      onChange={(e) => handleCostChange(service, e.target.value)}
+                      className="mt-1"
+                    />
+                  ) : (
+                    <p className="font-medium">₱{service.CostsAvail ? Number(service.CostsAvail).toFixed(2) : '0.00'}</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -472,15 +406,10 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
         <h3 className="font-medium text-gray-900 mb-2">Schedule</h3>
         <div className="space-y-2">
           {reservation.UtilTimes.map((time, index) => (
-            <div key={index} className="bg-gray-50 p-3 rounded-lg flex justify-between items-start">
-              <div>
-                <p><span className="text-gray-600">Day {time.DayNum || index + 1}:</span></p>
-                <p className="ml-4">Start: {formatDateTime(time.StartTime)}</p>
-                <p className="ml-4">End: {formatDateTime(time.EndTime)}</p>
-              </div>
-              <div className="pt-1">
-                <TimeStatusBadge status={time.DateStatus} />
-              </div>
+            <div key={index} className="bg-gray-50 p-3 rounded-lg">
+              <p><span className="text-gray-600">Day {time.DayNum}:</span></p>
+              <p className="ml-4">Start: {time.StartTime ? new Date(time.StartTime).toLocaleString() : 'Not set'}</p>
+              <p className="ml-4">End: {time.EndTime ? new Date(time.EndTime).toLocaleString() : 'Not set'}</p>
             </div>
           ))}
           {reservation.UtilTimes.length === 0 && (

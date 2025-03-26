@@ -173,37 +173,28 @@ export async function POST(
       const processedData = await Promise.all(data.map(async (incomingMachineUtil) => {
         // Start a transaction to ensure data consistency
         return prisma.$transaction(async (tx) => {
-          let machineUtilResult;
-          
-          // Check if we have a valid ID for update
-          if (incomingMachineUtil.id) {
-            // Update existing record
-            machineUtilResult = await tx.machineUtilization.update({
-              where: { 
-                id: incomingMachineUtil.id
-              },
-              data: {
-                Machine: incomingMachineUtil.Machine,
-                ReviwedBy: incomingMachineUtil.ReviwedBy || incomingMachineUtil.ReviewedBy,
-                MachineApproval: null,
-                DateReviewed: incomingMachineUtil.DateReviewed,
-                ServiceName: incomingMachineUtil.ServiceName,
-                utilReqId: utilReqId
-              }
-            });
-          } else {
-            // Create new record
-            machineUtilResult = await tx.machineUtilization.create({
-              data: {
-                Machine: incomingMachineUtil.Machine,
-                ReviwedBy: incomingMachineUtil.ReviwedBy || incomingMachineUtil.ReviewedBy,
-                MachineApproval: null,
-                DateReviewed: incomingMachineUtil.DateReviewed,
-                ServiceName: incomingMachineUtil.ServiceName,
-                utilReqId: utilReqId
-              }
-            });
-          }
+          // Upsert machine utilization record
+          const machineUtilResult = await tx.machineUtilization.upsert({
+            where: { 
+              id: incomingMachineUtil.id || undefined 
+            },
+            update: {
+              Machine: incomingMachineUtil.Machine,
+              ReviwedBy: incomingMachineUtil.ReviwedBy || incomingMachineUtil.ReviewedBy,
+              MachineApproval: null,
+              DateReviewed: incomingMachineUtil.DateReviewed,
+              ServiceName: incomingMachineUtil.ServiceName,
+              utilReqId: utilReqId
+            },
+            create: {
+              Machine: incomingMachineUtil.Machine,
+              ReviwedBy: incomingMachineUtil.ReviwedBy || incomingMachineUtil.ReviewedBy,
+              MachineApproval: null,
+              DateReviewed: incomingMachineUtil.DateReviewed,
+              ServiceName: incomingMachineUtil.ServiceName,
+              utilReqId: utilReqId
+            }
+          });
   
           // Delete existing related records
           await Promise.all([
