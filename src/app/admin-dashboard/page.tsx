@@ -4,7 +4,6 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useUser, UserButton } from "@clerk/nextjs";
-import ReservationHistory from '@/components/admin/reservation-history';
 import TestCalendar from '@/components/admin-functions/admin-calendar';
 import { format } from 'date-fns';
 import RoleGuard from '@/components/auth/role-guard';
@@ -201,7 +200,6 @@ const DashboardAdmin = () => {
           <p className="text-sm text-[#143370] mb-4 font-poppins1">{formattedDate}</p>
           <div className="flex flex-col gap-6">
             <TestCalendar />
-            <ReservationHistory />
           </div>
           </div>
         </main>
