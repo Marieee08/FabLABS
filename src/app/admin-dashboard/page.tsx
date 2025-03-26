@@ -188,7 +188,7 @@ const DashboardAdmin = () => {
               </form>
             </div>
             <div className="flex items-center gap-3 2xsm:gap-7">
-              <UserButton showName> </UserButton>
+              <UserButton />
             </div>
           </div>
         </header>
