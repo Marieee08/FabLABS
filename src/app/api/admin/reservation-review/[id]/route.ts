@@ -32,7 +32,13 @@ export async function GET(
         UserServices: true,
         UserTools: true,
         UtilTimes: true,
-        MachineUtilizations: true,
+        MachineUtilizations: {
+          include: {
+            OperatingTimes: true,
+            DownTimes: true,
+            RepairChecks: true,
+          }
+        },
       },
     });
 
@@ -88,41 +94,8 @@ export async function PATCH(
         }
       });
       
-      // If equipment is specified, create or update MachineUtilization record
-      if (equipment && equipment.trim() !== '') {
-        // Extract machine name from equipment string (format: "MachineName:Quantity")
-        const machineName = equipment.split(':')[0].trim();
-        
-        // Check if a MachineUtilization record already exists for this service and machine
-        const existingUtilization = await prisma.machineUtilization.findFirst({
-          where: {
-            utilReqId: id,
-            ServiceName: machineName
-          }
-        });
-        
-        if (existingUtilization) {
-          // Update existing record
-          await prisma.machineUtilization.update({
-            where: {
-              id: existingUtilization.id
-            },
-            data: {
-              Machine: machineName
-            }
-          });
-        } else {
-          // Create new record
-          await prisma.machineUtilization.create({
-            data: {
-              Machine: machineName,
-              ServiceName: machineName,
-              MachineApproval: false,
-              utilReqId: id
-            }
-          });
-        }
-      }
+      // Machine utilization creation is removed from here
+      // Now it will only be created during the approval process
     } 
     // Update comments
     else if (resourceType === 'comments') {
@@ -157,7 +130,13 @@ export async function PATCH(
         UserServices: true,
         UserTools: true,
         UtilTimes: true,
-        MachineUtilizations: true,
+        MachineUtilizations: {
+          include: {
+            OperatingTimes: true,
+            DownTimes: true,
+            RepairChecks: true,
+          }
+        },
       },
     });
 
@@ -210,20 +189,8 @@ export async function POST(
         }
       });
       
-      // If equipment is specified, create a new MachineUtilization record
-      if (equipment && equipment.trim() !== '') {
-        // Extract machine name from equipment string (format: "MachineName:Quantity")
-        const machineName = equipment.split(':')[0].trim();
-        
-        await prisma.machineUtilization.create({
-          data: {
-            Machine: machineName,
-            ServiceName: machineName,
-            MachineApproval: false,
-            utilReqId: id
-          }
-        });
-      }
+      // Machine utilization creation is removed from here
+      // Now it will only be created during the approval process
       
       return NextResponse.json(newService);
     }
@@ -265,43 +232,12 @@ export async function DELETE(
 
     // Delete UserService
     if (resourceType === 'service' && serviceId) {
-      // Get the service to find associated machine
-      const service = await prisma.userService.findUnique({
-        where: {
-          id: serviceId
-        }
-      });
-      
-      // Extract machine name if available
-      let machineName = null;
-      if (service?.EquipmentAvail) {
-        machineName = service.EquipmentAvail.split(':')[0].trim();
-      }
-      
       // Delete the UserService
       await prisma.userService.delete({
         where: {
           id: serviceId
         }
       });
-      
-      // Delete associated MachineUtilization if a machine was assigned
-      if (machineName) {
-        const machineUtil = await prisma.machineUtilization.findFirst({
-          where: {
-            utilReqId: id,
-            Machine: machineName
-          }
-        });
-        
-        if (machineUtil) {
-          await prisma.machineUtilization.delete({
-            where: {
-              id: machineUtil.id
-            }
-          });
-        }
-      }
       
       return NextResponse.json({ success: true });
     }
@@ -352,7 +288,13 @@ export async function PUT(
         UserServices: true,
         UserTools: true,
         UtilTimes: true,
-        MachineUtilizations: true,
+        MachineUtilizations: {
+          include: {
+            OperatingTimes: true,
+            DownTimes: true,
+            RepairChecks: true,
+          }
+        },
       },
     });
 
