@@ -1,3 +1,4 @@
+// src/components/admin/review-reservation.tsx
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -11,8 +12,9 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { EditIcon, Save, X } from 'lucide-react';
-import ReservationDetailsTab from './review-reservation-details'; // Import the extracted component
+import ReservationDetailsTab from './review-reservation-details';
 
+// Interface definitions remain the same
 interface UserService {
   id: string;
   ServiceAvail: string;
@@ -115,7 +117,7 @@ interface ReviewReservationProps {
   selectedReservation: DetailedReservation | null;
   handleStatusUpdate: (
     reservationId: number,
-    newStatus: 'Approved' | 'Ongoing' | 'Pending payment' | 'Paid' | 'Completed' | 'Cancelled'
+    newStatus: 'Approved' | 'Ongoing' | 'Pending Payment' | 'Paid' | 'Completed' | 'Cancelled' | 'Rejected'
   ) => void;
 }
 
@@ -479,7 +481,6 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
                   <p className="text-gray-500 italic">No business information available</p>
                 )}
               </TabsContent>
-
             </Tabs>
 
             <DialogFooter className="mt-6">
@@ -515,11 +516,12 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
                   </div>
                 )}
                 <div className="flex gap-4">
-                {localReservation.Status === 'Pending' && (
+                {/* Updated status flow for MSME users */}
+                {localReservation.Status === 'Pending Admin Approval' && (
                   <>
                     <Button
                       variant="destructive"
-                      onClick={() => handleStatusUpdate(localReservation.id, 'Cancelled')}
+                      onClick={() => handleStatusUpdate(localReservation.id, 'Rejected')}
                     >
                       Reject Reservation
                     </Button>
@@ -559,14 +561,14 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
                     </Button>
                     <Button
                       variant="default"
-                      onClick={() => handleStatusUpdate(localReservation.id, 'Pending payment')}
+                      onClick={() => handleStatusUpdate(localReservation.id, 'Pending Payment')}
                     >
-                      Mark as To Pay
+                      Mark as Pending Payment
                     </Button>
                   </>
                 )}
 
-                {localReservation.Status === 'Pending payment' && (
+                {localReservation.Status === 'Pending Payment' && (
                   <>
                     <Button
                       variant="default"
@@ -586,6 +588,18 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
                       Mark as Completed
                     </Button>
                   </>
+                )}
+
+                {/* Display a view-only button for completed/rejected/cancelled reservations */}
+                {(localReservation.Status === 'Completed' || 
+                  localReservation.Status === 'Rejected' || 
+                  localReservation.Status === 'Cancelled') && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsModalOpen(false)}
+                  >
+                    Close
+                  </Button>
                 )}
                 </div>
               </div>
