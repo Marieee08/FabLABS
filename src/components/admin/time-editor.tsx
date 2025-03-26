@@ -69,6 +69,47 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
     { value: "Cancelled", label: "Cancelled" }
   ];
 
+  const validateAllUtilTimesComplete = (utilTimes) => {
+    if (!utilTimes || !Array.isArray(utilTimes) || utilTimes.length === 0) {
+      return {
+        valid: false,
+        message: "No time slots found to validate."
+      };
+    }
+    
+    const incompleteSlots = utilTimes.filter(
+      time => time.DateStatus !== "Completed" && time.DateStatus !== "Cancelled"
+    );
+    
+    if (incompleteSlots.length > 0) {
+      return {
+        valid: false,
+        message: `${incompleteSlots.length} time slot(s) still marked as Ongoing. All time slots must be marked as Completed or Cancelled before proceeding to payment.`
+      };
+    }
+    
+    return {
+      valid: true,
+      message: "All time slots are properly marked."
+    };
+  };
+
+  const handleTransitionToPendingPayment = () => {
+    // Validate that all time slots are completed
+    const validation = validateAllUtilTimesComplete(editedTimes);
+    
+    if (!validation.valid) {
+      // Display an error message indicating why pending payment cannot proceed
+      setError(validation.message);
+      return;
+    }
+    
+    // If all times are valid, proceed with status update
+    // You'll need to pass the actual reservation ID and implementation
+    // of handleStatusUpdate from the parent component
+    handleStatusUpdate(reservationId, 'Pending Payment');
+  };
+
   // Generate time options in 15-minute increments for a 24-hour period
   const generateTimeOptions = () => {
     const options = [];
