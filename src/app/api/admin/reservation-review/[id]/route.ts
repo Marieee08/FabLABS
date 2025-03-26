@@ -1,3 +1,5 @@
+// src\app\api\admin\reservation-review\[id]\route.ts
+
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 
@@ -30,6 +32,13 @@ export async function GET(
         UserServices: true,
         UserTools: true,
         UtilTimes: true,
+        MachineUtilizations: {
+          include: {
+            OperatingTimes: true,
+            DownTimes: true,
+            RepairChecks: true,
+          }
+        },
       },
     });
 
@@ -74,6 +83,7 @@ export async function PATCH(
     if (resourceType === 'equipment') {
       const { serviceId, equipment, cost } = data;
       
+      // Update the existing UserService
       await prisma.userService.update({
         where: {
           id: serviceId
@@ -83,6 +93,9 @@ export async function PATCH(
           CostsAvail: cost !== undefined ? parseFloat(cost) : undefined
         }
       });
+      
+      // Machine utilization creation is removed from here
+      // Now it will only be created during the approval process
     } 
     // Update comments
     else if (resourceType === 'comments') {
@@ -117,6 +130,13 @@ export async function PATCH(
         UserServices: true,
         UserTools: true,
         UtilTimes: true,
+        MachineUtilizations: {
+          include: {
+            OperatingTimes: true,
+            DownTimes: true,
+            RepairChecks: true,
+          }
+        },
       },
     });
 
@@ -125,6 +145,113 @@ export async function PATCH(
     console.error("Error updating resource:", error);
     return NextResponse.json(
       { error: "Failed to update resource" },
+      { status: 500 }
+    );
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+// POST handler for creating new UserService records
+export async function POST(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const id = parseInt(params.id);
+    const url = new URL(req.url);
+    const resourceType = url.searchParams.get('type');
+    const data = await req.json();
+
+    if (isNaN(id)) {
+      return NextResponse.json(
+        { error: "Invalid reservation ID" },
+        { status: 400 }
+      );
+    }
+
+    // Create new UserService
+    if (resourceType === 'service') {
+      const { serviceAvail, equipment, cost, mins } = data;
+      
+      // Create new UserService record
+      const newService = await prisma.userService.create({
+        data: {
+          ServiceAvail: serviceAvail,
+          EquipmentAvail: equipment,
+          CostsAvail: cost !== undefined ? parseFloat(cost) : null,
+          MinsAvail: mins !== undefined ? parseFloat(mins) : null,
+          utilReq: {
+            connect: {
+              id: id
+            }
+          }
+        }
+      });
+      
+      // Machine utilization creation is removed from here
+      // Now it will only be created during the approval process
+      
+      return NextResponse.json(newService);
+    }
+    // Unknown resource type
+    else {
+      return NextResponse.json(
+        { error: "Invalid resource type" },
+        { status: 400 }
+      );
+    }
+  } catch (error) {
+    console.error("Error creating resource:", error);
+    return NextResponse.json(
+      { error: "Failed to create resource" },
+      { status: 500 }
+    );
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+// DELETE handler for removing UserService records
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const id = parseInt(params.id);
+    const url = new URL(req.url);
+    const resourceType = url.searchParams.get('type');
+    const serviceId = url.searchParams.get('serviceId');
+
+    if (isNaN(id)) {
+      return NextResponse.json(
+        { error: "Invalid reservation ID" },
+        { status: 400 }
+      );
+    }
+
+    // Delete UserService
+    if (resourceType === 'service' && serviceId) {
+      // Delete the UserService
+      await prisma.userService.delete({
+        where: {
+          id: serviceId
+        }
+      });
+      
+      return NextResponse.json({ success: true });
+    }
+    // Unknown resource type
+    else {
+      return NextResponse.json(
+        { error: "Invalid resource type or missing serviceId" },
+        { status: 400 }
+      );
+    }
+  } catch (error) {
+    console.error("Error deleting resource:", error);
+    return NextResponse.json(
+      { error: "Failed to delete resource" },
       { status: 500 }
     );
   } finally {
@@ -161,6 +288,13 @@ export async function PUT(
         UserServices: true,
         UserTools: true,
         UtilTimes: true,
+        MachineUtilizations: {
+          include: {
+            OperatingTimes: true,
+            DownTimes: true,
+            RepairChecks: true,
+          }
+        },
       },
     });
 

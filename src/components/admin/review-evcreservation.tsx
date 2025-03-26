@@ -1,5 +1,5 @@
 // src/components/admin/review-evcreservation.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -55,12 +55,14 @@ interface ReviewEVCReservationProps {
   ) => void;
 }
 
+
 const ReviewEVCReservation: React.FC<ReviewEVCReservationProps> = ({
   isModalOpen,
   setIsModalOpen,
   selectedReservation,
   handleStatusUpdate
 }) => {
+  const [isLoading, setIsLoading] = useState(false);
   const getStatusColor = (status: string) => {
     const colors = {
       'Pending Teacher Approval': 'bg-purple-100 text-purple-800',
@@ -83,50 +85,88 @@ const ReviewEVCReservation: React.FC<ReviewEVCReservationProps> = ({
     });
   };
 
+
   const handleStatusUpdateWithApprover = async (
     reservationId: number, 
     newStatus: 'Pending Admin Approval' | 'Approved' | 'Ongoing' | 'Completed' | 'Cancelled' | 'Rejected'
   ) => {
     try {
+      // Set loading state to true when starting the update
+      setIsLoading(true);
+      
       console.log(`Updating reservation ${reservationId} to status: ${newStatus}`);
       
-      // REPLACE THIS WITH YOUR ACTUAL NAME OR A CONTEXTUAL ADMIN NAME
-      const adminName = "Admin"; 
-      
-      // Create payload with admin name
-      const payload = { 
-        status: newStatus,
-        adminName: adminName
-      };
-      
-      console.log("Sending payload to API:", payload);
-      
-      const response = await fetch(`/api/admin/evc-reservation-status/${reservationId}`, {
+      // Updated to use the correct API endpoint
+      const updateResponse = await fetch(`/api/admin/evc-reservation-status/${reservationId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          status: newStatus,
+          adminName: "Admin" // You could add user context to get the actual admin name
+        }),
       });
-
-      console.log("API response status:", response.status);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to update EVC status: ${response.status} ${errorText}`);
+  
+      if (!updateResponse.ok) {
+        const errorData = await updateResponse.json();
+        throw new Error(`Status update failed: ${errorData.error || 'Unknown error'}`);
       }
-
-      console.log("Update successful");
-      
-      // First close the modal
-      setIsModalOpen(false);
-      
-      // Then update the parent component's state
+  
+      // Proceed with email notification based on status
+      if (newStatus === 'Approved') {
+        // Send approval email
+        const emailResponse = await fetch('/api/admin-email/approved-request', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            reservationId,
+            reservationType: 'evc',
+          }),
+        });
+  
+        if (!emailResponse.ok) {
+          console.warn('Approval email notification failed to send, but status was updated');
+        } else {
+          console.log('Approval email sent successfully');
+        }
+      } else if (newStatus === 'Rejected') {
+        // Send rejection email with reason
+        const rejectionReason = prompt('Please provide a reason for rejection:');
+        
+        const emailResponse = await fetch('/api/admin-email/rejected-request', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            reservationId,
+            reservationType: 'evc',
+            rejectionReason: rejectionReason || 'No reason provided',
+          }),
+        });
+  
+        if (!emailResponse.ok) {
+          console.warn('Rejection email notification failed to send, but status was updated');
+        } else {
+          console.log('Rejection email sent successfully');
+        }
+      }
+  
+      // Call the passed-in handleStatusUpdate function to update UI
       handleStatusUpdate(reservationId, newStatus);
+      
+      // Close the modal after successful update
+      setIsModalOpen(false);
       
     } catch (error: any) {
       console.error('Error updating EVC reservation status:', error);
       alert(`Failed to update reservation status: ${error.message}`);
+    } finally {
+      // Always set loading state back to false when finished
+      setIsLoading(false);
     }
   };
 
@@ -321,14 +361,30 @@ const ReviewEVCReservation: React.FC<ReviewEVCReservationProps> = ({
                     <Button
                       variant="destructive"
                       onClick={() => handleStatusUpdateWithApprover(selectedReservation.id, 'Rejected')}
+                      disabled={isLoading}
                     >
-                      Reject Reservation
+                      {isLoading ? (
+                        <>
+                          <span className="animate-spin mr-2">⊚</span>
+                          Processing...
+                        </>
+                      ) : (
+                        'Reject Reservation'
+                      )}
                     </Button>
                     <Button
                       variant="default"
                       onClick={() => handleStatusUpdateWithApprover(selectedReservation.id, 'Approved')}
+                      disabled={isLoading}
                     >
-                      Accept Reservation
+                      {isLoading ? (
+                        <>
+                          <span className="animate-spin mr-2">⊚</span>
+                          Processing...
+                        </>
+                      ) : (
+                        'Accept Reservation'
+                      )}
                     </Button>
                   </>
                 )}

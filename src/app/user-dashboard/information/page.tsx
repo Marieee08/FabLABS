@@ -122,13 +122,15 @@ const PersonalInformationPage = () => {
             </h2>
             <p className="text-[#1c62b5]">{userRole}</p>
           </div>
+  
+  
           <div>
             <h3 className="mb-4 ml-4 text-sm font-semibold text-gray-600">MENU</h3>
             <ul className="mb-6 flex flex-col gap-1.5">
               <li>
                 <button
                   onClick={() => setOrderDropdownOpen(!orderDropdownOpen)}
-                  className="group relative flex w-full items-center justify-between gap-2.5 rounded-full py-2 px-4 font-medium text-[#0d172c] text-blue-800 bg-blue-100 border border-[#5e86ca]"
+                  className="group relative flex w-full items-center justify-between gap-2.5 rounded-full py-2 px-4 font-medium text-[#0d172c] border border-transparent hover:text-blue-800 hover:bg-blue-100 hover:border-[#5e86ca]"
                 >
                   <span>Reservations</span>
                   <svg
@@ -172,18 +174,19 @@ const PersonalInformationPage = () => {
                   Information
                 </button>
                 <div className="ml-6 mt-2 space-y-2">
-                  <Link 
-                    href="/user-dashboard/information/personal" 
-                    className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-blue-800 bg-blue-100 border border-[#5e86ca]"
-                  >
-                    Personal Info
-                  </Link>
-                  <Link 
-                    href="/user-dashboard/information/business" 
-                    className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]"
-                  >
-                    Business Info
-                  </Link>
+ 
+                <Link 
+                  href="/user-dashboard/information" 
+                  className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-blue-800 bg-blue-100 hover:text-[#0d172c]"
+                >
+                  Personal Info
+                </Link>
+                <Link 
+                  href="/user-dashboard/information/business" 
+                  className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]"
+                >
+                  Business Info
+                </Link>
                 </div>
               </li>
             </ul>
