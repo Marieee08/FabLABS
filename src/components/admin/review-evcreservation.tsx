@@ -96,16 +96,15 @@ const ReviewEVCReservation: React.FC<ReviewEVCReservationProps> = ({
       
       console.log(`Updating reservation ${reservationId} to status: ${newStatus}`);
       
-      // 1. First, update the reservation status in the database
-      const updateResponse = await fetch('/api/admin/update-evc-status', {
-        method: 'POST',
+      // Updated to use the correct API endpoint
+      const updateResponse = await fetch(`/api/admin/evc-reservation-status/${reservationId}`, {
+        method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          reservationId,
-          newStatus,
-          approverName: user?.fullName || 'Admin User', // Assuming you have access to user context
+          status: newStatus,
+          adminName: "Admin" // You could add user context to get the actual admin name
         }),
       });
   
@@ -114,7 +113,7 @@ const ReviewEVCReservation: React.FC<ReviewEVCReservationProps> = ({
         throw new Error(`Status update failed: ${errorData.error || 'Unknown error'}`);
       }
   
-      // 2. Send email notification based on the new status
+      // Proceed with email notification based on status
       if (newStatus === 'Approved') {
         // Send approval email
         const emailResponse = await fetch('/api/admin-email/approved-request', {
@@ -156,10 +155,10 @@ const ReviewEVCReservation: React.FC<ReviewEVCReservationProps> = ({
         }
       }
   
-      // 3. Call the passed-in handleStatusUpdate function to update UI
+      // Call the passed-in handleStatusUpdate function to update UI
       handleStatusUpdate(reservationId, newStatus);
       
-      // 4. Close the modal after successful update
+      // Close the modal after successful update
       setIsModalOpen(false);
       
     } catch (error: any) {
