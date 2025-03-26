@@ -9,6 +9,9 @@ const prisma = new PrismaClient();
 export async function POST(request: NextRequest) {
   try {
     const { reservationId, reservationType } = await request.json();
+        
+    console.log(`Approved request email API called: reservationId=${reservationId}, type=${reservationType}`);
+    console.log(`Email credentials: ${process.env.EMAIL_USER ? 'Available' : 'Missing'}`);
     
     if (!reservationId || !reservationType) {
       return NextResponse.json(

@@ -15,7 +15,7 @@ import { EditIcon, Save, X, Clock, AlertCircle, Database } from 'lucide-react';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import ReservationDetailsTab from './review-reservation-details';
 import TimeEditor from './time-editor';
-import MachineUtilization from './machine-utilization';
+import  MachineUtilization from './machine-utilization';
 import { toast } from 'sonner';
 
 // Updated interface definitions
@@ -199,10 +199,13 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
   };
 
   // Update local state when selected reservation changes
-  useEffect(() => {
-    if (selectedReservation) {
-      setLocalReservation(selectedReservation);
-      
+// Update local state when selected reservation changes
+useEffect(() => {
+  if (selectedReservation) {
+    setLocalReservation(selectedReservation);
+    
+    // Make sure UserServices exists and is an array before mapping
+    if (selectedReservation.UserServices && Array.isArray(selectedReservation.UserServices)) {
       // Convert each service to include an array of selected machines with quantities
       const servicesWithMachines = selectedReservation.UserServices.map(service => ({
         ...service,
@@ -210,14 +213,20 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
       }));
       
       setEditedServices(servicesWithMachines);
-      setComments(selectedReservation.Comments || '');
-      setEditMode(false);
-      setEditingTimes(false); // Reset time editing mode
-      setEditingMachineUtilization(false); // Reset machine utilization editing mode
-      setValidationError(null);
-      setHasUnsavedChanges(false);
+    } else {
+      // Handle the case where UserServices is undefined or not an array
+      setEditedServices([]);
     }
-  }, [selectedReservation]);
+    
+    setComments(selectedReservation.Comments || '');
+    setEditMode(false);
+    setEditingTimes(false); // Reset time editing mode
+    setEditingMachineUtilization(false); // Reset machine utilization editing mode
+    setValidationError(null);
+    setHasUnsavedChanges(false);
+  }
+}, [selectedReservation]);
+
 
   // Fetch machines from the correct API endpoint
   useEffect(() => {
@@ -643,6 +652,32 @@ const handleApproveReservation = async () => {
     
     // 5. Now update the status to Approved
     await handleStatusUpdate(localReservation.id, 'Approved');
+
+
+  // 6. Send approval email notification - ADD THIS PART
+  try {
+    const emailResponse = await fetch('/api/admin-email/approved-request', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        reservationId: localReservation.id.toString(),
+        reservationType: 'utilization' // Specifies this is a regular utilization, not EVC
+      }),
+    });
+    
+    if (!emailResponse.ok) {
+      console.warn('Email notification failed to send:', await emailResponse.text());
+    } else {
+      console.log('Approval email sent successfully');
+    }
+  } catch (emailError) {
+    console.error('Error sending approval email:', emailError);
+    // We don't want to fail the whole approval process if just the email fails
+  }
+    
+
     
     alert('Reservation approved successfully with machine utilization records');
   } catch (error) {

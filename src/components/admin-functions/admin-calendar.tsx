@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
 import CalendarGrid from '@/components/custom/calendar-grid';
@@ -38,6 +38,7 @@ const AdminCalendar: React.FC = () => {
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
   const [currentMonth, setCurrentMonth] = useState<CalendarDate>(new Date());
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
   const fetchBlockedDates = async () => {
     try {
@@ -114,7 +115,7 @@ const AdminCalendar: React.FC = () => {
       });
       
       // Sort reservations by start time
-      const sortedReservations = processedReservations.sort((a, b) => {
+      const sortedReservations = processedReservations.sort((a: { startTime: string; }, b: { startTime: any; }) => {
         if (a.startTime && b.startTime) {
           return a.startTime.localeCompare(b.startTime);
         }
@@ -128,6 +129,30 @@ const AdminCalendar: React.FC = () => {
         description: "Failed to fetch reservations",
         variant: "destructive",
       });
+    }
+  };
+
+  // Add a refresh function that updates both blocked dates and reservations
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        fetchBlockedDates(),
+        fetchReservations()
+      ]);
+      
+      toast({
+        title: "Success",
+        description: "Calendar data refreshed successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to refresh calendar data",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -339,6 +364,45 @@ const AdminCalendar: React.FC = () => {
 
   return (
     <div className="calendar-container p-4">
+      {/* Month Navigation Row with Refresh Button */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={previousMonth} 
+            className="mr-2"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          
+          <h2 className="text-lg font-semibold">
+            {new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(currentMonth)}
+          </h2>
+          
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={nextMonth} 
+            className="ml-2"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+        
+        {/* Add Refresh Button */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className="flex items-center"
+        >
+          <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+          {isRefreshing ? 'Refreshing...' : 'Refresh Calendar'}
+        </Button>
+      </div>
+      
       <CalendarGrid 
         days={getDaysInMonth(currentMonth)}
         isDateBlocked={isDateBlocked}

@@ -803,14 +803,12 @@ const handleGeneratePDF = async (
 };
 
 
-
-
-
 const handleStatusUpdate = async (
   reservationId: number,
   newStatus: 'Approved' | 'Ongoing' | 'Pending Payment' | 'Paid' | 'Completed' | 'Cancelled' | 'Rejected'
 ) => {
   try {
+    // Update database status
     const response = await fetch(`/api/admin/reservation-status/${reservationId}`, {
       method: 'PUT',
       headers: {
@@ -823,85 +821,165 @@ const handleStatusUpdate = async (
       throw new Error(`Failed to update status: ${response.status} ${response.statusText}`);
     }
 
-
-
-
-
-
-      if (!response.ok) {
-        throw new Error(`Failed to update status: ${response.status} ${response.statusText}`);
+    // Send email notification based on status
+    if (newStatus === 'Approved') {
+      try {
+        console.log("Sending approval email for reservation:", reservationId);
+        const emailResponse = await fetch('/api/admin-email/approved-request', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            reservationId: reservationId.toString(),
+            reservationType: 'utilization'
+          }),
+        });
+        
+        if (!emailResponse.ok) {
+          console.warn('Failed to send approval email:', await emailResponse.text());
+        } else {
+          console.log('Approval email sent successfully');
+        }
+      } catch (emailError) {
+        console.error('Error sending approval email:', emailError);
+        // Don't fail the whole approval process if just the email fails
       }
-
-
-      // Update the reservations list with the new status
-      setReservations(prevReservations =>
-        prevReservations.map(res =>
-          res.id === String(reservationId)
-            ? { ...res, status: newStatus }
-            : res
-        )
-      );
-
-
-
-
-      if (selectedReservation && selectedReservation.id === reservationId) {
-        setSelectedReservation({ ...selectedReservation, Status: newStatus });
+    } else if (newStatus === 'Rejected') {
+      try {
+        console.log("Sending rejection email for reservation:", reservationId);
+        const emailResponse = await fetch('/api/admin-email/rejected-request', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            reservationId: reservationId.toString(),
+            reservationType: 'utilization',
+            rejectionReason: 'Your reservation request could not be accommodated at this time.'
+          }),
+        });
+        
+        if (!emailResponse.ok) {
+          console.warn('Failed to send rejection email:', await emailResponse.text());
+        } else {
+          console.log('Rejection email sent successfully');
+        }
+      } catch (emailError) {
+        console.error('Error sending rejection email:', emailError);
       }
-
-      // Close the modal
-      setIsModalOpen(false);
-    } catch (error: any) {
-      console.error('Error updating reservation status:', error instanceof Error ? error.message : String(error));
     }
-  };
 
+    // Update the UI
+    setReservations(prevReservations =>
+      prevReservations.map(res =>
+        res.id === String(reservationId)
+          ? { ...res, status: newStatus }
+          : res
+      )
+    );
 
-
-
-
-
-  const handleEVCStatusUpdate = async (
-    reservationId: number,
-    newStatus: 'Pending Admin Approval' | 'Approved' | 'Ongoing' | 'Completed' | 'Cancelled' | 'Rejected'
-  ) => {
-    try {
-      const response = await fetch(`/api/admin/evc-reservation-status/${reservationId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ 
-          status: newStatus,
-          adminName: "Admin" // You might want to replace this with the actual admin name
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Failed to update EVC status: ${response.status} ${response.statusText}`);
-      }
-
-      // Update the reservations list with the new status
-      setReservations(prevReservations =>
-        prevReservations.map(res =>
-          res.id === `evc-${reservationId}`
-            ? { ...res, status: newStatus }
-            : res
-        )
-      );
-
-      // Update the selected EVC reservation if it's open in the modal
-      if (selectedEVCReservation && selectedEVCReservation.id === reservationId) {
-        setSelectedEVCReservation({ ...selectedEVCReservation, EVCStatus: newStatus });
-      }
-
-      // Close the modal
-      setIsEVCModalOpen(false);
-    } catch (error: any) {
-      console.error('Error updating EVC reservation status:', error instanceof Error ? error.message : String(error));
+    if (selectedReservation && selectedReservation.id === reservationId) {
+      setSelectedReservation({ ...selectedReservation, Status: newStatus });
     }
-  };
 
+    // Close the modal
+    setIsModalOpen(false);
+  } catch (error: any) {
+    console.error('Error updating reservation status:', error instanceof Error ? error.message : String(error));
+  }
+};
+
+
+
+
+const handleEVCStatusUpdate = async (
+  reservationId: number,
+  newStatus: 'Pending Admin Approval' | 'Approved' | 'Ongoing' | 'Completed' | 'Cancelled' | 'Rejected'
+) => {
+  try {
+    const response = await fetch(`/api/admin/evc-reservation-status/${reservationId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ 
+        status: newStatus,
+        adminName: "Admin" // You might want to replace this with the actual admin name
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to update EVC status: ${response.status} ${response.statusText}`);
+    }
+
+    // Send email notification based on status for EVC reservations
+    if (newStatus === 'Approved') {
+      try {
+        console.log("Sending approval email for EVC reservation:", reservationId);
+        const emailResponse = await fetch('/api/admin-email/approved-request', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            reservationId: reservationId.toString(),
+            reservationType: 'evc'
+          }),
+        });
+        
+        if (!emailResponse.ok) {
+          console.warn('Failed to send EVC approval email:', await emailResponse.text());
+        } else {
+          console.log('EVC approval email sent successfully');
+        }
+      } catch (emailError) {
+        console.error('Error sending EVC approval email:', emailError);
+      }
+    } else if (newStatus === 'Rejected') {
+      try {
+        console.log("Sending rejection email for EVC reservation:", reservationId);
+        const emailResponse = await fetch('/api/admin-email/rejected-request', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            reservationId: reservationId.toString(),
+            reservationType: 'evc',
+            rejectionReason: 'Your EVC reservation request could not be accommodated at this time.'
+          }),
+        });
+        
+        if (!emailResponse.ok) {
+          console.warn('Failed to send EVC rejection email:', await emailResponse.text());
+        } else {
+          console.log('EVC rejection email sent successfully');
+        }
+      } catch (emailError) {
+        console.error('Error sending EVC rejection email:', emailError);
+      }
+    }
+
+    // Update UI states
+    setReservations(prevReservations =>
+      prevReservations.map(res =>
+        res.id === `evc-${reservationId}`
+          ? { ...res, status: newStatus }
+          : res
+      )
+    );
+
+    if (selectedEVCReservation && selectedEVCReservation.id === reservationId) {
+      setSelectedEVCReservation({ ...selectedEVCReservation, EVCStatus: newStatus });
+    }
+
+    // Close the modal
+    setIsEVCModalOpen(false);
+  } catch (error: any) {
+    console.error('Error updating EVC reservation status:', error instanceof Error ? error.message : String(error));
+  }
+};
 
 
   const filteredReservations = reservations.filter(reservation => {
