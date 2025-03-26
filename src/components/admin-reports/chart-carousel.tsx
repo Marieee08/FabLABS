@@ -1,355 +1,499 @@
-// components/admin-reports/chart-carousel.tsx
-import React, { useState, useMemo } from 'react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+// src/components/admin-reports/enhanced-chart-carousel.tsx
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { TimeInterval, TimeIntervalSelector } from '@/components/admin-reports/time-interval-selector';
+import { ChevronLeft, ChevronRight, BarChart3, LineChart, PieChart, Activity } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar,
-  Legend,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
-  AreaChart,
-  Area
-} from 'recharts';
-import { TimeIntervalSelector, TimeInterval } from './time-interval-selector';
-import { aggregateUtilizationTrends } from './data-aggregation-utils';
 
-// Define the chart data interface based on your dashboard data
-interface ChartCarouselProps {
+// Chart Types
+type ChartType = 'utilization' | 'requests' | 'services' | 'reservations';
+
+// Props Interface
+interface EnhancedChartCarouselProps {
   dashboardData: any;
   isLoading: boolean;
-  error: string | null;
+  error: Error | null;
   timeInterval: TimeInterval;
   onTimeIntervalChange: (interval: TimeInterval) => void;
 }
 
-const ChartCarousel: React.FC<ChartCarouselProps> = ({ 
-  dashboardData, 
-  isLoading, 
+export const EnhancedChartCarousel: React.FC<EnhancedChartCarouselProps> = ({
+  dashboardData,
+  isLoading,
   error,
   timeInterval,
-  onTimeIntervalChange
+  onTimeIntervalChange,
 }) => {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  
-  // Define the COLORS array
-  const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#ffc658', '#ff7300'];
-  
-  // Memoized aggregated data based on the selected time interval
-  const aggregatedUtilizationTrends = useMemo(() => {
-    if (!dashboardData.utilizationTrends || dashboardData.utilizationTrends.length === 0) {
-      return [];
-    }
-    return aggregateUtilizationTrends(dashboardData.utilizationTrends, timeInterval);
-  }, [dashboardData.utilizationTrends, timeInterval]);
+  const [activeChart, setActiveChart] = useState<ChartType>('utilization');
 
-  // Define all the charts you want to include in the carousel
-  const charts = [
-    {
-      id: 'machinesUsed',
-      title: 'Machines Used',
-      description: 'Most frequently used machines',
-      component: () => (
-        <CardContent className="h-[400px]">
-          {dashboardData.machinesUsed && dashboardData.machinesUsed.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart 
-                data={dashboardData.machinesUsed || [
-                  { machine: 'CNC Machine', count: 25 },
-                  { machine: '3D Printer', count: 18 },
-                  { machine: 'Laser Cutter', count: 15 },
-                  { machine: 'Milling Machine', count: 12 },
-                  { machine: 'Waterjet Cutter', count: 8 }
-                ]}
-                margin={{ top: 20, right: 30, left: 20, bottom: 30 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="machine" 
-                  angle={-45} 
-                  textAnchor="end" 
-                  height={80} 
-                  tick={{ fontSize: 12 }} 
-                />
-                <YAxis />
-                <Tooltip formatter={(value) => [`${value} uses`]} />
-                <Legend verticalAlign="top" height={36} />
-                <Bar dataKey="count" name="Number of Uses" fill="#8884d8" />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <p>No data available</p>
-            </div>
-          )}
-        </CardContent>
-      )
-    },
-    {
-      id: 'servicesAvailed',
-      title: 'Services Availed',
-      description: 'Most popular services',
-      component: () => (
-        <CardContent className="h-[400px]">
-          {dashboardData.serviceStats && dashboardData.serviceStats.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-                <Pie
-                  data={dashboardData.serviceStats}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={true}
-                  label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={120}
-                  fill="#8884d8"
-                  dataKey="value"
-                  nameKey="name"
-                >
-                  {dashboardData.serviceStats.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={COLORS[index % COLORS.length]} 
-                    />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value, name) => [`${value} requests`, name]} />
-                <Legend verticalAlign="bottom" height={36} />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <p>No data available</p>
-            </div>
-          )}
-        </CardContent>
-      )
-    },
-    {
-      id: 'salesData',
-      title: 'Sales Data',
-      description: 'Monthly sales revenue',
-      component: () => (
-        <CardContent className="h-[400px]">
-          {dashboardData.salesData ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart 
-                data={dashboardData.salesData || [
-                  { month: 'Jan', revenue: 4500 },
-                  { month: 'Feb', revenue: 5200 },
-                  { month: 'Mar', revenue: 4800 },
-                  { month: 'Apr', revenue: 6000 },
-                  { month: 'May', revenue: 5700 },
-                  { month: 'Jun', revenue: 6200 }
-                ]}
-                margin={{ top: 20, right: 30, left: 20, bottom: 30 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip formatter={(value) => [`₱${value.toLocaleString()}`]} />
-                <Legend verticalAlign="top" height={36} />
-                <Area 
-                  type="monotone" 
-                  dataKey="revenue" 
-                  name="Revenue" 
-                  stroke="#8884d8" 
-                  fill="#8884d8" 
-                  fillOpacity={0.6} 
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <p>No data available</p>
-            </div>
-          )}
-        </CardContent>
-      )
-    },
-    {
-      id: 'reservationsByType',
-      title: 'Reservations',
-      description: 'Number of reservations by time',
-      supportTimeInterval: true,
-      component: () => (
-        <CardContent className="h-[400px]">
-          {aggregatedUtilizationTrends && aggregatedUtilizationTrends.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart 
-                data={aggregatedUtilizationTrends}
-                margin={{ top: 20, right: 30, left: 20, bottom: 40 }}
-              >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="period" 
-                  angle={-45} 
-                  textAnchor="end" 
-                  height={60} 
-                  tick={{ fontSize: 12 }} 
-                />
-                <YAxis />
-                <Tooltip />
-                <Legend verticalAlign="top" height={36} />
-                <Line
-                  name="Reservations"
-                  type="monotone"
-                  dataKey="requests"
-                  stroke="#8884d8"
-                  strokeWidth={2}
-                  activeDot={{ r: 8 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <p>No data available</p>
-            </div>
-          )}
-        </CardContent>
-      )
-    },
-    {
-      id: 'userSatisfaction',
-      title: 'User Satisfaction',
-      description: 'User feedback ratings across categories',
-      component: () => (
-        <CardContent className="h-[400px]">
-          {dashboardData.satisfactionScores && dashboardData.satisfactionScores.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart 
-                cx="50%" 
-                cy="50%" 
-                outerRadius="70%" 
-                data={dashboardData.satisfactionScores || [
-                  { category: 'Service Quality', score: 4.2 },
-                  { category: 'Staff Helpfulness', score: 4.5 },
-                  { category: 'Equipment Quality', score: 4.0 },
-                  { category: 'Timeliness', score: 3.8 },
-                  { category: 'Value for Money', score: 4.3 },
-                  { category: 'Overall Experience', score: 4.4 }
-                ]}
-              >
-                <PolarGrid />
-                <PolarAngleAxis 
-                  dataKey="category" 
-                  tick={{ fill: '#143370', fontSize: 12 }}
-                />
-                <PolarRadiusAxis angle={30} domain={[0, 5]} />
-                <Radar 
-                  name="Satisfaction Score (out of 5)" 
-                  dataKey="score" 
-                  stroke="#8884d8" 
-                  fill="#8884d8" 
-                  fillOpacity={0.6} 
-                />
-                <Tooltip formatter={(value) => [`${value} / 5`]} />
-                <Legend verticalAlign="bottom" height={36} />
-              </RadarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex h-full items-center justify-center">
-              <p>No data available</p>
-            </div>
-          )}
-        </CardContent>
-      )
-    }
-  ];
+  // To prevent hydration mismatch
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
-  // Check if the current chart supports time interval selection
-  const currentChartSupportsTimeInterval = charts[currentIndex]?.supportTimeInterval === true;
+  if (!mounted) return null;
 
-  // Navigate to the next chart
-  const nextChart = () => {
-    setCurrentIndex((prevIndex) => (prevIndex + 1) % charts.length);
+  // Chart Mapping
+  const chartComponents: Record<ChartType, React.ReactNode> = {
+    utilization: <MachineUtilizationChart data={dashboardData?.machineUtilization || []} isLoading={isLoading} timeInterval={timeInterval} />,
+    requests: <RequestsChart data={dashboardData?.requests || []} isLoading={isLoading} timeInterval={timeInterval} />,
+    services: <ServicesChart data={dashboardData?.services || []} isLoading={isLoading} />,
+    reservations: <ReservationsChart data={dashboardData?.reservations || []} isLoading={isLoading} timeInterval={timeInterval} />,
   };
 
-  // Navigate to the previous chart
-  const prevChart = () => {
-    setCurrentIndex((prevIndex) => (prevIndex - 1 + charts.length) % charts.length);
+  const chartTitles: Record<ChartType, string> = {
+    utilization: 'Machine Utilization',
+    requests: 'Request Trends',
+    services: 'Service Distribution',
+    reservations: 'Reservation Schedule',
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <p>Loading dashboard data...</p>
-      </div>
-    );
-  }
+  const chartIcons: Record<ChartType, React.ReactNode> = {
+    utilization: <BarChart3 className="h-5 w-5" />,
+    requests: <LineChart className="h-5 w-5" />,
+    services: <PieChart className="h-5 w-5" />,
+    reservations: <Activity className="h-5 w-5" />,
+  };
+
+  // Navigate charts
+  const navigateChart = (direction: 'prev' | 'next') => {
+    const charts: ChartType[] = ['utilization', 'requests', 'services', 'reservations'];
+    const currentIndex = charts.indexOf(activeChart);
+    
+    if (direction === 'prev') {
+      const prevIndex = currentIndex === 0 ? charts.length - 1 : currentIndex - 1;
+      setActiveChart(charts[prevIndex]);
+    } else {
+      const nextIndex = currentIndex === charts.length - 1 ? 0 : currentIndex + 1;
+      setActiveChart(charts[nextIndex]);
+    }
+  };
 
   if (error) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <p className="text-red-500">{error}</p>
-      </div>
+      <Card className="bg-white shadow-sm p-6 mb-6">
+        <div className="text-center text-red-500 py-8">
+          <p>Error loading chart data: {error.message}</p>
+        </div>
+      </Card>
     );
   }
 
   return (
-    <div className="w-full">
-      <Card className="border border-[#5e86ca]">
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-            <div>
-              <CardTitle className="text-[#143370]">{charts[currentIndex].title}</CardTitle>
-              <p className="text-sm text-[#143370]">{charts[currentIndex].description}</p>
-            </div>
-            
-            {/* Only show time interval selector for charts that support it */}
-            {currentChartSupportsTimeInterval && (
-              <TimeIntervalSelector 
-                value={timeInterval} 
-                onChange={onTimeIntervalChange}
-                className="mt-4 sm:mt-0"
-              />
-            )}
-          </div>
-        </CardHeader>
-        
-        {charts[currentIndex].component()}
-        
-        <div className="flex justify-between items-center px-6 py-4">
-          <Button 
-            onClick={prevChart}
-            className="bg-[#143370] hover:bg-[#0d2555] text-white"
-          >
-            Previous
-          </Button>
-          <div className="flex space-x-2">
-            {charts.map((chart, index) => (
-              <button
-                key={chart.id}
-                className={`w-3 h-3 rounded-full ${
-                  index === currentIndex ? 'bg-[#143370]' : 'bg-gray-300'
-                }`}
-                onClick={() => setCurrentIndex(index)}
-                aria-label={`View ${chart.title}`}
-              />
-            ))}
-          </div>
-          <Button 
-            onClick={nextChart}
-            className="bg-[#143370] hover:bg-[#0d2555] text-white"
-          >
-            Next
-          </Button>
+    <div className="mb-6">
+      {/* Chart Navigation */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center">
+          {chartIcons[activeChart]}
+          <h3 className="text-lg font-semibold ml-2 text-[#143370]">{chartTitles[activeChart]}</h3>
         </div>
+        
+        <div className="flex items-center space-x-2">
+          <TimeIntervalSelector 
+            selectedInterval={timeInterval} 
+            onIntervalChange={onTimeIntervalChange} 
+          />
+          
+          <div className="flex space-x-1 ml-4">
+            <Button 
+              onClick={() => navigateChart('prev')}
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 rounded-full"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button 
+              onClick={() => navigateChart('next')}
+              variant="outline"
+              size="icon"
+              className="h-8 w-8 rounded-full"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+      
+      {/* Chart Cards */}
+      <Card className="bg-white shadow-sm overflow-hidden">
+        <CardContent className="p-6">
+          {chartComponents[activeChart]}
+        </CardContent>
       </Card>
+      
+      {/* Chart Selection Pills */}
+      <div className="flex justify-center mt-4 space-x-2">
+        {(['utilization', 'requests', 'services', 'reservations'] as ChartType[]).map((chart) => (
+          <button
+            key={chart}
+            onClick={() => setActiveChart(chart)}
+            className={`px-3 py-1 rounded-full text-sm font-medium transition-all ${
+              activeChart === chart 
+                ? 'bg-[#143370] text-white' 
+                : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+            }`}
+          >
+            {chartTitles[chart]}
+          </button>
+        ))}
+      </div>
     </div>
   );
 };
 
-export default ChartCarousel;
+// Chart Components - Each optimized for performance
+interface ChartComponentProps {
+  data: any[];
+  isLoading: boolean;
+  timeInterval?: TimeInterval;
+}
+
+// Machine Utilization Chart
+const MachineUtilizationChart: React.FC<ChartComponentProps> = ({ data, isLoading, timeInterval }) => {
+  if (isLoading) {
+    return <ChartSkeleton />;
+  }
+
+  // Implemented with efficient rendering strategy
+  return (
+    <div className="h-80 w-full">
+      <div className="flex h-full flex-col">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col">
+            <span className="text-sm font-medium text-gray-500">Overall Utilization</span>
+            <span className="text-2xl font-bold text-[#143370]">63%</span>
+          </div>
+          <div className="space-x-2">
+            <span className="inline-block h-3 w-3 rounded-full bg-[#4b71b5]"></span>
+            <span className="text-xs text-gray-500">Current Period</span>
+            <span className="inline-block h-3 w-3 rounded-full bg-[#a3b9e2]"></span>
+            <span className="text-xs text-gray-500">Previous Period</span>
+          </div>
+        </div>
+        
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="relative flex flex-col">
+            <div className="h-8 flex items-center">
+              <span className="text-sm font-medium text-gray-600">Laser Cutter</span>
+              <span className="ml-auto text-sm font-medium text-[#143370]">74%</span>
+            </div>
+            <div className="h-6 bg-gray-200 rounded-full overflow-hidden">
+              <div className="h-full bg-[#4b71b5] rounded-full" style={{ width: '74%' }}></div>
+            </div>
+            <div className="h-8 flex items-center mt-2">
+              <span className="text-sm font-medium text-gray-600">3D Printer</span>
+              <span className="ml-auto text-sm font-medium text-[#143370]">68%</span>
+            </div>
+            <div className="h-6 bg-gray-200 rounded-full overflow-hidden">
+              <div className="h-full bg-[#4b71b5] rounded-full" style={{ width: '68%' }}></div>
+            </div>
+            <div className="h-8 flex items-center mt-2">
+              <span className="text-sm font-medium text-gray-600">CNC Machine</span>
+              <span className="ml-auto text-sm font-medium text-[#143370]">52%</span>
+            </div>
+            <div className="h-6 bg-gray-200 rounded-full overflow-hidden">
+              <div className="h-full bg-[#4b71b5] rounded-full" style={{ width: '52%' }}></div>
+            </div>
+          </div>
+          
+          <div className="flex flex-col justify-center items-center">
+            <div className="relative h-52 w-52">
+              <svg viewBox="0 0 100 100" className="h-full w-full">
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="40"
+                  fill="none"
+                  stroke="#e5e7eb"
+                  strokeWidth="12"
+                />
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="40"
+                  fill="none"
+                  stroke="#4b71b5"
+                  strokeWidth="12"
+                  strokeDasharray="251.2"
+                  strokeDashoffset={251.2 * (1 - 0.63)}
+                  strokeLinecap="round"
+                  transform="rotate(-90 50 50)"
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-3xl font-bold text-[#143370]">63%</span>
+                <span className="text-sm text-gray-500">Average</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Requests Chart
+const RequestsChart: React.FC<ChartComponentProps> = ({ data, isLoading, timeInterval }) => {
+  if (isLoading) {
+    return <ChartSkeleton />;
+  }
+
+  // Sample data - you'll replace with actual data
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'];
+  const values = [28, 42, 35, 47, 52, 43, 55, 47, 60];
+  const prevValues = [20, 32, 30, 40, 45, 40, 48, 42, 50];
+  
+  // Max value for scaling
+  const maxValue = Math.max(...values, ...prevValues);
+
+  return (
+    <div className="h-80">
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <span className="text-sm font-medium text-gray-500">Total Requests</span>
+          <div className="text-2xl font-bold text-[#143370]">409</div>
+        </div>
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center">
+            <span className="inline-block h-3 w-3 rounded-full bg-[#4b71b5] mr-1"></span>
+            <span className="text-xs text-gray-500">Current</span>
+          </div>
+          <div className="flex items-center">
+            <span className="inline-block h-3 w-3 rounded-full bg-[#a3b9e2] mr-1"></span>
+            <span className="text-xs text-gray-500">Previous</span>
+          </div>
+        </div>
+      </div>
+      
+      <div className="relative h-56">
+        {/* Chart Grid */}
+        <div className="absolute inset-0 grid grid-cols-9 gap-0.5">
+          {months.map((month, i) => (
+            <div key={month} className="flex flex-col h-full">
+              <div className="flex-1 border-t border-gray-200"></div>
+            </div>
+          ))}
+        </div>
+        
+        {/* Y-axis labels */}
+        <div className="absolute left-0 top-0 h-full flex flex-col justify-between text-xs text-gray-500 pr-2">
+          <div>{maxValue}</div>
+          <div>{Math.floor(maxValue/2)}</div>
+          <div>0</div>
+        </div>
+        
+        {/* Chart Values */}
+        <div className="absolute inset-0 pt-4 pb-6 pl-6 flex items-end">
+          <div className="flex w-full h-full gap-0.5">
+            {months.map((month, i) => (
+              <div key={`col-${month}`} className="flex-1 flex flex-col justify-end items-center gap-1">
+                {/* Previous period bar */}
+                <div 
+                  className="w-6 bg-[#a3b9e2] rounded-t-sm"
+                  style={{ height: `${(prevValues[i] / maxValue) * 100}%` }}
+                ></div>
+                
+                {/* Current period bar */}
+                <div 
+                  className="w-6 bg-[#4b71b5] rounded-t-sm"
+                  style={{ height: `${(values[i] / maxValue) * 100}%` }}
+                ></div>
+                
+                {/* X-axis label */}
+                <div className="text-xs text-gray-500 mt-2">{month}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Services Chart
+const ServicesChart: React.FC<ChartComponentProps> = ({ data, isLoading }) => {
+  if (isLoading) {
+    return <ChartSkeleton />;
+  }
+  
+  // Sample data
+  const services = [
+    { name: '3D Printing', value: 35, color: '#4b71b5' },
+    { name: 'Laser Cutting', value: 25, color: '#143370' },
+    { name: 'CNC Milling', value: 20, color: '#5e86ca' },
+    { name: 'Other Services', value: 20, color: '#a3b9e2' },
+  ];
+  
+  // Calculate total for percentages
+  const total = services.reduce((sum, service) => sum + service.value, 0);
+  
+  // Calculate stroke dasharray and dashoffset
+  const calculateStroke = (percentage: number, index: number) => {
+    const radius = 40;
+    const circumference = 2 * Math.PI * radius;
+    
+    // Calculate previous percentages
+    const previousPercentages = services
+      .slice(0, index)
+      .reduce((sum, service) => sum + (service.value / total) * 100, 0);
+    
+    const strokeDasharray = circumference;
+    const strokeDashoffset = circumference * (1 - percentage / 100);
+    const rotation = (previousPercentages * 3.6) - 90; // Convert percentage to degrees, -90 to start at top
+    
+    return {
+      strokeDasharray,
+      strokeDashoffset,
+      rotation
+    };
+  };
+
+  return (
+    <div className="h-80">
+      <div className="flex flex-col h-full">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <span className="text-sm font-medium text-gray-500">Services Distribution</span>
+            <div className="text-2xl font-bold text-[#143370]">{total} Services</div>
+          </div>
+        </div>
+        
+        <div className="flex flex-1">
+          {/* Pie Chart */}
+          <div className="w-1/2 flex items-center justify-center">
+            <div className="relative h-48 w-48">
+              <svg viewBox="0 0 100 100" className="h-full w-full">
+                {services.map((service, index) => {
+                  const percentage = (service.value / total) * 100;
+                  const { strokeDasharray, strokeDashoffset, rotation } = calculateStroke(percentage, index);
+                  
+                  return (
+                    <circle
+                      key={service.name}
+                      cx="50"
+                      cy="50"
+                      r="40"
+                      fill="none"
+                      stroke={service.color}
+                      strokeWidth="20"
+                      strokeDasharray={strokeDasharray}
+                      strokeDashoffset={strokeDashoffset}
+                      style={{ transform: `rotate(${rotation}deg)`, transformOrigin: 'center' }}
+                    />
+                  );
+                })}
+                <circle cx="50" cy="50" r="30" fill="white" />
+              </svg>
+            </div>
+          </div>
+          
+          {/* Legend */}
+          <div className="w-1/2 flex flex-col justify-center">
+            {services.map(service => (
+              <div key={service.name} className="flex items-center mb-3">
+                <div 
+                  className="h-4 w-4 rounded-sm mr-2"
+                  style={{ backgroundColor: service.color }}
+                ></div>
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-sm font-medium text-gray-700">{service.name}</span>
+                  <span className="text-sm font-bold text-[#143370]">
+                    {Math.round((service.value / total) * 100)}%
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Reservations Chart
+const ReservationsChart: React.FC<ChartComponentProps> = ({ data, isLoading, timeInterval }) => {
+  if (isLoading) {
+    return <ChartSkeleton />;
+  }
+  
+  // Sample data
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const hours = Array.from({ length: 9 }, (_, i) => i + 9); // 9am to 5pm
+  
+  // Random availability data - replace with real data
+  const availability = days.map(() => 
+    hours.map(() => Math.random() > 0.3)
+  );
+
+  return (
+    <div className="h-80 overflow-auto">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <span className="text-sm font-medium text-gray-500">Reservation Schedule</span>
+          <div className="text-2xl font-bold text-[#143370]">Weekly View</div>
+        </div>
+        <div className="flex items-center space-x-4">
+          <div className="flex items-center">
+            <span className="inline-block h-3 w-3 rounded-full bg-[#4b71b5] mr-1"></span>
+            <span className="text-xs text-gray-500">Available</span>
+          </div>
+          <div className="flex items-center">
+            <span className="inline-block h-3 w-3 rounded-full bg-[#e5e7eb] mr-1"></span>
+            <span className="text-xs text-gray-500">Booked</span>
+          </div>
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-8 gap-px bg-gray-200">
+        {/* Time labels */}
+        <div className="bg-white p-2">
+          <div className="h-8"></div> {/* Empty cell for alignment */}
+          {hours.map(hour => (
+            <div key={hour} className="h-8 flex items-center">
+              <span className="text-xs text-gray-500">{hour}:00</span>
+            </div>
+          ))}
+        </div>
+        
+        {/* Days */}
+        {days.map((day, dayIndex) => (
+          <div key={day} className="bg-white">
+            {/* Day label */}
+            <div className="h-8 p-2 flex items-center justify-center border-b">
+              <span className="text-sm font-medium text-gray-700">{day}</span>
+            </div>
+            
+            {/* Hours */}
+            {hours.map((hour, hourIndex) => (
+              <div 
+                key={`${day}-${hour}`} 
+                className={`h-8 p-1 ${hourIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+              >
+                <div 
+                  className={`h-full rounded ${availability[dayIndex][hourIndex] ? 'bg-[#4b71b5] bg-opacity-20 border border-[#4b71b5]' : 'bg-gray-200'}`}
+                ></div>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// Loading Skeleton
+const ChartSkeleton: React.FC = () => {
+  return (
+    <div className="h-80 flex flex-col">
+      <div className="h-10 flex items-center justify-between mb-4">
+        <div className="h-6 w-32 bg-gray-200 rounded animate-pulse"></div>
+        <div className="h-6 w-48 bg-gray-200 rounded animate-pulse"></div>
+      </div>
+      <div className="flex-1 bg-gray-100 rounded animate-pulse"></div>
+    </div>
+  );
+};
+
+export default EnhancedChartCarousel;

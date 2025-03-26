@@ -6,14 +6,15 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import { useUser, UserButton } from "@clerk/nextjs";
 import { DateRange } from 'react-day-picker';
+import { FileIcon, RefreshCw, Download } from "lucide-react";
 
 import { DateRangeSelector } from '@/components/admin-reports/date-range-selector';
 import { useDashboardData } from '@/components/admin-reports/use-dashboard-data';
-import ChartCarousel from '@/components/admin-reports/chart-carousel';
 import { TimeInterval } from '@/components/admin-reports/time-interval-selector';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import RoleGuard from '@/components/auth/role-guard';
+import { EnhancedChartCarousel } from '@/components/admin-reports/chart-carousel';
 
 const ReportsPage: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -22,6 +23,7 @@ const ReportsPage: React.FC = () => {
   const formattedDate = format(today, 'EEEE, dd MMMM yyyy');
   const { user, isLoaded } = useUser();
   const [userRole, setUserRole] = useState<string>("Loading...");
+  const [generatingReport, setGeneratingReport] = useState(false);
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
     from: new Date(new Date().setMonth(new Date().getMonth() - 1)),
@@ -71,6 +73,15 @@ const ReportsPage: React.FC = () => {
   // Handle time interval change
   const handleTimeIntervalChange = (interval: TimeInterval) => {
     setTimeInterval(interval);
+  };
+
+  // Handle Generate Report
+  const handleGenerateReport = () => {
+    setGeneratingReport(true);
+    // Placeholder for PDF generation - will be implemented later
+    setTimeout(() => {
+      setGeneratingReport(false);
+    }, 1500);
   };
 
   return (
@@ -209,12 +220,32 @@ const ReportsPage: React.FC = () => {
                   <p className="text-sm text-[#143370] font-poppins1">{formattedDate}</p>
                 </div>
                 
-                <div className="mt-4 sm:mt-0">
+                <div className="mt-4 sm:mt-0 flex space-x-3">
                   <Button 
                     onClick={() => refreshData()}
                     className="bg-[#143370] hover:bg-[#0d2555] text-white"
+                    disabled={isLoading}
                   >
-                    Refresh Data
+                    <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </Button>
+
+                  <Button 
+                    onClick={handleGenerateReport}
+                    className="bg-[#5e86ca] hover:bg-[#4b71b5] text-white"
+                    disabled={generatingReport || isLoading}
+                  >
+                    {generatingReport ? (
+                      <>
+                        <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <FileIcon className="mr-2 h-4 w-4" />
+                        Generate Report
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>
@@ -224,39 +255,33 @@ const ReportsPage: React.FC = () => {
               
               {/* Key Metrics */}
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3 mb-6">
-                <Card className="bg-white shadow-sm transform hover:scale-105 transition-all duration-300 border border-[#5e86ca]">
-                  <CardHeader>
-                    <CardTitle>Pending Requests</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <h2 className="text-4xl font-bold text-[#143370]">{dashboardData?.pendingRequests || 0}</h2>
-                    <p className="text-sm text-[#143370]">Awaiting Approval</p>
-                  </CardContent>
-                </Card>
+                <MetricCard 
+                  title="Pending Requests" 
+                  value={dashboardData?.pendingRequests || 0} 
+                  description="Awaiting Approval"
+                  color="#143370"
+                  isLoading={isLoading}
+                />
 
-                <Card className="bg-white shadow-sm transform hover:scale-105 transition-all duration-300 border border-[#5e86ca]">
-                  <CardHeader>
-                    <CardTitle>Completed Requests</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <h2 className="text-4xl font-bold text-[#143370]">{dashboardData?.completedRequestsLastMonth || 0}</h2>
-                    <p className="text-sm text-[#143370]">in the last 30 Days</p>
-                  </CardContent>
-                </Card>
+                <MetricCard 
+                  title="Completed Requests" 
+                  value={dashboardData?.completedRequestsLastMonth || 0} 
+                  description="in the last 30 Days"
+                  color="#143370"
+                  isLoading={isLoading}
+                />
 
-                <Card className="bg-white shadow-sm transform hover:scale-105 transition-all duration-300 border border-[#5e86ca]">
-                  <CardHeader>
-                    <CardTitle>Active EVC Reservations</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <h2 className="text-4xl font-bold text-[#143370]">{dashboardData?.activeEVCReservations || 0}</h2>
-                    <p className="text-sm text-[#143370]">Currently Scheduled</p>
-                  </CardContent>
-                </Card>
+                <MetricCard 
+                  title="Active EVC Reservations" 
+                  value={dashboardData?.activeEVCReservations || 0} 
+                  description="Currently Scheduled"
+                  color="#143370"
+                  isLoading={isLoading}
+                />
               </div>
               
-              {/* Chart Carousel */}
-              <ChartCarousel 
+              {/* Chart Carousel - Using the enhanced version */}
+              <EnhancedChartCarousel 
                 dashboardData={dashboardData || {}} 
                 isLoading={isLoading} 
                 error={error} 
@@ -270,11 +295,101 @@ const ReportsPage: React.FC = () => {
                   <p>Last updated: {format(lastUpdated, 'MMM dd, yyyy HH:mm:ss')}</p>
                 )}
               </div>
+
+              {/* Download section */}
+              <div className="mt-8 bg-white p-6 rounded-lg shadow-sm border border-[#5e86ca]">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h3 className="text-xl font-bold text-[#143370] mb-2">Report Downloads</h3>
+                    <p className="text-sm text-gray-600">Export data for your records or presentations</p>
+                  </div>
+                  <Button 
+                    onClick={handleGenerateReport}
+                    className="bg-[#143370] hover:bg-[#0d2555] text-white"
+                    disabled={generatingReport}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    {generatingReport ? 'Processing...' : 'Download PDF Report'}
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                  <Card className="bg-gray-50 hover:bg-gray-100 transition-all cursor-pointer">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center">
+                        <div className="bg-blue-100 p-3 rounded-full mr-4">
+                          <FileIcon className="h-6 w-6 text-[#143370]" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium">Usage Statistics</h4>
+                          <p className="text-xs text-gray-500">CSV, Excel</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card className="bg-gray-50 hover:bg-gray-100 transition-all cursor-pointer">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center">
+                        <div className="bg-green-100 p-3 rounded-full mr-4">
+                          <FileIcon className="h-6 w-6 text-[#143370]" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium">Machine Report</h4>
+                          <p className="text-xs text-gray-500">PDF, Excel</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  
+                  <Card className="bg-gray-50 hover:bg-gray-100 transition-all cursor-pointer">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center">
+                        <div className="bg-purple-100 p-3 rounded-full mr-4">
+                          <FileIcon className="h-6 w-6 text-[#143370]" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium">User Activity</h4>
+                          <p className="text-xs text-gray-500">PDF, CSV</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
             </div>
           </main>
         </div>
       </div>
     </RoleGuard>
+  );
+};
+
+// Metric Card Component
+interface MetricCardProps {
+  title: string;
+  value: number;
+  description: string;
+  color: string;
+  isLoading: boolean;
+}
+
+const MetricCard: React.FC<MetricCardProps> = ({ title, value, description, color, isLoading }) => {
+  return (
+    <Card className="bg-white shadow-sm transform hover:scale-105 transition-all duration-300 border border-[#5e86ca] overflow-hidden">
+      <div className="h-1 bg-[#5e86ca]"></div>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg font-medium">{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="h-10 w-20 bg-gray-200 animate-pulse rounded-md"></div>
+        ) : (
+          <h2 className="text-4xl font-bold" style={{ color }}>{value}</h2>
+        )}
+        <p className="text-sm text-gray-500">{description}</p>
+      </CardContent>
+    </Card>
   );
 };
 
