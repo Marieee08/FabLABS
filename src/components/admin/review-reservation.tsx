@@ -568,31 +568,11 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
                   </>
                 )}
 
-                {localReservation.Status === 'Pending Payment' && (
-                  <>
-                    <Button
-                      variant="default"
-                      onClick={() => handleStatusUpdate(localReservation.id, 'Paid')}
-                    >
-                      Mark as Paid
-                    </Button>
-                  </>
-                )}
-
-                {localReservation.Status === 'Paid' && (
-                  <>
-                    <Button
-                      variant="default"
-                      onClick={() => handleStatusUpdate(localReservation.id, 'Completed')}
-                    >
-                      Mark as Completed
-                    </Button>
-                  </>
-                )}
-
                 {/* Display a view-only button for completed/rejected/cancelled reservations */}
                 {(localReservation.Status === 'Completed' || 
                   localReservation.Status === 'Rejected' || 
+                  localReservation.Status === 'Pending Payment' ||
+                  localReservation.Status === 'Paid' ||  
                   localReservation.Status === 'Cancelled') && (
                   <Button
                     variant="outline"
