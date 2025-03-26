@@ -353,12 +353,6 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
                   <label className="text-sm text-gray-600">Service</label>
                   <p className="font-medium flex items-center">
                     {service.ServiceAvail}
-                    {/* FIX #3: Only show "requires equipment" if hideRequiresEquipment is false */}
-                    {!hideRequiresEquipment && serviceRequiresMachines(service.ServiceAvail) && (
-                      <span className="ml-2 text-xs px-2 py-0.5 bg-orange-100 text-orange-800 rounded-full">
-                        Requires Equipment
-                      </span>
-                    )}
                   </p>
                 </div>
                 <div>
