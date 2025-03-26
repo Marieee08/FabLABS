@@ -1,12 +1,12 @@
-// src/components/admin-reports/enhanced-chart-carousel.tsx
+// src/components/admin-reports/chart-carousel.tsx
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { TimeInterval, TimeIntervalSelector } from '@/components/admin-reports/time-interval-selector';
-import { ChevronLeft, ChevronRight, BarChart3, LineChart, PieChart, Activity } from 'lucide-react';
+import { ChevronLeft, ChevronRight, BarChart3, LineChart, PieChart, SmilePlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 // Chart Types
-type ChartType = 'utilization' | 'requests' | 'services' | 'reservations';
+type ChartType = 'userRoles' | 'requests' | 'services' | 'satisfaction';
 
 // Props Interface
 interface EnhancedChartCarouselProps {
@@ -17,6 +17,13 @@ interface EnhancedChartCarouselProps {
   onTimeIntervalChange: (interval: TimeInterval) => void;
 }
 
+// Chart Component Props
+interface ChartComponentProps {
+  data: any;
+  isLoading: boolean;
+  timeInterval?: TimeInterval;
+}
+
 export const EnhancedChartCarousel: React.FC<EnhancedChartCarouselProps> = ({
   dashboardData,
   isLoading,
@@ -24,7 +31,7 @@ export const EnhancedChartCarousel: React.FC<EnhancedChartCarouselProps> = ({
   timeInterval,
   onTimeIntervalChange,
 }) => {
-  const [activeChart, setActiveChart] = useState<ChartType>('utilization');
+  const [activeChart, setActiveChart] = useState<ChartType>('userRoles');
 
   // To prevent hydration mismatch
   const [mounted, setMounted] = useState(false);
@@ -36,29 +43,29 @@ export const EnhancedChartCarousel: React.FC<EnhancedChartCarouselProps> = ({
 
   // Chart Mapping
   const chartComponents: Record<ChartType, React.ReactNode> = {
-    utilization: <MachineUtilizationChart data={dashboardData?.machineUtilization || []} isLoading={isLoading} timeInterval={timeInterval} />,
-    requests: <RequestsChart data={dashboardData?.requests || []} isLoading={isLoading} timeInterval={timeInterval} />,
-    services: <ServicesChart data={dashboardData?.services || []} isLoading={isLoading} />,
-    reservations: <ReservationsChart data={dashboardData?.reservations || []} isLoading={isLoading} timeInterval={timeInterval} />,
+    userRoles: <UserRolesChart data={dashboardData} isLoading={isLoading} timeInterval={timeInterval} />,
+    requests: <RequestsChart data={dashboardData} isLoading={isLoading} timeInterval={timeInterval} />,
+    services: <ServicesChart data={dashboardData} isLoading={isLoading} />,
+    satisfaction: <SatisfactionChart data={dashboardData} isLoading={isLoading} />,
   };
 
   const chartTitles: Record<ChartType, string> = {
-    utilization: 'Machine Utilization',
+    userRoles: 'User Role Distribution',
     requests: 'Request Trends',
     services: 'Service Distribution',
-    reservations: 'Reservation Schedule',
+    satisfaction: 'Customer Satisfaction',
   };
 
   const chartIcons: Record<ChartType, React.ReactNode> = {
-    utilization: <BarChart3 className="h-5 w-5" />,
+    userRoles: <BarChart3 className="h-5 w-5" />,
     requests: <LineChart className="h-5 w-5" />,
     services: <PieChart className="h-5 w-5" />,
-    reservations: <Activity className="h-5 w-5" />,
+    satisfaction: <SmilePlus className="h-5 w-5" />,
   };
 
   // Navigate charts
   const navigateChart = (direction: 'prev' | 'next') => {
-    const charts: ChartType[] = ['utilization', 'requests', 'services', 'reservations'];
+    const charts: ChartType[] = ['userRoles', 'requests', 'services', 'satisfaction'];
     const currentIndex = charts.indexOf(activeChart);
     
     if (direction === 'prev') {
@@ -69,7 +76,7 @@ export const EnhancedChartCarousel: React.FC<EnhancedChartCarouselProps> = ({
       setActiveChart(charts[nextIndex]);
     }
   };
-
+  
   if (error) {
     return (
       <Card className="bg-white shadow-sm p-6 mb-6">
@@ -91,8 +98,8 @@ export const EnhancedChartCarousel: React.FC<EnhancedChartCarouselProps> = ({
         
         <div className="flex items-center space-x-2">
           <TimeIntervalSelector 
-            selectedInterval={timeInterval} 
-            onIntervalChange={onTimeIntervalChange} 
+            value={timeInterval}
+            onChange={onTimeIntervalChange} 
           />
           
           <div className="flex space-x-1 ml-4">
@@ -125,7 +132,7 @@ export const EnhancedChartCarousel: React.FC<EnhancedChartCarouselProps> = ({
       
       {/* Chart Selection Pills */}
       <div className="flex justify-center mt-4 space-x-2">
-        {(['utilization', 'requests', 'services', 'reservations'] as ChartType[]).map((chart) => (
+        {(['userRoles', 'requests', 'services', 'satisfaction'] as ChartType[]).map((chart) => (
           <button
             key={chart}
             onClick={() => setActiveChart(chart)}
@@ -143,89 +150,147 @@ export const EnhancedChartCarousel: React.FC<EnhancedChartCarouselProps> = ({
   );
 };
 
-// Chart Components - Each optimized for performance
-interface ChartComponentProps {
-  data: any[];
-  isLoading: boolean;
-  timeInterval?: TimeInterval;
-}
-
-// Machine Utilization Chart
-const MachineUtilizationChart: React.FC<ChartComponentProps> = ({ data, isLoading, timeInterval }) => {
+// User Role Distribution Chart
+const UserRolesChart: React.FC<ChartComponentProps> = ({ data, isLoading }) => {
   if (isLoading) {
     return <ChartSkeleton />;
   }
 
-  // Implemented with efficient rendering strategy
+  // Get user role distribution data from API
+  const userRoles = data.userRoleDistribution || [];
+  
+  // For debugging - log what we're getting from the API
+  console.log('User role distribution data:', userRoles);
+  
+  // If no data is available, show a message
+  if (userRoles.length === 0) {
+    return (
+      <div className="h-80 flex items-center justify-center">
+        <p className="text-gray-500">No user role data available</p>
+      </div>
+    );
+  }
+
+  // Define colors for different roles
+  const roleColors: Record<string, string> = {
+    'ADMIN': '#143370',    // Dark blue for admins
+    'MSME': '#4b71b5',     // Medium blue for MSMEs
+    'STUDENT': '#5e86ca',  // Light blue for students
+    'CASHIER': '#a3b9e2',  // Pale blue for cashiers
+    'USER': '#7ea0d4',     // Another blue for regular users
+    'TEACHER': '#2c5282',  // Another blue variant for teachers
+  };
+
+  // Sort roles by count (most to least)
+  const sortedRoles = [...userRoles].sort((a, b) => (b.value || 0) - (a.value || 0));
+  
+  // Calculate total users
+  const totalUsers = sortedRoles.reduce((total, role) => total + (role.value || 0), 0);
+
   return (
     <div className="h-80 w-full">
       <div className="flex h-full flex-col">
         <div className="flex items-center justify-between mb-4">
           <div className="flex flex-col">
-            <span className="text-sm font-medium text-gray-500">Overall Utilization</span>
-            <span className="text-2xl font-bold text-[#143370]">63%</span>
-          </div>
-          <div className="space-x-2">
-            <span className="inline-block h-3 w-3 rounded-full bg-[#4b71b5]"></span>
-            <span className="text-xs text-gray-500">Current Period</span>
-            <span className="inline-block h-3 w-3 rounded-full bg-[#a3b9e2]"></span>
-            <span className="text-xs text-gray-500">Previous Period</span>
+            <span className="text-sm font-medium text-gray-500">User Distribution</span>
+            <span className="text-2xl font-bold text-[#143370]">{totalUsers} Total Users</span>
           </div>
         </div>
         
         <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Role Distribution Bars */}
           <div className="relative flex flex-col">
-            <div className="h-8 flex items-center">
-              <span className="text-sm font-medium text-gray-600">Laser Cutter</span>
-              <span className="ml-auto text-sm font-medium text-[#143370]">74%</span>
-            </div>
-            <div className="h-6 bg-gray-200 rounded-full overflow-hidden">
-              <div className="h-full bg-[#4b71b5] rounded-full" style={{ width: '74%' }}></div>
-            </div>
-            <div className="h-8 flex items-center mt-2">
-              <span className="text-sm font-medium text-gray-600">3D Printer</span>
-              <span className="ml-auto text-sm font-medium text-[#143370]">68%</span>
-            </div>
-            <div className="h-6 bg-gray-200 rounded-full overflow-hidden">
-              <div className="h-full bg-[#4b71b5] rounded-full" style={{ width: '68%' }}></div>
-            </div>
-            <div className="h-8 flex items-center mt-2">
-              <span className="text-sm font-medium text-gray-600">CNC Machine</span>
-              <span className="ml-auto text-sm font-medium text-[#143370]">52%</span>
-            </div>
-            <div className="h-6 bg-gray-200 rounded-full overflow-hidden">
-              <div className="h-full bg-[#4b71b5] rounded-full" style={{ width: '52%' }}></div>
-            </div>
+            {sortedRoles.map((role, index) => {
+              const percentage = Math.round((role.value / totalUsers) * 100);
+              const roleColor = roleColors[role.name] || '#4b71b5'; // Default color if role not found
+              
+              return (
+                <React.Fragment key={role.name}>
+                  <div className="h-8 flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div 
+                        className="h-3 w-3 rounded-sm mr-2"
+                        style={{ backgroundColor: roleColor }}
+                      ></div>
+                      <span className="text-sm font-medium text-gray-600">{role.name}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <span className="text-sm font-medium text-gray-500 mr-2">{role.value}</span>
+                      <span className="text-sm font-medium text-[#143370] w-[40px] text-right">{percentage}%</span>
+                    </div>
+                  </div>
+                  <div className="h-6 bg-gray-200 rounded-full overflow-hidden mb-3">
+                    <div 
+                      className="h-full rounded-full" 
+                      style={{ 
+                        width: `${percentage}%`,
+                        backgroundColor: roleColor 
+                      }}
+                    ></div>
+                  </div>
+                </React.Fragment>
+              );
+            })}
           </div>
           
+          {/* Pie Chart */}
           <div className="flex flex-col justify-center items-center">
             <div className="relative h-52 w-52">
               <svg viewBox="0 0 100 100" className="h-full w-full">
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="none"
-                  stroke="#e5e7eb"
-                  strokeWidth="12"
-                />
-                <circle
-                  cx="50"
-                  cy="50"
-                  r="40"
-                  fill="none"
-                  stroke="#4b71b5"
-                  strokeWidth="12"
-                  strokeDasharray="251.2"
-                  strokeDashoffset={251.2 * (1 - 0.63)}
-                  strokeLinecap="round"
-                  transform="rotate(-90 50 50)"
-                />
+                {sortedRoles.map((role, index) => {
+                  // Calculate start and end angles for this slice
+                  const roleColor = roleColors[role.name] || '#4b71b5'; // Default color
+                  const percentage = (role.value / totalUsers) * 100;
+                  
+                  // Calculate the total percentage of all previous slices
+                  const previousTotal = sortedRoles
+                    .slice(0, index)
+                    .reduce((sum, r) => sum + ((r.value / totalUsers) * 100), 0);
+                  
+                  // Convert percentages to radians
+                  const startAngle = (previousTotal / 100) * Math.PI * 2 - Math.PI / 2;
+                  const endAngle = ((previousTotal + percentage) / 100) * Math.PI * 2 - Math.PI / 2;
+                  
+                  // Calculate points for the path
+                  const startX = 50 + 40 * Math.cos(startAngle);
+                  const startY = 50 + 40 * Math.sin(startAngle);
+                  const endX = 50 + 40 * Math.cos(endAngle);
+                  const endY = 50 + 40 * Math.sin(endAngle);
+                  
+                  // Determine if the arc should be drawn as a large arc (more than 180 degrees)
+                  const largeArcFlag = percentage > 50 ? 1 : 0;
+                  
+                  // Create the path for this slice
+                  const path = [
+                    `M 50 50`, // Move to center
+                    `L ${startX} ${startY}`, // Line to start point
+                    `A 40 40 0 ${largeArcFlag} 1 ${endX} ${endY}`, // Arc to end point
+                    `Z` // Close path back to center
+                  ].join(' ');
+                  
+                  return (
+                    <path
+                      key={role.name}
+                      d={path}
+                      fill={roleColor}
+                      stroke="white"
+                      strokeWidth="1"
+                    />
+                  );
+                })}
+                <circle cx="50" cy="50" r="20" fill="white" />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-3xl font-bold text-[#143370]">63%</span>
-                <span className="text-sm text-gray-500">Average</span>
+                <span className="text-3xl font-bold text-[#143370]">{totalUsers}</span>
+                <span className="text-sm text-gray-500">Users</span>
               </div>
+            </div>
+            
+            {/* Add additional stats if available */}
+            <div className="mt-3 text-center">
+              <p className="text-sm text-gray-600">
+                {sortedRoles.length} different user roles
+              </p>
             </div>
           </div>
         </div>
@@ -234,44 +299,87 @@ const MachineUtilizationChart: React.FC<ChartComponentProps> = ({ data, isLoadin
   );
 };
 
-// Requests Chart
+// Improved RequestsChart Component
 const RequestsChart: React.FC<ChartComponentProps> = ({ data, isLoading, timeInterval }) => {
   if (isLoading) {
     return <ChartSkeleton />;
   }
 
-  // Sample data - you'll replace with actual data
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'];
-  const values = [28, 42, 35, 47, 52, 43, 55, 47, 60];
-  const prevValues = [20, 32, 30, 40, 45, 40, 48, 42, 50];
+  // Get utilization trends data from API
+  const trendsData = data.utilizationTrends || [];
   
-  // Max value for scaling
-  const maxValue = Math.max(...values, ...prevValues);
+  // For debugging - log what we're getting from the API
+  console.log('Utilization trends data:', trendsData);
+  console.log('Current time interval:', timeInterval);
+  
+  // If no data is available, show a message
+  if (trendsData.length === 0) {
+    return (
+      <div className="h-80 flex items-center justify-center">
+        <p className="text-gray-500">No request data available for the selected period</p>
+      </div>
+    );
+  }
+
+  // Extract periods (months/weeks/days) and request counts
+  const periods = trendsData.map((item: { period: any; month: any; }) => item.period || item.month || '');
+  const requestCounts = trendsData.map((item: { requests: any; }) => item.requests || 0);
+  
+  // Calculate total requests
+  const totalRequests = requestCounts.reduce((sum: any, val: any) => sum + val, 0);
+  
+  // Calculate trend indicators
+  const isIncreasing = requestCounts.length >= 2 && 
+    requestCounts[requestCounts.length - 1] > requestCounts[requestCounts.length - 2];
+  
+  // Calculate average requests per period
+  const avgRequests = totalRequests / requestCounts.length;
+  
+  // Find the maximum value for scaling the chart
+  const maxValue = Math.max(...requestCounts, 1); // Ensure at least 1 to avoid division by zero
+
+  // Calculate growth rate if we have enough data
+  let growthRate = 0;
+  if (requestCounts.length >= 2) {
+    const firstValue = requestCounts[0];
+    const lastValue = requestCounts[requestCounts.length - 1];
+    
+    if (firstValue > 0) {
+      growthRate = ((lastValue - firstValue) / firstValue) * 100;
+    }
+  }
 
   return (
     <div className="h-80">
       <div className="flex justify-between items-center mb-4">
         <div>
           <span className="text-sm font-medium text-gray-500">Total Requests</span>
-          <div className="text-2xl font-bold text-[#143370]">409</div>
+          <div className="text-2xl font-bold text-[#143370]">{totalRequests}</div>
         </div>
-        <div className="flex items-center space-x-4">
+        <div className="flex flex-col items-end">
           <div className="flex items-center">
-            <span className="inline-block h-3 w-3 rounded-full bg-[#4b71b5] mr-1"></span>
-            <span className="text-xs text-gray-500">Current</span>
+            <span className="text-xs text-gray-500 mr-2">Avg. per {timeInterval}:</span>
+            <span className="font-medium text-[#143370]">{Math.round(avgRequests)}</span>
           </div>
-          <div className="flex items-center">
-            <span className="inline-block h-3 w-3 rounded-full bg-[#a3b9e2] mr-1"></span>
-            <span className="text-xs text-gray-500">Previous</span>
+          <div className="flex items-center mt-1">
+            <span className="text-xs text-gray-500 mr-2">Trend:</span>
+            <span className={`font-medium ${
+              growthRate > 0 ? 'text-green-600' : 
+              growthRate < 0 ? 'text-red-600' : 
+              'text-gray-600'
+            }`}>
+              {growthRate > 0 ? '+' : ''}{Math.round(growthRate)}%
+            </span>
           </div>
         </div>
       </div>
       
       <div className="relative h-56">
         {/* Chart Grid */}
-        <div className="absolute inset-0 grid grid-cols-9 gap-0.5">
-          {months.map((month, i) => (
-            <div key={month} className="flex flex-col h-full">
+        <div className="absolute inset-0 grid grid-cols-1" 
+             style={{ gridTemplateColumns: `repeat(${periods.length}, 1fr)` }}>
+          {periods.map((period: any, i: any) => (
+            <div key={`grid-${period}-${i}`} className="flex flex-col h-full">
               <div className="flex-1 border-t border-gray-200"></div>
             </div>
           ))}
@@ -286,58 +394,97 @@ const RequestsChart: React.FC<ChartComponentProps> = ({ data, isLoading, timeInt
         
         {/* Chart Values */}
         <div className="absolute inset-0 pt-4 pb-6 pl-6 flex items-end">
-          <div className="flex w-full h-full gap-0.5">
-            {months.map((month, i) => (
-              <div key={`col-${month}`} className="flex-1 flex flex-col justify-end items-center gap-1">
-                {/* Previous period bar */}
-                <div 
-                  className="w-6 bg-[#a3b9e2] rounded-t-sm"
-                  style={{ height: `${(prevValues[i] / maxValue) * 100}%` }}
-                ></div>
-                
-                {/* Current period bar */}
-                <div 
-                  className="w-6 bg-[#4b71b5] rounded-t-sm"
-                  style={{ height: `${(values[i] / maxValue) * 100}%` }}
-                ></div>
-                
-                {/* X-axis label */}
-                <div className="text-xs text-gray-500 mt-2">{month}</div>
-              </div>
-            ))}
+          <div className="flex w-full h-full gap-2">
+            {periods.map((period: string | number | bigint | boolean | React.ReactElement<any, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<React.AwaitedReactNode> | null | undefined, i: string | number) => {
+              // Determine bar color based on comparison to average
+              const barColor = requestCounts[i] >= avgRequests ? '#4b71b5' : '#a3b9e2';
+              
+              return (
+                <div key={`col-${period}-${i}`} className="flex-1 flex flex-col justify-end items-center">
+                  {/* Request count bar */}
+                  <div 
+                    className={`w-full max-w-[30px] rounded-t-sm transition-all duration-300`}
+                    style={{ 
+                      height: `${maxValue > 0 ? (requestCounts[i] / maxValue) * 100 : 0}%`,
+                      backgroundColor: barColor
+                    }}
+                  ></div>
+                  
+                  {/* Actual count number */}
+                  <div className="text-xs font-medium text-[#143370] mt-1">
+                    {requestCounts[i]}
+                  </div>
+                  
+                  {/* X-axis label */}
+                  <div className="text-xs text-gray-500 mt-1 truncate w-full text-center" 
+                       style={{ maxWidth: '100%' }}>
+                    {period}
+                  </div>
+                </div>
+              );
+            })}
           </div>
+        </div>
+      </div>
+      
+      <div className="mt-3 flex justify-between text-xs text-gray-500">
+        <div className="flex items-center">
+          <div className="h-3 w-3 bg-[#4b71b5] rounded-sm mr-1"></div>
+          <span>Above Average</span>
+        </div>
+        <div className="flex items-center">
+          <div className="h-3 w-3 bg-[#a3b9e2] rounded-sm mr-1"></div>
+          <span>Below Average</span>
         </div>
       </div>
     </div>
   );
 };
 
-// Services Chart
+// Improved ServicesChart Component
 const ServicesChart: React.FC<ChartComponentProps> = ({ data, isLoading }) => {
   if (isLoading) {
     return <ChartSkeleton />;
   }
   
-  // Sample data
-  const services = [
-    { name: '3D Printing', value: 35, color: '#4b71b5' },
-    { name: 'Laser Cutting', value: 25, color: '#143370' },
-    { name: 'CNC Milling', value: 20, color: '#5e86ca' },
-    { name: 'Other Services', value: 20, color: '#a3b9e2' },
-  ];
+  // Get service stats from API
+  const serviceStats = data.serviceStats || [];
+  
+  // For debugging - log what we're getting from the API
+  console.log('Service stats data:', serviceStats);
+  
+  // If no data is available, show a message
+  if (serviceStats.length === 0) {
+    return (
+      <div className="h-80 flex items-center justify-center">
+        <p className="text-gray-500">No service data available for the selected period</p>
+      </div>
+    );
+  }
+  
+  // Define colors for the services (you can extend this array for more services)
+  const colors = ['#4b71b5', '#143370', '#5e86ca', '#a3b9e2', '#2c5282', '#7ea0d4', '#3b5998', '#8da9e1'];
+  
+  // Sort services by usage (most used first) and add colors
+  const servicesWithColors = [...serviceStats]
+    .sort((a, b) => (b.value || 0) - (a.value || 0))
+    .map((service, index) => ({
+      ...service,
+      color: colors[index % colors.length]
+    }));
   
   // Calculate total for percentages
-  const total = services.reduce((sum, service) => sum + service.value, 0);
+  const total = servicesWithColors.reduce((sum, service) => sum + (service.value || 0), 0);
   
-  // Calculate stroke dasharray and dashoffset
+  // Calculate stroke dasharray and dashoffset for pie chart
   const calculateStroke = (percentage: number, index: number) => {
     const radius = 40;
     const circumference = 2 * Math.PI * radius;
     
-    // Calculate previous percentages
-    const previousPercentages = services
+    // Calculate previous percentages to determine rotation
+    const previousPercentages = servicesWithColors
       .slice(0, index)
-      .reduce((sum, service) => sum + (service.value / total) * 100, 0);
+      .reduce((sum, service) => sum + ((service.value / total) * 100), 0);
     
     const strokeDasharray = circumference;
     const strokeDashoffset = circumference * (1 - percentage / 100);
@@ -356,7 +503,10 @@ const ServicesChart: React.FC<ChartComponentProps> = ({ data, isLoading }) => {
         <div className="flex items-center justify-between mb-4">
           <div>
             <span className="text-sm font-medium text-gray-500">Services Distribution</span>
-            <div className="text-2xl font-bold text-[#143370]">{total} Services</div>
+            <div className="text-2xl font-bold text-[#143370]">{total} Total Usages</div>
+          </div>
+          <div className="text-xs text-gray-500">
+            {servicesWithColors.length > 0 && `${Math.min(servicesWithColors.length, 8)} services shown`}
           </div>
         </div>
         
@@ -365,7 +515,7 @@ const ServicesChart: React.FC<ChartComponentProps> = ({ data, isLoading }) => {
           <div className="w-1/2 flex items-center justify-center">
             <div className="relative h-48 w-48">
               <svg viewBox="0 0 100 100" className="h-full w-full">
-                {services.map((service, index) => {
+                {servicesWithColors.map((service, index) => {
                   const percentage = (service.value / total) * 100;
                   const { strokeDasharray, strokeDashoffset, rotation } = calculateStroke(percentage, index);
                   
@@ -386,25 +536,42 @@ const ServicesChart: React.FC<ChartComponentProps> = ({ data, isLoading }) => {
                 })}
                 <circle cx="50" cy="50" r="30" fill="white" />
               </svg>
+              {/* Total in the middle */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="text-lg font-bold text-[#143370]">{total}</span>
+                <span className="text-xs text-gray-500">Total Usages</span>
+              </div>
             </div>
           </div>
           
           {/* Legend */}
-          <div className="w-1/2 flex flex-col justify-center">
-            {services.map(service => (
-              <div key={service.name} className="flex items-center mb-3">
-                <div 
-                  className="h-4 w-4 rounded-sm mr-2"
-                  style={{ backgroundColor: service.color }}
-                ></div>
-                <div className="flex items-center justify-between w-full">
-                  <span className="text-sm font-medium text-gray-700">{service.name}</span>
-                  <span className="text-sm font-bold text-[#143370]">
-                    {Math.round((service.value / total) * 100)}%
-                  </span>
+          <div className="w-1/2 flex flex-col justify-center max-h-full overflow-y-auto">
+            {servicesWithColors.map(service => {
+              // Calculate percentage
+              const percentage = Math.round((service.value / total) * 100);
+              
+              return (
+                <div key={service.name} className="flex items-center mb-3">
+                  <div 
+                    className="h-4 w-4 rounded-sm mr-2 flex-shrink-0"
+                    style={{ backgroundColor: service.color }}
+                  ></div>
+                  <div className="flex items-center justify-between w-full">
+                    <span className="text-sm font-medium text-gray-700 truncate max-w-[120px]" title={service.name}>
+                      {service.name}
+                    </span>
+                    <div className="flex items-center">
+                      <span className="text-sm font-medium text-gray-600 mr-2">
+                        {service.value}
+                      </span>
+                      <span className="text-sm font-bold text-[#143370] w-[40px] text-right">
+                        {percentage}%
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
@@ -412,72 +579,233 @@ const ServicesChart: React.FC<ChartComponentProps> = ({ data, isLoading }) => {
   );
 };
 
-// Reservations Chart
-const ReservationsChart: React.FC<ChartComponentProps> = ({ data, isLoading, timeInterval }) => {
+// Customer Satisfaction Chart
+const SatisfactionChart: React.FC<ChartComponentProps> = ({ data, isLoading }) => {
   if (isLoading) {
     return <ChartSkeleton />;
   }
+
+  // Get satisfaction data from API
+  const satisfactionScores = data.satisfactionScores || [];
   
-  // Sample data
-  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-  const hours = Array.from({ length: 9 }, (_, i) => i + 9); // 9am to 5pm
+  // For debugging - log what we're getting from the API
+  console.log('Satisfaction data:', satisfactionScores);
   
-  // Random availability data - replace with real data
-  const availability = days.map(() => 
-    hours.map(() => Math.random() > 0.3)
+  // If no data is available, show a message
+  if (satisfactionScores.length === 0) {
+    return (
+      <div className="h-80 flex items-center justify-center">
+        <p className="text-gray-500">No satisfaction data available for the selected period</p>
+      </div>
+    );
+  }
+
+  // Calculate overall average satisfaction
+  const overallScore = satisfactionScores.reduce((sum: any, item: { score: any; }) => sum + (item.score || 0), 0) / 
+                      satisfactionScores.length;
+  
+  // Find min and max category scores for highlighting
+  const scores = satisfactionScores.map((item: { score: any; }) => item.score || 0);
+  const maxScore = Math.max(...scores);
+  const minScore = Math.min(...scores);
+  
+  // Determine which categories have max/min scores
+  const maxCategory = satisfactionScores.find((item: { score: number; }) => item.score === maxScore)?.category || '';
+  const minCategory = satisfactionScores.find((item: { score: number; }) => item.score === minScore)?.category || '';
+
+  // Helper function to get color based on score
+  const getScoreColor = (score: number) => {
+    if (score >= 4) return '#4ade80'; // Green for high scores
+    if (score >= 3) return '#4b71b5'; // Blue for medium scores
+    return '#f87171';  // Red for low scores
+  };
+
+  // Radar chart settings
+  const centerX = 150; // Center X coordinate
+  const centerY = 150; // Center Y coordinate
+  const maxRadius = 100; // Maximum radius of the chart
+  const categories = satisfactionScores.length;
+  
+  // Calculate points for each category on the radar
+  const calculatePoint = (index: number, value: number) => {
+    // Calculate angle for this category (in radians)
+    const angleStep = (Math.PI * 2) / categories;
+    const angle = index * angleStep - Math.PI / 2; // Start from top
+    
+    // Calculate distance from center (scale the value)
+    const scaledValue = (value / 5) * maxRadius; // Assuming max score is 5
+    
+    // Calculate x,y coordinates
+    const x = centerX + scaledValue * Math.cos(angle);
+    const y = centerY + scaledValue * Math.sin(angle);
+    
+    return { x, y };
+  };
+  
+  // Generate radar polygon points
+  const radarPoints = satisfactionScores.map((item: { score: any; }, index: number) => 
+    calculatePoint(index, item.score || 0)
   );
+  
+  // Create SVG path for the radar polygon
+  const radarPath = radarPoints.map((point: { x: any; y: any; }, index: number) => 
+    index === 0 ? `M ${point.x} ${point.y}` : `L ${point.x} ${point.y}`
+  ).join(' ') + ' Z'; // Z to close the path
+
+  // Create background grid lines (5 levels)
+  const gridLines = Array.from({ length: 5 }, (_, i) => {
+    const radius = ((i + 1) / 5) * maxRadius;
+    const gridPoints = Array.from({ length: categories }, (_, j) => 
+      calculatePoint(j, (i + 1))
+    );
+    
+    const gridPath = gridPoints.map((point, index) => 
+      index === 0 ? `M ${point.x} ${point.y}` : `L ${point.x} ${point.y}`
+    ).join(' ') + ' Z';
+    
+    return gridPath;
+  });
+
+  // Create axis lines (from center to each category)
+  const axisLines = satisfactionScores.map((_: any, index: number) => {
+    const point = calculatePoint(index, 5); // Full length to max score of 5
+    return `M ${centerX} ${centerY} L ${point.x} ${point.y}`;
+  });
 
   return (
-    <div className="h-80 overflow-auto">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <span className="text-sm font-medium text-gray-500">Reservation Schedule</span>
-          <div className="text-2xl font-bold text-[#143370]">Weekly View</div>
-        </div>
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center">
-            <span className="inline-block h-3 w-3 rounded-full bg-[#4b71b5] mr-1"></span>
-            <span className="text-xs text-gray-500">Available</span>
-          </div>
-          <div className="flex items-center">
-            <span className="inline-block h-3 w-3 rounded-full bg-[#e5e7eb] mr-1"></span>
-            <span className="text-xs text-gray-500">Booked</span>
-          </div>
-        </div>
-      </div>
-      
-      <div className="grid grid-cols-8 gap-px bg-gray-200">
-        {/* Time labels */}
-        <div className="bg-white p-2">
-          <div className="h-8"></div> {/* Empty cell for alignment */}
-          {hours.map(hour => (
-            <div key={hour} className="h-8 flex items-center">
-              <span className="text-xs text-gray-500">{hour}:00</span>
+    <div className="h-80 w-full">
+      <div className="flex h-full flex-col">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex flex-col">
+            <span className="text-sm font-medium text-gray-500">Customer Satisfaction</span>
+            <div className="flex items-baseline">
+              <span className="text-2xl font-bold text-[#143370]">{overallScore.toFixed(1)}</span>
+              <span className="text-sm text-gray-500 ml-2">/ 5.0 Overall Score</span>
             </div>
-          ))}
+          </div>
+          <div className="flex flex-col items-end">
+            <div className="flex items-center">
+              <span className="text-xs text-gray-500 mr-2">Highest:</span>
+              <span className="font-medium text-green-600">{maxCategory} ({maxScore.toFixed(1)})</span>
+            </div>
+            <div className="flex items-center mt-1">
+              <span className="text-xs text-gray-500 mr-2">Lowest:</span>
+              <span className="font-medium text-red-500">{minCategory} ({minScore.toFixed(1)})</span>
+            </div>
+          </div>
         </div>
         
-        {/* Days */}
-        {days.map((day, dayIndex) => (
-          <div key={day} className="bg-white">
-            {/* Day label */}
-            <div className="h-8 p-2 flex items-center justify-center border-b">
-              <span className="text-sm font-medium text-gray-700">{day}</span>
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Radar Chart */}
+          <div className="flex items-center justify-center">
+            <div className="relative">
+              <svg width="300" height="300" viewBox="0 0 300 300">
+                {/* Background grid */}
+                {gridLines.map((path, i) => (
+                  <path 
+                    key={`grid-${i}`} 
+                    d={path} 
+                    fill="none" 
+                    stroke="#e5e7eb" 
+                    strokeWidth="1"
+                  />
+                ))}
+                
+                {/* Axis lines */}
+                {axisLines.map((path: string | undefined, i: any) => (
+                  <path 
+                    key={`axis-${i}`} 
+                    d={path} 
+                    fill="none" 
+                    stroke="#e5e7eb" 
+                    strokeWidth="1"
+                  />
+                ))}
+                
+                {/* Category labels */}
+                {satisfactionScores.map((item: { category: string | number | bigint | boolean | React.ReactElement<any, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<React.AwaitedReactNode> | null | undefined; }, index: number) => {
+                  const point = calculatePoint(index, 5.5); // Slightly beyond max radius
+                  return (
+                    <text 
+                      key={`label-${index}`} 
+                      x={point.x} 
+                      y={point.y} 
+                      textAnchor="middle" 
+                      dominantBaseline="middle"
+                      fontSize="10"
+                      fill="#4b5563"
+                    >
+                      {item.category}
+                    </text>
+                  );
+                })}
+                
+                {/* Radar polygon */}
+                <path 
+                  d={radarPath} 
+                  fill="#4b71b5" 
+                  fillOpacity="0.2" 
+                  stroke="#4b71b5" 
+                  strokeWidth="2"
+                />
+                
+                {/* Data points */}
+                {radarPoints.map((point: { x: string | number | undefined; y: string | number | undefined; }, index: string | number) => (
+                  <circle 
+                    key={`point-${index}`} 
+                    cx={point.x} 
+                    cy={point.y} 
+                    r="4" 
+                    fill={getScoreColor(satisfactionScores[index].score || 0)}
+                    stroke="white"
+                    strokeWidth="1"
+                  />
+                ))}
+              </svg>
+            </div>
+          </div>
+          
+          {/* Scores List */}
+          <div className="flex flex-col justify-center">
+            <div className="space-y-3 max-h-72 overflow-y-auto pr-2">
+              {satisfactionScores.map((item: { score: number; category: string | number | bigint | boolean | React.ReactElement<any, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | Promise<React.AwaitedReactNode> | null | undefined; }, index: any) => {
+                const score = item.score || 0;
+                const scoreColor = getScoreColor(score);
+                
+                return (
+                  <div key={`score-${index}`} className="flex items-center">
+                    <div className="w-7/12 pr-2">
+                      <div className="text-sm font-medium text-gray-700 truncate" title={item.category}>
+                        {item.category}
+                      </div>
+                    </div>
+                    <div className="w-5/12">
+                      <div className="relative h-6 bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full rounded-full"
+                          style={{ 
+                            width: `${(score / 5) * 100}%`,
+                            backgroundColor: scoreColor
+                          }}
+                        ></div>
+                        <div className="absolute inset-0 flex items-center justify-end pr-2">
+                          <span className="text-xs font-medium text-gray-800">
+                            {score.toFixed(1)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
             
-            {/* Hours */}
-            {hours.map((hour, hourIndex) => (
-              <div 
-                key={`${day}-${hour}`} 
-                className={`h-8 p-1 ${hourIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
-              >
-                <div 
-                  className={`h-full rounded ${availability[dayIndex][hourIndex] ? 'bg-[#4b71b5] bg-opacity-20 border border-[#4b71b5]' : 'bg-gray-200'}`}
-                ></div>
-              </div>
-            ))}
+            <div className="mt-4 text-xs text-gray-500 text-center">
+              <p>Scores based on customer and employee feedback surveys</p>
+              <p>Scale: 1 (Poor) - 5 (Excellent)</p>
+            </div>
           </div>
-        ))}
+        </div>
       </div>
     </div>
   );
