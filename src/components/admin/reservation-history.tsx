@@ -1177,18 +1177,6 @@ const handleStatusUpdate = async (
                           </TableCell>
                         </TableRow>
                         <TableRow>
-                          <TableCell className="font-medium">Machine Utilization Form</TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => selectedReservationId && handleGeneratePDF(selectedReservationId, 'machine-utilization')}
-                            >
-                              Generate PDF
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                        <TableRow>
                           <TableCell className="font-medium">Job and Payment Order</TableCell>
                           <TableCell className="text-right">
                             <Button
