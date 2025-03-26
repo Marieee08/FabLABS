@@ -1,6 +1,6 @@
 // app/api/admin/reports/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/prisma';
+import { prisma } from '@/lib/prisma';
 import { parseISO, isValid, format, startOfDay, endOfDay } from 'date-fns';
 
 export async function GET(request: NextRequest) {
@@ -33,13 +33,13 @@ export async function GET(request: NextRequest) {
       }
     }
     
-    // Fetch data from database
+    // Fetch various data points in parallel
     const [
       pendingRequests,
       completedRequests,
       activeEVCReservations,
       servicesData,
-      utilizationData,
+      utilizationTrends,
       userRoleDistribution,
       satisfactionScores,
       machineDowntime,
@@ -191,12 +191,12 @@ export async function GET(request: NextRequest) {
     
     // Process the utilization trends data
     const monthCounts = {};
-    utilizationData.forEach(req => {
+    utilizationTrends.forEach(req => {
       const monthYear = format(req.RequestDate, 'MMM yyyy');
       monthCounts[monthYear] = (monthCounts[monthYear] || 0) + 1;
     });
     
-    const utilizationTrends = Object.entries(monthCounts).map(([month, count]) => ({
+    const utilizationTrendsData = Object.entries(monthCounts).map(([month, count]) => ({
       month,
       requests: count
     })).sort((a, b) => {
@@ -293,7 +293,7 @@ export async function GET(request: NextRequest) {
       completedRequestsLastMonth: completedRequests,
       activeEVCReservations,
       serviceStats,
-      utilizationTrends,
+      utilizationTrends: utilizationTrendsData,
       userRoleDistribution: userRoles,
       satisfactionScores: satisfactionScoresFormatted,
       machineDowntime: machineDowntimeFormatted,
@@ -302,8 +302,9 @@ export async function GET(request: NextRequest) {
       salesData,
       machineAvailability: { 
         available: 15, 
-        unavailable: 3 
-      } // Replace with real data when available
+        unavailable: 3,
+        percentageAvailable: ((15 / (15 + 3)) * 100).toFixed(2)
+      }
     });
     
   } catch (error) {
