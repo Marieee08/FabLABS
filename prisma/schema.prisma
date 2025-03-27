@@ -133,7 +133,6 @@ model UserTool {
 model UserService {
 id             String          @id @default(cuid())
 ServiceAvail   String
-MachineNo      Int?
 EquipmentAvail String
 CostsAvail     Decimal?
 MinsAvail      Decimal?
