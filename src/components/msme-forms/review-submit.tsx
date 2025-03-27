@@ -194,6 +194,56 @@ const CostReviewTable = ({
       setGroupedData({});
       return;
     }
+
+
+    // New function to validate machine availability for all time slots
+const validateMachineAvailability = async () => {
+  const selectedServices = Array.isArray(formData.ProductsManufactured) 
+    ? formData.ProductsManufactured 
+    : [formData.ProductsManufactured];
+    
+  if (selectedServices.length === 0 || formData.days.length === 0) {
+    return false;
+  }
+  
+  try {
+    // Check each day and time slot
+    for (const day of formData.days) {
+      if (!day.startTime || !day.endTime) continue;
+      
+      // Check against the API
+      const response = await fetch('/api/machine-availability', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          serviceId: selectedServices[0], // Check primary service
+          date: new Date(day.date).toISOString(),
+          startTime: day.startTime,
+          endTime: day.endTime
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to check machine availability');
+      }
+      
+      const data = await response.json();
+      
+      if (!data.available) {
+        setError(`No machines available for ${new Date(day.date).toLocaleDateString()} from ${day.startTime} to ${day.endTime}`);
+        return false;
+      }
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error validating machine availability:', error);
+    setError('Failed to validate machine availability');
+    return false;
+  }
+};
     
     // Group data by service for clearer organization
     const calculatedGroupedData: GroupedServiceData = selectedServices.reduce<GroupedServiceData>((acc, serviceName) => {
@@ -390,96 +440,26 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
   }, []);
 
   
-
   const handleSubmit = async () => {
     try {
       setIsSubmitting(true);
       setError('');
-  
+      
+      // Check machine availability before proceeding
+      const availability = await validateMachineAvailability();
+      if (!availability) {
+        setIsSubmitting(false);
+        return; // Don't proceed if machines aren't available
+      }
+      
+      // Rest of your submit logic...
       const token = await getToken();
       
-      // Create a clean version of the service cost data to avoid circular references
-      const simplifiedServiceData = {};
-      Object.entries(serviceCostData).forEach(([service, data]) => {
-        simplifiedServiceData[service] = {
-          totalServiceCost: data.totalServiceCost,
-          dates: data.dates.map(date => ({
-            day: {
-              date: date.day.date,
-              startTime: date.day.startTime,
-              endTime: date.day.endTime
-            },
-            duration: date.duration,
-            billableHours: date.billableHours,
-            cost: date.cost
-          }))
-        };
-      });
-      
-      // Prepare service cost details array for the API
-      const serviceCostDetails = Object.entries(serviceCostData).map(([serviceName, data]) => ({
-        serviceName,
-        totalCost: data.totalServiceCost,
-        daysCount: data.dates.length
-      }));
-      
-      // Remove any circular references from form data
-      const cleanedFormData = {
-        ...formData,
-        days: formData.days.map(day => ({
-          date: day.date instanceof Date ? day.date.toISOString() : day.date,
-          startTime: day.startTime,
-          endTime: day.endTime
-        })),
-        ProductsManufactured: Array.isArray(formData.ProductsManufactured) 
-          ? formData.ProductsManufactured 
-          : [formData.ProductsManufactured],
-        totalCost,
-        serviceCostDetails,
-        groupedServiceData: simplifiedServiceData
-      };
-  
-      console.log("Submitting reservation with cleaned data:", cleanedFormData);
-  
-      const response = await fetch('/api/user/create-reservation', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          ...cleanedFormData,
-          userInfo: {
-            clientInfo: accInfo?.ClientInfo,
-            businessInfo: accInfo?.BusinessInfo
-          }
-        }),
-      });
-  
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || errorData.details || 'Failed to submit reservation');
-      }
-  
-      const result = await response.json();
-      console.log("Reservation created successfully:", result);
-  
-      toast({
-        title: "Success!",
-        description: "Your service has been scheduled successfully!",
-      });
-  
-      router.push('/user-dashboard');
+      // (Your existing code for submitting the reservation...)
       
     } catch (err) {
       console.error('Submission error:', err);
       setError(err instanceof Error ? err.message : 'Failed to submit reservation');
-      
-      toast({
-        title: "Error",
-        description: err instanceof Error ? err.message : 'Failed to submit reservation',
-        variant: "destructive",
-      });
     } finally {
       setIsSubmitting(false);
     }
@@ -753,4 +733,8 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
       </Card>
     </div>
   );
+}
+
+function validateMachineAvailability() {
+  throw new Error('Function not implemented.');
 }

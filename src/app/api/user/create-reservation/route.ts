@@ -72,7 +72,7 @@ export async function POST(request: Request) {
     });
     
     // Prepare machine utilizations data
-    const machinesToCreate = [];
+    const machinesToCreate: any[] | undefined = [];
     const serviceMachinesMap = new Map();
 
     servicesWithDetails.forEach(service => {
@@ -90,7 +90,7 @@ export async function POST(request: Request) {
     });
 
     // Process tools - parse JSON if needed
-    let userTools = [];
+    let userTools: string | any[] | undefined = [];
     try {
       if (data.Tools) {
         const toolsData = typeof data.Tools === 'string' ? JSON.parse(data.Tools) : data.Tools;
@@ -142,7 +142,7 @@ export async function POST(request: Request) {
     }, 0);
 
     // Process user services
-    const userServices = selectedServices.map(service => {
+    const userServices = selectedServices.map((service: string | number) => {
       const machines = serviceMachinesMap.get(service) || [];
       const serviceLink = serviceLinks[service] || '';
       
@@ -165,9 +165,96 @@ export async function POST(request: Request) {
     });
 
     // Process service availed
-    const serviceAvailed = selectedServices.map(service => ({
+    const serviceAvailed = selectedServices.map((service: any) => ({
       service
     }));
+
+    // Add this validation before creating the reservation
+const validateMachineAvailability = async (services: any, days: any) => {
+  // For each service and time slot, check if machines are available
+  for (const service of services) {
+    for (const day of days) {
+      if (!day.startTime || !day.endTime) continue;
+      
+      const startDateTime = new Date(day.date);
+      const endDateTime = new Date(day.date);
+      
+      // Parse time strings
+      const parseTimeString = (timeStr) => {
+        const [timePart, period] = timeStr.split(' ');
+        let [hours, minutes] = timePart.split(':').map(Number);
+        
+        if (period === 'PM' && hours !== 12) {
+          hours += 12;
+        } else if (period === 'AM' && hours === 12) {
+          hours = 0;
+        }
+        
+        return { hours, minutes };
+      };
+      
+      const startTimeParts = parseTimeString(day.startTime);
+      const endTimeParts = parseTimeString(day.endTime);
+      
+      startDateTime.setHours(startTimeParts.hours, startTimeParts.minutes, 0, 0);
+      endDateTime.setHours(endTimeParts.hours, endTimeParts.minutes, 0, 0);
+
+      // Get service details
+      const serviceObj = await prisma.service.findFirst({
+        where: { Service: service },
+        include: {
+          Machines: {
+            include: {
+              machine: true
+            }
+          }
+        }
+      });
+      
+      if (!serviceObj) continue;
+      
+      // Count available machines
+      const machines = serviceObj.Machines.map(ms => ms.machine);
+      const totalMachines = machines.filter(m => m.isAvailable).length;
+      
+      // Count booked machines for this time slot
+      const bookedMachines = await prisma.utilReq.count({
+        where: {
+          Status: { in: ['Approved', 'Ongoing'] },
+          UserServices: {
+            some: {
+              ServiceAvail: service
+            }
+          },
+          UtilTimes: {
+            some: {
+              AND: [
+                {
+                  StartTime: {
+                    lte: endDateTime
+                  }
+                },
+                {
+                  EndTime: {
+                    gte: startDateTime
+                  }
+                }
+              ]
+            }
+          }
+        }
+      });
+      
+      if (bookedMachines >= totalMachines) {
+        return false; // No machines available
+      }
+    }
+  }
+  
+  return true; // All slots have availability
+};
+
+
 
     // Create the reservation in a transaction
     const utilReq = await prisma.$transaction(async (tx) => {

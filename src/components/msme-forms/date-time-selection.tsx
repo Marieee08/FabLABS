@@ -95,7 +95,7 @@ export default function DateTimeSelection({
   const addNewDay = useCallback((date: Date) => {
     const clickedDateString = date.toDateString();
     
-    setFormData((prevData) => {
+    setFormData((prevData: { days: any[]; syncTimes: any; unifiedStartTime: any; unifiedEndTime: any; }) => {
       const existingDayIndex = prevData.days.findIndex(
         day => new Date(day.date).toDateString() === clickedDateString
       );
@@ -132,7 +132,7 @@ export default function DateTimeSelection({
 
   // Handle unified time changes with memoization
   const handleUnifiedTimeChange = useCallback((time: string, field: 'startTime' | 'endTime') => {
-    setFormData(prevData => {
+    setFormData((prevData: { unifiedStartTime: string; unifiedEndTime: string; syncTimes: any; days: any[]; }) => {
       // Check if there's any actual change to avoid unnecessary updates
       if (field === 'startTime' && prevData.unifiedStartTime === time) {
         return prevData;
@@ -166,48 +166,123 @@ export default function DateTimeSelection({
     });
   }, []);
 
-  function handleIndividualTimeChange(time: string, field: 'startTime' | 'endTime', index: number) {
-    // Track which day is being edited
-    setEditingDayIndex(index);
-    
-    // Handle time changes based on sync setting
-    setFormData(prev => {
-      // Create a new days array to avoid reference issues
-      const newDays = [...prev.days];
+  // Modify handleIndividualTimeChange to check availability
+function handleIndividualTimeChange(time: string, field: 'startTime' | 'endTime', index: number) {
+  // Track which day is being edited
+  setEditingDayIndex(index);
+  
+  // Create temp object to evaluate availability
+  const updatedDay = { ...formData.days[index] };
+  updatedDay[field] = time;
+  
+  // Only validate if both start and end time are set
+  if (updatedDay.startTime && updatedDay.endTime && field === 'endTime') {
+    const selectedServices = Array.isArray(formData.ProductsManufactured) 
+      ? formData.ProductsManufactured 
+      : [formData.ProductsManufactured];
       
-      if (prev.syncTimes) {
-        // In sync mode: update the unified time and all days
-        const updatedDays = newDays.map(day => ({
-          ...day,
-          [field]: time
+    // Check availability asynchronously
+    checkMachineAvailability(
+      new Date(updatedDay.date), 
+      updatedDay.startTime, 
+      updatedDay.endTime,
+      selectedServices
+    ).then(isAvailable => {
+      if (!isAvailable) {
+        // Alert user about unavailability
+        setErrors(prev => ({
+          ...prev,
+          [`timeSlot-${index}`]: 'No machines available for this time slot'
         }));
-        
-        return {
-          ...prev,
-          days: updatedDays,
-          [field === 'startTime' ? 'unifiedStartTime' : 'unifiedEndTime']: time
-        };
       } else {
-        // NON-sync mode: ONLY update the specific day
-        newDays[index] = {
-          ...newDays[index],
-          [field]: time
-        };
-        
-        // Return with ONLY the specific day updated
-        return {
-          ...prev,
-          days: newDays
-        };
+        // Clear error if previously set
+        setErrors(prev => {
+          const newErrors = { ...prev };
+          delete newErrors[`timeSlot-${index}`];
+          return newErrors;
+        });
       }
     });
   }
+  
+  // Handle time changes based on sync setting
+  setFormData((prev: { days: any; syncTimes: any; }) => {
+    // Create a new days array to avoid reference issues
+    const newDays = [...prev.days];
+    
+    if (prev.syncTimes) {
+      // In sync mode: update the unified time and all days
+      const updatedDays = newDays.map(day => ({
+        ...day,
+        [field]: time
+      }));
+      
+      return {
+        ...prev,
+        days: updatedDays,
+        [field === 'startTime' ? 'unifiedStartTime' : 'unifiedEndTime']: time
+      };
+    } else {
+      // NON-sync mode: ONLY update the specific day
+      newDays[index] = {
+        ...newDays[index],
+        [field]: time
+      };
+      
+      // Return with ONLY the specific day updated
+      return {
+        ...prev,
+        days: newDays
+      };
+    }
+  });
+}
+
+  // New function to check machine availability
+const checkMachineAvailability = async (date: Date, startTime: string, endTime: string, selectedServices: string[]) => {
+  if (!startTime || !endTime || !date || selectedServices.length === 0) {
+    return true; // Skip validation if incomplete data
+  }
+  
+  try {
+    // Check availability for each selected service
+    for (const serviceId of selectedServices) {
+      const response = await fetch('/api/machine-availability', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          serviceId,
+          date: date.toISOString(),
+          startTime,
+          endTime
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to check machine availability');
+      }
+      
+      const data = await response.json();
+      
+      if (!data.available) {
+        return false; // Not available for this service
+      }
+    }
+    
+    return true; // Available for all services
+  } catch (error) {
+    console.error('Error checking machine availability:', error);
+    return false; // Default to unavailable on error
+  }
+};
 
   // Handle sync toggle with memoization
   const handleSyncToggle = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newSyncState = e.target.checked;
     
-    setFormData(prevData => {
+    setFormData((prevData: { syncTimes: boolean; unifiedStartTime: any; unifiedEndTime: any; days: any[]; }) => {
       // If the sync state isn't changing, don't update
       if (prevData.syncTimes === newSyncState) {
         return prevData;
@@ -228,7 +303,7 @@ export default function DateTimeSelection({
         }
         
         // Apply unified times to all days
-        const updatedDays = prevData.days.map(day => ({
+        const updatedDays = prevData.days.map((day: any) => ({
           ...day,
           startTime: newStartTime,
           endTime: newEndTime
@@ -430,7 +505,7 @@ export default function DateTimeSelection({
                   <div className="max-h-full overflow-y-auto pr-2 space-y-3">
                   {sortedDays.map((day, sortedIndex) => {
   // Find the actual index of this day in the original formData.days array
-  const actualIndex = formData.days.findIndex(d => 
+  const actualIndex = formData.days.findIndex((d: { date: string | number | Date; }) => 
     new Date(d.date).toISOString() === new Date(day.date).toISOString()
   );
   
