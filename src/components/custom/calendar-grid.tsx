@@ -54,7 +54,9 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
     switch (status.toLowerCase()) {
       case 'approved':
         return 'bg-green-100 text-green-800 border-green-200';
-      case 'pending':
+      case 'pending admin approval':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'pending teacher approval':
         return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'cancelled':
         return 'bg-red-100 text-red-800 border-red-200';
@@ -77,7 +79,9 @@ const CalendarGrid: React.FC<CalendarGridProps> = ({
     switch (status.toLowerCase()) {
       case 'approved':
         return 'bg-green-50';
-      case 'pending':
+      case 'pending admin approval':
+        return 'bg-yellow-50';
+        case 'pending teacher approval':
         return 'bg-yellow-50';
       case 'completed':
         return 'bg-blue-50';
