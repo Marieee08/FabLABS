@@ -35,7 +35,9 @@ export async function GET(request: NextRequest) {
     
     // Fetch various data points in parallel
     const [
-      pendingRequests,
+      pendingUtilRequests,
+      pendingTeacherApprovals,
+      pendingAdminApprovals,
       completedRequests,
       activeEVCReservations,
       servicesData,
@@ -46,11 +48,33 @@ export async function GET(request: NextRequest) {
       repairsByType,
       machinesUsedData
     ] = await Promise.all([
-      // Pending requests count
+      // Regular pending requests
       prisma.utilReq.count({
         where: {
-          Status: 'Pending',
+          Status: 'Pending Admin Approval',
           RequestDate: {
+            gte: fromDate,
+            lte: toDate
+          }
+        }
+      }),
+      
+      // Pending EVC Teacher approvals
+      prisma.eVCReservation.count({
+        where: {
+          EVCStatus: 'Pending Teacher Approval',
+          DateRequested: {
+            gte: fromDate,
+            lte: toDate
+          }
+        }
+      }),
+      
+      // Pending EVC Admin approvals
+      prisma.eVCReservation.count({
+        where: {
+          EVCStatus: 'Pending Admin Approval',
+          DateRequested: {
             gte: fromDate,
             lte: toDate
           }
@@ -95,21 +119,42 @@ export async function GET(request: NextRequest) {
         }
       }),
       
-      // Utilization trends - Get request counts by month
-      prisma.utilReq.findMany({
-        where: {
-          RequestDate: {
-            gte: fromDate,
-            lte: toDate
+      // Get ALL reservations for trends (not just completed ones)
+      prisma.$transaction([
+        // Utilization requests for trends
+        prisma.utilReq.findMany({
+          where: {
+            RequestDate: {
+              gte: fromDate,
+              lte: toDate
+            }
+          },
+          select: {
+            RequestDate: true,
+            Status: true
+          },
+          orderBy: {
+            RequestDate: 'asc'
           }
-        },
-        select: {
-          RequestDate: true
-        },
-        orderBy: {
-          RequestDate: 'asc'
-        }
-      }),
+        }),
+        
+        // EVC reservations for trends
+        prisma.eVCReservation.findMany({
+          where: {
+            DateRequested: {
+              gte: fromDate,
+              lte: toDate
+            }
+          },
+          select: {
+            DateRequested: true,
+            EVCStatus: true
+          },
+          orderBy: {
+            DateRequested: 'asc'
+          }
+        })
+      ]),
       
       // User role distribution
       prisma.accInfo.groupBy({
@@ -144,8 +189,8 @@ export async function GET(request: NextRequest) {
       prisma.downTime.findMany({
         where: {
           DTDate: {
-            gte: fromDate,
-            lte: toDate
+            gte: fromDate.toISOString(),
+            lte: toDate.toISOString()
           }
         },
         select: {
@@ -166,8 +211,8 @@ export async function GET(request: NextRequest) {
         },
         where: {
           RepairDate: {
-            gte: fromDate,
-            lte: toDate
+            gte: fromDate.toISOString(),
+            lte: toDate.toISOString()
           }
         }
       }),
@@ -189,11 +234,31 @@ export async function GET(request: NextRequest) {
       })
     ]);
     
-    // Process the utilization trends data
+    // Combine all pending requests
+    const pendingRequests = pendingUtilRequests + pendingTeacherApprovals + pendingAdminApprovals;
+    
+    // Process the utilization trends data (combine both types of reservations)
+    const [utilRequests, evcRequests] = utilizationTrends;
+    
+    // Group by month for both types
     const monthCounts = {};
-    utilizationTrends.forEach(req => {
+    
+    // Process util requests
+    utilRequests.forEach(req => {
       const monthYear = format(req.RequestDate, 'MMM yyyy');
-      monthCounts[monthYear] = (monthCounts[monthYear] || 0) + 1;
+      if (!monthCounts[monthYear]) {
+        monthCounts[monthYear] = 0;
+      }
+      monthCounts[monthYear] += 1;
+    });
+    
+    // Process EVC requests
+    evcRequests.forEach(req => {
+      const monthYear = format(req.DateRequested, 'MMM yyyy');
+      if (!monthCounts[monthYear]) {
+        monthCounts[monthYear] = 0;
+      }
+      monthCounts[monthYear] += 1;
     });
     
     const utilizationTrendsData = Object.entries(monthCounts).map(([month, count]) => ({
@@ -214,7 +279,7 @@ export async function GET(request: NextRequest) {
     
     // Process user role distribution
     const userRoles = userRoleDistribution.map(role => ({
-      name: role.Role,
+      name: role.Role || 'Unknown',
       value: role._count.id
     }));
     
@@ -277,19 +342,11 @@ export async function GET(request: NextRequest) {
       count: machine._count.id
     })).sort((a, b) => b.count - a.count);
     
-    // Prepare mock sales data (replace with real data when available)
-    const salesData = [
-      { month: 'Jan', revenue: 4500 },
-      { month: 'Feb', revenue: 5200 },
-      { month: 'Mar', revenue: 4800 },
-      { month: 'Apr', revenue: 6000 },
-      { month: 'May', revenue: 5700 },
-      { month: 'Jun', revenue: 6200 }
-    ];
-    
     // Return the final data structure
     return NextResponse.json({
       pendingRequests,
+      pendingTeacherApprovals,
+      pendingAdminApprovals,
       completedRequestsLastMonth: completedRequests,
       activeEVCReservations,
       serviceStats,
@@ -299,7 +356,6 @@ export async function GET(request: NextRequest) {
       machineDowntime: machineDowntimeFormatted,
       repairsByType: repairsByTypeFormatted,
       machinesUsed,
-      salesData,
       machineAvailability: { 
         available: 15, 
         unavailable: 3,
@@ -310,7 +366,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error fetching dashboard data:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch dashboard data' },
+      { error: 'Failed to fetch dashboard data', details: error instanceof Error ? error.message : String(error) },
       { status: 500 }
     );
   }
