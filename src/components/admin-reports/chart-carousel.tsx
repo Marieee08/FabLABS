@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, BarChart3, LineChart, PieChart, SmilePlus } 
 import { Button } from '@/components/ui/button';
 
 // Chart Types
-type ChartType = 'userRoles' | 'requests' | 'services';
+type ChartType = 'userRoles' | 'services';
 
 // Props Interface
 interface EnhancedChartCarouselProps {
@@ -44,25 +44,22 @@ export const EnhancedChartCarousel: React.FC<EnhancedChartCarouselProps> = ({
   // Chart Mapping
   const chartComponents: Record<ChartType, React.ReactNode> = {
     userRoles: <UserRolesChart data={dashboardData} isLoading={isLoading} timeInterval={timeInterval} />,
-    requests: <RequestsChart data={dashboardData} isLoading={isLoading} timeInterval={timeInterval} />,
     services: <ServicesChart data={dashboardData} isLoading={isLoading} />,
   };
 
   const chartTitles: Record<ChartType, string> = {
     userRoles: 'User Role Distribution',
-    requests: 'Request Trends',
     services: 'Service Distribution',
   };
 
   const chartIcons: Record<ChartType, React.ReactNode> = {
     userRoles: <BarChart3 className="h-5 w-5" />,
-    requests: <LineChart className="h-5 w-5" />,
     services: <PieChart className="h-5 w-5" />,
   };
 
   // Navigate charts
   const navigateChart = (direction: 'prev' | 'next') => {
-    const charts: ChartType[] = ['userRoles', 'requests', 'services'];
+    const charts: ChartType[] = ['userRoles',, 'services'];
     const currentIndex = charts.indexOf(activeChart);
     
     if (direction === 'prev') {
@@ -129,7 +126,7 @@ export const EnhancedChartCarousel: React.FC<EnhancedChartCarouselProps> = ({
       
       {/* Chart Selection Pills */}
       <div className="flex justify-center mt-4 space-x-2">
-        {(['userRoles', 'requests', 'services'] as ChartType[]).map((chart) => (
+        {(['userRoles', 'services'] as ChartType[]).map((chart) => (
           <button
             key={chart}
             onClick={() => setActiveChart(chart)}
@@ -297,146 +294,6 @@ const UserRolesChart: React.FC<ChartComponentProps> = ({ data, isLoading }) => {
 };
 
 // Improved RequestsChart Component
-const RequestsChart: React.FC<ChartComponentProps> = ({ data, isLoading, timeInterval }) => {
-  if (isLoading) {
-    return <ChartSkeleton />;
-  }
-
-  // Get utilization trends data from API
-  const trendsData = data.utilizationTrends || [];
-  
-  // For debugging - log what we're getting from the API
-  console.log('Utilization trends data:', trendsData);
-  console.log('Current time interval:', timeInterval);
-  
-  // If no data is available, show a message
-  if (trendsData.length === 0) {
-    return (
-      <div className="h-80 flex items-center justify-center">
-        <p className="text-gray-500">No request data available for the selected period</p>
-      </div>
-    );
-  }
-
-  // Extract periods (months/weeks/days) and request counts
-  const periods = trendsData.map((item: { period: any; month: any; }) => item.period || item.month || '');
-  const requestCounts = trendsData.map((item: { requests: any; }) => item.requests || 0);
-  
-  // Calculate total requests
-  const totalRequests = requestCounts.reduce((sum: any, val: any) => sum + val, 0);
-  
-  // Calculate trend indicators
-  const isIncreasing = requestCounts.length >= 2 && 
-    requestCounts[requestCounts.length - 1] > requestCounts[requestCounts.length - 2];
-  
-  // Calculate average requests per period
-  const avgRequests = totalRequests / requestCounts.length;
-  
-  // Find the maximum value for scaling the chart
-  const maxValue = Math.max(...requestCounts, 1); // Ensure at least 1 to avoid division by zero
-
-  // Calculate growth rate if we have enough data
-  let growthRate = 0;
-  if (requestCounts.length >= 2) {
-    const firstValue = requestCounts[0];
-    const lastValue = requestCounts[requestCounts.length - 1];
-    
-    if (firstValue > 0) {
-      growthRate = ((lastValue - firstValue) / firstValue) * 100;
-    }
-  }
-
-  return (
-    <div className="h-80">
-      <div className="flex justify-between items-center mb-4">
-        <div>
-          <span className="text-sm font-medium text-gray-500">Total Requests</span>
-          <div className="text-2xl font-bold text-[#143370]">{totalRequests}</div>
-        </div>
-        <div className="flex flex-col items-end">
-          <div className="flex items-center">
-            <span className="text-xs text-gray-500 mr-2">Avg. per {timeInterval}:</span>
-            <span className="font-medium text-[#143370]">{Math.round(avgRequests)}</span>
-          </div>
-          <div className="flex items-center mt-1">
-            <span className="text-xs text-gray-500 mr-2">Trend:</span>
-            <span className={`font-medium ${
-              growthRate > 0 ? 'text-green-600' : 
-              growthRate < 0 ? 'text-red-600' : 
-              'text-gray-600'
-            }`}>
-              {growthRate > 0 ? '+' : ''}{Math.round(growthRate)}%
-            </span>
-          </div>
-        </div>
-      </div>
-      
-      <div className="relative h-56">
-        {/* Chart Grid */}
-        <div className="absolute inset-0 grid grid-cols-1" 
-             style={{ gridTemplateColumns: `repeat(${periods.length}, 1fr)` }}>
-          {periods.map((period: any, i: any) => (
-            <div key={`grid-${period}-${i}`} className="flex flex-col h-full">
-              <div className="flex-1 border-t border-gray-200"></div>
-            </div>
-          ))}
-        </div>
-        
-        {/* Y-axis labels */}
-        <div className="absolute left-0 top-0 h-full flex flex-col justify-between text-xs text-gray-500 pr-2">
-          <div>{maxValue}</div>
-          <div>{Math.floor(maxValue/2)}</div>
-          <div>0</div>
-        </div>
-        
-        {/* Chart Values */}
-        <div className="absolute inset-0 pt-4 pb-6 pl-6 flex items-end">
-          <div className="flex w-full h-full gap-2">
-            {periods.map((period: string | number | bigint | boolean | React.ReactElement<any, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<React.AwaitedReactNode> | null | undefined, i: string | number) => {
-              // Determine bar color based on comparison to average
-              const barColor = requestCounts[i] >= avgRequests ? '#4b71b5' : '#a3b9e2';
-              
-              return (
-                <div key={`col-${period}-${i}`} className="flex-1 flex flex-col justify-end items-center">
-                  {/* Request count bar */}
-                  <div 
-                    className={`w-full max-w-[30px] rounded-t-sm transition-all duration-300`}
-                    style={{ 
-                      height: `${maxValue > 0 ? (requestCounts[i] / maxValue) * 100 : 0}%`,
-                      backgroundColor: barColor
-                    }}
-                  ></div>
-                  
-                  {/* Actual count number */}
-                  <div className="text-xs font-medium text-[#143370] mt-1">
-                    {requestCounts[i]}
-                  </div>
-                  
-                  {/* X-axis label */}
-                  <div className="text-xs text-gray-500 mt-1 truncate w-full text-center" 
-                       style={{ maxWidth: '100%' }}>
-                    {period}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-      
-      <div className="mt-3 flex justify-between text-xs text-gray-500">
-        <div className="flex items-center">
-          <div className="h-3 w-3 bg-[#4b71b5] rounded-sm mr-1"></div>
-          <span>Above Average</span>
-        </div>
-        <div className="flex items-center">
-          <div className="h-3 w-3 bg-[#a3b9e2] rounded-sm mr-1"></div>
-          <span>Below Average</span>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 // Improved ServicesChart Component
 const ServicesChart: React.FC<ChartComponentProps> = ({ data, isLoading }) => {

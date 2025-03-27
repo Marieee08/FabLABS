@@ -15,7 +15,7 @@ import { EditIcon, Save, X, Clock, AlertCircle, Database } from 'lucide-react';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import ReservationDetailsTab from './review-reservation-details';
 import TimeEditor from './time-editor';
-import MachineUtilization from './machine-utilization';
+import { downloadMachineUtilPDF } from "@/components/admin-functions/pdf/machine-utilization-pdf";
 import CostBreakdown from './cost-breakdown'; // Import the new CostBreakdown component
 import { toast } from 'sonner';
 
@@ -200,6 +200,48 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
     return machines.map(m => `${m.name}:${m.quantity}`).join(', ');
   };
 
+  const handleGeneratePDF = () => {
+    if (!localReservation || !localReservation.MachineUtilizations || localReservation.MachineUtilizations.length === 0) {
+      toast.error('No machine utilization data to generate PDF');
+      return;
+    }
+  
+    // Transform each machine utilization to the PDF format
+    localReservation.MachineUtilizations.forEach((machineUtil) => {
+      const pdfData = {
+        id: machineUtil.id || localReservation.id,
+        Machine: machineUtil.Machine || 'Unknown Machine',
+        ReviewedBy: machineUtil.ReviwedBy || 'Unknown', // Note the spelling 'ReviwedBy' to match your interface
+        ServiceName: machineUtil.ServiceName || 'Unspecified',
+        OperatingTimes: (machineUtil.OperatingTimes || []).map(ot => ({
+          OTDate: ot.OTDate,
+          OTTypeofProducts: ot.OTTypeofProducts || '',
+          OTStartTime: ot.OTStartTime || '',
+          OTEndTime: ot.OTEndTime || '',
+          OTMachineOp: ot.OTMachineOp || ''
+        })),
+        DownTimes: (machineUtil.DownTimes || []).map(dt => ({
+          DTDate: dt.DTDate,
+          DTTypeofProducts: dt.DTTypeofProducts || '',
+          DTTime: dt.DTTime || 0,
+          Cause: dt.Cause || '',
+          DTMachineOp: dt.DTMachineOp || ''
+        })),
+        RepairChecks: (machineUtil.RepairChecks || []).map(rc => ({
+          RepairDate: rc.RepairDate,
+          Service: rc.Service || '',
+          Duration: rc.Duration || 0,
+          RepairReason: rc.RepairReason || '',
+          PartsReplaced: rc.PartsReplaced || '',
+          RPPersonnel: rc.RPPersonnel || ''
+        }))
+      };
+  
+      // Generate PDF for each machine
+      downloadMachineUtilPDF(pdfData);
+    });
+  };
+
   // Update local state when selected reservation changes
 // Update local state when selected reservation changes
 useEffect(() => {
@@ -285,6 +327,7 @@ useEffect(() => {
     return true;
   };
 
+  
   // Get service rates for time-based cost calculation
   const getServiceRates = (): Map<string, number> => {
     const rates = new Map<string, number>();
@@ -924,7 +967,18 @@ return (
                         )}
                       </>
                     )}
+                  {localReservation.Status === 'Completed' && (
+                  <Button 
+                    variant="outline" 
+                    onClick={handleGeneratePDF}
+                    className="ml-2"
+                  >
+                    <Database className="h-4 w-4 mr-2" />
+                    Generate PDF
+                  </Button>
+                )}
                   </div>
+                  
                 )}
                 {/* Status flow section in the DialogFooter of ReviewReservation component */}
 <div className="flex gap-4">

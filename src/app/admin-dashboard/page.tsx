@@ -138,11 +138,11 @@ const DashboardAdmin = () => {
                   </li>
                 </>
               )}
-              <li>
+              {/*<li>
                 <Link href="/admin-dashboard/reports" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-white border border-transparent hover:bg-[#1c2a52] hover:border-[#5e86ca]">
                   Reports
-                </Link>
-              </li>
+                </Link> 
+              </li>*/}
             </ul>
           </div>
         </nav>

@@ -226,33 +226,7 @@ const ReportsPage: React.FC = () => {
               {/* Date Range Selector */}
               <DateRangeSelector onRangeChange={handleDateRangeChange} />
               
-              {/* Key Metrics */}
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-3 mb-6">
-                <MetricCard 
-                  title="Pending Requests" 
-                  value={dashboardData?.pendingRequests || 0} 
-                  description="Awaiting Approval"
-                  color="#143370"
-                  isLoading={isLoading}
-                />
-
-                <MetricCard 
-                  title="Completed Requests" 
-                  value={dashboardData?.completedRequestsLastMonth || 0} 
-                  description="in the last 30 Days"
-                  color="#143370"
-                  isLoading={isLoading}
-                />
-
-                <MetricCard 
-                  title="Active EVC Reservations" 
-                  value={dashboardData?.activeEVCReservations || 0} 
-                  description="Currently Scheduled"
-                  color="#143370"
-                  isLoading={isLoading}
-                />
-              </div>
-              
+             
               {/* Chart Carousel - Using the enhanced version */}
               <EnhancedChartCarousel 
                 dashboardData={dashboardData || {}} 
