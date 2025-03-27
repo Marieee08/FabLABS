@@ -220,7 +220,7 @@ export const downloadLabReservationFormPDF = (formData: LabReservationFormData):
     // Add header text
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text('PHILIPPINE SCIENCE HIGH SCHOOL SYSTEM', pageWidth / 2, y, { align: 'center' });
+    doc.text('PHILIPPINE SCIENCE HIGH SCHOOL SYSTEM', pageWidth / 2, y, { align: 'left' });
     y += 7;
 
     // Add campus field with underline
@@ -242,7 +242,7 @@ export const downloadLabReservationFormPDF = (formData: LabReservationFormData):
     // Form title
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text('LABORATORY RESERVATION FORM', pageWidth / 2, y, { align: 'center' });
+    doc.text('LABORATORY RESERVATION FORM', pageWidth / 2, y, { align: 'left' });
    
     y += 10;
    
@@ -434,29 +434,42 @@ export const downloadLabReservationFormPDF = (formData: LabReservationFormData):
    
     y += 7;
    
-    // Student list
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-   
-    for (let i = 0; i < 5; i++) {
-      const studentNumber = `${i + 1}.`;
-      const studentX = margin + 5;
-     
-      doc.text(studentNumber, studentX, y);
-     
-      // Draw line for student name
-      const lineStart = studentX + doc.getTextWidth(studentNumber) + 2;
-      drawUnderline(doc, lineStart, y, 70);
-     
-      // Add student name if available
-      if (studentsData[i] && studentsData[i].name) {
-        // Position the student name just above the line for better visibility
-        // Changed y-offset from -1.5 to -1 to ensure text is visible
-        doc.text(studentsData[i].name, lineStart + 2, y - 1);
-      }
-     
-      y += 7;
+// Student list
+doc.setFontSize(10);
+doc.setFont('helvetica', 'normal');
+
+for (let i = 0; i < 5; i++) {
+  const studentNumber = `${i + 1}.`;
+  const studentX = margin + 5;
+  
+  doc.text(studentNumber, studentX, y);
+  
+  // Draw line for student name
+  const lineStart = studentX + doc.getTextWidth(studentNumber) + 2;
+  const lineWidth = 70;
+  drawUnderline(doc, lineStart, y, lineWidth);
+  
+  // Add student name if available
+  if (studentsData[i] && studentsData[i].name) {
+    // Calculate text width to prevent overflow
+    const studentName = studentsData[i].name;
+    const textWidth = doc.getTextWidth(studentName);
+    
+    // Adjust font size if name is too long
+    if (textWidth > lineWidth - 4) {
+      const originalSize = doc.getFontSize();
+      const scaleFactor = (lineWidth - 4) / textWidth;
+      const newSize = originalSize * Math.min(scaleFactor, 1);
+      doc.setFontSize(newSize);
+      doc.text(studentName, lineStart + 2, y - 1);
+      doc.setFontSize(originalSize); // Reset to original size
+    } else {
+      doc.text(studentName, lineStart + 2, y - 1);
     }
+  }
+  
+  y += 7;
+}
    
     y += 15;
    
