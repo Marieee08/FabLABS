@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
-import { AlertCircle, Plus, Trash2, ArrowLeft, Save, Calendar, Clock, AlertTriangle, Wrench } from 'lucide-react';
+import { AlertCircle, Plus, Trash2, ArrowLeft, Save, Calendar, Clock, AlertTriangle, Wrench, FileText } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { format } from 'date-fns';
 import {
@@ -21,6 +21,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { downloadMachineUtilPDF } from "@/components/admin-functions/pdf/machine-utilization-pdf";
 
 // Interfaces for machine utilization data
 interface OperatingTime {
@@ -95,8 +96,6 @@ interface MachineUtilizationProps {
   onSave: () => void;
 }
 
-// Modification to the MachineUtilization component to remove the fields
-
 const MachineUtilization: React.FC<MachineUtilizationProps> = ({
     reservationId,
     userServices,
@@ -147,7 +146,7 @@ const MachineUtilization: React.FC<MachineUtilizationProps> = ({
                   RepairDate: rc.RepairDate ? new Date(rc.RepairDate).toISOString().split('T')[0] : null,
                 }))
               }));
-  
+
               setMachineUtilizations(formattedData);
             }
           } catch (error) {
@@ -351,6 +350,50 @@ const MachineUtilization: React.FC<MachineUtilizationProps> = ({
         return updated;
       });
     };
+
+    // Handle generating PDF for all machine utilizations
+// Update the handleGeneratePDF function in your modal component
+const handleGeneratePDF = () => {
+  if (machineUtilizations.length === 0) {
+    alert('No machine utilization data to generate PDF');
+    return;
+  }
+
+  // Transform each machine utilization to the PDF format
+  machineUtilizations.forEach((machineUtil) => {
+    const pdfData = {
+      id: machineUtil.id || reservationId,
+      Machine: machineUtil.Machine || 'Unknown Machine',
+      ReviewedBy: machineUtil.ReviewedBy || 'Unknown',
+      ServiceName: machineUtil.ServiceName || 'Unspecified',
+      OperatingTimes: machineUtil.OperatingTimes.map(ot => ({
+        OTDate: ot.OTDate,
+        OTTypeofProducts: ot.OTTypeofProducts || '',
+        OTStartTime: ot.OTStartTime || '',
+        OTEndTime: ot.OTEndTime || '',
+        OTMachineOp: ot.OTMachineOp || ''
+      })),
+      DownTimes: machineUtil.DownTimes.map(dt => ({
+        DTDate: dt.DTDate,
+        DTTypeofProducts: dt.DTTypeofProducts || '',
+        DTTime: dt.DTTime || 0,
+        Cause: dt.Cause || '',
+        DTMachineOp: dt.DTMachineOp || ''
+      })),
+      RepairChecks: machineUtil.RepairChecks.map(rc => ({
+        RepairDate: rc.RepairDate,
+        Service: rc.Service || '',
+        Duration: rc.Duration || 0,
+        RepairReason: rc.RepairReason || '',
+        PartsReplaced: rc.PartsReplaced || '',
+        RPPersonnel: rc.RPPersonnel || ''
+      }))
+    };
+
+    // Generate PDF for each machine
+    downloadMachineUtilPDF(pdfData);
+  });
+};
   
     // Handle saving all machine utilization data
     const handleSaveAll = async () => {
@@ -458,9 +501,9 @@ const MachineUtilization: React.FC<MachineUtilizationProps> = ({
             })
           };
         });
-  
+
         console.log('Sending data to server:', JSON.stringify(preparedData, null, 2));
-  
+
         try {
           const response = await fetch(`/api/admin/machine-utilization/${reservationId}`, {
             method: 'POST',
@@ -469,13 +512,13 @@ const MachineUtilization: React.FC<MachineUtilizationProps> = ({
             },
             body: JSON.stringify(preparedData),
           });
-  
+
           if (!response.ok) {
             // Try to get more detailed error information
             const errorData = await response.json().catch(() => ({}));
             throw new Error(`API responded with status: ${response.status}. Details: ${JSON.stringify(errorData)}`);
           }
-  
+
           // Get the updated data from the response
           const updatedData = await response.json();
           
@@ -498,7 +541,7 @@ const MachineUtilization: React.FC<MachineUtilizationProps> = ({
               RepairDate: rc.RepairDate ? new Date(rc.RepairDate).toISOString().split('T')[0] : null
             }))
           })));
-  
+
           // Show success message
           setSaving(false);
           alert('Machine utilization data saved successfully');
@@ -563,9 +606,9 @@ const MachineUtilization: React.FC<MachineUtilizationProps> = ({
                         />
                       </div>
                     </div>
-  
+
                     <Separator />
-  
+
                     {/* Operating Times */}
                     <div>
                       <div className="flex justify-between items-center mb-2">
@@ -652,9 +695,9 @@ const MachineUtilization: React.FC<MachineUtilizationProps> = ({
                         </div>
                       )}
                     </div>
-  
+
                     <Separator />
-  
+
                     {/* Down Times */}
                     <div>
                       <div className="flex justify-between items-center mb-2">
@@ -742,9 +785,9 @@ const MachineUtilization: React.FC<MachineUtilizationProps> = ({
                         </div>
                       )}
                     </div>
-  
+
                     <Separator />
-  
+
                     {/* Repair Checks */}
                     <div>
                       <div className="flex justify-between items-center mb-2">
@@ -861,14 +904,24 @@ const MachineUtilization: React.FC<MachineUtilizationProps> = ({
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to Reservation
           </Button>
-          <Button 
-            variant="default" 
-            onClick={handleSaveAll}
-            disabled={saving}
-          >
-            <Save className="h-4 w-4 mr-2" />
-            {saving ? 'Saving...' : 'Save All Changes'}
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="secondary" 
+              onClick={handleGeneratePDF}
+              disabled={machineUtilizations.length === 0}
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Generate PDF
+            </Button>
+            <Button 
+              variant="default" 
+              onClick={handleSaveAll}
+              disabled={saving}
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {saving ? 'Saving...' : 'Save All Changes'}
+            </Button>
+          </div>
         </div>
       </div>
     );
