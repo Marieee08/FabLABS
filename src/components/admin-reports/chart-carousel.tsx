@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, BarChart3, LineChart, PieChart, SmilePlus } 
 import { Button } from '@/components/ui/button';
 
 // Chart Types
-type ChartType = 'userRoles' | 'requests' | 'services' | 'satisfaction';
+type ChartType = 'userRoles' | 'requests' | 'services';
 
 // Props Interface
 interface EnhancedChartCarouselProps {
@@ -46,26 +46,23 @@ export const EnhancedChartCarousel: React.FC<EnhancedChartCarouselProps> = ({
     userRoles: <UserRolesChart data={dashboardData} isLoading={isLoading} timeInterval={timeInterval} />,
     requests: <RequestsChart data={dashboardData} isLoading={isLoading} timeInterval={timeInterval} />,
     services: <ServicesChart data={dashboardData} isLoading={isLoading} />,
-    satisfaction: <SatisfactionChart data={dashboardData} isLoading={isLoading} />,
   };
 
   const chartTitles: Record<ChartType, string> = {
     userRoles: 'User Role Distribution',
     requests: 'Request Trends',
     services: 'Service Distribution',
-    satisfaction: 'Customer Satisfaction',
   };
 
   const chartIcons: Record<ChartType, React.ReactNode> = {
     userRoles: <BarChart3 className="h-5 w-5" />,
     requests: <LineChart className="h-5 w-5" />,
     services: <PieChart className="h-5 w-5" />,
-    satisfaction: <SmilePlus className="h-5 w-5" />,
   };
 
   // Navigate charts
   const navigateChart = (direction: 'prev' | 'next') => {
-    const charts: ChartType[] = ['userRoles', 'requests', 'services', 'satisfaction'];
+    const charts: ChartType[] = ['userRoles', 'requests', 'services'];
     const currentIndex = charts.indexOf(activeChart);
     
     if (direction === 'prev') {
@@ -132,7 +129,7 @@ export const EnhancedChartCarousel: React.FC<EnhancedChartCarouselProps> = ({
       
       {/* Chart Selection Pills */}
       <div className="flex justify-center mt-4 space-x-2">
-        {(['userRoles', 'requests', 'services', 'satisfaction'] as ChartType[]).map((chart) => (
+        {(['userRoles', 'requests', 'services'] as ChartType[]).map((chart) => (
           <button
             key={chart}
             onClick={() => setActiveChart(chart)}
@@ -579,342 +576,7 @@ const ServicesChart: React.FC<ChartComponentProps> = ({ data, isLoading }) => {
   );
 };
 
-// Customer Satisfaction Chart
-// Updated SatisfactionChart component for improved visualization and data handling
-const SatisfactionChart: React.FC<ChartComponentProps> = ({ data, isLoading }) => {
-  if (isLoading) {
-    return <ChartSkeleton />;
-  }
 
-  // Get satisfaction data from API
-  const satisfactionScores = data.satisfactionScores || [];
-  
-  // For debugging - log what we're getting from the API
-  console.log('Satisfaction data:', satisfactionScores);
-  
-  // If no data is available, show a message
-  if (satisfactionScores.length === 0) {
-    return (
-      <div className="h-80 flex items-center justify-center">
-        <p className="text-gray-500">No satisfaction data available for the selected period</p>
-      </div>
-    );
-  }
-
-  // Map for full category descriptions to provide better context
-  const categoryDescriptions: Record<string, string> = {
-    'Service Quality': 'I am satisfied with the services that I availed.',
-    'Staff Knowledge': 'I spent reasonable amount of time for my transaction.',
-    'Responsiveness': 'The office followed the transaction\'s requirements and steps based on the information provided.',
-    'Timeliness': 'The steps (including payment) I needed to do for my transaction were easy and simple.',
-    'Equipment Quality': 'I easily found information about my transaction from the office\'s website.',
-    'Process Efficiency': 'I paid a reasonable amount of fees for my transaction.',
-    'Communication': 'I am confident my transaction was secure.',
-    'Value for Money': 'The office\'s support was available, and (if asked questions) support was quick to respond.',
-    'Overall Experience': 'I got what I needed from the government office, or (if denied) denial of request was sufficiently explained to me.'
-  };
-
-  // Calculate overall average satisfaction
-  const overallScore = satisfactionScores.reduce((sum: any, item: { score: any; }) => sum + (item.score || 0), 0) / 
-                      satisfactionScores.length;
-  
-  // Find min and max category scores for highlighting
-  const scores = satisfactionScores.map((item: { score: any; }) => item.score || 0);
-  const maxScore = Math.max(...scores);
-  const minScore = Math.min(...scores);
-  
-  // Determine which categories have max/min scores
-  const maxCategory = satisfactionScores.find((item: { score: number; }) => item.score === maxScore)?.category || '';
-  const minCategory = satisfactionScores.find((item: { score: number; }) => item.score === minScore)?.category || '';
-
-  // Helper function to get color based on score
-  const getScoreColor = (score: number) => {
-    if (score >= 4.5) return '#10b981'; // Green for excellent scores
-    if (score >= 4) return '#4ade80'; // Light green for very good scores
-    if (score >= 3.5) return '#4b71b5'; // Blue for good scores
-    if (score >= 3) return '#60a5fa'; // Light blue for average scores
-    if (score >= 2) return '#f59e0b'; // Yellow for below average scores
-    return '#ef4444';  // Red for poor scores
-  };
-
-  // Helper function to get score label
-  const getScoreLabel = (score: number) => {
-    if (score >= 4.5) return 'Excellent';
-    if (score >= 4) return 'Very Good';
-    if (score >= 3.5) return 'Good';
-    if (score >= 3) return 'Average';
-    if (score >= 2) return 'Fair';
-    return 'Poor';
-  };
-
-  // Radar chart settings
-  const centerX = 150; // Center X coordinate
-  const centerY = 150; // Center Y coordinate
-  const maxRadius = 100; // Maximum radius of the chart
-  const categories = satisfactionScores.length;
-  
-  // Calculate points for each category on the radar
-  const calculatePoint = (index: number, value: number) => {
-    // Calculate angle for this category (in radians)
-    const angleStep = (Math.PI * 2) / categories;
-    const angle = index * angleStep - Math.PI / 2; // Start from top
-    
-    // Calculate distance from center (scale the value)
-    const scaledValue = (value / 5) * maxRadius; // Assuming max score is 5
-    
-    // Calculate x,y coordinates
-    const x = centerX + scaledValue * Math.cos(angle);
-    const y = centerY + scaledValue * Math.sin(angle);
-    
-    return { x, y };
-  };
-  
-  // Generate radar polygon points
-  const radarPoints = satisfactionScores.map((item: { score: any; }, index: number) => 
-    calculatePoint(index, item.score || 0)
-  );
-  
-  // Create SVG path for the radar polygon
-  const radarPath = radarPoints.map((point: { x: any; y: any; }, index: number) => 
-    index === 0 ? `M ${point.x} ${point.y}` : `L ${point.x} ${point.y}`
-  ).join(' ') + ' Z'; // Z to close the path
-
-  // Create background grid lines (5 levels)
-  const gridLines = Array.from({ length: 5 }, (_, i) => {
-    const radius = ((i + 1) / 5) * maxRadius;
-    const gridPoints = Array.from({ length: categories }, (_, j) => 
-      calculatePoint(j, (i + 1))
-    );
-    
-    const gridPath = gridPoints.map((point, index) => 
-      index === 0 ? `M ${point.x} ${point.y}` : `L ${point.x} ${point.y}`
-    ).join(' ') + ' Z';
-    
-    return gridPath;
-  });
-
-  // Create axis lines (from center to each category)
-  const axisLines = satisfactionScores.map((_: any, index: number) => {
-    const point = calculatePoint(index, 5); // Full length to max score of 5
-    return `M ${centerX} ${centerY} L ${point.x} ${point.y}`;
-  });
-
-  return (
-    <div className="h-80 w-full">
-      <div className="flex h-full flex-col">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex flex-col">
-            <span className="text-sm font-medium text-gray-500">Customer Satisfaction</span>
-            <div className="flex items-baseline">
-              <span className="text-2xl font-bold" style={{ color: getScoreColor(overallScore) }}>
-                {overallScore.toFixed(1)}
-              </span>
-              <span className="text-sm text-gray-500 ml-2">/ 5.0 Overall Score</span>
-              <span className="ml-3 px-2 py-0.5 text-xs rounded-full" 
-                    style={{ 
-                      backgroundColor: `${getScoreColor(overallScore)}20`, 
-                      color: getScoreColor(overallScore) 
-                    }}>
-                {getScoreLabel(overallScore)}
-              </span>
-            </div>
-          </div>
-          <div className="flex flex-col items-end">
-            <div className="flex items-center">
-              <span className="text-xs text-gray-500 mr-2">Highest:</span>
-              <span className="font-medium text-green-600">{maxCategory} ({maxScore.toFixed(1)})</span>
-            </div>
-            <div className="flex items-center mt-1">
-              <span className="text-xs text-gray-500 mr-2">Lowest:</span>
-              <span className="font-medium text-amber-600">{minCategory} ({minScore.toFixed(1)})</span>
-            </div>
-          </div>
-        </div>
-        
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Radar Chart */}
-          <div className="flex items-center justify-center">
-            <div className="relative">
-              <svg width="300" height="300" viewBox="0 0 300 300">
-                {/* Background grid */}
-                {gridLines.map((path, i) => (
-                  <path 
-                    key={`grid-${i}`} 
-                    d={path} 
-                    fill="none" 
-                    stroke="#e5e7eb" 
-                    strokeWidth="1"
-                  />
-                ))}
-                
-                {/* Score labels on grid lines */}
-                {[1, 2, 3, 4, 5].map((score) => (
-                  <text
-                    key={`score-${score}`}
-                    x={centerX + 5}
-                    y={centerY - (score / 5) * maxRadius + 5}
-                    fontSize="8"
-                    fill="#9ca3af"
-                  >
-                    {score}
-                  </text>
-                ))}
-                
-                {/* Axis lines */}
-                {axisLines.map((path: string | undefined, i: any) => (
-                  <path 
-                    key={`axis-${i}`} 
-                    d={path} 
-                    fill="none" 
-                    stroke="#e5e7eb" 
-                    strokeWidth="1"
-                  />
-                ))}
-                
-                {/* Category labels */}
-                {satisfactionScores.map((item: { score: number; category: string | number | bigint | boolean | React.ReactElement<any, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<React.AwaitedReactNode> | null | undefined; }, index: number) => {
-                  const point = calculatePoint(index, 5.5); // Slightly beyond max radius
-                  return (
-                    <text 
-                      key={`label-${index}`} 
-                      x={point.x} 
-                      y={point.y} 
-                      textAnchor="middle" 
-                      dominantBaseline="middle"
-                      fontSize="10"
-                      fill="#4b5563"
-                      style={{
-                        fontWeight: item.score === maxScore || item.score === minScore ? 'bold' : 'normal'
-                      }}
-                    >
-                      {item.category}
-                    </text>
-                  );
-                })}
-                
-                {/* Radar polygon */}
-                <path 
-                  d={radarPath} 
-                  fill="url(#gradientFill)" 
-                  fillOpacity="0.4" 
-                  stroke="#4b71b5" 
-                  strokeWidth="2"
-                />
-                
-                {/* Define gradient for radar fill */}
-                <defs>
-                  <linearGradient id="gradientFill" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stopColor="#4b71b5" stopOpacity="0.8" />
-                    <stop offset="100%" stopColor="#60a5fa" stopOpacity="0.4" />
-                  </linearGradient>
-                </defs>
-                
-                {/* Data points */}
-                {radarPoints.map((point, index) => {
-                  const score = satisfactionScores[index].score || 0;
-                  const scoreColor = getScoreColor(score);
-                  
-                  return (
-                    <g key={`point-${index}`}>
-                      {/* Highlight the point area */}
-                      <circle 
-                        cx={point.x} 
-                        cy={point.y} 
-                        r="4" 
-                        fill={scoreColor}
-                        stroke="white"
-                        strokeWidth="1"
-                      />
-                      {/* Add score label near point */}
-                      <text
-                        x={point.x + (point.x > centerX ? 10 : -10)}
-                        y={point.y}
-                        textAnchor={point.x > centerX ? "start" : "end"}
-                        fontSize="9"
-                        fontWeight="bold"
-                        fill={scoreColor}
-                      >
-                        {score.toFixed(1)}
-                      </text>
-                    </g>
-                  );
-                })}
-                
-                {/* Center circle */}
-                <circle cx={centerX} cy={centerY} r="3" fill="#e5e7eb" />
-              </svg>
-            </div>
-          </div>
-          
-          {/* Scores List */}
-          <div className="flex flex-col justify-center">
-            <div className="space-y-3 max-h-72 overflow-y-auto pr-2">
-              {satisfactionScores.map((item: { score: number; category: string | number | bigint | boolean | React.ReactElement<any, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | Promise<React.AwaitedReactNode> | null | undefined; }, index: any) => {
-                const score = item.score || 0;
-                const scoreColor = getScoreColor(score);
-                const tooltip = categoryDescriptions[item.category] || '';
-                
-                return (
-                  <div key={`score-${index}`} 
-                       className="flex items-center group relative"
-                       title={tooltip}>
-                    <div className="w-7/12 pr-2">
-                      <div className="text-sm font-medium text-gray-700 truncate group-hover:underline">
-                        {item.category}
-                      </div>
-                    </div>
-                    <div className="w-5/12">
-                      <div className="relative h-6 bg-gray-100 rounded-full overflow-hidden">
-                        <div 
-                          className="h-full rounded-full transition-all duration-300"
-                          style={{ 
-                            width: `${(score / 5) * 100}%`,
-                            backgroundColor: scoreColor
-                          }}
-                        ></div>
-                        <div className="absolute inset-0 flex items-center justify-end pr-2">
-                          <span className="text-xs font-medium text-gray-800">
-                            {score.toFixed(1)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {/* Tooltip on hover */}
-                    <div className="absolute left-0 bottom-full mb-2 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-200 z-50">
-                      <div>{tooltip}</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            
-            <div className="mt-3 border-t border-gray-200 pt-3">
-              <div className="grid grid-cols-3 gap-1">
-                {[
-                  { label: "Poor", color: "#ef4444", range: "< 2.0" },
-                  { label: "Fair", color: "#f59e0b", range: "2.0-3.0" },
-                  { label: "Average", color: "#60a5fa", range: "3.0-3.5" },
-                  { label: "Good", color: "#4b71b5", range: "3.5-4.0" },
-                  { label: "Very Good", color: "#4ade80", range: "4.0-4.5" },
-                  { label: "Excellent", color: "#10b981", range: "4.5+" },
-                ].map((legend, i) => (
-                  <div key={`legend-${i}`} className="flex items-center">
-                    <div
-                      className="w-3 h-3 rounded-sm mr-1"
-                      style={{ backgroundColor: legend.color }}
-                    ></div>
-                    <span className="text-xs text-gray-600">{legend.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 // Loading Skeleton
 const ChartSkeleton: React.FC = () => {

@@ -15,7 +15,8 @@ import { EditIcon, Save, X, Clock, AlertCircle, Database } from 'lucide-react';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import ReservationDetailsTab from './review-reservation-details';
 import TimeEditor from './time-editor';
-import  MachineUtilization from './machine-utilization';
+import MachineUtilization from './machine-utilization';
+import CostBreakdown from './cost-breakdown'; // Import the new CostBreakdown component
 import { toast } from 'sonner';
 
 // Updated interface definitions
@@ -154,6 +155,7 @@ interface DetailedReservation {
     };
   };
 }
+
 
 const ReviewReservation: React.FC<ReviewReservationProps> = ({
   isModalOpen,
@@ -680,15 +682,15 @@ const handleApproveReservation = async () => {
 // Add this loading state to component
 const [isLoading, setIsLoading] = useState(false);
 
-  return (
-    <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-semibold">Reservation Details</DialogTitle>
-        </DialogHeader>
-        
-        {localReservation && (
-          <div className="space-y-6">
+return (
+  <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+    <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+      <DialogHeader>
+        <DialogTitle className="text-2xl font-semibold">Reservation Details</DialogTitle>
+      </DialogHeader>
+      
+      {localReservation && (
+        <div className="space-y-6">
             {/* Display notification if reservation is in non-editable state */}
             {isEditingDisabled(localReservation.Status) && (
               <Alert variant="warning" className="bg-amber-50">
@@ -852,6 +854,17 @@ const [isLoading, setIsLoading] = useState(false);
                   <p className="text-gray-500 italic">No business information available</p>
                 )}
               </TabsContent>
+
+              <TabsContent value="reservation" className="mt-4 space-y-6">
+              {!editingTimes && !editingMachineUtilization && (
+                  <CostBreakdown 
+                    userServices={localReservation.UserServices}
+                    totalAmountDue={localReservation.TotalAmntDue}
+                    reservationId={localReservation.id}
+                    allowFix={true} // Enable fixing total if there's a discrepancy
+                  />
+                )}
+              </TabsContent>
             </Tabs>
 
             <DialogFooter className="mt-6">
@@ -897,7 +910,7 @@ const [isLoading, setIsLoading] = useState(false);
                               className="ml-2"
                             >
                               <Clock className="h-4 w-4 mr-2" />
-                              Update Usage Times
+                              Edit Times
                             </Button>
                             <Button 
                               variant="outline" 
@@ -917,30 +930,30 @@ const [isLoading, setIsLoading] = useState(false);
 <div className="flex gap-4">
   {/* Updated status flow to include "Pending Admin Approval" status */}
   {(localReservation.Status === 'Pending' || localReservation.Status === 'Pending Admin Approval') && (
-  <>
-    <Button
-      variant="destructive"
-      onClick={() => handleStatusUpdate(localReservation.id, 'Rejected')}
-      disabled={isLoading}
-    >
-      Reject Reservation
-    </Button>
-    <Button
-      variant="default"
-      onClick={handleApproveReservation}
-      disabled={isLoading}
-    >
-      {isLoading ? (
-        <>
-          <span className="animate-spin mr-2">⊚</span>
-          Processing...
-        </>
-      ) : (
-        'Accept Reservation'
-      )}
-    </Button>
-  </>
-)}
+    <>
+      <Button
+        variant="destructive"
+        onClick={() => handleStatusUpdate(localReservation.id, 'Rejected')}
+        disabled={isLoading}
+      >
+        Reject Reservation
+      </Button>
+      <Button
+        variant="default"
+        onClick={handleApproveReservation}
+        disabled={isLoading}
+      >
+        {isLoading ? (
+          <>
+            <span className="animate-spin mr-2">⊚</span>
+            Processing...
+          </>
+        ) : (
+          'Accept Reservation'
+        )}
+      </Button>
+    </>
+  )}
   
   {localReservation.Status === 'Approved' && (
     <>
@@ -959,30 +972,38 @@ const [isLoading, setIsLoading] = useState(false);
     </>
   )}
 
-  {localReservation.Status === 'Ongoing' && !editingMachineUtilization && !editingTimes && (
+{localReservation.Status === 'Ongoing' && !editingMachineUtilization && !editingTimes && (
     <>
-      <Button
-        variant="destructive"
-        onClick={() => handleStatusUpdate(localReservation.id, 'Cancelled')}
-      >
-        Cancel Reservation
-      </Button>
-      <Button
-        variant="default"
-        onClick={() => handleStatusUpdate(localReservation.id, 'Pending Payment')}
-      >
-        Mark as Pending Payment
-      </Button>
+    <Button
+  variant="default"
+  onClick={() => {
+    // Check if all UtilTimes are marked as Completed or Cancelled
+    const incompleteTimes = localReservation.UtilTimes.filter(
+      time => time.DateStatus !== "Completed" && time.DateStatus !== "Cancelled"
+    );
+    
+    if (incompleteTimes.length > 0) {
+      toast.error("Cannot proceed to payment", {
+        description: `${incompleteTimes.length} time slot(s) are not yet marked as Completed or Cancelled. 
+        Please review and update all time slots before proceeding.`,
+        duration: 5000
+      });
+      return;
+    }
+    
+    handleStatusUpdate(localReservation.id, 'Pending Payment');
+  }}
+>
+  Mark as Pending Payment
+</Button>
     </>
   )}
   
   {localReservation.Status === 'Pending Payment' && (
-    <Button
-      variant="default"
-      onClick={() => handleStatusUpdate(localReservation.id, 'Paid')}
-    >
-      Mark as Paid
-    </Button>
+    <div className="flex items-center">
+      <AlertCircle className="h-4 w-4 mr-2 text-amber-500" />
+      <span className="text-sm text-amber-700">Payment status is managed by the cashier</span>
+    </div>
   )}
   
   {localReservation.Status === 'Paid' && (
