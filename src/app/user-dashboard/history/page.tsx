@@ -248,20 +248,12 @@ const HistoryPage = () => {
                 <div className="ml-6 mt-2 space-y-2">
                   <Link 
                     href="/user-dashboard/information" 
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleNavigation('/user-dashboard/information');
-                    }}
                     className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]"
                   >
                     Personal Info
                   </Link>
                   <Link 
                     href="/user-dashboard/information/business" 
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handleNavigation('/user-dashboard/information/business');
-                    }}
                     className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]"
                   >
                     Business Info
