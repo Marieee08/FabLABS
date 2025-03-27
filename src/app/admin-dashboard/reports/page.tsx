@@ -1,4 +1,3 @@
-// Cleaned Reports Page with all file generation UI removed
 // src/app/admin-dashboard/reports/page.tsx
 "use client";
 
@@ -252,6 +251,31 @@ const ReportsPage: React.FC = () => {
                   isLoading={isLoading}
                 />
               </div>
+
+              {/* Detailed Approval Stats */}
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 mb-6">
+                {dashboardData?.pendingTeacherApprovals !== undefined && (
+                  <MetricCard 
+                    title="Teacher Pending Approvals" 
+                    value={dashboardData.pendingTeacherApprovals} 
+                    description="Education Visit Requests"
+                    color="#5e86ca"
+                    isLoading={isLoading}
+                    size="small"
+                  />
+                )}
+
+                {dashboardData?.pendingAdminApprovals !== undefined && (
+                  <MetricCard 
+                    title="Admin Pending Approvals" 
+                    value={dashboardData.pendingAdminApprovals} 
+                    description="Education Visit Requests"
+                    color="#5e86ca"
+                    isLoading={isLoading}
+                    size="small"
+                  />
+                )}
+              </div>
               
               {/* Chart Carousel - Using the enhanced version */}
               <EnhancedChartCarousel 
@@ -283,20 +307,28 @@ interface MetricCardProps {
   description: string;
   color: string;
   isLoading: boolean;
+  size?: 'default' | 'small';
 }
 
-const MetricCard: React.FC<MetricCardProps> = ({ title, value, description, color, isLoading }) => {
+const MetricCard: React.FC<MetricCardProps> = ({ 
+  title, 
+  value, 
+  description, 
+  color, 
+  isLoading,
+  size = 'default'
+}) => {
   return (
-    <Card className="bg-white shadow-sm transform hover:scale-105 transition-all duration-300 border border-[#5e86ca] overflow-hidden">
+    <Card className={`bg-white shadow-sm transform ${size === 'default' ? 'hover:scale-105' : 'hover:scale-102'} transition-all duration-300 border border-[#5e86ca] overflow-hidden`}>
       <div className="h-1 bg-[#5e86ca]"></div>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg font-medium">{title}</CardTitle>
+      <CardHeader className={size === 'small' ? 'pb-1 pt-3' : 'pb-2'}>
+        <CardTitle className={size === 'small' ? 'text-base font-medium' : 'text-lg font-medium'}>{title}</CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (
           <div className="h-10 w-20 bg-gray-200 animate-pulse rounded-md"></div>
         ) : (
-          <h2 className="text-4xl font-bold" style={{ color }}>{value}</h2>
+          <h2 className={size === 'small' ? 'text-2xl font-bold' : 'text-4xl font-bold'} style={{ color }}>{value}</h2>
         )}
         <p className="text-sm text-gray-500">{description}</p>
       </CardContent>
