@@ -170,7 +170,7 @@ export async function POST(
       }
       
       // Process and store machine utilization data
-      const processedData = await Promise.all(data.map(async (incomingMachineUtil) => {
+      const processedData = await Promise.all(data.map(async (incomingMachineUtil: { id: any; Machine: any; ReviwedBy: any; ReviewedBy: any; DateReviewed: any; ServiceName: any; OperatingTimes: any[]; DownTimes: any[]; RepairChecks: any[]; }) => {
         // Start a transaction to ensure data consistency
         return prisma.$transaction(async (tx) => {
           let machineUtilResult;

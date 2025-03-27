@@ -18,6 +18,7 @@ import TimeEditor from './time-editor';
 import { downloadMachineUtilPDF } from "@/components/admin-functions/pdf/machine-utilization-pdf";
 import CostBreakdown from './cost-breakdown'; // Import the new CostBreakdown component
 import { toast } from 'sonner';
+import MachineUtilization from './machine-utilization';
 
 // Updated interface definitions
 interface UserService {
@@ -705,7 +706,7 @@ const handleApproveReservation = async () => {
       setLocalReservation(updatedReservation);
       
       // Update the edited services with the latest data
-      const updatedServices = updatedReservation.UserServices.map((service) => ({
+      const updatedServices = updatedReservation.UserServices.map((service: { EquipmentAvail: any; }) => ({
         ...service,
         selectedMachines: parseMachines(service.EquipmentAvail || '')
       }));
