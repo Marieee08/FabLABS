@@ -23,7 +23,7 @@ const DashboardAdmin = () => {
       }
       try {
         const publicMetadata = user.publicMetadata;
-        const role = publicMetadata.role || "USER";
+        const role = publicMetadata.role || "ADMIN";
         setUserRole(role as string);
       } catch (error) {
         console.error("Error fetching user role:", error);

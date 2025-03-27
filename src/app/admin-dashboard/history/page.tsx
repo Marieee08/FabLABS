@@ -66,7 +66,7 @@ const DashboardAdmin = () => {
               <h2 className="text-white text-xl font-bold">
                 {user?.firstName} {user?.lastName}
               </h2>
-              <p className="text-[#5e86ca]">{userRole}</p>
+              <p className="text-[#5e86ca]">ADMIN</p>
           </div>
             <div>
               <h3 className="mb-4 ml-4 text-sm font-semibold text-gray-400">MENU</h3>

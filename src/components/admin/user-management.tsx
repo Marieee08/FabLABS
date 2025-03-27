@@ -18,13 +18,13 @@ import {
 import { useToast } from '@/components/ui/use-toast';
 import EditRoleModal from '@/components/admin-functions/admin-role';
 import DeleteConfirmationModal from '@/components/admin-functions/delete-confirmation-modal';
+import ContactModal from '@/components/admin-functions/admin-contact';
 
 interface User {
   id: string;
   name: string;
   email: string;
   role: string;
-  permissions: string[];
   type: 'all' | 'msme' | 'student' | 'admin' | 'cashier';
 }
 
@@ -34,6 +34,7 @@ const UserManagement = () => {
   const { toast } = useToast();
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [contactModalOpen, setContactModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   // Fetch users data from the AccInfo table
@@ -62,7 +63,6 @@ const UserManagement = () => {
           name: user.Name,
           email: user.email,
           role: user.Role.toUpperCase(),
-          permissions: generatePermissions(user.Role),
           type: mapRoleToType(user.Role)
         }));
         
@@ -84,22 +84,6 @@ const UserManagement = () => {
     fetchUsers();
   }, [toast]);
 
-  // Generate permissions array based on role
-  const generatePermissions = (role: string): string[] => {
-    switch (role.toLowerCase()) {
-      case 'admin':
-        return ['USER', 'STUDENT', 'ADMIN'];
-      case 'msme':
-        return ['USER', 'STUDENT'];
-      case 'student':
-        return ['STUDENT'];
-      case 'cashier':
-        return ['STUDENT', 'CASHIER'];
-      default:
-        return ['USER'];
-    }
-  };
-
   // Map the Role field from AccInfo to the type used for filtering
   const mapRoleToType = (role: string): 'all' | 'msme' | 'student' | 'admin' | 'cashier' => {
     switch (role.toLowerCase()) {
@@ -116,16 +100,6 @@ const UserManagement = () => {
     }
   };
 
-  const getPermissionColor = (permission: string) => {
-    const colors = {
-      STUDENT: 'bg-blue-100 text-blue-800',
-      USER: 'bg-green-100 text-green-800',
-      ADMIN: 'bg-purple-100 text-purple-800',
-      CASHIER: 'bg-yellow-100 text-yellow-800'
-    };
-    return colors[permission as keyof typeof colors] || 'bg-gray-100 text-gray-800';
-  };
-
   const getRoleColor = (role: string) => {
     const colors = {
       MSME: 'bg-green-100 text-green-800',
@@ -136,19 +110,19 @@ const UserManagement = () => {
     return colors[role.toUpperCase() as keyof typeof colors] || 'bg-gray-100 text-gray-800';
   };
 
-  const handleEditPermissions = (userId: string) => {
-    const user = users.find(u => u.id === userId);
-    if (user) {
-      setSelectedUser(user);
-      setEditModalOpen(true);
-    }
-  };
-
   const handleInitiateDelete = (userId: string) => {
     const user = users.find(u => u.id === userId);
     if (user) {
       setSelectedUser(user);
       setDeleteModalOpen(true);
+    }
+  };
+
+  const handleContact = (userId: string) => {
+    const user = users.find(u => u.id === userId);
+    if (user) {
+      setSelectedUser(user);
+      setContactModalOpen(true);
     }
   };
 
@@ -211,11 +185,6 @@ const UserManagement = () => {
       setLoading(false);
     }
   };
-  
-  const handleContact = (userId: string, email: string) => {
-    // Open default email client
-    window.location.href = `mailto:${email}`;
-  };
 
   const UserTable = ({ users }: { users: User[] }) => (
     <Table>
@@ -224,14 +193,13 @@ const UserManagement = () => {
           <TableHead>Name</TableHead>
           <TableHead>Email</TableHead>
           <TableHead>Role</TableHead>
-          <TableHead>Permissions</TableHead>
           <TableHead className="w-24">Action</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {users.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={5} className="text-center py-4">
+            <TableCell colSpan={4} className="text-center py-4">
               No users found
             </TableCell>
           </TableRow>
@@ -248,27 +216,11 @@ const UserManagement = () => {
                 </span>
               </TableCell>
               <TableCell>
-                <div className="flex gap-2 flex-wrap">
-                  {user.permissions.map((permission, index) => (
-                    <span
-                      key={index}
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${getPermissionColor(permission)}`}
-                    >
-                      {permission}
-                    </span>
-                  ))}
-                </div>
-              </TableCell>
-              <TableCell>
                 <DropdownMenu>
                   <DropdownMenuTrigger className="p-2 hover:bg-gray-100 rounded-full">
                     <MoreVertical className="h-4 w-4" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent>
-                    <DropdownMenuItem onClick={() => handleEditPermissions(user.id)}>
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit Role
-                    </DropdownMenuItem>
                     <DropdownMenuItem 
                       onClick={() => handleInitiateDelete(user.id)}
                       className="text-red-600 focus:text-red-600"
@@ -276,7 +228,7 @@ const UserManagement = () => {
                       <Trash2 className="mr-2 h-4 w-4" />
                       Delete Account
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleContact(user.id, user.email)}>
+                    <DropdownMenuItem onClick={() => handleContact(user.id)}>
                       <Mail className="mr-2 h-4 w-4" />
                       Contact
                     </DropdownMenuItem>
@@ -293,51 +245,6 @@ const UserManagement = () => {
   if (loading) {
     return <div className="p-4 text-center">Loading users...</div>;
   }
-
-  const handleSaveRole = async (userId: string, newRole: string) => {
-    try {
-      const upperCaseRole = newRole.toUpperCase();
-      
-      const response = await fetch(`/api/user/user-management/${userId}/role`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ role: upperCaseRole }),
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to update role');
-      }
-      
-      const updatedUser = await response.json();
-      
-      setUsers(users.map(user => {
-        if (user.id === userId) {
-          return {
-            ...user,
-            role: updatedUser.Role.toUpperCase(),
-            permissions: generatePermissions(updatedUser.Role),
-            type: mapRoleToType(updatedUser.Role)
-          };
-        }
-        return user;
-      }));
-      
-      toast({
-        title: 'Success',
-        description: 'User role updated successfully',
-      });
-    } catch (error) {
-      console.error('Error updating role:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to update user role. Please try again.',
-        variant: 'destructive',
-      });
-      throw error;
-    }
-  };
   
   return (
     <div className="p-4 bg-white rounded-lg shadow-sm">
@@ -368,18 +275,7 @@ const UserManagement = () => {
       </Tabs>
       
       {selectedUser && (
-        <>
-          <EditRoleModal
-            isOpen={editModalOpen}
-            onClose={() => {
-              setEditModalOpen(false);
-              setSelectedUser(null);
-            }}
-            userId={selectedUser.id}
-            currentRole={selectedUser.role}
-            onSave={handleSaveRole}
-          />
-          
+        <>       
           <DeleteConfirmationModal
             isOpen={deleteModalOpen}
             onClose={() => {
@@ -388,6 +284,16 @@ const UserManagement = () => {
             }}
             onConfirm={handleDeleteAccount}
             userName={selectedUser.name}
+          />
+          
+          <ContactModal
+            isOpen={contactModalOpen}
+            onClose={() => {
+              setContactModalOpen(false);
+              setSelectedUser(null);
+            }}
+            userName={selectedUser.name}
+            userEmail={selectedUser.email}
           />
         </>
       )}
