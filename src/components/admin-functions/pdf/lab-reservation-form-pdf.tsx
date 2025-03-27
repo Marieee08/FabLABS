@@ -1,11 +1,9 @@
 import { jsPDF } from 'jspdf';
 
-
 // Define interfaces for the laboratory reservation form data
 interface StudentInfo {
   name: string;
 }
-
 
 interface UtilTime {
   id: number;
@@ -13,7 +11,6 @@ interface UtilTime {
   timeEnd: string;
   date: string;
 }
-
 
 interface DetailedEVCReservation {
   id: number;
@@ -42,7 +39,6 @@ interface DetailedEVCReservation {
   };
 }
 
-
 interface LabReservationFormData {
   campus: string;
   controlNo: string;
@@ -61,7 +57,6 @@ interface LabReservationFormData {
   approvedBy: string;
 }
 
-
 /**
  * Draw an underline
  */
@@ -77,7 +72,6 @@ const drawUnderline = (
   doc.line(x, y, x + width, y);
 };
 
-
 /**
  * Format date for display
  */
@@ -90,7 +84,6 @@ const formatDate = (dateString: string | undefined): string => {
     return dateString; // Return the original string if parsing fails
   }
 };
-
 
 /**
  * Convert DetailedEVCReservation to LabReservationFormData
@@ -107,7 +100,6 @@ export const convertEVCToLabFormData = (evcData: DetailedEVCReservation): LabRes
     timeString = times.join(', ');
   }
 
-
   // Format date from UtilTimes
   let dateString = '';
   if (evcData.UtilTimes && evcData.UtilTimes.length > 0) {
@@ -115,23 +107,45 @@ export const convertEVCToLabFormData = (evcData: DetailedEVCReservation): LabRes
     dateString = dates.join(', ');
   }
 
-
   // Convert student data from EVCStudents
   const students: StudentInfo[] = [];
+  
   if (evcData.EVCStudents && evcData.EVCStudents.length > 0) {
-    // Iterate through EVCStudents array and extract student names
-    // The structure may vary, so handling different possible formats
+    // Iterate through EVCStudents array
     evcData.EVCStudents.forEach(student => {
-      // Check different possible property names for student name
-      const studentName = student.StudentName || student.Name || student.name ||
-                          (typeof student === 'string' ? student : '');
-     
-      if (studentName) {
-        students.push({ name: studentName });
+      // Based on your UI code, the primary property seems to be StudentName
+      // First try to get StudentName directly
+      let studentName = student.StudentName;
+      
+      // If StudentName is not available, try other possible property names
+      if (!studentName) {
+        studentName = student.Name || student.name;
+        
+        // If student is a string itself (e.g., just the name)
+        if (!studentName && typeof student === 'string') {
+          studentName = student;
+        }
+        
+        // Last resort - try to stringify if it's an object without expected properties
+        if (!studentName && typeof student === 'object') {
+          try {
+            // This is a fallback - try to get any usable string representation
+            studentName = JSON.stringify(student);
+          } catch (e) {
+            studentName = 'Unknown Student';
+          }
+        }
+      }
+      
+      // Only add non-empty student names
+      if (studentName && studentName.trim() !== '') {
+        students.push({ name: studentName.trim() });
       }
     });
   }
 
+  // Add debug logging to check the extracted student data
+  console.log('Extracted students:', students);
 
   return {
     campus: '',  // Default or from configuration
@@ -151,7 +165,6 @@ export const convertEVCToLabFormData = (evcData: DetailedEVCReservation): LabRes
     approvedBy: evcData.ApprovedBy || ''
   };
 };
-
 
 /**
  * Generate and download a PDF laboratory reservation form
@@ -178,13 +191,14 @@ export const downloadLabReservationFormPDF = (formData: LabReservationFormData):
       approvedBy: formData.approvedBy || ''
     };
 
+    // Log students data for debugging
+    console.log('Student data for PDF:', safeFormData.students);
 
     // Ensure we have 5 student spots
     const studentsData = [...safeFormData.students];
     while (studentsData.length < 5) {
       studentsData.push({ name: '' });
     }
-
 
     // Initialize jsPDF
     const doc = new jsPDF({
@@ -193,17 +207,14 @@ export const downloadLabReservationFormPDF = (formData: LabReservationFormData):
       format: 'a4'
     });
 
-
     // Define page dimensions and margins
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 15;
     const contentWidth = pageWidth - (margin * 2);
 
-
     // Start position for content
     let y = 15;
-
 
     // HEADER SECTION
     // Add header text
@@ -211,7 +222,6 @@ export const downloadLabReservationFormPDF = (formData: LabReservationFormData):
     doc.setFont('helvetica', 'bold');
     doc.text('PHILIPPINE SCIENCE HIGH SCHOOL SYSTEM', pageWidth / 2, y, { align: 'center' });
     y += 7;
-
 
     // Add campus field with underline
     doc.setFontSize(10);
@@ -270,7 +280,6 @@ export const downloadLabReservationFormPDF = (formData: LabReservationFormData):
     }
    
     y += 10;
-
 
     // FORM FIELDS SECTION
     // Grade Level and Section & Number of Students
@@ -439,10 +448,11 @@ export const downloadLabReservationFormPDF = (formData: LabReservationFormData):
       const lineStart = studentX + doc.getTextWidth(studentNumber) + 2;
       drawUnderline(doc, lineStart, y, 70);
      
-      // Add student name if available - placing it directly on the line
+      // Add student name if available
       if (studentsData[i] && studentsData[i].name) {
-        // Position text 2mm above the line so it appears to rest on the line
-        doc.text(studentsData[i].name, lineStart + 2, y - 1.5);
+        // Position the student name just above the line for better visibility
+        // Changed y-offset from -1.5 to -1 to ensure text is visible
+        doc.text(studentsData[i].name, lineStart + 2, y - 1);
       }
      
       y += 7;
@@ -499,7 +509,6 @@ export const downloadLabReservationFormPDF = (formData: LabReservationFormData):
   }
 };
 
-
 /**
  * Generate and download a PDF laboratory reservation form directly from EVC reservation data
  * @param evcData - The EVC reservation data
@@ -508,6 +517,5 @@ export const downloadEVCReservationFormPDF = (evcData: DetailedEVCReservation): 
   const formData = convertEVCToLabFormData(evcData);
   downloadLabReservationFormPDF(formData);
 };
-
 
 export default downloadLabReservationFormPDF;

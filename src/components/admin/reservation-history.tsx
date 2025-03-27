@@ -34,6 +34,7 @@ import { downloadLabRequestFormPDF } from "@/components/admin-functions/pdf/lab-
 import { downloadLabReservationFormPDF } from "@/components/admin-functions/pdf/lab-reservation-form-pdf";
 
 interface UserService {
+  MachineNo: number;
   id: string;
   ServiceAvail: string;
   EquipmentAvail: string;
