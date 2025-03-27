@@ -526,7 +526,7 @@ function downloadMachineUtilPDF(utilizationData: MachineUtilization): void {
 
     // Reviewed Section
     autoTable(doc, {
-      startY: yPosition,
+      startY: yPosition + rowHeight,
       head: [],
       body: [
         [
