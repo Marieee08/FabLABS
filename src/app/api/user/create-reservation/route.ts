@@ -50,6 +50,10 @@ export async function POST(request: Request) {
       ? data.ProductsManufactured 
       : [data.ProductsManufactured].filter(Boolean);
     
+    // Extract machine numbers and service links
+    const serviceMachineNumbers = data.serviceMachineNumbers || {};
+    const serviceLinks = data.serviceLinks || {};
+    
     // Fetch service details
     const servicesWithDetails = await prisma.service.findMany({
       where: {
@@ -58,11 +62,13 @@ export async function POST(request: Request) {
         }
       },
       select: {
+        id: true,
         Service: true,
         Machines: {
           select: {
             machine: {
               select: {
+                id: true,
                 Machine: true
               }
             }
@@ -79,9 +85,14 @@ export async function POST(request: Request) {
       const machineNames = service.Machines.map(machineService => machineService.machine.Machine);
       serviceMachinesMap.set(service.Service, machineNames);
       
-      if (service.Machines.length === 1) {
+      // Create machine utilization entries
+      const machineQuantity = serviceMachineNumbers[service.Service] || 
+                             (service.Machines.length === 1 ? 1 : 0);
+      
+      // Create machine utilization entries based on quantity
+      for (let i = 0; i < Math.min(machineQuantity, service.Machines.length); i++) {
         machinesToCreate.push({
-          Machine: service.Machines[0].machine.Machine,
+          Machine: service.Machines[i]?.machine.Machine || service.Machines[0]?.machine.Machine,
           MachineApproval: false,
           DateReviewed: null,
           ServiceName: service.Service
@@ -102,9 +113,6 @@ export async function POST(request: Request) {
     } catch (e) {
       console.warn('Error parsing tools data:', e);
     }
-
-    // Process service links
-    const serviceLinks = data.serviceLinks || {};
     
     // Process time slots - FIX DATE PARSING ISSUE
     const utilTimes = data.days.map((day, index) => {
@@ -127,7 +135,8 @@ export async function POST(request: Request) {
       return {
         DayNum: index + 1,
         StartTime: startTime,
-        EndTime: endTime
+        EndTime: endTime,
+        DateStatus: "Ongoing" // Default status
       };
     });
     
@@ -141,10 +150,15 @@ export async function POST(request: Request) {
       return total;
     }, 0);
 
-    // Process user services
-    const userServices = selectedServices.map(service => {
+    // Process user services - Ensure MachineNo is a number or null
+    const userServices = selectedServices.flatMap(service => {
+      const serviceInfo = servicesWithDetails.find(s => s.Service === service);
       const machines = serviceMachinesMap.get(service) || [];
       const serviceLink = serviceLinks[service] || '';
+      
+      // Get machine quantity from form data
+      const machineQuantity = serviceMachineNumbers[service] || 
+                             (machines.length > 0 ? 1 : null);
       
       // Find cost for this service from provided data
       let serviceCost = 0;
@@ -155,13 +169,16 @@ export async function POST(request: Request) {
         if (costDetail) serviceCost = costDetail.totalCost || 0;
       }
       
-      return {
+      // Create entries for each machine
+      return Array.from({length: machineQuantity || 0}, (_, index) => ({
         ServiceAvail: service,
+        // Use numeric machine number or null
+        MachineNo: machineQuantity && machineQuantity > 1 ? index + 1 : null, 
         EquipmentAvail: machines.length === 1 ? machines[0] : 'Not Specified',
-        CostsAvail: serviceCost,
+        CostsAvail: serviceCost / (machineQuantity || 1),
         MinsAvail: totalMinutes,
-        Files: serviceLink
-      };
+        Files: serviceLink // Store link in Files field
+      }));
     });
 
     // Process service availed
@@ -215,10 +232,24 @@ export async function POST(request: Request) {
     
   } catch (error) {
     console.error('Error creating reservation:', error);
+    
+    // More detailed error logging
+    const errorDetails = {
+      message: error instanceof Error ? error.message : 'Unknown error',
+      name: error instanceof Error ? error.name : 'UnknownError',
+      stack: error instanceof Error ? error.stack : undefined
+    };
+
+    // Special handling for Prisma errors
+    if (error instanceof Error && error.name === 'PrismaClientKnownRequestError') {
+      errorDetails.code = (error as any).code;
+      errorDetails.meta = (error as any).meta;
+    }
+
     return NextResponse.json(
       { 
         error: 'Failed to create reservation', 
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: errorDetails
       },
       { status: 500 }
     );

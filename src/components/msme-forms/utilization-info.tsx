@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, ChangeEvent } from 're
 import { ChevronDown, ChevronUp, CheckCircle } from 'lucide-react';
 import ToolsSelector from '@/components/msme-forms/tools-selector';
 import ServiceSelector from '@/components/msme-forms/service-selector';
-import { Textarea } from '@/components/ui/textarea'; // Import Textarea component
+import { Textarea } from '@/components/ui/textarea';
 
 interface Day {
   date: Date;
@@ -16,14 +16,15 @@ interface FormData {
   BulkofCommodity: string;
   Equipment: string;
   Tools: string;
-  serviceLinks?: {[service: string]: string}; // New field for links instead of files
-  Remarks?: string; // New field for remarks
+  serviceMachineNumbers?: Record<string, number>;
+  serviceLinks?: {[service: string]: string}; 
+  Remarks?: string;
   NeededMaterials?: Array<{
     Item: string;
     ItemQty: number;
     Description: string;
   }>;
-  [key: string]: any; // Add index signature for dynamic access
+  [key: string]: any;
 }
 
 interface Service {
@@ -45,6 +46,61 @@ interface ProcessInformationProps {
   standalonePage?: boolean;
 }
 
+// Machine Quantity Selector Component
+interface MachineQuantitySelectorProps {
+  selectedServices: string[];
+  servicesMachineData: Record<string, { machineCount: number }>;
+  onChange: (machineNumbers: Record<string, number>) => void;
+  initialValues?: Record<string, number>;
+}
+
+const MachineQuantitySelector: React.FC<MachineQuantitySelectorProps> = ({
+  selectedServices,
+  servicesMachineData,
+  onChange,
+  initialValues = {}
+}) => {
+  const [machineNumbers, setMachineNumbers] = useState<Record<string, number>>(initialValues);
+
+  const handleMachineNumberChange = (service: string, count: number) => {
+    const newMachineNumbers = {
+      ...machineNumbers,
+      [service]: count
+    };
+    setMachineNumbers(newMachineNumbers);
+    onChange(newMachineNumbers);
+  };
+
+  return (
+    <div className="mt-4 space-y-4">
+      <h3 className="text-sm font-medium text-gray-700">Machine Quantity</h3>
+      <p className="text-xs text-gray-500">Select the number of machines for each service</p>
+      {selectedServices.map((service) => {
+        const machineCount = servicesMachineData[service]?.machineCount || 0;
+        return machineCount > 0 ? (
+          <div key={service} className="p-4 border rounded-md bg-gray-50">
+            <div className="flex justify-between items-center mb-2">
+              <h4 className="text-sm font-medium">{service}</h4>
+              <p className="text-xs text-gray-500">Max Available: {machineCount}</p>
+            </div>
+            <div className="flex items-center">
+              <input
+                type="number"
+                min="0"
+                max={machineCount}
+                value={machineNumbers[service] || 0}
+                onChange={(e) => handleMachineNumberChange(service, Number(e.target.value))}
+                className="w-20 p-2 border rounded mr-2"
+              />
+              <span className="text-xs text-gray-500">machines</span>
+            </div>
+          </div>
+        ) : null;
+      })}
+    </div>
+  );
+};
+
 export default function ProcessInformation({ 
   formData, 
   updateFormData, 
@@ -58,6 +114,7 @@ export default function ProcessInformation({
   const [isLoadingServices, setIsLoadingServices] = useState(true);
   const [serviceError, setServiceError] = useState<string | null>(null);
   const [hasMachines, setHasMachines] = useState<boolean>(true);
+  const [servicesMachineData, setServicesMachineData] = useState<Record<string, { machineCount: number }>>({});
   
   useEffect(() => {
     const fetchServices = async () => {
@@ -68,6 +125,16 @@ export default function ProcessInformation({
         }
         const data = await response.json();
         setServices(data);
+        
+        // Process machine data for each service
+        const machineData = {};
+        data.forEach(service => {
+          machineData[service.Service] = {
+            machineCount: service.Machines?.length || 0
+          };
+        });
+        setServicesMachineData(machineData);
+        
         setIsLoadingServices(false);
       } catch (err) {
         console.error('Services fetch error:', err);
@@ -127,6 +194,11 @@ export default function ProcessInformation({
       [service]: value
     });
   }, [formData.serviceLinks, updateFormData]);
+
+  // Handle machine numbers changes
+  const handleMachineNumbersChange = useCallback((machineNumbers: Record<string, number>) => {
+    updateFormData('serviceMachineNumbers', machineNumbers);
+  }, [updateFormData]);
 
   // Memoize this function to prevent recalculation on every render
   const isFieldDisabled = useCallback((fieldName: keyof FormData): boolean => {
@@ -259,6 +331,20 @@ export default function ProcessInformation({
               errorMessage={errors.ProductsManufactured}
             />
           </div>
+
+          {/* Machine Quantity Selector - New component */}
+          {formData.ProductsManufactured && 
+           formData.ProductsManufactured.length > 0 && 
+           hasMachines && (
+            <MachineQuantitySelector
+              selectedServices={Array.isArray(formData.ProductsManufactured) 
+                ? formData.ProductsManufactured 
+                : [formData.ProductsManufactured]}
+              servicesMachineData={servicesMachineData}
+              onChange={handleMachineNumbersChange}
+              initialValues={formData.serviceMachineNumbers}
+            />
+          )}
 
           {/* Links for selected services that have machines */}
           {formData.ProductsManufactured && 

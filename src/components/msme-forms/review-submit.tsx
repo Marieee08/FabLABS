@@ -389,101 +389,123 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
     setServiceCostData(serviceData);
   }, []);
 
-  
-
   const handleSubmit = async () => {
-    try {
-      setIsSubmitting(true);
-      setError('');
-  
-      const token = await getToken();
-      
-      // Create a clean version of the service cost data to avoid circular references
-      const simplifiedServiceData = {};
-      Object.entries(serviceCostData).forEach(([service, data]) => {
-        simplifiedServiceData[service] = {
-          totalServiceCost: data.totalServiceCost,
-          dates: data.dates.map(date => ({
-            day: {
-              date: date.day.date,
-              startTime: date.day.startTime,
-              endTime: date.day.endTime
-            },
-            duration: date.duration,
-            billableHours: date.billableHours,
-            cost: date.cost
-          }))
+      try {
+        setIsSubmitting(true);
+        setError('');
+
+        const token = await getToken();
+        
+        // Create a clean version of the service cost data to avoid circular references
+        const simplifiedServiceData = {};
+        Object.entries(serviceCostData).forEach(([service, data]) => {
+          simplifiedServiceData[service] = {
+            totalServiceCost: data.totalServiceCost,
+            dates: data.dates.map(date => ({
+              day: {
+                date: date.day.date,
+                startTime: date.day.startTime,
+                endTime: date.day.endTime
+              },
+              duration: date.duration,
+              billableHours: date.billableHours,
+              cost: date.cost
+            }))
+          };
+        });
+        
+        // Prepare service cost details array for the API
+        const serviceCostDetails = Object.entries(serviceCostData).map(([serviceName, data]) => ({
+          serviceName,
+          totalCost: data.totalServiceCost,
+          daysCount: data.dates.length
+        }));
+        
+        // Remove any circular references from form data
+        const cleanedFormData = {
+          ...formData,
+          days: formData.days.map(day => ({
+            date: day.date instanceof Date ? day.date.toISOString() : day.date,
+            startTime: day.startTime,
+            endTime: day.endTime
+          })),
+          ProductsManufactured: Array.isArray(formData.ProductsManufactured) 
+            ? formData.ProductsManufactured 
+            : [formData.ProductsManufactured],
+          totalCost,
+          serviceCostDetails,
+          groupedServiceData: simplifiedServiceData
         };
-      });
-      
-      // Prepare service cost details array for the API
-      const serviceCostDetails = Object.entries(serviceCostData).map(([serviceName, data]) => ({
-        serviceName,
-        totalCost: data.totalServiceCost,
-        daysCount: data.dates.length
-      }));
-      
-      // Remove any circular references from form data
-      const cleanedFormData = {
-        ...formData,
-        days: formData.days.map(day => ({
-          date: day.date instanceof Date ? day.date.toISOString() : day.date,
-          startTime: day.startTime,
-          endTime: day.endTime
-        })),
-        ProductsManufactured: Array.isArray(formData.ProductsManufactured) 
-          ? formData.ProductsManufactured 
-          : [formData.ProductsManufactured],
-        totalCost,
-        serviceCostDetails,
-        groupedServiceData: simplifiedServiceData
-      };
-  
-      console.log("Submitting reservation with cleaned data:", cleanedFormData);
-  
-      const response = await fetch('/api/user/create-reservation', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          ...cleanedFormData,
-          userInfo: {
-            clientInfo: accInfo?.ClientInfo,
-            businessInfo: accInfo?.BusinessInfo
-          }
-        }),
-      });
-  
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || errorData.details || 'Failed to submit reservation');
+
+        console.log("Submitting reservation with cleaned data:", JSON.stringify(cleanedFormData, null, 2));
+
+        const response = await fetch('/api/user/create-reservation', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            ...cleanedFormData,
+            userInfo: {
+              clientInfo: accInfo?.ClientInfo,
+              businessInfo: accInfo?.BusinessInfo
+            }
+          }),
+        });
+
+        // Log the full response for debugging
+        console.log('Full response status:', response.status);
+
+        let responseData;
+        try {
+          responseData = await response.json();
+          console.log('Full response body:', JSON.stringify(responseData, null, 2));
+        } catch (parseError) {
+          console.error('Error parsing response:', parseError);
+          responseData = { error: 'Failed to parse server response' };
+        }
+
+        if (!response.ok) {
+          console.error('Reservation submission error:', responseData);
+          
+          // More detailed error extraction
+          const errorMessage = 
+            responseData.details?.message || 
+            responseData.details?.error || 
+            responseData.error || 
+            responseData.message || 
+            'Failed to submit reservation';
+          
+          throw new Error(errorMessage);
+        }
+
+        console.log("Reservation created successfully:", responseData);
+
+        toast({
+          title: "Success!",
+          description: "Your service has been scheduled successfully!",
+        });
+
+        router.push('/user-dashboard');
+        
+      } catch (err) {
+        console.error('Submission error:', err);
+        const errorMessage = err instanceof Error 
+          ? err.message 
+          : 'Failed to submit reservation';
+        
+        setError(errorMessage);
+        
+        toast({
+          title: "Error",
+          description: errorMessage,
+          variant: "destructive",
+        });
+      } finally {
+        setIsSubmitting(false);
       }
-  
-      const result = await response.json();
-      console.log("Reservation created successfully:", result);
-  
-      toast({
-        title: "Success!",
-        description: "Your service has been scheduled successfully!",
-      });
-  
-      router.push('/user-dashboard');
-      
-    } catch (err) {
-      console.error('Submission error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to submit reservation');
-      
-      toast({
-        title: "Error",
-        description: err instanceof Error ? err.message : 'Failed to submit reservation',
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    };
 
   if (loading) {
     return (
@@ -645,6 +667,24 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
                     )}
                   </div>
                   
+                  {formData.serviceMachineNumbers && Object.keys(formData.serviceMachineNumbers).length > 0 && (
+  <div className="md:col-span-2 mt-4">
+    <p className="text-sm font-medium text-gray-700">Machine Quantities</p>
+    <div className="mt-2 space-y-2">
+      {Object.entries(formData.serviceMachineNumbers).map(([service, quantity]) => (
+        <div 
+          key={service} 
+          className="flex items-center justify-between bg-gray-50 p-2 rounded"
+        >
+          <span className="font-medium text-gray-800">{service}</span>
+          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">
+            {quantity} {quantity === 1 ? 'machine' : 'machines'}
+          </span>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
                   {/* Display resource links for each service */}
                   {formData.serviceLinks && Object.keys(formData.serviceLinks).length > 0 && (
                     <div className="md:col-span-2 mt-2">
