@@ -1,12 +1,13 @@
+// src\components\msme-forms\review-submit.tsx
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { useUser } from "@clerk/nextjs";
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from "@/components/ui/button";
 import { CheckCircle, Clock, AlertCircle, Briefcase, User, CreditCard, FileText, Link as LinkIcon, MessageSquare } from 'lucide-react';
-import Link from 'next/link';
+import CostReview from '@/components/msme-forms/cost-review';
 import { toast } from 'sonner';
 
 interface ClientInfo {
@@ -60,6 +61,7 @@ interface FormData {
   Tools: string;
   serviceLinks?: {[service: string]: string};
   Remarks?: string;
+  serviceMachineNumbers?: Record<string, number>;
   NeededMaterials?: Array<{
     Item: string;
     ItemQty: number;
@@ -76,31 +78,21 @@ interface ReviewSubmitProps {
   updateFormData: <K extends keyof FormData>(field: K, value: FormData[K]) => void;
 }
 
-interface ServiceCost {
-  Service: string;
-  Costs: number | string;
-  Per: string;
-}
-
-interface DateInfo {
-  day: Day;
-  duration: number;
-  billableHours: number;
-  cost: number;
-}
-
 interface GroupedServiceData {
   [serviceName: string]: {
-    service: ServiceCost;
-    dates: DateInfo[];
+    service: {
+      Service: string;
+      Costs: number | string;
+      Per: string;
+    };
+    dates: Array<{
+      day: Day;
+      duration: number;
+      billableHours: number;
+      cost: number;
+    }>;
     totalServiceCost: number;
   }
-}
-
-interface CostReviewProps {
-  selectedServices: string[];
-  days: Day[];
-  onCostCalculated?: (cost: number) => void;
 }
 
 const parseToolString = (toolString: string): { Tool: string; Quantity: number }[] => {
@@ -121,224 +113,6 @@ const formatDate = (date: Date): string => {
   });
 };
 
-const CostReviewTable = ({ 
-  selectedServices, 
-  days, 
-  onCostCalculated = () => {},
-  onServiceCostsCalculated = () => {} 
-}: CostReviewProps & { onServiceCostsCalculated?: (serviceData: GroupedServiceData) => void }) => {
-  const [serviceCosts, setServiceCosts] = useState<ServiceCost[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [groupedData, setGroupedData] = useState<GroupedServiceData>({});
-
-  const getNumericCost = useCallback((cost: number | string): number => {
-    if (typeof cost === 'number') return cost;
-    const cleanedCost = cost.replace(/[₱,]/g, '');
-    const parsedCost = parseFloat(cleanedCost);
-    return isNaN(parsedCost) ? 0 : parsedCost;
-  }, []);
-
-  const calculateDuration = useCallback((startTime: string | null, endTime: string | null): number => {
-    if (!startTime || !endTime) return 0;
-    
-    const convertTo24Hour = (time: string): string => {
-      const [timePart, meridiem] = time.split(' ');
-      let [hours, minutes] = timePart.split(':').map(Number);
-      
-      if (meridiem?.toLowerCase() === 'pm' && hours !== 12) {
-        hours += 12;
-      } else if (meridiem?.toLowerCase() === 'am' && hours === 12) {
-        hours = 0;
-      }
-      
-      return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
-    };
-
-    const start24 = startTime.toLowerCase().includes('m') ? convertTo24Hour(startTime) : startTime;
-    const end24 = endTime.toLowerCase().includes('m') ? convertTo24Hour(endTime) : endTime;
-    
-    const [startHour, startMinute] = start24.split(':').map(Number);
-    const [endHour, endMinute] = end24.split(':').map(Number);
-    
-    const startTotalMinutes = startHour * 60 + startMinute;
-    const endTotalMinutes = endHour * 60 + endMinute;
-    
-    const durationInHours = (endTotalMinutes - startTotalMinutes) / 60;
-    return durationInHours > 0 ? durationInHours : 0;
-  }, []);
-
-  const calculateBillableHours = useCallback((duration: number): number => {
-    return Math.ceil(duration);
-  }, []);
-
-  useEffect(() => {
-    const fetchServiceCosts = async () => {
-      try {
-        const response = await fetch('/api/services');
-        if (!response.ok) throw new Error('Failed to fetch service costs');
-        const data = await response.json();
-        setServiceCosts(data);
-      } catch (err) {
-        setError('Failed to load service costs');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchServiceCosts();
-  }, []);
-
-  useEffect(() => {
-    if (!serviceCosts.length || !selectedServices.length || !days.length) {
-      setGroupedData({});
-      return;
-    }
-    
-    // Group data by service for clearer organization
-    const calculatedGroupedData: GroupedServiceData = selectedServices.reduce<GroupedServiceData>((acc, serviceName) => {
-      const service = serviceCosts.find(s => s.Service === serviceName);
-      if (!service || !service.Costs) return acc;
-      
-      if (!acc[serviceName]) {
-        acc[serviceName] = { 
-          service, 
-          dates: [], 
-          totalServiceCost: 0 
-        };
-      }
-      
-      return acc;
-    }, {});
-
-    // Fill the grouped data with dates and costs
-    Object.keys(calculatedGroupedData).forEach(serviceName => {
-      const { service } = calculatedGroupedData[serviceName];
-      let serviceTotalCost = 0;
-      
-      days.forEach(day => {
-        const duration = calculateDuration(day.startTime, day.endTime);
-        const billableHours = calculateBillableHours(duration);
-        const numericCost = getNumericCost(service.Costs);
-        const cost = billableHours * numericCost;
-        
-        calculatedGroupedData[serviceName].dates.push({
-          day,
-          duration,
-          billableHours,
-          cost
-        });
-        
-        serviceTotalCost += cost;
-      });
-      
-      calculatedGroupedData[serviceName].totalServiceCost = serviceTotalCost;
-    });
-
-    setGroupedData(calculatedGroupedData);
-    
-    // Call the callback with the calculated data
-    onServiceCostsCalculated(calculatedGroupedData);
-    
-    // Calculate and report the total cost
-    let totalCost = 0;
-    Object.values(calculatedGroupedData).forEach(data => {
-      totalCost += data.totalServiceCost;
-    });
-    onCostCalculated(totalCost);
-    
-  }, [serviceCosts, selectedServices, days, getNumericCost, calculateDuration, calculateBillableHours, onCostCalculated, onServiceCostsCalculated]);
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center p-4">
-        <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return <div className="text-red-500 text-sm">{error}</div>;
-  }
-
-  // Create an array of service cost details for the API
-  const serviceCostDetails = Object.entries(groupedData).map(([serviceName, data]) => ({
-    serviceName,
-    totalCost: data.totalServiceCost,
-    daysCount: data.dates.length
-  }));
-
-  return (
-    <div className="overflow-x-auto border rounded-lg">
-      <table className="w-full border-collapse">
-        <thead>
-          <tr className="bg-gray-50 border-b-2 border-gray-200">
-            <th className="p-3 text-left border text-gray-700 font-semibold">Service</th>
-            <th className="p-3 text-left border text-gray-700 font-semibold">Date</th>
-            <th className="p-3 text-left border text-gray-700 font-semibold">Duration</th>
-            <th className="p-3 text-left border text-gray-700 font-semibold">Rate</th>
-            <th className="p-3 text-left border text-gray-700 font-semibold">Cost</th>
-          </tr>
-        </thead>
-        <tbody>
-          {Object.entries(groupedData).map(([serviceName, data], serviceIndex) => (
-            <React.Fragment key={serviceName}>
-              {data.dates.map((dateInfo, dateIndex) => (
-                <tr 
-                  key={`${serviceName}-${dateIndex}`} 
-                  className={`
-                    ${dateIndex === data.dates.length - 1 && serviceIndex !== Object.keys(groupedData).length - 1 ? 'border-b-2 border-gray-200' : 'border-b'} 
-                    hover:bg-gray-50
-                  `}
-                >
-                  {dateIndex === 0 ? (
-                    <td className="p-3 border font-medium" rowSpan={data.dates.length}>
-                      {serviceName}
-                    </td>
-                  ) : null}
-                  <td className="p-3 border">
-                    {new Date(dateInfo.day.date).toLocaleDateString('en-US', {
-                      weekday: 'short', 
-                      month: 'short', 
-                      day: 'numeric'
-                    })}
-                  </td>
-                  <td className="p-3 border">
-                    {dateInfo.duration.toFixed(2)} hours
-                    {dateInfo.duration !== dateInfo.billableHours && (
-                      <div className="text-xs text-gray-500">
-                        (Billed as {dateInfo.billableHours} {dateInfo.billableHours === 1 ? 'hour' : 'hours'})
-                      </div>
-                    )}
-                  </td>
-                  <td className="p-3 border">
-                    ₱{getNumericCost(data.service.Costs).toFixed(2)} per {data.service.Per}
-                  </td>
-                  <td className="p-3 border">₱{dateInfo.cost.toFixed(2)}</td>
-                </tr>
-              ))}
-              <tr className="bg-blue-50 border-b hover:bg-blue-100">
-                <td colSpan={4} className="p-3 border text-right font-medium">
-                  Subtotal for {serviceName}
-                </td>
-                <td className="p-3 border text-blue-700 font-medium">
-                  ₱{data.totalServiceCost.toFixed(2)}
-                </td>
-              </tr>
-            </React.Fragment>
-          ))}
-          <tr className="bg-blue-100 font-bold border-t-2 border-blue-300">
-            <td colSpan={4} className="p-3 border text-right">Total Cost</td>
-            <td className="p-3 border text-blue-800">
-              ₱{Object.values(groupedData).reduce((total, data) => total + data.totalServiceCost, 0).toFixed(2)}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  );
-};
-
 export default function ReviewSubmit({ formData, prevStep, updateFormData, nextStep }: ReviewSubmitProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -349,6 +123,28 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
   const [loading, setLoading] = useState(true);
   const [totalCost, setTotalCost] = useState(0);
   const [serviceCostData, setServiceCostData] = useState<GroupedServiceData>({});
+  const [selectedServices, setSelectedServices] = useState<string[]>(() => {
+    return Array.isArray(formData.ProductsManufactured) 
+      ? formData.ProductsManufactured 
+      : [formData.ProductsManufactured].filter(Boolean);
+  });
+
+  const handlePrevStep = useCallback(() => {
+    // Make sure the ProductsManufactured is always an array before going back
+    if (!Array.isArray(formData.ProductsManufactured) && formData.ProductsManufactured) {
+      updateFormData('ProductsManufactured', [formData.ProductsManufactured]);
+    }
+    
+    // Log state for debugging
+    console.log("Going back to previous step with formData:", {
+      services: formData.ProductsManufactured,
+      serviceLinks: formData.serviceLinks,
+      machineNumbers: formData.serviceMachineNumbers
+    });
+    
+    // Call the original prevStep function
+    prevStep();
+  }, [formData, prevStep, updateFormData]);
 
   useEffect(() => {
     const fetchUserInfo = async () => {
@@ -371,13 +167,24 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
     }
   }, [user, isLoaded]);
 
+  // Update selectedServices whenever formData.ProductsManufactured changes
+  useEffect(() => {
+    const newSelectedServices = Array.isArray(formData.ProductsManufactured) 
+      ? formData.ProductsManufactured 
+      : [formData.ProductsManufactured].filter(Boolean);
+    
+    console.log("Updating selectedServices from formData:", newSelectedServices);
+    setSelectedServices(newSelectedServices);
+  }, [formData.ProductsManufactured]);
+
   useEffect(() => {
     // Log formData when it changes to help with debugging
     console.log("Review submit formData:", {
       services: formData.ProductsManufactured,
       hasServiceLinks: !!formData.serviceLinks,
       serviceLinksKeys: formData.serviceLinks ? Object.keys(formData.serviceLinks) : [],
-      remarks: formData.Remarks
+      remarks: formData.Remarks,
+      machineNumbers: formData.serviceMachineNumbers,
     });
   }, [formData]);
 
@@ -390,122 +197,224 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
   }, []);
 
   const handleSubmit = async () => {
-      try {
-        setIsSubmitting(true);
-        setError('');
-
-        const token = await getToken();
-        
-        // Create a clean version of the service cost data to avoid circular references
-        const simplifiedServiceData = {};
-        Object.entries(serviceCostData).forEach(([service, data]) => {
-          simplifiedServiceData[service] = {
-            totalServiceCost: data.totalServiceCost,
-            dates: data.dates.map(date => ({
-              day: {
-                date: date.day.date,
-                startTime: date.day.startTime,
-                endTime: date.day.endTime
-              },
-              duration: date.duration,
-              billableHours: date.billableHours,
-              cost: date.cost
-            }))
-          };
-        });
-        
-        // Prepare service cost details array for the API
-        const serviceCostDetails = Object.entries(serviceCostData).map(([serviceName, data]) => ({
-          serviceName,
-          totalCost: data.totalServiceCost,
-          daysCount: data.dates.length
-        }));
-        
-        // Remove any circular references from form data
-        const cleanedFormData = {
-          ...formData,
-          days: formData.days.map(day => ({
-            date: day.date instanceof Date ? day.date.toISOString() : day.date,
-            startTime: day.startTime,
-            endTime: day.endTime
-          })),
-          ProductsManufactured: Array.isArray(formData.ProductsManufactured) 
-            ? formData.ProductsManufactured 
-            : [formData.ProductsManufactured],
-          totalCost,
-          serviceCostDetails,
-          groupedServiceData: simplifiedServiceData
+    try {
+      // Set submission state
+      setIsSubmitting(true);
+      setError('');
+  
+      // Get authentication token
+      const token = await getToken();
+      
+      // Create a clean version of service cost data to avoid circular references
+      const simplifiedServiceData = {};
+      Object.entries(serviceCostData).forEach(([service, data]) => {
+        simplifiedServiceData[service] = {
+          totalServiceCost: data.totalServiceCost,
+          dates: data.dates.map(date => ({
+            day: {
+              date: date.day.date,
+              startTime: date.day.startTime,
+              endTime: date.day.endTime
+            },
+            duration: date.duration,
+            billableHours: date.billableHours,
+            cost: date.cost
+          }))
         };
-
-        console.log("Submitting reservation with cleaned data:", JSON.stringify(cleanedFormData, null, 2));
-
-        const response = await fetch('/api/user/create-reservation', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            ...cleanedFormData,
-            userInfo: {
-              clientInfo: accInfo?.ClientInfo,
-              businessInfo: accInfo?.BusinessInfo
-            }
-          }),
+      });
+      
+      // Prepare service cost details array for the API
+      const serviceCostDetails = Object.entries(serviceCostData).map(([serviceName, data]) => ({
+        serviceName,
+        totalCost: data.totalServiceCost,
+        daysCount: data.dates.length
+      }));
+      
+      // Helper function to calculate total minutes across selected days
+      const calculateTotalMinutes = (days: Day[]) => {
+        return days.reduce((total, day) => {
+          if (day.startTime && day.endTime) {
+            const start = new Date(`1970-01-01T${day.startTime}`);
+            const end = new Date(`1970-01-01T${day.endTime}`);
+            return total + (end.getTime() - start.getTime()) / (1000 * 60);
+          }
+          return total;
+        }, 0);
+      };
+  
+      // Prepare UserServices with correct quantity
+      const prepareUserServices = () => {
+        const userServices: any[] = [];
+      
+        // Iterate through selected services
+        Object.entries(formData.serviceMachineNumbers || {}).forEach(([service, quantity]) => {
+          // Get the total cost for this service
+          const serviceData = serviceCostData[service];
+          const totalServiceCost = serviceData?.totalServiceCost || 0;
+          const totalMinutes = calculateTotalMinutes(formData.days);
+      
+          // Create multiple UserService entries based on quantity
+          for (let i = 0; i < quantity; i++) {
+            userServices.push({
+              ServiceAvail: service,
+              EquipmentAvail: 'Not Specified',
+              CostsAvail: totalServiceCost / quantity,
+              MinsAvail: totalMinutes,
+              Files: formData.serviceLinks?.[service] || ''
+              // Removed MachineNo field
+            });
+          }
         });
-
-        // Log the full response for debugging
-        console.log('Full response status:', response.status);
-
-        let responseData;
+      
+        return userServices;
+      };
+  
+      // Prepare tools data for submission
+      const prepareUserTools = () => {
         try {
-          responseData = await response.json();
-          console.log('Full response body:', JSON.stringify(responseData, null, 2));
-        } catch (parseError) {
-          console.error('Error parsing response:', parseError);
-          responseData = { error: 'Failed to parse server response' };
+          if (formData.Tools) {
+            const toolsData = typeof formData.Tools === 'string' 
+              ? JSON.parse(formData.Tools) 
+              : formData.Tools;
+            
+            return Array.isArray(toolsData) 
+              ? toolsData.map(tool => ({
+                  ToolUser: tool.Tool,
+                  ToolQuantity: parseInt(tool.Quantity) || 1
+                }))
+              : [];
+          }
+          return [];
+        } catch (e) {
+          console.warn('Error parsing tools data:', e);
+          return [];
         }
-
-        if (!response.ok) {
-          console.error('Reservation submission error:', responseData);
-          
-          // More detailed error extraction
-          const errorMessage = 
-            responseData.details?.message || 
-            responseData.details?.error || 
-            responseData.error || 
-            responseData.message || 
-            'Failed to submit reservation';
-          
-          throw new Error(errorMessage);
+      };
+  
+      // Remove any circular references from form data
+      const cleanedFormData = {
+        ...formData,
+        // Normalize dates
+        days: formData.days.map(day => ({
+          date: day.date instanceof Date ? day.date.toISOString() : day.date,
+          startTime: day.startTime,
+          endTime: day.endTime
+        })),
+        // Ensure ProductsManufactured is always an array
+        ProductsManufactured: Array.isArray(formData.ProductsManufactured) 
+          ? formData.ProductsManufactured 
+          : [formData.ProductsManufactured],
+        // Add processed data
+        TotalAmntDue: totalCost,
+        serviceCostDetails,
+        groupedServiceData: simplifiedServiceData,
+        UserServices: prepareUserServices(),
+        UserTools: prepareUserTools()
+      };
+  
+      // Log cleaned data for debugging
+      console.log("Submitting reservation with cleaned data:", JSON.stringify(cleanedFormData, null, 2));
+  
+      // Send reservation request
+      const response = await fetch('/api/user/create-reservation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          ...cleanedFormData,
+          userInfo: {
+            clientInfo: accInfo?.ClientInfo,
+            businessInfo: accInfo?.BusinessInfo
+          }
+        }),
+      });
+  
+      // Log full response details for debugging
+      console.log('Response status:', response.status);
+  
+      // Parse response
+      let responseData: any;
+      try {
+        responseData = await response.text();
+        
+        // Try to parse the text as JSON
+        try {
+          responseData = JSON.parse(responseData);
+        } catch {
+          // If parsing fails, keep the original text
+          console.warn('Response was not JSON', responseData);
         }
-
-        console.log("Reservation created successfully:", responseData);
-
-        toast({
-          title: "Success!",
-          description: "Your service has been scheduled successfully!",
-        });
-
-        router.push('/user-dashboard');
         
-      } catch (err) {
-        console.error('Submission error:', err);
-        const errorMessage = err instanceof Error 
-          ? err.message 
-          : 'Failed to submit reservation';
-        
-        setError(errorMessage);
-        
-        toast({
-          title: "Error",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      } finally {
-        setIsSubmitting(false);
+        // Log the parsed or raw response data
+        console.log('Full response body:', responseData);
+      } catch (parseError) {
+        console.error('Error parsing response:', parseError);
+        responseData = { error: 'Failed to parse server response' };
       }
-    };
+  
+      // Handle non-successful responses
+      if (!response.ok) {
+        // More comprehensive error logging
+        console.error('Reservation submission error details:', {
+          status: response.status,
+          responseData,
+          cleanedFormData
+        });
+        
+        // Extract most informative error message
+        const errorMessage = 
+          // Check for nested error messages
+          (typeof responseData === 'object' && 
+            (responseData.details?.message || 
+             responseData.details?.error || 
+             responseData.error || 
+             responseData.message)) || 
+          // Fallback to response status text
+          response.statusText || 
+          // Ultimate fallback
+          'Failed to submit reservation';
+        
+        // Throw an error with the extracted message
+        throw new Error(errorMessage);
+      }
+  
+      // Log successful reservation
+      console.log("Reservation created successfully:", responseData);
+  
+      // Show success toast
+      toast({
+        title: "Success!",
+        description: "Your service has been scheduled successfully!",
+      });
+  
+      // Redirect to dashboard
+      router.push('/user-dashboard');
+      
+    } catch (err) {
+      // Handle submission errors
+      console.error('Submission error:', err);
+      
+      // Extract error message
+      const errorMessage = err instanceof Error 
+        ? err.message 
+        : 'Failed to submit reservation';
+      
+      // Set error state
+      setError(errorMessage);
+      
+      // Show error toast
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      // Reset submission state
+      setIsSubmitting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -520,11 +429,6 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
       </div>
     );
   }
-
-  // Get all selected services
-  const selectedServices = Array.isArray(formData.ProductsManufactured) 
-    ? formData.ProductsManufactured 
-    : [formData.ProductsManufactured].filter(Boolean);
 
   return (
     <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 pt-0 flex flex-col">
@@ -573,7 +477,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
               )}
             </div>
           </div>
-
+  
           {/* Personal Information */}
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-3 flex items-center">
@@ -602,7 +506,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
               </CardContent>
             </Card>
           </div>
-
+  
           {/* Business Information */}
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-3 flex items-center">
@@ -640,7 +544,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
               </CardContent>
             </Card>
           </div>
-
+  
           {/* Utilization Information */}
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-3 flex items-center">
@@ -668,23 +572,26 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
                   </div>
                   
                   {formData.serviceMachineNumbers && Object.keys(formData.serviceMachineNumbers).length > 0 && (
-  <div className="md:col-span-2 mt-4">
-    <p className="text-sm font-medium text-gray-700">Machine Quantities</p>
-    <div className="mt-2 space-y-2">
-      {Object.entries(formData.serviceMachineNumbers).map(([service, quantity]) => (
-        <div 
-          key={service} 
-          className="flex items-center justify-between bg-gray-50 p-2 rounded"
-        >
-          <span className="font-medium text-gray-800">{service}</span>
-          <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">
-            {quantity} {quantity === 1 ? 'machine' : 'machines'}
-          </span>
-        </div>
-      ))}
-    </div>
-  </div>
-)}
+                    <div className="md:col-span-2 mt-4">
+                      <p className="text-sm font-medium text-gray-700">Machine Quantities</p>
+                      <div className="mt-2 space-y-2">
+                        {Object.entries(formData.serviceMachineNumbers)
+                          .filter(([service, quantity]) => selectedServices.includes(service) && quantity > 0)
+                          .map(([service, quantity]) => (
+                            <div 
+                              key={service} 
+                              className="flex items-center justify-between bg-gray-50 p-2 rounded"
+                            >
+                              <span className="font-medium text-gray-800">{service}</span>
+                              <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">
+                                {quantity} {quantity === 1 ? 'machine' : 'machines'}
+                              </span>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+  
                   {/* Display resource links for each service */}
                   {formData.serviceLinks && Object.keys(formData.serviceLinks).length > 0 && (
                     <div className="md:col-span-2 mt-2">
@@ -746,31 +653,32 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
               </CardContent>
             </Card>
           </div>
-
+  
           {/* Cost Breakdown */}
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-3 flex items-center">
               <CreditCard className="h-5 w-5 text-blue-600 mr-2" /> Cost Breakdown
             </h3>
-            <CostReviewTable
-              selectedServices={selectedServices}
-              days={formData.days}
-              onCostCalculated={handleCostCalculated}
-              onServiceCostsCalculated={handleServiceCostsCalculated}
-            />
+            <CostReview
+            selectedServices={selectedServices}
+            days={formData.days}
+            serviceMachineNumbers={formData.serviceMachineNumbers}
+            onCostCalculated={handleCostCalculated}
+            onServiceCostsCalculated={handleServiceCostsCalculated}
+          />
           </div>
-
+  
           {/* Error messages */}
           {error && (
             <Alert variant="destructive" className="mt-4">
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-
+  
           {/* Navigation buttons */}
           <div className="mt-6 flex justify-between">
             <Button
-              onClick={prevStep}
+              onClick={handlePrevStep}
               disabled={isSubmitting}
               className="bg-gray-500 text-white hover:bg-gray-600 transition-colors disabled:opacity-50"
             >

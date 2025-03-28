@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import ProgressBar from '@/components/msme-forms/progress-bar';
 import Navbar from '@/components/custom/navbar';
 import ProcessInformation from '@/components/msme-forms/utilization-info';
@@ -12,6 +12,7 @@ import MachineCalendar from '@/components/user/machine-calendar';
 import { Button } from "@/components/ui/button";
 import { CalendarX2, CalendarCheck } from 'lucide-react';
 
+// Update the interface to match what the child components expect
 export interface FormData {
   days: {
     date: Date;
@@ -23,11 +24,22 @@ export interface FormData {
   unifiedEndTime: string | null;
 
   // UtilizationInfo fields
-  ProductsManufactured: string;
+  ProductsManufactured: string | string[];
   BulkofCommodity: string;
   Equipment: string;
   Tools: string;
-  ToolsQty: number;
+  ToolsQty?: number;
+  
+  // Additional fields from ProcessInformation
+  serviceMachineNumbers?: Record<string, number>;
+  serviceLinks?: {[service: string]: string};
+  Remarks?: string;
+  NeededMaterials?: Array<{
+    Item: string;
+    ItemQty: number;
+    Description: string;
+  }>;
+  [key: string]: any; // Add index signature for dynamic access
 }
 
 interface Machine {
@@ -36,7 +48,8 @@ interface Machine {
   isAvailable: boolean;
 }
 
-type UpdateFormData = (field: keyof FormData, value: FormData[keyof FormData] | number) => void;
+// Improved type for updateFormData to handle nested objects
+type UpdateFormData = <K extends keyof FormData>(field: K, value: FormData[K]) => void;
 
 export default function Schedule() {
   const [step, setStep] = React.useState(1);
@@ -52,6 +65,11 @@ export default function Schedule() {
     Equipment: '',
     Tools: '',
     ToolsQty: 0,
+    
+    // Initialize additional fields
+    serviceMachineNumbers: {},
+    serviceLinks: {},
+    Remarks: '',
   });
   
   interface BlockedDate {
@@ -107,6 +125,11 @@ export default function Schedule() {
     fetchMachines();
   }, []);
 
+  // Debug effect to track form data changes
+  useEffect(() => {
+    console.log("Form data updated:", formData);
+  }, [formData]);
+
   const isDateBlocked = (date: Date) => {
     return blockedDates.some(blockedDate => 
       date.getFullYear() === blockedDate.getFullYear() &&
@@ -116,11 +139,109 @@ export default function Schedule() {
   };
 
   const updateFormData: UpdateFormData = (field, value) => {
-    setFormData(prevData => ({ ...prevData, [field]: value }));
+    setFormData(prevData => {
+      console.log(`Updating ${String(field)}:`, value);
+      
+      // Special handling for ProductsManufactured changes
+      if (field === 'ProductsManufactured') {
+        // Create a deep copy of the previous data
+        const updatedData = JSON.parse(JSON.stringify(prevData));
+        
+        // Update the ProductsManufactured field
+        updatedData[field] = value;
+        
+        // If we have serviceMachineNumbers data, synchronize it with the selected services
+        if (updatedData.serviceMachineNumbers) {
+          const currentMachineNumbers = { ...updatedData.serviceMachineNumbers };
+          const updatedMachineNumbers = {};
+          
+          // Get array of selected services
+          const selectedServices = Array.isArray(value) ? value : [value].filter(Boolean);
+          
+          // Only keep machine numbers for selected services
+          selectedServices.forEach(service => {
+            if (currentMachineNumbers[service] !== undefined) {
+              updatedMachineNumbers[service] = currentMachineNumbers[service];
+            } else {
+              // Initialize with 0 for new services
+              updatedMachineNumbers[service] = 0;
+            }
+          });
+          
+          updatedData.serviceMachineNumbers = updatedMachineNumbers;
+        }
+        
+        // Similarly update serviceLinks if present
+        if (updatedData.serviceLinks) {
+          const currentLinks = { ...updatedData.serviceLinks };
+          const updatedLinks = {};
+          
+          const selectedServices = Array.isArray(value) ? value : [value].filter(Boolean);
+          
+          selectedServices.forEach(service => {
+            if (currentLinks[service]) {
+              updatedLinks[service] = currentLinks[service];
+            }
+          });
+          
+          updatedData.serviceLinks = updatedLinks;
+        }
+        
+        return updatedData;
+      }
+      
+      // Special handling for serviceLinks and serviceMachineNumbers to perform deep copies
+      if (field === 'serviceLinks' || field === 'serviceMachineNumbers') {
+        return {
+          ...prevData,
+          [field]: value ? JSON.parse(JSON.stringify(value)) : value
+        };
+      }
+      
+      // For all other fields, just do the simple update
+      return { ...prevData, [field]: value };
+    });
   };
   
-  const nextStep = () => setStep(prevStep => prevStep + 1);
-  const prevStep = () => setStep(prevStep => prevStep - 1);
+  
+  const nextStep = () => {
+    // Before moving to the review step, ensure all data is properly formatted
+    if (step === 1) {
+      // Make sure ProductsManufactured is always an array
+      if (!Array.isArray(formData.ProductsManufactured) && formData.ProductsManufactured) {
+        updateFormData('ProductsManufactured', [formData.ProductsManufactured]);
+      }
+      
+      // Ensure serviceMachineNumbers exists and is properly initialized
+      if (!formData.serviceMachineNumbers) {
+        const selectedServices = Array.isArray(formData.ProductsManufactured) 
+          ? formData.ProductsManufactured 
+          : formData.ProductsManufactured ? [formData.ProductsManufactured] : [];
+        
+        const initialMachineNumbers = {};
+        selectedServices.forEach(service => {
+          initialMachineNumbers[service] = 0;
+        });
+        
+        updateFormData('serviceMachineNumbers', initialMachineNumbers);
+      }
+      
+      // Ensure serviceLinks exists
+      if (!formData.serviceLinks) {
+        updateFormData('serviceLinks', {});
+      }
+      
+      console.log("Moving to next step with formatted formData:", formData);
+    }
+    
+    setStep(prevStep => prevStep + 1);
+  };
+  
+  const prevStep = () => {
+    // Log the entire form state for debugging
+    console.log("Moving back to previous step with formData:", formData);
+    setStep(prevStep => prevStep - 1);
+  };
   
   const toggleCalendar = () => {
     setShowCalendar(prev => !prev);
@@ -224,14 +345,14 @@ export default function Schedule() {
                       </div>
                     </div>
                     
-                    {/* Combined Navigation Buttons - Cancel button removed */}
+                    {/* Combined Navigation Buttons - Updated validation */}
                     <div className="mt-6 flex justify-end">
                       <Button 
                         onClick={nextStep} 
                         disabled={
                           formData.days.length === 0 || 
                           !formData.ProductsManufactured || 
-                          !formData.BulkofCommodity
+                          (formData.BulkofCommodity === '' && formData.BulkofCommodity !== 'none')
                         }
                       >
                         Continue to Review
