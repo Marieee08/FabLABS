@@ -3,7 +3,7 @@ import autoTable from 'jspdf-autotable';
 import {
   AutoTableResult,
   AutoTableColumnOption
-} from '@/components/admin-functions/pdf-types';
+} from '@/components/admin-functions/pdf/pdf-types';
 
 
 // Define interfaces for the laboratory request form data
@@ -705,5 +705,6 @@ export const downloadLabRequestFormPDF = (formData: LabRequestFormData): void =>
 
 
 export default downloadLabRequestFormPDF;
+
 
 
