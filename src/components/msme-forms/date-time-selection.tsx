@@ -2,10 +2,20 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Calendar } from '@/components/ui/calendar';
-import { FormData } from './schedule';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { CheckCircle, Clock } from 'lucide-react';
+
+interface FormData {
+  days: {
+    date: Date;
+    startTime: string | null;
+    endTime: string | null;
+  }[];
+  syncTimes: boolean;
+  unifiedStartTime: string | null;
+  unifiedEndTime: string | null;
+}
 
 interface DateTimeSelectionProps {
   formData: FormData;
