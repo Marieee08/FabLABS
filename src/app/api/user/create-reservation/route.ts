@@ -1,5 +1,3 @@
-// src/app/api/user/create-reservation/route.ts
-
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
@@ -42,17 +40,16 @@ export async function POST(request: Request) {
     }
 
     // 5. Process total cost
-    const totalAmountDue = typeof data.totalCost === 'number' 
-      ? data.totalCost 
-      : parseFloat(data.totalCost || '0') || 0;
+    const totalAmountDue = typeof data.TotalAmntDue === 'number' 
+      ? data.TotalAmntDue 
+      : parseFloat(data.TotalAmntDue || '0') || 0;
 
     // 6. Normalize selected services
     const selectedServices = Array.isArray(data.ProductsManufactured) 
       ? data.ProductsManufactured 
       : [data.ProductsManufactured].filter(Boolean);
     
-    // 7. Prepare machine numbers and service links
-    const serviceMachineNumbers = data.serviceMachineNumbers || {};
+    // 7. Prepare service links
     const serviceLinks = data.serviceLinks || {};
     
     // 8. Fetch service details from database
@@ -78,27 +75,13 @@ export async function POST(request: Request) {
       }
     });
 
-    // 9. Prepare machine utilizations
-    const machinesToCreate = [];
+    // 9. Create a map of services to machines
     const serviceMachinesMap = new Map();
+    const serviceMachineNumbers = data.serviceMachineNumbers || {};
 
     servicesWithDetails.forEach(service => {
       const machineNames = service.Machines.map(machineService => machineService.machine.Machine);
       serviceMachinesMap.set(service.Service, machineNames);
-      
-      // Determine machine quantity
-      const machineQuantity = serviceMachineNumbers[service.Service] || 
-                             (service.Machines.length === 1 ? 1 : 0);
-      
-      // Create machine utilization entries
-      for (let i = 0; i < Math.min(machineQuantity, service.Machines.length); i++) {
-        machinesToCreate.push({
-          Machine: service.Machines[i]?.machine.Machine || service.Machines[0]?.machine.Machine,
-          MachineApproval: false,
-          DateReviewed: null,
-          ServiceName: service.Service
-        });
-      }
     });
 
     // 10. Process user tools
@@ -204,10 +187,8 @@ export async function POST(request: Request) {
           },
           ServiceAvailed: { 
             create: serviceAvailed 
-          },
-          MachineUtilizations: { 
-            create: machinesToCreate.length > 0 ? machinesToCreate : undefined
           }
+          // MachineUtilizations creation removed
         },
         select: {
           id: true,
