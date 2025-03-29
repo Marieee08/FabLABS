@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Separator } from "@/components/ui/separator";
-import { Input } from "@/components/ui/input";
 import { X } from 'lucide-react';
-import { Alert, AlertDescription, AlertCircle } from "@/components/ui/alert";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface UserService {
   id: string;
@@ -49,10 +48,9 @@ interface Machine {
   Services: Service[];
 }
 
-// Structure for selected machine with quantity
+// Simplified structure for selected machine without quantity
 interface SelectedMachine {
   name: string;
-  quantity: number;
 }
 
 // Extended service that includes selected machines
@@ -69,8 +67,11 @@ interface ReservationDetailsTabProps {
   hideRequiresEquipment?: boolean; // Added prop to hide "requires equipment" label
 }
 
-// Simple time status badge component
-const TimeStatusBadge = ({ status }: { status: string | null | undefined }) => {
+// Simple time status badge component that only shows when reservation is Ongoing
+const TimeStatusBadge = ({ status, reservationStatus }: { status: string | null | undefined, reservationStatus: string }) => {
+  // Only show status badges when reservation is Ongoing
+  if (reservationStatus !== 'Ongoing') return null;
+  
   const getStatusBadgeStyle = (): string => {
     switch (status) {
       case "Completed":
@@ -90,6 +91,20 @@ const TimeStatusBadge = ({ status }: { status: string | null | undefined }) => {
   );
 };
 
+// Custom error alert component to avoid issues with AlertCircle
+const ErrorAlert = ({ message }: { message: string }) => (
+  <div className="bg-red-50 border border-red-200 text-red-800 rounded-md p-4 mb-4">
+    <div className="flex">
+      <div className="shrink-0">
+        <div className="w-5 h-5 rounded-full bg-red-500 flex items-center justify-center text-white font-bold">!</div>
+      </div>
+      <div className="ml-3">
+        <p className="text-sm">{message}</p>
+      </div>
+    </div>
+  </div>
+);
+
 const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
   reservation,
   machines,
@@ -99,40 +114,50 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
   hideRequiresEquipment = false // Default to false for backward compatibility
 }) => {
   const [servicesWithMachines, setServicesWithMachines] = useState<UserServiceWithMachines[]>([]);
-  // New state for tracking equipment text input for direct editing
+  // State for tracking equipment text input for direct editing
   const [equipmentTexts, setEquipmentTexts] = useState<{[serviceId: string]: string}>({});
 
+  // Modified to parse machines without quantity
   const parseMachines = (equipmentStr: string): SelectedMachine[] => {
     if (!equipmentStr) return [];
+    if (equipmentStr.trim().toLowerCase() === 'not specified') return [];
     
     return equipmentStr.split(',').map(machine => {
+      // Split by colon to handle legacy data that might have quantities
       const parts = machine.trim().split(':');
       const name = parts[0].trim();
-      // Always use quantity of 1
-      const quantity = 1;
       
-      return { name, quantity };
+      // Skip "Not Specified" values
+      if (name.toLowerCase() === 'not specified') return { name: '' };
+      
+      return { name };
     }).filter(m => m.name !== '');
   };
   
+  // Modified to stringify machines without quantity
   const stringifyMachines = (machines: SelectedMachine[]): string => {
-    return machines.map(m => `${m.name}:${m.quantity}`).join(', ');
+    return machines.map(m => m.name).join(', ');
   };
 
   // Initialize the services with machines data
   useEffect(() => {
     if (reservation) {
-      const servicesWithMachines = reservation.UserServices.map(service => ({
-        ...service,
-        selectedMachines: parseMachines(service.EquipmentAvail || '')
-      }));
+      const servicesWithMachines = reservation.UserServices.map(service => {
+        // Default to "Not Specified" if equipment is empty or null
+        const equipmentAvail = service.EquipmentAvail || "Not Specified";
+        return {
+          ...service,
+          EquipmentAvail: equipmentAvail,
+          selectedMachines: parseMachines(equipmentAvail)
+        };
+      });
       
       setServicesWithMachines(servicesWithMachines);
       
       // Initialize the equipment text inputs
       const initialTexts: {[serviceId: string]: string} = {};
       servicesWithMachines.forEach(service => {
-        initialTexts[service.id] = service.EquipmentAvail || '';
+        initialTexts[service.id] = service.EquipmentAvail || "Not Specified";
       });
       setEquipmentTexts(initialTexts);
     }
@@ -140,7 +165,6 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
 
   // Find machines that can perform a specific service
   const getMachinesForService = (serviceName: string) => {
-    // Find machines that have this service in their Services array
     return machines.filter(machine => 
       machine.isAvailable && machine.Services.some(service => 
         service.Service.toLowerCase() === serviceName.toLowerCase()
@@ -148,64 +172,48 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
     );
   };
 
-  // Check if a service requires machines (has associated machines in the database)
+  // Check if a service requires machines
   const serviceRequiresMachines = (serviceName: string) => {
-    // Return false if we're hiding the "requires equipment" label
     if (hideRequiresEquipment) return false;
-    
     return getMachinesForService(serviceName).length > 0;
   };
 
-  // Get available quantity for a specific machine
-  const getAvailableMachineQuantity = (machineName: string): number => {
-    const machine = machines.find(m => m.Machine === machineName);
-    return machine?.Number || 1;
-  };
-
-  // Add a machine to a service's selected machines
+  // Add a machine to a service's selected machines - replacing any existing ones
   const handleAddMachine = (service: UserServiceWithMachines, machineName: string) => {
-    if (!service.selectedMachines.some(m => m.name === machineName)) {
-      // Find the machine to get its default number
-      const machineObj = machines.find(m => m.Machine === machineName);
-      const defaultQuantity = 1; // Start with 1 by default
-      
-      const updatedMachines = [
-        ...service.selectedMachines, 
-        { name: machineName, quantity: defaultQuantity }
-      ];
-      
-      const equipmentStr = stringifyMachines(updatedMachines);
-      
-      const updatedService = {
-        ...service,
-        selectedMachines: updatedMachines,
-        EquipmentAvail: equipmentStr
-      };
-      
-      // Update local state
-      setServicesWithMachines(prev => 
-        prev.map(s => s.id === service.id ? updatedService : s)
-      );
-      
-      // Update equipment text state
-      setEquipmentTexts(prev => ({
-        ...prev,
-        [service.id]: equipmentStr
-      }));
-      
-      // Propagate changes to parent component
-      onUpdateService(updatedService);
-    }
+    // Only allow one machine - replace any existing ones
+    const updatedMachines = [{ name: machineName }];
+    
+    const equipmentStr = stringifyMachines(updatedMachines);
+    
+    const updatedService = {
+      ...service,
+      selectedMachines: updatedMachines,
+      EquipmentAvail: equipmentStr
+    };
+    
+    // Update local state
+    setServicesWithMachines(prev => 
+      prev.map(s => s.id === service.id ? updatedService : s)
+    );
+    
+    // Update equipment text state
+    setEquipmentTexts(prev => ({
+      ...prev,
+      [service.id]: equipmentStr
+    }));
+    
+    // Propagate changes to parent component
+    onUpdateService(updatedService);
   };
 
   // Remove a machine from a service's selected machines
   const handleRemoveMachine = (service: UserServiceWithMachines, machineName: string) => {
-    const updatedMachines = service.selectedMachines.filter(m => m.name !== machineName);
-    const equipmentStr = stringifyMachines(updatedMachines);
+    // Set to "Not Specified" instead of empty string when removing the last machine
+    const equipmentStr = "Not Specified";
     
     const updatedService = {
       ...service,
-      selectedMachines: updatedMachines,
+      selectedMachines: [],
       EquipmentAvail: equipmentStr
     };
     
@@ -224,57 +232,25 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
     onUpdateService(updatedService);
   };
 
-  // Update machine quantity with limit validation
-  const handleUpdateMachineQuantity = (service: UserServiceWithMachines, machineName: string, quantity: number) => {
-    // Get the maximum available quantity for this machine
-    const maxQuantity = getAvailableMachineQuantity(machineName);
-    
-    // Ensure quantity is within bounds (at least 1, at most maxQuantity)
-    const validatedQuantity = Math.min(Math.max(1, quantity), maxQuantity);
-    
-    const updatedMachines = service.selectedMachines.map(m => 
-      m.name === machineName ? { ...m, quantity: validatedQuantity } : m
-    );
-    
-    const equipmentStr = stringifyMachines(updatedMachines);
-    
-    const updatedService = {
-      ...service,
-      selectedMachines: updatedMachines,
-      EquipmentAvail: equipmentStr
-    };
-    
-    // Update local state
-    setServicesWithMachines(prev => 
-      prev.map(s => s.id === service.id ? updatedService : s)
-    );
-    
-    // Update equipment text state
-    setEquipmentTexts(prev => ({
-      ...prev,
-      [service.id]: equipmentStr
-    }));
-    
-    // Propagate changes to parent component
-    onUpdateService(updatedService);
-  };
-
-  // FIX #2: Handle direct equipment text editing
+  // Handle direct equipment text editing
   const handleEquipmentTextChange = (service: UserServiceWithMachines, text: string) => {
+    // If text is empty or cleared, set to "Not Specified"
+    const finalText = text.trim() === '' ? 'Not Specified' : text;
+    
     // Update the equipment text state
     setEquipmentTexts(prev => ({
       ...prev,
-      [service.id]: text
+      [service.id]: finalText
     }));
     
     // Parse the text to get the machines array
-    const machines = parseMachines(text);
+    const machines = parseMachines(finalText);
     
     // Create the updated service
     const updatedService = {
       ...service,
       selectedMachines: machines,
-      EquipmentAvail: text
+      EquipmentAvail: finalText
     };
     
     // Update local state
@@ -285,8 +261,6 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
     // Propagate changes to parent component
     onUpdateService(updatedService);
   };
-
-  // FIX #1: Removed handleCostChange function to prevent cost modifications
 
   const getStatusColor = (status: string) => {
     const colors = {
@@ -316,12 +290,7 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
   return (
     <div className="space-y-6">
       {validationError && (
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            {validationError}
-          </AlertDescription>
-        </Alert>
+        <ErrorAlert message={validationError} />
       )}
       
       <div className="grid grid-cols-2 gap-4">
@@ -359,41 +328,19 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
                   <label className="text-sm text-gray-600">Equipment</label>
                   {editMode ? (
                     <div className="space-y-2">
-                      {/* Display currently selected machines with quantities and remove button */}
+                      {/* Display currently selected machine with remove button */}
                       {service.selectedMachines.length > 0 ? (
                         <div className="flex flex-wrap gap-2 mb-2">
-                          {service.selectedMachines.map((machine, idx) => {
-                            const maxQuantity = getAvailableMachineQuantity(machine.name);
-                            return (
-                              <div key={idx} className="bg-blue-100 px-2 py-1 rounded-lg flex items-center text-sm">
-                                <span className="mr-2">{machine.name}</span>
-                                <div className="flex items-center">
-                                  <Input
-                                    type="number"
-                                    min="1"
-                                    max={maxQuantity}
-                                    value={machine.quantity}
-                                    onChange={(e) => handleUpdateMachineQuantity(
-                                      service, 
-                                      machine.name, 
-                                      parseInt(e.target.value) || 1
-                                    )}
-                                    className="w-16 h-6 text-xs py-0 px-1 mr-2"
-                                  />
-                                  <span className="text-xs mr-2 text-gray-500">
-                                    / {maxQuantity}
-                                  </span>
-                                  <button 
-                                    type="button" 
-                                    onClick={() => handleRemoveMachine(service, machine.name)}
-                                    className="text-blue-700 hover:text-blue-900"
-                                  >
-                                    <X size={14} />
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
+                          <div className="bg-blue-100 px-2 py-1 rounded-lg flex items-center text-sm">
+                            <span className="mr-2">{service.selectedMachines[0].name}</span>
+                            <button 
+                              type="button" 
+                              onClick={() => handleRemoveMachine(service, service.selectedMachines[0].name)}
+                              className="text-blue-700 hover:text-blue-900"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
                         </div>
                       ) : (
                         <p className="italic text-sm mb-2 text-gray-500">
@@ -401,7 +348,7 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
                         </p>
                       )}
                       
-                      {/* Dropdown to add more machines */}
+                      {/* Dropdown to select a machine */}
                       <div className="flex gap-2">
                         <select 
                           className="w-full border rounded px-2 py-1 text-sm"
@@ -413,12 +360,11 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
                           }}
                           value=""
                         >
-                          <option value="">Add equipment...</option>
+                          <option value="">Select equipment...</option>
                           {getMachinesForService(service.ServiceAvail)
-                            .filter(machine => !service.selectedMachines.some(m => m.name === machine.Machine)) // Only show machines not already selected
                             .map(machine => (
                               <option key={machine.id} value={machine.Machine}>
-                                {machine.Machine} {machine.Number ? `(${machine.Number} available)` : ''}
+                                {machine.Machine}
                               </option>
                             ))
                           }
@@ -428,18 +374,16 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
                   ) : (
                     <div>
                       {service.selectedMachines.length > 0 ? (
-  <div className="flex flex-wrap gap-2">
-    {service.selectedMachines.map((machine, idx) => (
-      <span key={idx} className="bg-blue-50 px-2 py-1 rounded-lg text-sm">
-        {machine.name}
-      </span>
-    ))}
-  </div>
-) : (
-  <p className="italic text-gray-500">
-    Not assigned
-  </p>
-)}
+                        <div className="flex flex-wrap gap-2">
+                          <span className="bg-blue-50 px-2 py-1 rounded-lg text-sm">
+                            {service.selectedMachines[0].name}
+                          </span>
+                        </div>
+                      ) : (
+                        <p className="italic text-gray-500">
+                          Not assigned
+                        </p>
+                      )}
                     </div>
                   )}
                 </div>
@@ -451,7 +395,6 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
                 </div>
                 <div>
                   <label className="text-sm text-gray-600">Cost</label>
-                  {/* FIX #1: Changed to display the cost as read-only, even in edit mode */}
                   <p className="font-medium">₱{service.CostsAvail ? Number(service.CostsAvail).toFixed(2) : '0.00'}</p>
                 </div>
               </div>
@@ -473,7 +416,8 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
                 <p className="ml-4">End: {formatDateTime(time.EndTime)}</p>
               </div>
               <div className="pt-1">
-                <TimeStatusBadge status={time.DateStatus} />
+                {/* Pass the reservation status to the TimeStatusBadge component */}
+                <TimeStatusBadge status={time.DateStatus} reservationStatus={reservation.Status} />
               </div>
             </div>
           ))}

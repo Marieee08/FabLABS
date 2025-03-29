@@ -86,7 +86,6 @@ interface RepairCheck {
 
 interface SelectedMachine {
   name: string;
-  quantity: number;
 }
 
 // This extends the UserService interface to include selectedMachines
@@ -182,23 +181,25 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
     return status === 'Pending' || status === 'Pending Admin Approval';
   };
 
-  // Parse the EquipmentAvail string into an array of machine objects with names and quantities
   const parseMachines = (equipmentStr: string): SelectedMachine[] => {
     if (!equipmentStr) return [];
+    if (equipmentStr.trim().toLowerCase() === 'not specified') return [];
     
     return equipmentStr.split(',').map(machine => {
+      // Split by colon to handle legacy data that might have quantities
       const parts = machine.trim().split(':');
       const name = parts[0].trim();
-      // If quantity is specified with :, use it, otherwise default to 1
-      const quantity = parts.length > 1 ? parseInt(parts[1].trim()) || 1 : 1;
       
-      return { name, quantity };
+      // Skip "Not Specified" values
+      if (name.toLowerCase() === 'not specified') return { name: '' };
+      
+      return { name };
     }).filter(m => m.name !== '');
   };
 
   // Convert the array of machine objects back to a comma-separated string
   const stringifyMachines = (machines: SelectedMachine[]): string => {
-    return machines.map(m => `${m.name}:${m.quantity}`).join(', ');
+    return machines.map(m => m.name).join(', ');
   };
 
   const handleGeneratePDF = () => {
@@ -362,97 +363,46 @@ useEffect(() => {
     }
   
     try {
+      // Start loading state
+      setIsLoading(true);
+      
       // Calculate total amount due
       const totalAmount = editedServices.reduce((sum, service) => {
         const serviceCost = service.CostsAvail ? parseFloat(service.CostsAvail.toString()) : 0;
         return sum + serviceCost;
       }, 0);
   
-      // For each service, create separate UserService records for each machine
+      // Create an array to store all promises
+      const updatePromises = [];
+  
+      // For each service, update the equipment information without quantities
       for (const service of editedServices) {
-        // If no machines selected for this service, keep the service as is but clear equipment
-        if (service.selectedMachines.length === 0) {
-          await fetch(`/api/admin/reservation-review/${localReservation.id}?type=equipment`, {
+        // Determine equipment value - if no machines selected, use "Not Specified"
+        const equipmentValue = service.selectedMachines.length === 0 
+          ? 'Not Specified' 
+          : service.selectedMachines[0].name;
+        
+        // Add the API call to our promises array (but don't await it yet)
+        updatePromises.push(
+          fetch(`/api/admin/reservation-review/${localReservation.id}?type=equipment`, {
             method: 'PATCH',
             headers: {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
               serviceId: service.id,
-              equipment: '',
+              equipment: equipmentValue,
               cost: service.CostsAvail
             }),
-          });
-          continue;
-        }
-        
-        // Get the original service to compare
-        const originalService = localReservation.UserServices.find(s => s.id === service.id);
-        const originalMachines = originalService ? parseMachines(originalService.EquipmentAvail || '') : [];
-        
-        // Get cost per machine by dividing total cost by number of machines
-        const costPerMachine = service.CostsAvail 
-          ? parseFloat(service.CostsAvail.toString()) / service.selectedMachines.length 
-          : 0;
-        
-        // Update or create separate UserService records for each machine
-        for (const machine of service.selectedMachines) {
-          // For the first machine, update the existing service record
-          if (machine === service.selectedMachines[0]) {
-            await fetch(`/api/admin/reservation-review/${localReservation.id}?type=equipment`, {
-              method: 'PATCH',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                serviceId: service.id,
-                equipment: `${machine.name}:${machine.quantity}`,
-                cost: costPerMachine
-              }),
-            });
-          } else {
-            // For additional machines, create new UserService records
-            await fetch(`/api/admin/reservation-review/${localReservation.id}?type=service`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                serviceAvail: service.ServiceAvail,
-                equipment: `${machine.name}:${machine.quantity}`,
-                cost: costPerMachine,
-                mins: service.MinsAvail
-              }),
-            });
-          }
-        }
-        
-        // Find machines that were removed and should be deleted
-        const removedMachines = originalMachines.filter(
-          om => !service.selectedMachines.some(sm => sm.name === om.name)
+          })
         );
-        
-        // If there are removed machines, delete the corresponding service records
-        if (removedMachines.length > 0 && originalService) {
-          for (const machine of removedMachines) {
-            // Find the service with this machine (not the first service which we updated)
-            const serviceToDelete = localReservation.UserServices.find(s => 
-              s.id !== service.id && 
-              s.ServiceAvail === service.ServiceAvail && 
-              s.EquipmentAvail?.includes(machine.name)
-            );
-            
-            if (serviceToDelete) {
-              await fetch(`/api/admin/reservation-review/${localReservation.id}?type=service&serviceId=${serviceToDelete.id}`, {
-                method: 'DELETE',
-              });
-            }
-          }
-        }
       }
   
-      // Save comments and total amount
-      const updateResponse = await fetch(`/api/admin/reservation-review/${localReservation.id}?type=comments`, {
+      // Wait for all equipment updates to complete
+      await Promise.all(updatePromises);
+  
+      // Now save comments and total amount
+      await fetch(`/api/admin/reservation-review/${localReservation.id}?type=comments`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -463,14 +413,24 @@ useEffect(() => {
         }),
       });
   
-      if (!updateResponse.ok) throw new Error('Failed to update reservation information');
-  
       // Fetch the updated reservation data
       const fetchResponse = await fetch(`/api/admin/reservation-review/${localReservation.id}`);
+      if (!fetchResponse.ok) {
+        throw new Error('Failed to fetch updated reservation data');
+      }
+      
       const updatedData = await fetchResponse.json();
       
+      // Ensure updatedData.UserServices has the correct length and all items
+      if (updatedData.UserServices.length !== editedServices.length) {
+        console.error(
+          `Service count mismatch: Expected ${editedServices.length}, got ${updatedData.UserServices.length}`
+        );
+        // We don't throw here, we'll try to work with what we have
+      }
+      
       // Update the local data with the new services
-      const updatedServices = updatedData.UserServices.map((service: UserService) => ({
+      const updatedServices = updatedData.UserServices.map((service) => ({
         ...service,
         selectedMachines: parseMachines(service.EquipmentAvail || '')
       }));
@@ -479,11 +439,13 @@ useEffect(() => {
       setEditedServices(updatedServices);
       setEditMode(false);
       setHasUnsavedChanges(false);
-      alert('Changes saved successfully');
+      toast.success('Changes saved successfully');
       
     } catch (error) {
       console.error('Error saving changes:', error);
-      alert('Failed to save changes');
+      toast.error('Failed to save changes');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -626,26 +588,23 @@ useEffect(() => {
     setHasUnsavedChanges(true);
   };
 
-  // Fixed handleApproveReservation function that works with the existing API
-
-const handleApproveReservation = async () => {
-  if (!localReservation) return;
-  
-  // 1. First validate that all required services have machines assigned
-  if (!validateRequiredMachines()) {
-    return;
-  }
-  
-  try {
-    // 2. Set up loading state for better UX
-    setIsLoading(true);
+  const handleApproveReservation = async () => {
+    if (!localReservation) return;
     
-    // 3. For each UserService with equipment, prepare MachineUtilization records
-    const machineUtilizations = editedServices
-      .filter(service => service.selectedMachines.length > 0)
-      .flatMap(service => 
-        service.selectedMachines.map(machine => ({
-          Machine: machine.name,
+    // 1. First validate that all required services have machines assigned
+    if (!validateRequiredMachines()) {
+      return;
+    }
+    
+    try {
+      // 2. Set up loading state for better UX
+      setIsLoading(true);
+      
+      // 3. For each UserService with equipment, prepare MachineUtilization records
+      const machineUtilizations = editedServices
+        .filter(service => service.selectedMachines.length > 0)
+        .map(service => ({
+          Machine: service.selectedMachines[0].name, // Just the machine name
           ReviewedBy: null,  // This will be filled in later when reviewed
           MachineApproval: false,
           DateReviewed: null,
@@ -653,75 +612,71 @@ const handleApproveReservation = async () => {
           OperatingTimes: [],  // Empty arrays for now, will be filled later
           DownTimes: [],
           RepairChecks: []
-        }))
-      );
-    
-    // 4. Create all machine utilization records in a single API call
-    const response = await fetch(`/api/admin/machine-utilization/${localReservation.id}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(machineUtilizations)
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to create machine utilization records');
-    }
-    
-    // 5. Now update the status to Approved
-    await handleStatusUpdate(localReservation.id, 'Approved');
-
-
-  // 6. Send approval email notification - ADD THIS PART
-  try {
-    const emailResponse = await fetch('/api/admin-email/approved-request', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        reservationId: localReservation.id.toString(),
-        reservationType: 'utilization' // Specifies this is a regular utilization, not EVC
-      }),
-    });
-    
-    if (!emailResponse.ok) {
-      console.warn('Email notification failed to send:', await emailResponse.text());
-    } else {
-      console.log('Approval email sent successfully');
-    }
-  } catch (emailError) {
-    console.error('Error sending approval email:', emailError);
-    // We don't want to fail the whole approval process if just the email fails
-  }
-    
-
-    
-    // 6. Fetch the updated reservation data to ensure we have the latest MachineUtilizations
-    const updatedResponse = await fetch(`/api/admin/reservation-review/${localReservation.id}`);
-    if (updatedResponse.ok) {
-      const updatedReservation = await updatedResponse.json();
-      setLocalReservation(updatedReservation);
+        }));
       
-      // Update the edited services with the latest data
-      const updatedServices = updatedReservation.UserServices.map((service: { EquipmentAvail: any; }) => ({
-        ...service,
-        selectedMachines: parseMachines(service.EquipmentAvail || '')
-      }));
+      // 4. Create all machine utilization records in a single API call
+      const response = await fetch(`/api/admin/machine-utilization/${localReservation.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(machineUtilizations)
+      });
       
-      setEditedServices(updatedServices);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create machine utilization records');
+      }
+      
+      // 5. Now update the status to Approved
+      await handleStatusUpdate(localReservation.id, 'Approved');
+  
+      // 6. Send approval email notification
+      try {
+        const emailResponse = await fetch('/api/admin-email/approved-request', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            reservationId: localReservation.id.toString(),
+            reservationType: 'utilization' // Specifies this is a regular utilization, not EVC
+          }),
+        });
+        
+        if (!emailResponse.ok) {
+          console.warn('Email notification failed to send:', await emailResponse.text());
+        } else {
+          console.log('Approval email sent successfully');
+        }
+      } catch (emailError) {
+        console.error('Error sending approval email:', emailError);
+        // We don't want to fail the whole approval process if just the email fails
+      }
+      
+      // 7. Fetch the updated reservation data to ensure we have the latest MachineUtilizations
+      const updatedResponse = await fetch(`/api/admin/reservation-review/${localReservation.id}`);
+      if (updatedResponse.ok) {
+        const updatedReservation = await updatedResponse.json();
+        setLocalReservation(updatedReservation);
+        
+        // Update the edited services with the latest data
+        const updatedServices = updatedReservation.UserServices.map((service: { EquipmentAvail: any; }) => ({
+          ...service,
+          selectedMachines: parseMachines(service.EquipmentAvail || '')
+        }));
+        
+        setEditedServices(updatedServices);
+      }
+      
+      alert('Reservation approved successfully with machine utilization records');
+    } catch (error) {
+      console.error('Error during reservation approval:', error);
+      alert(`Failed to approve reservation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
     }
-    
-    alert('Reservation approved successfully with machine utilization records');
-  } catch (error) {
-    console.error('Error during reservation approval:', error);
-    alert(`Failed to approve reservation: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
 // Add this loading state to component
 const [isLoading, setIsLoading] = useState(false);
@@ -916,23 +871,33 @@ return (
                 {localReservation && !editingTimes && !editingMachineUtilization && (
                   <div className="flex gap-2">
                     {editMode ? (
-                      <>
-                        <Button 
-                          variant="outline" 
-                          onClick={handleCancelEdit}
-                        >
-                          <X className="h-4 w-4 mr-2" />
-                          Cancel
-                        </Button>
-                        <Button 
-                          variant="default" 
-                          onClick={handleSaveChanges}
-                        >
-                          <Save className="h-4 w-4 mr-2" />
-                          Save Changes
-                        </Button>
-                      </>
-                    ) : (
+  <>
+    <Button 
+      variant="outline" 
+      onClick={handleCancelEdit}
+      disabled={isLoading}
+    >
+      {isLoading ? (
+        <span className="animate-spin mr-2">⊚</span>
+      ) : (
+        <X className="h-4 w-4 mr-2" />
+      )}
+      Cancel
+    </Button>
+    <Button 
+      variant="default" 
+      onClick={handleSaveChanges}
+      disabled={isLoading}
+    >
+      {isLoading ? (
+        <span className="animate-spin mr-2">⊚</span>
+      ) : (
+        <Save className="h-4 w-4 mr-2" />
+      )}
+      {isLoading ? 'Saving...' : 'Save Changes'}
+    </Button>
+  </>
+) : (
                       <>
                         {/* Only show edit buttons if reservation is not in a non-editable state */}
                         {!isEditingDisabled(localReservation.Status) && (
