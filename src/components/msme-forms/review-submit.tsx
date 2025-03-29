@@ -242,7 +242,6 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
         }, 0);
       };
   
-      // Prepare UserServices with correct quantity
       const prepareUserServices = () => {
         const userServices: any[] = [];
       
@@ -253,15 +252,21 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
           const totalServiceCost = serviceData?.totalServiceCost || 0;
           const totalMinutes = calculateTotalMinutes(formData.days);
       
+          // Check if this service has any machines assigned to it
+          // This assumes we have access to a serviceMachinesMap similar to the API route
+          // We'll need to modify the component to fetch this information if it's not available
+          
+          // Set equipment availability - Change to "None" when no machines exist
+          const equipmentAvail = 'None'; // Default to None for services with no machines
+          
           // Create multiple UserService entries based on quantity
           for (let i = 0; i < quantity; i++) {
             userServices.push({
               ServiceAvail: service,
-              EquipmentAvail: 'Not Specified',
+              EquipmentAvail: equipmentAvail,
               CostsAvail: totalServiceCost / quantity,
               MinsAvail: totalMinutes,
               Files: formData.serviceLinks?.[service] || ''
-              // Removed MachineNo field
             });
           }
         });

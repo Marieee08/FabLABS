@@ -182,19 +182,31 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
   };
 
   const parseMachines = (equipmentStr: string): SelectedMachine[] => {
-    if (!equipmentStr) return [];
-    if (equipmentStr.trim().toLowerCase() === 'not specified') return [];
+    // Return empty array for empty or null strings
+    if (!equipmentStr || equipmentStr.trim() === '') {
+      return [];
+    }
     
-    return equipmentStr.split(',').map(machine => {
-      // Split by colon to handle legacy data that might have quantities
-      const parts = machine.trim().split(':');
-      const name = parts[0].trim();
-      
-      // Skip "Not Specified" values
-      if (name.toLowerCase() === 'not specified') return { name: '' };
-      
-      return { name };
-    }).filter(m => m.name !== '');
+    // If the entire string is just "Not Specified" (case insensitive), return empty array
+    if (equipmentStr.trim().toLowerCase() === 'not specified') {
+      return [];
+    }
+    
+    return equipmentStr
+      .split(',')
+      .map(machine => {
+        // Split by colon to handle legacy data that might have quantities
+        const parts = machine.trim().split(':');
+        const name = parts[0].trim();
+        
+        // Skip empty names or "Not Specified" values
+        if (name === '' || name.toLowerCase() === 'not specified') {
+          return { name: '' };
+        }
+        
+        return { name };
+      })
+      .filter(m => m.name !== ''); // Filter out any empty machine names
   };
 
   // Convert the array of machine objects back to a comma-separated string
@@ -620,9 +632,19 @@ useEffect(() => {
       console.log("Services with machines:", editedServices.filter(s => s.selectedMachines.length > 0).length);
       console.log("All services:", editedServices);
       
-      // 3. For each UserService with equipment, prepare MachineUtilization records
+      // 3. For each UserService with valid equipment, prepare MachineUtilization records
       const machineUtilizations = editedServices
-        .filter(service => service.selectedMachines.length > 0)
+        .filter(service => {
+          // Check if service has at least one machine
+          if (service.selectedMachines.length === 0) {
+            return false;
+          }
+          
+          // Check if first machine has a valid name (not empty and not "Not Specified")
+          const machineName = service.selectedMachines[0].name.trim();
+          return machineName !== '' && 
+                 machineName.toLowerCase() !== 'not specified';
+        })
         .map(service => ({
           Machine: service.selectedMachines[0].name, // Just the machine name
           ReviewedBy: null,  // This will be filled in later when reviewed
@@ -637,22 +659,26 @@ useEffect(() => {
       console.log("Machine utilizations to create:", machineUtilizations.length);
       console.log("Machine utilization data:", machineUtilizations);
       
-      // 4. Create all machine utilization records in a single API call
-      console.log("Calling machine utilization API");
-      const response = await fetch(`/api/admin/machine-utilization/${localReservation.id}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(machineUtilizations)
-      });
-      
-      const responseData = await response.json();
-      console.log("API response status:", response.status);
-      console.log("API response:", responseData);
-      
-      if (!response.ok) {
-        throw new Error(responseData.error || 'Failed to create machine utilization records');
+      // 4. Create all machine utilization records in a single API call - only if there are any
+      if (machineUtilizations.length > 0) {
+        console.log("Calling machine utilization API");
+        const response = await fetch(`/api/admin/machine-utilization/${localReservation.id}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(machineUtilizations)
+        });
+        
+        const responseData = await response.json();
+        console.log("API response status:", response.status);
+        console.log("API response:", responseData);
+        
+        if (!response.ok) {
+          throw new Error(responseData.error || 'Failed to create machine utilization records');
+        }
+      } else {
+        console.log("No valid machine utilizations to create");
       }
       
       // 5. Now update the status to Approved
@@ -757,13 +783,13 @@ return (
               <TabsContent value="reservation" className="mt-4 space-y-6">
                 {/* Display machine utilization editor when in machine utilization editing mode */}
                 {editingMachineUtilization ? (
-  <MachineUtilization
-    reservationId={localReservation.id}
-    userServices={localReservation.UserServices}
-    onClose={() => setEditingMachineUtilization(false)}
-    onSave={handleMachineUtilizationComplete}
-  />
-) : editingTimes ? (
+                  <MachineUtilization
+                    reservationId={localReservation.id}
+                    userServices={localReservation.UserServices}
+                    onClose={() => setEditingMachineUtilization(false)}
+                    onSave={handleMachineUtilizationComplete}
+                  />
+                ) : editingTimes ? (
                   <TimeEditor
                     utilTimes={localReservation.UtilTimes}
                     serviceRates={getServiceRates()}
@@ -773,11 +799,12 @@ return (
                 ) : (
                   <>
                     {/* Using the extracted ReservationDetailsTab component */}
+                    {/* Removed validation error from here */}
                     <ReservationDetailsTab 
                       reservation={localReservation}
                       machines={machines}
                       editMode={editMode}
-                      validationError={validationError}
+                      validationError={null} // Remove the error from here
                       onUpdateService={handleUpdateService}
                     />
                     
@@ -902,49 +929,59 @@ return (
               </TabsContent>
 
               <TabsContent value="reservation" className="mt-4 space-y-6">
-              {!editingTimes && !editingMachineUtilization && (
+                {!editingTimes && !editingMachineUtilization && (
                   <CostBreakdown 
                     userServices={localReservation.UserServices}
                     totalAmountDue={localReservation.TotalAmntDue}
+                    machineUtilizations={localReservation.MachineUtilizations || []}
                     reservationId={localReservation.id}
-                    allowFix={true} // Enable fixing total if there's a discrepancy
+                    allowFix={true}
                   />
                 )}
               </TabsContent>
             </Tabs>
 
             <DialogFooter className="mt-6">
+              <div className="w-full flex flex-col">
+                {/* Add validation error message here, above all buttons */}
+                {validationError && (
+                  <Alert variant="destructive" className="mb-4 w-full">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>{validationError}</AlertDescription>
+                  </Alert>
+                )}
+              
               <div className="flex w-full justify-between">
                 {localReservation && !editingTimes && !editingMachineUtilization && (
                   <div className="flex gap-2">
                     {editMode ? (
-  <>
-    <Button 
-      variant="outline" 
-      onClick={handleCancelEdit}
-      disabled={isLoading}
-    >
-      {isLoading ? (
-        <span className="animate-spin mr-2">⊚</span>
-      ) : (
-        <X className="h-4 w-4 mr-2" />
-      )}
-      Cancel
-    </Button>
-    <Button 
-      variant="default" 
-      onClick={handleSaveChanges}
-      disabled={isLoading}
-    >
-      {isLoading ? (
-        <span className="animate-spin mr-2">⊚</span>
-      ) : (
-        <Save className="h-4 w-4 mr-2" />
-      )}
-      {isLoading ? 'Saving...' : 'Save Changes'}
-    </Button>
-  </>
-) : (
+                      <>
+                        <Button 
+                          variant="outline" 
+                          onClick={handleCancelEdit}
+                          disabled={isLoading}
+                        >
+                          {isLoading ? (
+                            <span className="animate-spin mr-2">⊚</span>
+                          ) : (
+                            <X className="h-4 w-4 mr-2" />
+                          )}
+                          Cancel
+                        </Button>
+                        <Button 
+                          variant="default" 
+                          onClick={handleSaveChanges}
+                          disabled={isLoading}
+                        >
+                          {isLoading ? (
+                            <span className="animate-spin mr-2">⊚</span>
+                          ) : (
+                            <Save className="h-4 w-4 mr-2" />
+                          )}
+                          {isLoading ? 'Saving...' : 'Save Changes'}
+                        </Button>
+                      </>
+                    ) : (
                       <>
                         {/* Only show edit buttons if reservation is not in a non-editable state */}
                         {!isEditingDisabled(localReservation.Status) && (
@@ -980,108 +1017,109 @@ return (
                         )}
                       </>
                     )}
-                  {localReservation.Status === 'Completed' && (
-                  <Button 
-                    variant="outline" 
-                    onClick={handleGeneratePDF}
-                    className="ml-2"
-                  >
-                    <Database className="h-4 w-4 mr-2" />
-                    Generate PDF
-                  </Button>
-                )}
+                    {localReservation.Status === 'Completed' && (
+                      <Button 
+                        variant="outline" 
+                        onClick={handleGeneratePDF}
+                        className="ml-2"
+                      >
+                        <Database className="h-4 w-4 mr-2" />
+                        Generate PDF
+                      </Button>
+                    )}
                   </div>
-                  
                 )}
-                {/* Status flow section in the DialogFooter of ReviewReservation component */}
-<div className="flex gap-4">
-  {/* Updated status flow to include "Pending Admin Approval" status */}
-  {(localReservation.Status === 'Pending' || localReservation.Status === 'Pending Admin Approval') && (
-    <>
-      <Button
-        variant="destructive"
-        onClick={() => handleStatusUpdate(localReservation.id, 'Rejected')}
-        disabled={isLoading}
-      >
-        Reject Reservation
-      </Button>
-      <Button
-        variant="default"
-        onClick={handleApproveReservation}
-        disabled={isLoading}
-      >
-        {isLoading ? (
-          <>
-            <span className="animate-spin mr-2">⊚</span>
-            Processing...
-          </>
-        ) : (
-          'Accept Reservation'
-        )}
-      </Button>
-    </>
-  )}
-  
-  {localReservation.Status === 'Approved' && (
-    <>
-      <Button
-        variant="destructive"
-        onClick={() => handleStatusUpdate(localReservation.id, 'Cancelled')}
-      >
-        Cancel Reservation
-      </Button>
-      <Button
-        variant="default"
-        onClick={() => handleStatusUpdate(localReservation.id, 'Ongoing')}
-      >
-        Mark as Ongoing
-      </Button>
-    </>
-  )}
+                
+                {/* Status flow section in the DialogFooter */}
+                <div className="flex gap-4">
+                  {/* Updated status flow to include "Pending Admin Approval" status */}
+                  {(localReservation.Status === 'Pending' || localReservation.Status === 'Pending Admin Approval') && (
+                    <>
+                      <Button
+                        variant="destructive"
+                        onClick={() => handleStatusUpdate(localReservation.id, 'Rejected')}
+                        disabled={isLoading}
+                      >
+                        Reject Reservation
+                      </Button>
+                      <Button
+                        variant="default"
+                        onClick={handleApproveReservation}
+                        disabled={isLoading}
+                      >
+                        {isLoading ? (
+                          <>
+                            <span className="animate-spin mr-2">⊚</span>
+                            Processing...
+                          </>
+                        ) : (
+                          'Accept Reservation'
+                        )}
+                      </Button>
+                    </>
+                  )}
+                  
+                  {localReservation.Status === 'Approved' && (
+                    <>
+                      <Button
+                        variant="destructive"
+                        onClick={() => handleStatusUpdate(localReservation.id, 'Cancelled')}
+                      >
+                        Cancel Reservation
+                      </Button>
+                      <Button
+                        variant="default"
+                        onClick={() => handleStatusUpdate(localReservation.id, 'Ongoing')}
+                      >
+                        Mark as Ongoing
+                      </Button>
+                    </>
+                  )}
 
-{localReservation.Status === 'Ongoing' && !editingMachineUtilization && !editingTimes && (
-    <>
-    <Button
-  variant="default"
-  onClick={() => {
-    // Check if all UtilTimes are marked as Completed or Cancelled
-    const incompleteTimes = localReservation.UtilTimes.filter(
-      time => time.DateStatus !== "Completed" && time.DateStatus !== "Cancelled"
-    );
-    
-    if (incompleteTimes.length > 0) {
-      toast.error("Cannot proceed to payment", {
-        description: `${incompleteTimes.length} time slot(s) are not yet marked as Completed or Cancelled. 
-        Please review and update all time slots before proceeding.`,
-        duration: 5000
-      });
-      return;
-    }
-    
-    handleStatusUpdate(localReservation.id, 'Pending Payment');
-  }}
->
-  Mark as Pending Payment
-</Button>
-    </>
-  )}
-  
-  {localReservation.Status === 'Pending Payment' && (
-    <div className="flex items-center">
-      <AlertCircle className="h-4 w-4 mr-2 text-amber-500" />
-      <span className="text-sm text-amber-700">Payment status is managed by the cashier</span>
-    </div>
-  )}
-  
-  {localReservation.Status === 'Paid' && (
-    <Button
-      variant="default"
-      onClick={() => handleStatusUpdate(localReservation.id, 'Completed')}
-    >
-      Mark as Completed
-    </Button>
-  )}
-</div>
+                  {localReservation.Status === 'Ongoing' && !editingMachineUtilization && !editingTimes && (
+                    <>
+                      <Button
+                        variant="default"
+                        onClick={() => {
+                          // Check if all UtilTimes are marked as Completed or Cancelled
+                          const incompleteTimes = localReservation.UtilTimes.filter(
+                            time => time.DateStatus !== "Completed" && time.DateStatus !== "Cancelled"
+                          );
+                          
+                          if (incompleteTimes.length > 0) {
+                            toast.error("Cannot proceed to payment", {
+                              description: `${incompleteTimes.length} time slot(s) are not yet marked as Completed or Cancelled. 
+                              Please review and update all time slots before proceeding.`,
+                              duration: 5000
+                            });
+                            return;
+                          }
+                          
+                          handleStatusUpdate(localReservation.id, 'Pending Payment');
+                        }}
+                      >
+                        Mark as Pending Payment
+                      </Button>
+                    </>
+                  )}
+                  
+                  {localReservation.Status === 'Pending Payment' && (
+                    <div className="flex items-center">
+                      <AlertCircle className="h-4 w-4 mr-2 text-amber-500" />
+                      <span className="text-sm text-amber-700">Payment status is managed by the cashier</span>
+                    </div>
+                  )}
+                  
+                  {localReservation.Status === 'Paid' && (
+                    <Button
+                      variant="default"
+                      onClick={() => handleStatusUpdate(localReservation.id, 'Completed')}
+                    >
+                      Mark as Completed
+                    </Button>
+                  )}
+                </div>
+              </div>
               </div>
             </DialogFooter>
           </div>
