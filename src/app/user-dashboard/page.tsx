@@ -1,3 +1,4 @@
+
 // src\app\user-dashboard\page.tsx
 "use client";
 
@@ -71,8 +72,6 @@ const DashboardUser = () => {
   const today = new Date();
   const formattedDate = format(today, 'EEEE, dd MMMM yyyy');
 
-
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Pending Admin Approval':
@@ -90,6 +89,13 @@ const DashboardUser = () => {
     }
   };
 
+  // Helper function to get unique items from arrays
+  const getUniqueItems = (items: (string | null)[]): string => {
+    // Filter out null values and create a Set to remove duplicates
+    const uniqueItems = Array.from(new Set(items.filter(Boolean) as string[]));
+    return uniqueItems.join(', ');
+  };
+
   // useEffect to fetch reservations
   useEffect(() => {
     const fetchReservations = async () => {
@@ -98,7 +104,71 @@ const DashboardUser = () => {
         const response = await fetch('/api/user/fetch-reservations');
         if (response.ok) {
           const data = await response.json();
-          setReservations(data);
+          
+          // Process the reservations to consolidate services and machines with same names
+          const processedData = data.map((reservation: Reservation) => {
+            // Process UserServices to consolidate duplicates
+            if (reservation.UserServices && Array.isArray(reservation.UserServices)) {
+              const serviceMap = new Map();
+              
+              reservation.UserServices.forEach((service: UserService) => {
+                // Create a composite key that combines service name and equipment name
+                const key = `${service.ServiceAvail}___${service.EquipmentAvail}`;
+                
+                if (!serviceMap.has(key)) {
+                  serviceMap.set(key, service);
+                }
+              });
+              
+              // Update UserServices with consolidated list
+              reservation.UserServices = Array.from(serviceMap.values());
+            }
+            
+            // Process MachineUtilizations to consolidate duplicate machines
+            if (reservation.MachineUtilizations && Array.isArray(reservation.MachineUtilizations)) {
+              const machineMap = new Map();
+              
+              reservation.MachineUtilizations.forEach((machine: MachineUtilization) => {
+                // Skip null machine names
+                if (!machine.Machine) return;
+                
+                // Create a key from the machine name
+                const key = machine.Machine;
+                
+                if (!machineMap.has(key)) {
+                  machineMap.set(key, machine);
+                }
+              });
+              
+              // Update MachineUtilizations with consolidated list
+              reservation.MachineUtilizations = Array.from(machineMap.values());
+            }
+            
+            // Process UserTools to consolidate duplicates and sum quantities
+            if (reservation.UserTools && Array.isArray(reservation.UserTools)) {
+              const toolMap = new Map();
+              
+              reservation.UserTools.forEach((tool: UserTool) => {
+                const key = tool.ToolUser;
+                
+                if (!toolMap.has(key)) {
+                  toolMap.set(key, { ...tool });
+                } else {
+                  // For tools, sum the quantities if they're the same tool
+                  const existingTool = toolMap.get(key);
+                  existingTool.ToolQuantity += tool.ToolQuantity;
+                  toolMap.set(key, existingTool);
+                }
+              });
+              
+              // Update UserTools with consolidated list
+              reservation.UserTools = Array.from(toolMap.values());
+            }
+            
+            return reservation;
+          });
+          
+          setReservations(processedData);
         }
       } catch (error) {
         console.error('Failed to fetch reservations:', error);
@@ -110,7 +180,7 @@ const DashboardUser = () => {
     fetchReservations();
   }, []);
 
-  // useEffect to user role
+  // useEffect to get user role
   useEffect(() => {
     const fetchUserRole = async () => {
       if (!isLoaded || !user) {
@@ -438,21 +508,21 @@ const DashboardUser = () => {
 
                             <td className="px-4 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-900">
-                                {reservation.UserServices.map(service => service.ServiceAvail).join(', ')}
+                                {/* Display unique service names */}
+                                {getUniqueItems(reservation.UserServices.map(service => service.ServiceAvail))}
                               </div>
                             </td>
 
                             <td className="px-6 py-4 whitespace-nowrap">
                               {reservation.MachineUtilizations && reservation.MachineUtilizations.length > 0 ? (
                                 <div className="text-sm font-medium text-gray-900">
-                                  {reservation.MachineUtilizations
-                                    .map(machine => machine.Machine)
-                                    .filter(Boolean)
-                                    .join(', ')}
+                                  {/* Display unique machine names */}
+                                  {getUniqueItems(reservation.MachineUtilizations.map(machine => machine.Machine))}
                                 </div>
                               ) : (
                                 <div className="text-sm font-medium text-gray-900">
-                                  {reservation.UserServices.map(service => service.EquipmentAvail).join(', ')}
+                                  {/* Display unique equipment names */}
+                                  {getUniqueItems(reservation.UserServices.map(service => service.EquipmentAvail))}
                                 </div>
                               )}
                             </td>
@@ -507,18 +577,20 @@ const DashboardUser = () => {
                       <div>
                         <h3 className="font-medium text-gray-900">Services Information</h3>
                         <div className="mt-2">
-                          <p><span className="text-gray-600">Services:</span> {selectedReservation.UserServices.map(service => service.ServiceAvail).join(', ')}</p>
-                          <p><span className="text-gray-600">Equipment:</span> {selectedReservation.UserServices.map(service => service.EquipmentAvail).join(', ')}</p>
+                          <p>
+                            <span className="text-gray-600">Services:</span> 
+                            {getUniqueItems(selectedReservation.UserServices.map(service => service.ServiceAvail))}
+                          </p>
+                          <p>
+                            <span className="text-gray-600">Equipment:</span> 
+                            {getUniqueItems(selectedReservation.UserServices.map(service => service.EquipmentAvail))}
+                          </p>
                           
                           {/* Display machine utilizations if available */}
                           {selectedReservation.MachineUtilizations && selectedReservation.MachineUtilizations.length > 0 && (
                             <p>
-                              <span className="text-gray-600">Machines:</span> {
-                                selectedReservation.MachineUtilizations
-                                  .map(machine => machine.Machine)
-                                  .filter(Boolean)
-                                  .join(', ')
-                              }
+                              <span className="text-gray-600">Machines:</span> 
+                              {getUniqueItems(selectedReservation.MachineUtilizations.map(machine => machine.Machine))}
                             </p>
                           )}
                           

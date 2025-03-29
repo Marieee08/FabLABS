@@ -81,29 +81,76 @@ export async function PATCH(
 
     // Update equipment for a service
     if (resourceType === 'equipment') {
-      const { serviceId, equipment } = data;
+      const { serviceId, equipment, cost } = data;
       
-      // FIX #1 & #2: Only update the equipment field, not the cost
+      if (!serviceId) {
+        return NextResponse.json(
+          { error: "Service ID is required" },
+          { status: 400 }
+        );
+      }
+      
+      // Ensure we store "Not Specified" instead of empty string
+      const finalEquipment = equipment === '' ? 'Not Specified' : equipment;
+      
+      // Update the specific service by its exact ID
       await prisma.userService.update({
         where: {
           id: serviceId
         },
         data: {
-          EquipmentAvail: equipment
-          // Removed CostsAvail update to prevent cost changes
+          EquipmentAvail: finalEquipment
+          // Keep the cost field if you need to update costs as well
+          // CostsAvail: cost !== undefined ? parseFloat(cost.toString()) : undefined
         }
       });
+      
+      // Return the updated service instead of the whole reservation
+      const updatedService = await prisma.userService.findUnique({
+        where: {
+          id: serviceId
+        }
+      });
+      
+      return NextResponse.json(updatedService);
     } 
     // Update comments
     else if (resourceType === 'comments') {
-      const { comments } = data;
+      const { comments, totalAmount } = data;
       
       await prisma.utilReq.update({
         where: { id },
         data: { 
-          Comments: comments
+          Comments: comments,
+          // Only update TotalAmntDue if provided
+          ...(totalAmount !== undefined && { TotalAmntDue: parseFloat(totalAmount.toString()) })
         }
       });
+      
+      // Fetch and return the updated reservation
+      const updatedReservation = await prisma.utilReq.findUnique({
+        where: { id },
+        include: {
+          accInfo: {
+            include: {
+              ClientInfo: true,
+              BusinessInfo: true,
+            },
+          },
+          UserServices: true,
+          UserTools: true,
+          UtilTimes: true,
+          MachineUtilizations: {
+            include: {
+              OperatingTimes: true,
+              DownTimes: true,
+              RepairChecks: true,
+            }
+          },
+        },
+      });
+
+      return NextResponse.json(updatedReservation);
     }
     // Unknown resource type
     else {
@@ -112,31 +159,6 @@ export async function PATCH(
         { status: 400 }
       );
     }
-
-    // Fetch updated reservation
-    const updatedReservation = await prisma.utilReq.findUnique({
-      where: { id },
-      include: {
-        accInfo: {
-          include: {
-            ClientInfo: true,
-            BusinessInfo: true,
-          },
-        },
-        UserServices: true,
-        UserTools: true,
-        UtilTimes: true,
-        MachineUtilizations: {
-          include: {
-            OperatingTimes: true,
-            DownTimes: true,
-            RepairChecks: true,
-          }
-        },
-      },
-    });
-
-    return NextResponse.json(updatedReservation);
   } catch (error) {
     console.error("Error updating resource:", error);
     return NextResponse.json(
@@ -170,11 +192,14 @@ export async function POST(
     if (resourceType === 'service') {
       const { serviceAvail, equipment, cost, mins } = data;
       
+      // Ensure "Not Specified" is used for empty equipment
+      const finalEquipment = !equipment || equipment.trim() === '' ? 'Not Specified' : equipment;
+      
       // Create new UserService record
       const newService = await prisma.userService.create({
         data: {
           ServiceAvail: serviceAvail,
-          EquipmentAvail: equipment,
+          EquipmentAvail: finalEquipment,
           CostsAvail: cost !== undefined ? parseFloat(cost) : null,
           MinsAvail: mins !== undefined ? parseFloat(mins) : null,
           utilReq: {
