@@ -30,6 +30,8 @@ interface Machine {
   id: string;
   Machine: string;
   isAvailable: boolean;
+  Number?: number; // Total available quantity of this machine
+  bookedCount?: number; // Currently booked count (will be calculated)
 }
 
 interface BlockedDate {
@@ -57,6 +59,7 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose, is
   const MORNING_END = 12; // 12 PM
   const AFTERNOON_START = 13; // 1 PM
   const AFTERNOON_END = 17; // 5 PM
+  const [machineAvailability, setMachineAvailability] = useState<Record<string, Record<string, number>>>({});
 
   useEffect(() => {
     const fetchCalendarData = async () => {
@@ -71,13 +74,51 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose, is
         const blockedDatesData = await blockedDatesRes.json();
         
         // Filter to only include approved and ongoing reservations
-        // and exclude EVC reservations
         const filteredReservations = reservationsData.filter((res: Reservation) => 
           ['Approved', 'Ongoing'].includes(res.status) && 
           res.type !== 'evc' &&
           res.machines.some(machine => machine !== 'Not specified' && machine)
         );
         
+        // Calculate machine availability per date
+        const availability: Record<string, Record<string, number>> = {};
+        
+        // Initialize with all machines available
+        machines.forEach(machine => {
+          if (machine.Number && machine.Number > 0) {
+            // Initialize the machine's availability
+            for (let i = -7; i <= 31; i++) {
+              const date = new Date();
+              date.setDate(date.getDate() + i);
+              const dateStr = date.toISOString().split('T')[0];
+              
+              if (!availability[dateStr]) {
+                availability[dateStr] = {};
+              }
+              availability[dateStr][machine.id] = machine.Number;
+            }
+          }
+        });
+        
+        // Reduce availability based on reservations
+        filteredReservations.forEach((reservation: Reservation) => {
+          // Get the date for this reservation
+          const reservationDate = new Date(reservation.date);
+          const dateStr = reservationDate.toISOString().split('T')[0];
+          
+          // For each machine in the reservation
+          reservation.machines.forEach(machineId => {
+            // Skip non-specific machines
+            if (machineId === 'Not specified' || !machineId) return;
+            
+            // Reduce available count for this machine on this date
+            if (availability[dateStr] && availability[dateStr][machineId] !== undefined) {
+              availability[dateStr][machineId] = Math.max(0, availability[dateStr][machineId] - 1);
+            }
+          });
+        });
+        
+        setMachineAvailability(availability);
         setReservations(filteredReservations);
         setBlockedDates(blockedDatesData);
       } catch (error) {
@@ -252,6 +293,7 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose, is
   const eventStyleGetter = (event: any) => {
     let backgroundColor = '#4F46E5'; // Indigo for all day
     let borderColor = '#4338CA';
+    let opacity = 1;
     
     if (event.resource) {
       // Check if this is a blocked date
@@ -264,6 +306,25 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose, is
       } else if (event.resource.timeSlot === 'afternoon') {
         backgroundColor = '#F59E0B'; // Amber for afternoon reservations
         borderColor = '#D97706';
+      }
+      
+      // Check if machine is fully booked
+      if (event.resource.machine && !event.resource.isBlocked) {
+        const machineId = event.resource.machine;
+        const dateStr = event.start.toISOString().split('T')[0];
+        
+        // If availability info exists and machine is fully booked
+        if (
+          machineAvailability[dateStr] && 
+          machineAvailability[dateStr][machineId] !== undefined &&
+          machineAvailability[dateStr][machineId] === 0
+        ) {
+          // Add "FULL" to the title
+          event.title = `${event.title} (FULL)`;
+          opacity = 0.8;
+          backgroundColor = '#9CA3AF'; // Gray for fully booked
+          borderColor = '#6B7280';
+        }
       }
     }
     
@@ -278,7 +339,8 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose, is
       overflow: 'hidden',
       textOverflow: 'ellipsis',
       whiteSpace: 'nowrap',
-      transition: 'all 0.2s ease-in-out'
+      transition: 'all 0.2s ease-in-out',
+      opacity
     };
     
     return {
@@ -286,6 +348,7 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose, is
       className: 'event-item hover:shadow-md'
     };
   };
+  
   
   // Day cell styling
   const dayPropGetter = (date: Date) => {
@@ -395,9 +458,40 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose, is
 
   // Custom event component without tooltip functionality
   const EventComponent = ({ event }: { event: any }) => {
+    // Check for machine availability info
+    let availabilityInfo = null;
+    
+    if (event.resource?.machine && !event.resource.isBlocked) {
+      const machineId = event.resource.machine;
+      const dateStr = event.start.toISOString().split('T')[0];
+      
+      if (machineAvailability[dateStr] && machineAvailability[dateStr][machineId] !== undefined) {
+        const availableCount = machineAvailability[dateStr][machineId];
+        
+        // Find the total count for this machine
+        const machine = machines.find(m => m.id === machineId);
+        const totalCount = machine?.Number || 0;
+        
+        if (availableCount === 0) {
+          availabilityInfo = (
+            <span className="text-white text-xs bg-red-500 px-1 rounded-sm ml-1">
+              FULL
+            </span>
+          );
+        } else if (availableCount < totalCount) {
+          availabilityInfo = (
+            <span className="text-white text-xs bg-yellow-500 px-1 rounded-sm ml-1">
+              {availableCount}/{totalCount}
+            </span>
+          );
+        }
+      }
+    }
+    
     return (
-      <div className="event-content truncate px-1 py-0.5">
-        {event.title}
+      <div className="event-content truncate px-1 py-0.5 flex items-center justify-between">
+        <span>{event.title.replace(' (FULL)', '')}</span>
+        {availabilityInfo}
       </div>
     );
   };
@@ -447,6 +541,11 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose, is
             <span className="text-xs text-gray-700">Past Dates</span>
           </div>
         </div>
+        <div className="flex items-center">
+          <div className="w-3 h-3 bg-[#9CA3AF] rounded-sm mr-1 shadow-sm"></div>
+          <span className="text-xs text-gray-700">Fully Booked</span>
+        </div>
+
       </div>
       
       {/* Calendar Section */}

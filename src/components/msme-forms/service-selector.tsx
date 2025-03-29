@@ -85,7 +85,7 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
       >
         <span>
           {selectedServices && selectedServices.length > 0
-            ? `${selectedServices.length} service(s) selected`
+            ? `${selectedServices.length} service selected`
             : 'Select services'}
         </span>
         {isDropdownOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}

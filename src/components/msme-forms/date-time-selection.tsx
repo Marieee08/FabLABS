@@ -4,7 +4,9 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Clock } from 'lucide-react';
+import { CheckCircle, Clock, AlertTriangle } from 'lucide-react';
+import { toast } from 'sonner'; // Make sure you have this package installed
+
 
 interface FormData {
   days: {
@@ -22,7 +24,21 @@ interface DateTimeSelectionProps {
   setFormData: React.Dispatch<React.SetStateAction<FormData>>;
   nextStep: () => void;
   isDateBlocked: (date: Date) => boolean;
-  standalonePage?: boolean; // New prop to determine if this is a standalone page
+  standalonePage?: boolean;
+  selectedService?: string; // Add this to receive the selected service
+  serviceMachineCount?: number; // Add this to receive the requested machine count
+}
+
+interface AvailabilityResponse {
+  available: boolean;
+  details: {
+    date: string;
+    startTime: string | null;
+    endTime: string | null;
+    available: boolean;
+    availableMachines: number;
+    requestedMachines: number;
+  }[];
 }
 
 const MAX_DATES = 5;
@@ -56,12 +72,75 @@ export default function DateTimeSelection({
   setFormData, 
   nextStep, 
   isDateBlocked,
-  standalonePage = true 
+  standalonePage = true,
+  selectedService,
+  serviceMachineCount 
 }: DateTimeSelectionProps) {
+  // The rest of your component
   const [errors, setErrors] = useState<string[]>([]);
   // Track which individual day is being edited to prevent propagation to other days
   const [editingDayIndex, setEditingDayIndex] = useState<number | null>(null);
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
+  const [availabilityWarnings, setAvailabilityWarnings] = useState<{[key: string]: string}>({});
 
+  const checkMachineAvailability = useCallback(async () => {
+    // Skip check if no service selected or no machines needed
+    if (!selectedService || !serviceMachineCount || serviceMachineCount === 0) {
+      return true;
+    }
+  
+    // Skip if no days selected
+    if (formData.days.length === 0) {
+      return true;
+    }
+  
+    setIsCheckingAvailability(true);
+    setAvailabilityWarnings({});
+    
+    try {
+      const response = await fetch('/api/machine-availability', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          serviceId: selectedService,
+          machineQuantity: serviceMachineCount,
+          dates: formData.days.map(day => ({
+            date: day.date,
+            startTime: day.startTime,
+            endTime: day.endTime
+          }))
+        }),
+      });
+  
+      if (!response.ok) {
+        throw new Error('Failed to check machine availability');
+      }
+  
+      const data = await response.json() as AvailabilityResponse;
+      
+      // If any date has availability issues, show warnings
+      const warnings: {[key: string]: string} = {};
+      data.details.forEach(detail => {
+        if (!detail.available) {
+          const date = new Date(detail.date).toLocaleDateString();
+          warnings[date] = `Only ${detail.availableMachines} machine(s) available at this time (you requested ${detail.requestedMachines})`;
+        }
+      });
+      
+      setAvailabilityWarnings(warnings);
+      
+      return data.available; // Return overall availability
+    } catch (error) {
+      console.error('Error checking availability:', error);
+      toast.error('Failed to check machine availability');
+      return false;
+    } finally {
+      setIsCheckingAvailability(false);
+    }
+  }, [selectedService, serviceMachineCount, formData.days]);
+  
   const validateTimes = useCallback(() => {
     const newErrors: string[] = [];
 
@@ -93,14 +172,26 @@ export default function DateTimeSelection({
     return newErrors;
   }, [formData.days]);
 
-  const handleNext = useCallback(() => {
+  const handleNext = useCallback(async () => {
     const validationErrors = validateTimes();
     setErrors(validationErrors);
-   
+    
     if (validationErrors.length === 0) {
+      // Check machine availability before proceeding
+      const isAvailable = await checkMachineAvailability();
+      
+      if (!isAvailable) {
+        // Show an availability warning but still allow proceeding if the user wants to
+        toast({
+          title: "Availability Warning",
+          description: "Some selected dates have limited machine availability. You may need to adjust your reservation.",
+          duration: 6000,
+        });
+      }
+      
       nextStep();
     }
-  }, [validateTimes, nextStep]);
+  }, [validateTimes, nextStep, checkMachineAvailability]);
 
   const addNewDay = useCallback((date: Date) => {
     const clickedDateString = date.toDateString();
@@ -140,6 +231,8 @@ export default function DateTimeSelection({
     });
   }, []);
 
+
+  
   // Handle unified time changes with memoization
   const handleUnifiedTimeChange = useCallback((time: string, field: 'startTime' | 'endTime') => {
     setFormData(prevData => {
@@ -414,6 +507,7 @@ export default function DateTimeSelection({
                     label="Start Time"
                     value={formData.unifiedStartTime}
                     onChange={(time) => handleUnifiedTimeChange(time, 'startTime')}
+                    
                   />
                   <TimePicker
                     required
@@ -424,6 +518,15 @@ export default function DateTimeSelection({
                     isEndTime={true}
                   />
                 </div>
+                {/* Add availability warning here */}
+                  {availabilityWarnings[new Date(day.date).toLocaleDateString()] && (
+                    <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <p className="text-xs text-yellow-700">
+                        <AlertTriangle className="h-3 w-3 inline mr-1" />
+                        {availabilityWarnings[new Date(day.date).toLocaleDateString()]}
+                      </p>
+                    </div>
+                  )}
               </CardContent>
             </Card>
           )}
@@ -488,6 +591,16 @@ export default function DateTimeSelection({
           </div>
         </div>
       )}
+
+      {/* Add availability warning here */}
+        {availabilityWarnings[new Date(day.date).toLocaleDateString()] && (
+          <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded-md">
+            <p className="text-xs text-yellow-700">
+              <AlertTriangle className="h-3 w-3 inline mr-1" />
+              {availabilityWarnings[new Date(day.date).toLocaleDateString()]}
+            </p>
+          </div>
+        )}
     </CardContent>
     </Card>
   );
@@ -522,10 +635,17 @@ export default function DateTimeSelection({
         <div className="mt-4 flex justify-end">
           <Button
             onClick={handleNext}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium"
-            disabled={formData.days.length === 0}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium flex items-center"
+            disabled={formData.days.length === 0 || isCheckingAvailability}
           >
-            Continue to Next Step
+            {isCheckingAvailability ? (
+              <>
+                <span className="mr-2">Checking availability...</span>
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              </>
+            ) : (
+              'Continue to Next Step'
+            )}
           </Button>
         </div>
       )}
