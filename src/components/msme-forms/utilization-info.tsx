@@ -12,7 +12,7 @@ interface Day {
 
 interface FormData {
   days: Day[];
-  ProductsManufactured: string | string[];
+  ProductsManufactured: string;  // Changed from string | string[] to just string
   BulkofCommodity: string;
   Equipment: string;
   Tools: string;
@@ -46,6 +46,7 @@ interface ProcessInformationProps {
   standalonePage?: boolean;
 }
 
+
 // Machine Quantity Selector Component
 interface MachineQuantitySelectorProps {
   selectedServices: string[];
@@ -60,43 +61,98 @@ const MachineQuantitySelector: React.FC<MachineQuantitySelectorProps> = ({
   onChange,
   initialValues = {}
 }) => {
-  const [machineNumbers, setMachineNumbers] = useState<Record<string, number>>(initialValues);
-
-  const handleMachineNumberChange = (service: string, count: number) => {
+  // Initialize state with provided initial values
+  const [machineNumbers, setMachineNumbers] = useState<Record<string, number>>(() => {
+    // Use provided initial values or default to empty object
+    return { ...initialValues };
+  });
+  
+  // Use a ref to track previous initialValues to avoid unnecessary updates
+  const prevInitialValuesRef = useRef<string>(JSON.stringify(initialValues));
+  
+  // Update state when initialValues change (e.g., when navigating back from review)
+  useEffect(() => {
+    const currentInitialValuesString = JSON.stringify(initialValues);
+    
+    // Only update if initialValues have changed
+    if (currentInitialValuesString !== prevInitialValuesRef.current) {
+      console.log("Machine quantity state updated from initialValues:", initialValues);
+      setMachineNumbers({ ...initialValues });
+      prevInitialValuesRef.current = currentInitialValuesString;
+    }
+  }, [initialValues]);
+  
+  // Handle machine quantity change
+  const handleMachineNumberChange = (service: string, value: string) => {
+    // Parse the input value to a number
+    const count = parseInt(value);
+    
+    // Validate input: ensure it's a number, not negative, and doesn't exceed max
+    const maxCount = servicesMachineData[service]?.machineCount || 0;
+    const validCount = isNaN(count) ? 0 : Math.min(Math.max(0, count), maxCount);
+    
+    // Update local state
     const newMachineNumbers = {
       ...machineNumbers,
-      [service]: count
+      [service]: validCount
     };
+    
+    // Update local state
     setMachineNumbers(newMachineNumbers);
+    
+    // Notify parent component
     onChange(newMachineNumbers);
   };
+  
+  // For debugging - log when component renders
+  console.log("MachineQuantitySelector rendering with:", {
+    selectedServices,
+    machineData: Object.keys(servicesMachineData).map(service => ({
+      service,
+      count: servicesMachineData[service]?.machineCount
+    })),
+    currentValues: machineNumbers
+  });
 
   return (
     <div className="mt-4 space-y-4">
       <h3 className="text-sm font-medium text-gray-700">Machine Quantity</h3>
       <p className="text-xs text-gray-500">Select the number of machines for each service</p>
-      {selectedServices.map((service) => {
-        const machineCount = servicesMachineData[service]?.machineCount || 0;
-        return machineCount > 0 ? (
-          <div key={service} className="p-4 border rounded-md bg-gray-50">
-            <div className="flex justify-between items-center mb-2">
-              <h4 className="text-sm font-medium">{service}</h4>
-              <p className="text-xs text-gray-500">Max Available: {machineCount}</p>
+      
+      {selectedServices.length === 0 ? (
+        <p className="text-sm text-gray-500">Please select at least one service that requires machines.</p>
+      ) : (
+        selectedServices.map((service) => {
+          // Check if this service has machine data
+          const serviceData = servicesMachineData[service];
+          if (!serviceData || serviceData.machineCount <= 0) {
+            return null;
+          }
+          
+          const machineCount = serviceData.machineCount;
+          const currentValue = machineNumbers[service] !== undefined ? machineNumbers[service] : 0;
+          
+          return (
+            <div key={service} className="p-4 border rounded-md bg-gray-50">
+              <div className="flex justify-between items-center mb-2">
+                <h4 className="text-sm font-medium">{service}</h4>
+                <p className="text-xs text-gray-500">Max Available: {machineCount}</p>
+              </div>
+              <div className="flex items-center">
+                <input
+                  type="number"
+                  min="0"
+                  max={machineCount}
+                  value={currentValue}
+                  onChange={(e) => handleMachineNumberChange(service, e.target.value)}
+                  className="w-20 p-2 border rounded mr-2"
+                />
+                <span className="text-xs text-gray-500">machines</span>
+              </div>
             </div>
-            <div className="flex items-center">
-              <input
-                type="number"
-                min="0"
-                max={machineCount}
-                value={machineNumbers[service] || 0}
-                onChange={(e) => handleMachineNumberChange(service, Number(e.target.value))}
-                className="w-20 p-2 border rounded mr-2"
-              />
-              <span className="text-xs text-gray-500">machines</span>
-            </div>
-          </div>
-        ) : null;
-      })}
+          );
+        })
+      )}
     </div>
   );
 };
@@ -116,6 +172,66 @@ export default function ProcessInformation({
   const [hasMachines, setHasMachines] = useState<boolean>(true);
   const [servicesMachineData, setServicesMachineData] = useState<Record<string, { machineCount: number }>>({});
   
+  // Store current form data in a ref to detect changes
+  const formDataRef = useRef(formData);
+  
+  const [selectedService, setSelectedService] = useState<string>(() => {
+    return typeof formData.ProductsManufactured === 'string' 
+      ? formData.ProductsManufactured 
+      : '';
+  });
+
+  // Log initial form state for debugging
+  useEffect(() => {
+    console.log("ProcessInformation mounted with formData:", {
+      ProductsManufactured: formData.ProductsManufactured,
+      BulkofCommodity: formData.BulkofCommodity,
+      serviceMachineNumbers: formData.serviceMachineNumbers,
+      serviceLinks: formData.serviceLinks,
+      Remarks: formData.Remarks
+    });
+  }, []);
+
+  useEffect(() => {
+    console.log("Debug Render Conditions:", {
+      selectedService,
+      hasMachines,
+      servicesMachineData,
+      servicesData: servicesRef.current
+    });
+
+    // Additional detailed logging for machine data
+    const selectedServiceObject = servicesRef.current.find(service => 
+      service.Service === selectedService
+    );
+
+    console.log("Selected Service Object:", selectedServiceObject);
+    
+    const machineDetails = selectedServiceObject ? [{
+      service: selectedServiceObject.Service,
+      hasMachines: selectedServiceObject.Machines && selectedServiceObject.Machines.length > 0,
+      machineCount: selectedServiceObject.Machines?.reduce((total, machineService) => {
+        return total + (machineService.machine.Quantity || 0);
+      }, 0) || 0
+    }] : [];
+
+    console.log("Machine Details for Selected Service:", machineDetails);
+  }, [selectedService, hasMachines, servicesMachineData]);
+
+
+  useEffect(() => {
+    // Update selected service when formData changes
+    const newSelectedService = typeof formData.ProductsManufactured === 'string' 
+      ? formData.ProductsManufactured 
+      : '';
+    
+    // Only update state if there's an actual change to avoid render loops
+    if (newSelectedService !== selectedService) {
+      console.log("Updating selectedService from formData:", newSelectedService);
+      setSelectedService(newSelectedService);
+    }
+  }, [formData]);
+  
   useEffect(() => {
     const fetchServices = async () => {
       try {
@@ -126,15 +242,27 @@ export default function ProcessInformation({
         const data = await response.json();
         setServices(data);
         
-        // Process machine data for each service
+        // Process machine data correctly by summing actual quantities
         const machineData = {};
         data.forEach(service => {
+          let totalMachineQuantity = 0;
+          
+          if (service.Machines && Array.isArray(service.Machines)) {
+            service.Machines.forEach(machineService => {
+              // Sum up the actual quantities (Number field)
+              const machineQuantity = machineService.machine.Number || 0;
+              totalMachineQuantity += machineQuantity;
+            });
+          }
+          
           machineData[service.Service] = {
-            machineCount: service.Machines?.length || 0
+            machineCount: totalMachineQuantity,
+            hasMachines: totalMachineQuantity > 0
           };
         });
-        setServicesMachineData(machineData);
         
+        console.log("Processed Machine Data:", machineData);
+        setServicesMachineData(machineData);
         setIsLoadingServices(false);
       } catch (err) {
         console.error('Services fetch error:', err);
@@ -142,10 +270,10 @@ export default function ProcessInformation({
         setIsLoadingServices(false);
       }
     };
-
+  
     fetchServices();
   }, []);
-
+  
   // Store services in a ref to avoid unnecessary re-renders
   const servicesRef = useRef(services);
   
@@ -154,33 +282,64 @@ export default function ProcessInformation({
     servicesRef.current = services;
   }, [services]);
 
-  // Check if selected services have machines - optimized to prevent unnecessary re-renders
+  // Determine if any selected service has machines
   useEffect(() => {
-    if (formData.ProductsManufactured && formData.ProductsManufactured.length > 0) {
-      // Use servicesRef.current instead of services directly
-      const selectedServices = servicesRef.current.filter(service => 
-        formData.ProductsManufactured.includes(service.Service)
-      );
+    if (selectedService && !isLoadingServices) {
+      // Check if the selected service has machines with quantity > 0
+      let anyServiceHasMachines = false;
       
-      const anyServiceHasMachines = selectedServices.some(service => 
-        service.Machines && service.Machines.length > 0
-      );
+      if (servicesMachineData[selectedService]?.machineCount > 0) {
+        anyServiceHasMachines = true;
+      }
       
-      // Only update state if it actually changed
+      // Only update state if it changed
       if (hasMachines !== anyServiceHasMachines) {
+        console.log(`Setting hasMachines to ${anyServiceHasMachines}`);
         setHasMachines(anyServiceHasMachines);
       }
-      
-      // Only update if necessary
-      if (!anyServiceHasMachines && formData.BulkofCommodity !== 'none') {
-        updateFormData('BulkofCommodity', 'none');
-      } else if (anyServiceHasMachines && formData.BulkofCommodity === 'none') {
-        updateFormData('BulkofCommodity', '');
-      }
+    } else if (!selectedService && hasMachines) {
+      // Reset when no service is selected
+      setHasMachines(false);
     }
-  }, [formData.ProductsManufactured, formData.BulkofCommodity, hasMachines, updateFormData]);
+  }, [selectedService, servicesMachineData, isLoadingServices, hasMachines]);
 
-  // Memoize event handlers to prevent recreating functions on every render
+  useEffect(() => {
+    if (formData.serviceMachineNumbers && Object.keys(formData.serviceMachineNumbers).length > 0) {
+      console.log("Found saved machine numbers:", formData.serviceMachineNumbers);
+      
+      // Ensure the selected service has machine numbers
+      const updatedMachineNumbers = { ...formData.serviceMachineNumbers };
+      let needsUpdate = false;
+      
+      if (selectedService) {
+        if (updatedMachineNumbers[selectedService] === undefined) {
+          updatedMachineNumbers[selectedService] = 0;
+          needsUpdate = true;
+        }
+      }
+      
+      // Remove any services that are no longer selected
+      Object.keys(updatedMachineNumbers).forEach(service => {
+        if (service !== selectedService) {
+          delete updatedMachineNumbers[service];
+          needsUpdate = true;
+        }
+      });
+      
+      // Update formData if changes were made
+      if (needsUpdate) {
+        updateFormData('serviceMachineNumbers', updatedMachineNumbers);
+      }
+    } else if (selectedService && hasMachines) {
+      // Initialize machine numbers if not present
+      const initialMachineNumbers = {
+        [selectedService]: 0
+      };
+      updateFormData('serviceMachineNumbers', initialMachineNumbers);
+    }
+  }, [formData.serviceMachineNumbers, selectedService, hasMachines, updateFormData]);
+
+  // Handle input changes
   const handleInputChange = useCallback((e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     updateFormData(name as keyof FormData, value);
@@ -189,10 +348,10 @@ export default function ProcessInformation({
 
   // Handle links for selected services
   const handleLinkChange = useCallback((service: string, value: string) => {
-    updateFormData('serviceLinks', {
-      ...formData.serviceLinks,
-      [service]: value
-    });
+    // Create a new object to avoid reference issues
+    const updatedLinks = { ...(formData.serviceLinks || {}) };
+    updatedLinks[service] = value;
+    updateFormData('serviceLinks', updatedLinks);
   }, [formData.serviceLinks, updateFormData]);
 
   // Handle machine numbers changes
@@ -200,15 +359,16 @@ export default function ProcessInformation({
     updateFormData('serviceMachineNumbers', machineNumbers);
   }, [updateFormData]);
 
-  // Memoize this function to prevent recalculation on every render
+  // Determine if a field should be disabled
   const isFieldDisabled = useCallback((fieldName: keyof FormData): boolean => {
-    // Disable fields if Benchmarking is selected or if no machines for BulkofCommodity
+    // Disable fields if selected service is Benchmarking or if no machines
     if (fieldName === 'BulkofCommodity') {
-      return formData.ProductsManufactured?.includes('Benchmarking') || !hasMachines;
+      return selectedService === 'Benchmarking' || !hasMachines;
     }
-    return formData.ProductsManufactured?.includes('Benchmarking') || false;
-  }, [formData.ProductsManufactured, hasMachines]);
+    return selectedService === 'Benchmarking' || false;
+  }, [selectedService, hasMachines]);
 
+  // Handle field blur
   const handleBlur = useCallback((fieldName: keyof FormData) => {
     setTouchedFields(prev => {
       const newTouchedFields = new Set(prev);
@@ -218,12 +378,12 @@ export default function ProcessInformation({
     validateField(fieldName, formData[fieldName]);
   }, [formData]);
 
-  const validateField = useCallback((fieldName: keyof FormData, value: string | string[]) => {
+  const validateField = useCallback((fieldName: keyof FormData, value: string) => {
     let error = '';
 
     if (fieldName === 'ProductsManufactured') {
-      if (!value || (Array.isArray(value) && value.length === 0)) {
-        error = 'Please select at least one service';
+      if (!value) {
+        error = 'Please select a service';
       }
     }
 
@@ -256,14 +416,14 @@ export default function ProcessInformation({
     const newErrors: Partial<Record<keyof FormData, string>> = {};
     let isValid = true;
 
-    if (!formData.ProductsManufactured || formData.ProductsManufactured.length === 0) {
-      newErrors.ProductsManufactured = 'Please select at least one service';
+    if (!selectedService) {
+      newErrors.ProductsManufactured = 'Please select a service';
       isValid = false;
     }
 
     // Only validate dependent fields if not in Benchmarking mode
-    if (formData.ProductsManufactured && 
-        !formData.ProductsManufactured.includes('Benchmarking')) {
+    if (selectedService && 
+        selectedService !== 'Benchmarking') {
       if (!formData.BulkofCommodity && hasMachines) {
         newErrors.BulkofCommodity = 'This field is required';
         isValid = false;
@@ -283,15 +443,21 @@ export default function ProcessInformation({
     });
     
     return isValid;
-  }, [formData, hasMachines]);
+  }, [selectedService, formData, hasMachines]);
 
-  // Now define handleNext after validateForm
+  // Handle next button click
   const handleNext = useCallback(() => {
     if (validateForm()) {
+      // Make sure ProductsManufactured is always an array before proceeding
+      if (!Array.isArray(formData.ProductsManufactured) && formData.ProductsManufactured) {
+        updateFormData('ProductsManufactured', [formData.ProductsManufactured]);
+      }
+      
       nextStep();
     }
-  }, [nextStep, validateForm]);
+  }, [nextStep, validateForm, formData.ProductsManufactured, updateFormData]);
 
+  // Get CSS class for input fields
   const getInputClassName = useCallback((fieldName: keyof FormData) => {
     const baseClasses = "mt-1 block w-full border rounded-md shadow-sm p-3";
     const errorClasses = touchedFields.has(fieldName) && errors[fieldName] 
@@ -302,16 +468,44 @@ export default function ProcessInformation({
   }, [touchedFields, errors, isFieldDisabled]);
 
   const handleServiceChange = useCallback((services: string[]) => {
-    updateFormData('ProductsManufactured', services);
-
-    // Reset dependent fields when services change
-    if (services.length === 0 || services.includes('Benchmarking')) {
-      updateFormData('BulkofCommodity', '');
-      updateFormData('Tools', '');
+    // Take only the first service if multiple are somehow passed
+    const selectedService = services[0] || '';
+    
+    // Update local state
+    setSelectedService(selectedService);
+    
+    // Update form data
+    updateFormData('ProductsManufactured', selectedService);
+    
+    // Update serviceMachineNumbers to synchronize with selected service
+    if (formData.serviceMachineNumbers) {
+      const updatedMachineNumbers: Record<string, number> = {};
+      
+      // Keep existing machine number for selected service or initialize to 0
+      if (selectedService) {
+        updatedMachineNumbers[selectedService] = 
+          formData.serviceMachineNumbers[selectedService] !== undefined 
+            ? formData.serviceMachineNumbers[selectedService] 
+            : 0;
+      }
+      
+      updateFormData('serviceMachineNumbers', updatedMachineNumbers);
     }
+    
+    // Update serviceLinks to synchronize with selected service
+    if (formData.serviceLinks) {
+      const updatedLinks: Record<string, string> = {};
+      
+      if (selectedService && formData.serviceLinks[selectedService]) {
+        updatedLinks[selectedService] = formData.serviceLinks[selectedService];
+      }
+      
+      updateFormData('serviceLinks', updatedLinks);
+    }
+    
+    validateField('ProductsManufactured', selectedService);
+  }, [updateFormData, formData.serviceMachineNumbers, formData.serviceLinks, validateField]);
 
-    validateField('ProductsManufactured', services);
-  }, [updateFormData, validateField]);
 
   return (
     <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 pt-1">
@@ -320,61 +514,75 @@ export default function ProcessInformation({
           {/* Services Selection */}
           <div className="relative">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Services to be availed<span className="text-red-500 ml-1">*</span>
+              Service to be availed<span className="text-red-500 ml-1">*</span>
             </label>
             
             <ServiceSelector 
-              selectedServices={formData.ProductsManufactured || []}
+              selectedServices={selectedService ? [selectedService] : []}
               onChange={handleServiceChange}
               onBlur={() => handleBlur('ProductsManufactured')}
               hasError={touchedFields.has('ProductsManufactured') && !!errors.ProductsManufactured}
               errorMessage={errors.ProductsManufactured}
+              // Add prop to enforce single selection
+              singleSelect={true}
             />
           </div>
 
-          {/* Machine Quantity Selector - New component */}
-          {formData.ProductsManufactured && 
-           formData.ProductsManufactured.length > 0 && 
-           hasMachines && (
-            <MachineQuantitySelector
-              selectedServices={Array.isArray(formData.ProductsManufactured) 
-                ? formData.ProductsManufactured 
-                : [formData.ProductsManufactured]}
-              servicesMachineData={servicesMachineData}
-              onChange={handleMachineNumbersChange}
-              initialValues={formData.serviceMachineNumbers}
-            />
-          )}
+          {/* Modify the rest of the existing rendering logic to use selectedService instead of selectedServices.length */}
+          {selectedService ? (
+            <div className="mt-6">
+              {/* Existing loading and error rendering */}
+              {isLoadingServices ? (
+                <div className="p-4 border rounded-md bg-gray-50">
+                  <p className="text-sm">Loading machine information...</p>
+                </div>
+              ) : serviceError ? (
+                <div className="p-4 border rounded-md bg-red-50 text-red-600">
+                  <p className="text-sm">{serviceError}</p>
+                </div>
+              ) : (
+                <>
+                  {hasMachines ? (
+                    <MachineQuantitySelector
+                      selectedServices={[selectedService]}
+                      servicesMachineData={servicesMachineData}
+                      onChange={handleMachineNumbersChange}
+                      initialValues={formData.serviceMachineNumbers || {}}
+                    />
+                  ) : (
+                    <div className="p-4 border rounded-md bg-gray-50">
+                      <p className="text-sm text-gray-500">The selected service doesn't have any machines available.</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          ) : null}
 
-          {/* Links for selected services that have machines */}
-          {formData.ProductsManufactured && 
-           formData.ProductsManufactured.length > 0 && 
-           hasMachines && (
+          {/* Links for selected service that has machines */}
+          {selectedService && hasMachines && (
             <div className="mt-4 space-y-4">
               <h3 className="text-sm font-medium text-gray-700">Resource Links</h3>
-              <p className="text-xs text-gray-500">Add Google Drive or other resource links for your selected services</p>
+              <p className="text-xs text-gray-500">Add Google Drive or other resource links for your selected service</p>
               
-              {Array.isArray(formData.ProductsManufactured) && formData.ProductsManufactured.map((service) => {
-                // Find the service in the services array
-                const serviceInfo = servicesRef.current.find(s => s.Service === service);
-                
-                // Check if this service has machines
+              {/* Find the service in the services array */}
+              {(() => {
+                const serviceInfo = servicesRef.current.find(s => s.Service === selectedService);
                 const serviceHasMachines = serviceInfo?.Machines && serviceInfo.Machines.length > 0;
                 
-                // Only render if the service has machines
                 return serviceHasMachines ? (
-                  <div key={service} className="p-4 border rounded-md bg-gray-50">
-                    <h4 className="text-sm font-medium mb-2">{service}</h4>
+                  <div key={selectedService} className="p-4 border rounded-md bg-gray-50">
+                    <h4 className="text-sm font-medium mb-2">{selectedService}</h4>
                     <input
                       type="text"
                       placeholder="Paste Google Drive or resource link here"
                       className="w-full p-2 border rounded"
-                      value={formData.serviceLinks?.[service] || ''}
-                      onChange={(e) => handleLinkChange(service, e.target.value)}
+                      value={formData.serviceLinks?.[selectedService] || ''}
+                      onChange={(e) => handleLinkChange(selectedService, e.target.value)}
                     />
                   </div>
                 ) : null;
-              })}
+              })()}
             </div>
           )}
 
@@ -388,7 +596,7 @@ export default function ProcessInformation({
               type="text"
               id="BulkofCommodity"
               name="BulkofCommodity"
-              value={!hasMachines ? 'none' : formData.BulkofCommodity}
+              value={formData.BulkofCommodity || ''}
               onChange={handleInputChange}
               onBlur={() => handleBlur('BulkofCommodity')}
               className={getInputClassName('BulkofCommodity')}

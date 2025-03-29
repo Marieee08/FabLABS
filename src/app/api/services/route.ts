@@ -35,10 +35,9 @@ function validateServiceData(data: any) {
   return errors;
 }
 
-// GET handler
 export async function GET() {
   try {
-    // Simplified query to reduce potential timeout issues
+    // Fetch services with complete machine data including Number field
     const services = await prisma.service.findMany({
       include: {
         Machines: {
@@ -46,14 +45,13 @@ export async function GET() {
             machine: {
               select: {
                 id: true,
-                Machine: true
+                Machine: true,
+                Number: true  // This field contains the quantity of each machine
               }
             }
           }
         }
-      },
-      // Add a timeout to ensure we don't hang indefinitely
-      // This is a Prisma Client Extension feature
+      }
     });
     
     // Return the response with proper headers

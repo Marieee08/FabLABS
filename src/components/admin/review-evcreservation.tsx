@@ -35,7 +35,11 @@ interface DetailedEVCReservation {
   ReceivedDate: string | null;
   InspectedBy: string | null;
   InspectedDate: string | null;
-  EVCStudents: any[];
+  EVCStudents: Array<{
+    id: number;
+    Students?: string;
+    StudentName?: string;
+  }>;
   NeededMaterials: any[];
   UtilTimes: UtilTime[];
   accInfo: {
@@ -54,7 +58,6 @@ interface ReviewEVCReservationProps {
     newStatus: 'Pending Admin Approval' | 'Approved' | 'Ongoing' | 'Completed' | 'Cancelled' | 'Rejected'
   ) => void;
 }
-
 
 const ReviewEVCReservation: React.FC<ReviewEVCReservationProps> = ({
   isModalOpen,
@@ -85,18 +88,14 @@ const ReviewEVCReservation: React.FC<ReviewEVCReservationProps> = ({
     });
   };
 
-
   const handleStatusUpdateWithApprover = async (
     reservationId: number, 
     newStatus: 'Pending Admin Approval' | 'Approved' | 'Ongoing' | 'Completed' | 'Cancelled' | 'Rejected'
   ) => {
     try {
-      // Set loading state to true when starting the update
       setIsLoading(true);
-      
       console.log(`Updating reservation ${reservationId} to status: ${newStatus}`);
       
-      // Updated to use the correct API endpoint
       const updateResponse = await fetch(`/api/admin/evc-reservation-status/${reservationId}`, {
         method: 'PUT',
         headers: {
@@ -104,7 +103,7 @@ const ReviewEVCReservation: React.FC<ReviewEVCReservationProps> = ({
         },
         body: JSON.stringify({
           status: newStatus,
-          adminName: "Admin" // You could add user context to get the actual admin name
+          adminName: "Admin"
         }),
       });
   
@@ -113,9 +112,7 @@ const ReviewEVCReservation: React.FC<ReviewEVCReservationProps> = ({
         throw new Error(`Status update failed: ${errorData.error || 'Unknown error'}`);
       }
   
-      // Proceed with email notification based on status
       if (newStatus === 'Approved') {
-        // Send approval email
         const emailResponse = await fetch('/api/admin-email/approved-request', {
           method: 'POST',
           headers: {
@@ -129,11 +126,8 @@ const ReviewEVCReservation: React.FC<ReviewEVCReservationProps> = ({
   
         if (!emailResponse.ok) {
           console.warn('Approval email notification failed to send, but status was updated');
-        } else {
-          console.log('Approval email sent successfully');
         }
       } else if (newStatus === 'Rejected') {
-        // Send rejection email with reason
         const rejectionReason = prompt('Please provide a reason for rejection:');
         
         const emailResponse = await fetch('/api/admin-email/rejected-request', {
@@ -150,22 +144,16 @@ const ReviewEVCReservation: React.FC<ReviewEVCReservationProps> = ({
   
         if (!emailResponse.ok) {
           console.warn('Rejection email notification failed to send, but status was updated');
-        } else {
-          console.log('Rejection email sent successfully');
         }
       }
   
-      // Call the passed-in handleStatusUpdate function to update UI
       handleStatusUpdate(reservationId, newStatus);
-      
-      // Close the modal after successful update
       setIsModalOpen(false);
       
     } catch (error: any) {
       console.error('Error updating EVC reservation status:', error);
       alert(`Failed to update reservation status: ${error.message}`);
     } finally {
-      // Always set loading state back to false when finished
       setIsLoading(false);
     }
   };
@@ -315,16 +303,17 @@ const ReviewEVCReservation: React.FC<ReviewEVCReservationProps> = ({
                   </div>
 
                   <Separator />
-
                   <div>
                     <h3 className="font-medium text-gray-900 mb-2">Student List ({selectedReservation.NoofStudents || 0} students)</h3>
                     <div className="space-y-2">
                       {selectedReservation.EVCStudents && selectedReservation.EVCStudents.length > 0 ? (
-                        selectedReservation.EVCStudents.map((student, index) => (
-                          <div key={index} className="bg-gray-50 p-3 rounded-lg">
-                            <p><span className="text-gray-600">Name:</span> {student.StudentName || 'Not provided'}</p>
-                          </div>
-                        ))
+                        <ul className="bg-gray-50 p-3 rounded-lg space-y-2">
+                          {selectedReservation.EVCStudents.map((student, index) => (
+                            <li key={index} className="pl-4">
+                              {student.Students || student.StudentName || 'Student ' + (index + 1)}
+                            </li>
+                          ))}
+                        </ul>
                       ) : (
                         <p className="text-gray-500 italic">No student list available</p>
                       )}

@@ -9,17 +9,18 @@ const prisma = new PrismaClient();
 
 export async function POST(request: Request) {
   try {
-    // IMPORTANT: Use await with auth() to fix the headers error
+    // 1. Authentication Check
     const { userId } = await auth();
     
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
+    // 2. Parse incoming request data
     const data = await request.json();
     console.log("API received data:", JSON.stringify(data, null, 2));
     
-    // Validate required data
+    // 3. Validate basic requirements
     if (!data.days?.length) {
       return NextResponse.json(
         { error: 'At least one day must be selected' },
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Fetch user data
+    // 4. Find the user's account in the database
     const userAccount = await prisma.accInfo.findUnique({
       where: { clerkId: userId },
       select: { id: true }
@@ -40,21 +41,21 @@ export async function POST(request: Request) {
       );
     }
 
-    // Parse the total cost (safely)
+    // 5. Process total cost
     const totalAmountDue = typeof data.totalCost === 'number' 
       ? data.totalCost 
       : parseFloat(data.totalCost || '0') || 0;
 
-    // Normalize selected services
+    // 6. Normalize selected services
     const selectedServices = Array.isArray(data.ProductsManufactured) 
       ? data.ProductsManufactured 
       : [data.ProductsManufactured].filter(Boolean);
     
-    // Extract machine numbers and service links
+    // 7. Prepare machine numbers and service links
     const serviceMachineNumbers = data.serviceMachineNumbers || {};
     const serviceLinks = data.serviceLinks || {};
     
-    // Fetch service details
+    // 8. Fetch service details from database
     const servicesWithDetails = await prisma.service.findMany({
       where: {
         Service: {
@@ -76,8 +77,8 @@ export async function POST(request: Request) {
         }
       }
     });
-    
-    // Prepare machine utilizations data
+
+    // 9. Prepare machine utilizations
     const machinesToCreate = [];
     const serviceMachinesMap = new Map();
 
@@ -85,11 +86,11 @@ export async function POST(request: Request) {
       const machineNames = service.Machines.map(machineService => machineService.machine.Machine);
       serviceMachinesMap.set(service.Service, machineNames);
       
-      // Create machine utilization entries
+      // Determine machine quantity
       const machineQuantity = serviceMachineNumbers[service.Service] || 
                              (service.Machines.length === 1 ? 1 : 0);
       
-      // Create machine utilization entries based on quantity
+      // Create machine utilization entries
       for (let i = 0; i < Math.min(machineQuantity, service.Machines.length); i++) {
         machinesToCreate.push({
           Machine: service.Machines[i]?.machine.Machine || service.Machines[0]?.machine.Machine,
@@ -100,7 +101,7 @@ export async function POST(request: Request) {
       }
     });
 
-    // Process tools - parse JSON if needed
+    // 10. Process user tools
     let userTools = [];
     try {
       if (data.Tools) {
@@ -114,9 +115,8 @@ export async function POST(request: Request) {
       console.warn('Error parsing tools data:', e);
     }
     
-    // Process time slots - FIX DATE PARSING ISSUE
+    // 11. Process time slots
     const utilTimes = data.days.map((day, index) => {
-      // Get the base date (handle both string and Date objects)
       const dateValue = typeof day.date === 'string' ? new Date(day.date) : day.date;
       
       if (!(dateValue instanceof Date) || isNaN(dateValue.getTime())) {
@@ -128,7 +128,6 @@ export async function POST(request: Request) {
         };
       }
       
-      // Create proper Date objects for start and end times
       const startTime = parseTimeString(day.startTime, dateValue);
       const endTime = parseTimeString(day.endTime, dateValue);
       
@@ -136,11 +135,11 @@ export async function POST(request: Request) {
         DayNum: index + 1,
         StartTime: startTime,
         EndTime: endTime,
-        DateStatus: "Ongoing" // Default status
+        DateStatus: "Ongoing"
       };
     });
     
-    // Calculate total minutes for all valid time slots
+    // 12. Calculate total minutes
     const totalMinutes = utilTimes.reduce((total, time) => {
       if (time.StartTime && time.EndTime) {
         const diffMs = time.EndTime.getTime() - time.StartTime.getTime();
@@ -150,17 +149,16 @@ export async function POST(request: Request) {
       return total;
     }, 0);
 
-    // Process user services - Ensure MachineNo is a number or null
+    // 13. Process user services
     const userServices = selectedServices.flatMap(service => {
-      const serviceInfo = servicesWithDetails.find(s => s.Service === service);
       const machines = serviceMachinesMap.get(service) || [];
       const serviceLink = serviceLinks[service] || '';
       
-      // Get machine quantity from form data
+      // Get machine quantity
       const machineQuantity = serviceMachineNumbers[service] || 
                              (machines.length > 0 ? 1 : null);
       
-      // Find cost for this service from provided data
+      // Find service cost
       let serviceCost = 0;
       if (data.groupedServiceData && data.groupedServiceData[service]) {
         serviceCost = data.groupedServiceData[service].totalServiceCost || 0;
@@ -169,24 +167,22 @@ export async function POST(request: Request) {
         if (costDetail) serviceCost = costDetail.totalCost || 0;
       }
       
-      // Create entries for each machine
+      // Create service entries
       return Array.from({length: machineQuantity || 0}, (_, index) => ({
         ServiceAvail: service,
-        // Use numeric machine number or null
-        MachineNo: machineQuantity && machineQuantity > 1 ? index + 1 : null, 
         EquipmentAvail: machines.length === 1 ? machines[0] : 'Not Specified',
         CostsAvail: serviceCost / (machineQuantity || 1),
         MinsAvail: totalMinutes,
-        Files: serviceLink // Store link in Files field
+        Files: serviceLink
       }));
     });
 
-    // Process service availed
+    // 14. Process service availed
     const serviceAvailed = selectedServices.map(service => ({
       service
     }));
 
-    // Create the reservation in a transaction
+    // 15. Create reservation in a transaction
     const utilReq = await prisma.$transaction(async (tx) => {
       return tx.utilReq.create({
         data: {
@@ -197,7 +193,6 @@ export async function POST(request: Request) {
           TotalAmntDue: totalAmountDue,
           Remarks: data.Remarks || '',
           
-          // Create all related records
           UserTools: { 
             create: userTools.length > 0 ? userTools : undefined 
           },
@@ -222,8 +217,7 @@ export async function POST(request: Request) {
       });
     });
 
-    console.log("Reservation created successfully:", utilReq);
-    
+    // 16. Return successful response
     return NextResponse.json({
       success: true,
       message: 'Reservation created successfully',
@@ -231,9 +225,9 @@ export async function POST(request: Request) {
     });
     
   } catch (error) {
+    // 17. Error handling
     console.error('Error creating reservation:', error);
     
-    // More detailed error logging
     const errorDetails = {
       message: error instanceof Error ? error.message : 'Unknown error',
       name: error instanceof Error ? error.name : 'UnknownError',

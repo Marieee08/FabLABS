@@ -34,6 +34,7 @@ import { downloadLabRequestFormPDF } from "@/components/admin-functions/pdf/lab-
 import { downloadLabReservationFormPDF } from "@/components/admin-functions/pdf/lab-reservation-form-pdf";
 
 interface UserService {
+  MachineNo: number;
   id: string;
   ServiceAvail: string;
   EquipmentAvail: string;
@@ -344,82 +345,87 @@ const handleGeneratePDF = async (
       detailedData = await response.json();
       console.log('EVC Reservation details for PDF generation:', detailedData);
      
-      // For lab-request form specifically, we'll use the EVC data
-      if (formType === 'lab-request' || formType === 'lab-reservation') {
-        // Format the needed materials into the required format
-        const materialItems = Array.isArray(detailedData.NeededMaterials)
-          ? detailedData.NeededMaterials.map((material: any) => ({
-              quantity: material.MaterialQty?.toString() || '',
-              item: material.MaterialName || '',
-              description: material.MaterialDesc || '',
-              issuedCondition: '',
-              returnedCondition: ''
-            }))
-          : [];
-         
-        // Format student list
-        const studentList = Array.isArray(detailedData.EVCStudents)
-          ? detailedData.EVCStudents.map((student: any) => ({
-              name: student.StudentName || ''
-            }))
-          : [];
-         
-        // Format time from UtilTimes if available
-        let inclusiveTime = '';
-        if (Array.isArray(detailedData.UtilTimes) && detailedData.UtilTimes.length > 0) {
-          const firstTime = detailedData.UtilTimes[0];
-          if (firstTime.StartTime && firstTime.EndTime) {
-            const startTime = new Date(firstTime.StartTime);
-            const endTime = new Date(firstTime.EndTime);
-            inclusiveTime = `${startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
-          }
+    if (formType === 'lab-request' || formType === 'lab-reservation') {
+      // Format the needed materials into the required format
+      const materialItems = Array.isArray(detailedData.NeededMaterials)
+        ? detailedData.NeededMaterials.map((material: any) => ({
+            quantity: material.MaterialQty?.toString() || '',
+            item: material.MaterialName || '',
+            description: material.MaterialDesc || '',
+            issuedCondition: '',
+            returnedCondition: ''
+          }))
+        : [];
+      
+      // Format student list - handle both Students and StudentName properties
+      const studentList = Array.isArray(detailedData.EVCStudents)
+        ? detailedData.EVCStudents.map((student: any) => {
+            // Try all possible property names for student name
+            const studentName = student.Students || student.StudentName || student.Name || student.name;
+            return {
+              name: studentName || ''
+            };
+          })
+        : [];
+      
+      console.log('Student list for PDF:', studentList); // Debug log
+      
+      // Format time from UtilTimes if available
+      let inclusiveTime = '';
+      if (Array.isArray(detailedData.UtilTimes) && detailedData.UtilTimes.length > 0) {
+        const firstTime = detailedData.UtilTimes[0];
+        if (firstTime.StartTime && firstTime.EndTime) {
+          const startTime = new Date(firstTime.StartTime);
+          const endTime = new Date(firstTime.EndTime);
+          inclusiveTime = `${startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
         }
-         
-        // Create lab request form data
-        const labFormData = {
-          campus: 'Eastern Visayas Campus', // Default value
-          controlNo: detailedData.ControlNo?.toString() || '',
-          schoolYear: detailedData.SchoolYear?.toString() || new Date().getFullYear().toString(),
-          gradeLevel: detailedData.LvlSec || '',
-          numberOfStudents: detailedData.NoofStudents?.toString() || '',
-          subject: detailedData.Subject || '',
-          concurrentTopic: detailedData.Topic || '',
-          unit: '', // Not available in EVC data
-          teacherInCharge: detailedData.Teacher || '',
-          venue: '', // Not available in EVC data
-          inclusiveTimeOfUse: inclusiveTime,
-          date: detailedData.DateRequested ? new Date(detailedData.DateRequested).toLocaleDateString() : '',
-          materials: materialItems,
-          receivedBy: detailedData.ReceivedBy || '',
-          receivedAndInspectedBy: detailedData.InspectedBy || '',
-          receivedDate: detailedData.ReceivedDate ? new Date(detailedData.ReceivedDate).toLocaleDateString() : '',
-          inspectedDate: detailedData.InspectedDate ? new Date(detailedData.InspectedDate).toLocaleDateString() : '',
-          requestedBy: detailedData.accInfo?.Name || '',
-          dateRequested: detailedData.DateRequested ? new Date(detailedData.DateRequested).toLocaleDateString() : '',
-          students: studentList,
-          endorsedBy: detailedData.Teacher || '', // Using teacher as endorser
-          approvedBy: detailedData.ApprovedBy || ''
-        };
-         
-        try {
-          if (formType === 'lab-request') {
-            console.log('Generating lab request PDF with data:', labFormData);
-            downloadLabRequestFormPDF(labFormData);
-          } else if (formType === 'lab-reservation') {
-            console.log('Generating lab reservation PDF with data:', labFormData);
-            downloadLabReservationFormPDF(labFormData);
-          }
-        } catch (error) {
-          console.error(`Error in ${formType} PDF generation:`, error);
-          alert(`Error generating ${formType} PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+      
+      // Create lab request form data
+      const labFormData = {
+        campus: 'Eastern Visayas Campus',
+        controlNo: detailedData.ControlNo?.toString() || '',
+        schoolYear: detailedData.SchoolYear?.toString() || new Date().getFullYear().toString(),
+        gradeLevel: detailedData.LvlSec || '',
+        numberOfStudents: detailedData.NoofStudents?.toString() || '',
+        subject: detailedData.Subject || '',
+        concurrentTopic: detailedData.Topic || '',
+        unit: '',
+        teacherInCharge: detailedData.Teacher || '',
+        venue: '',
+        inclusiveTimeOfUse: inclusiveTime,
+        date: detailedData.DateRequested ? new Date(detailedData.DateRequested).toLocaleDateString() : '',
+        materials: materialItems,
+        receivedBy: detailedData.ReceivedBy || '',
+        receivedAndInspectedBy: detailedData.InspectedBy || '',
+        receivedDate: detailedData.ReceivedDate ? new Date(detailedData.ReceivedDate).toLocaleDateString() : '',
+        inspectedDate: detailedData.InspectedDate ? new Date(detailedData.InspectedDate).toLocaleDateString() : '',
+        requestedBy: detailedData.accInfo?.Name || '',
+        dateRequested: detailedData.DateRequested ? new Date(detailedData.DateRequested).toLocaleDateString() : '',
+        students: studentList, // Use the properly formatted student list
+        endorsedBy: detailedData.Teacher || '',
+        approvedBy: detailedData.ApprovedBy || ''
+      };
+      
+      try {
+        if (formType === 'lab-request') {
+          console.log('Generating lab request PDF with data:', labFormData);
+          downloadLabRequestFormPDF(labFormData);
+        } else if (formType === 'lab-reservation') {
+          console.log('Generating lab reservation PDF with data:', labFormData);
+          downloadLabReservationFormPDF(labFormData);
         }
-       
-        // After generating, close modal and trigger scroll fix
-        setIsPdfModalOpen(false);
-        setSelectedReservationId(null);
-        setNeedsScrollFix(true);
-        return;
-      } else {
+      } catch (error) {
+        console.error(`Error in ${formType} PDF generation:`, error);
+        alert(`Error generating ${formType} PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    
+      // After generating, close modal and trigger scroll fix
+      setIsPdfModalOpen(false);
+      setSelectedReservationId(null);
+      setNeedsScrollFix(true);
+      return;
+    } else {
         // For other form types with EVC data, show not implemented message
         alert(`${formType} PDF generation for EVC reservations is not yet implemented`);
         setIsPdfModalOpen(false);

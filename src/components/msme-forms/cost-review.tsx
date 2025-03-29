@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from "@/components/ui/button";
+// src\components\msme-forms\cost-review.tsx
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { Clock } from 'lucide-react';
 
 interface Day {
   date: Date;
@@ -19,6 +19,7 @@ interface DateInfo {
   duration: number;
   billableHours: number;
   cost: number;
+  machineQuantity: number;
 }
 
 interface GroupedServiceData {
@@ -33,22 +34,25 @@ interface GroupedServiceData {
 interface CostReviewProps {
   selectedServices: string[];
   days: Day[];
-  serviceMachineNumbers?: {[service: string]: number};
+  serviceMachineNumbers?: Record<string, number>;
   onCostCalculated?: (cost: number) => void;
   onServiceCostsCalculated?: (serviceData: GroupedServiceData) => void;
 }
 
-export const CostReviewTable: React.FC<CostReviewProps> = ({ 
+const CostReview = ({ 
   selectedServices, 
   days, 
   serviceMachineNumbers = {}, 
   onCostCalculated = () => {},
   onServiceCostsCalculated = () => {} 
-}) => {
+}: CostReviewProps) => {
   const [serviceCosts, setServiceCosts] = useState<ServiceCost[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [groupedData, setGroupedData] = useState<GroupedServiceData>({});
+  
+  // Track the last set of selected services to detect changes
+  const previousServicesRef = useRef<string[]>([]);
 
   const getNumericCost = useCallback((cost: number | string): number => {
     if (typeof cost === 'number') return cost;
@@ -110,15 +114,26 @@ export const CostReviewTable: React.FC<CostReviewProps> = ({
   useEffect(() => {
     if (!serviceCosts.length || !selectedServices.length || !days.length) {
       setGroupedData({});
+      onCostCalculated(0);
+      onServiceCostsCalculated({});
       return;
     }
+    
+    // Check if services have changed
+    const servicesChanged = 
+      previousServicesRef.current.length !== selectedServices.length ||
+      previousServicesRef.current.some(s => !selectedServices.includes(s)) ||
+      selectedServices.some(s => !previousServicesRef.current.includes(s));
+    
+    // Update the ref for next comparison
+    previousServicesRef.current = [...selectedServices];
     
     // Group data by service for clearer organization
     const calculatedGroupedData: GroupedServiceData = selectedServices.reduce<GroupedServiceData>((acc, serviceName) => {
       const service = serviceCosts.find(s => s.Service === serviceName);
       if (!service || !service.Costs) return acc;
       
-      // Get machine quantity for this service (default to 1 if not specified)
+      // Get the number of machines for this service, default to 1 if not specified
       const machineQuantity = serviceMachineNumbers[serviceName] || 1;
       
       if (!acc[serviceName]) {
@@ -126,7 +141,7 @@ export const CostReviewTable: React.FC<CostReviewProps> = ({
           service, 
           dates: [], 
           totalServiceCost: 0,
-          machineQuantity
+          machineQuantity 
         };
       }
       
@@ -150,7 +165,8 @@ export const CostReviewTable: React.FC<CostReviewProps> = ({
           day,
           duration,
           billableHours,
-          cost
+          cost,
+          machineQuantity
         });
         
         serviceTotalCost += cost;
@@ -233,7 +249,7 @@ export const CostReviewTable: React.FC<CostReviewProps> = ({
                     ₱{getNumericCost(data.service.Costs).toFixed(2)} per {data.service.Per}
                   </td>
                   <td className="p-3 border">
-                    {data.machineQuantity} {data.machineQuantity === 1 ? 'machine' : 'machines'}
+                    {dateInfo.machineQuantity}
                   </td>
                   <td className="p-3 border">₱{dateInfo.cost.toFixed(2)}</td>
                 </tr>
@@ -259,3 +275,5 @@ export const CostReviewTable: React.FC<CostReviewProps> = ({
     </div>
   );
 };
+
+export default CostReview;
