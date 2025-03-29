@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
 
+
 // Set up the localizer for the calendar
 const localizer = momentLocalizer(moment);
 
@@ -79,6 +80,7 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
   const [currentDate, setCurrentDate] = useState(new Date());
   const [machineAvailabilityMap, setMachineAvailabilityMap] = useState<Record<string, number>>({});
 
+
   // Time slots definitions
   const MORNING_START = 8; // 8 AM
   const MORNING_END = 12; // 12 PM
@@ -86,6 +88,8 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
   const AFTERNOON_END = 17; // 5 PM
 
   // Fetch reservation and blocked date data
+
+
   useEffect(() => {
     const fetchCalendarData = async () => {
       setIsLoading(true);

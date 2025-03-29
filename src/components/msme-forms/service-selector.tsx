@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Check, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, X, AlertTriangle } from 'lucide-react';
 
 interface Service {
   id: string;
@@ -75,6 +75,12 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
     return (selectedServices || []).includes(service);
   };
 
+  // Check if a service requiring file upload is selected
+  const needsFileUpload = () => {
+    const fileRequiringServices = ['3D Printing', 'Laser Cutting', 'CNC Machining'];
+    return selectedServices.some(service => fileRequiringServices.includes(service));
+  };
+
   return (
     <div>
       <div 
@@ -85,7 +91,7 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
       >
         <span>
           {selectedServices && selectedServices.length > 0
-            ? `${selectedServices.length} service selected`
+            ? `${selectedServices.length} service(s) selected`
             : 'Select services'}
         </span>
         {isDropdownOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
@@ -139,6 +145,20 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
           ))}
         </div>
       )}
+
+      {/* Google Drive Link Note - Very noticeable notification */}
+      <div className="mt-6 p-4 border-2 border-yellow-400 bg-yellow-50 rounded-md">
+        <div className="flex items-start">
+          <AlertTriangle className="text-yellow-500 mr-3 flex-shrink-0 mt-0.5" size={24} />
+          <div>
+            <h4 className="font-bold text-yellow-700 text-lg">Google Drive Link Required</h4>
+            <p className="text-yellow-700">
+              For evaluation purposes, you <strong>must</strong> provide a Google Drive link containing your project files 
+              (3D printing models, laser cutter files, etc.). Files are necessary for assessment and fabrication.
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
