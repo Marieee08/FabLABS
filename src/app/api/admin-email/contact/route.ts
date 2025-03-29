@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
             <p>FabLab Administration Team</p>
           </div>
           <div style="background-color: #f3f4f6; padding: 15px; text-align: center; font-size: 12px; color: #6b7280;">
-            <p>This is a message from FabLab. Please do not reply to this email.</p>
+            <p>This is a message from FabLab.</p>
             <p>&copy; ${new Date().getFullYear()} FabLab. All rights reserved.</p>
           </div>
         </div>
