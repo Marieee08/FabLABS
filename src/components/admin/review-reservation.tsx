@@ -36,6 +36,15 @@ interface UserTool {
   ToolQuantity: number;
 }
 
+interface Service {
+  id: string;
+  Service: string;
+  Costs: number | string | null;
+  Icon?: string | null;
+  Info?: string | null;
+  Per?: string | null;
+}
+
 interface UtilTime {
   id: number;
   DayNum: number | null;
@@ -172,10 +181,12 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
   const [comments, setComments] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [editedTimes, setEditedTimes] = useState<UtilTime[]>([]);
   const isEditingDisabled = (status: string): boolean => {
     const nonEditableStatuses = ['Pending Payment', 'Paid', 'Completed'];
     return nonEditableStatuses.includes(status);
   };
+  const [services, setServices] = useState<ServicePricing[]>([]);
 
   const isPendingStatus = (status: string): boolean => {
     return status === 'Pending' || status === 'Pending Admin Approval';
@@ -256,47 +267,65 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
     });
   };
 
-  // Update local state when selected reservation changes
-useEffect(() => {
-  if (selectedReservation) {
-    console.log("selectedReservation received in ReviewReservation:", selectedReservation);
-    console.log("UserServices in selectedReservation:", selectedReservation.UserServices);
-    console.log("Number of UserServices in selectedReservation:", 
-      selectedReservation.UserServices ? selectedReservation.UserServices.length : 0);
-    
-    setLocalReservation(selectedReservation);
-    
-    // Make sure UserServices exists and is an array before mapping
-    if (selectedReservation.UserServices && Array.isArray(selectedReservation.UserServices)) {
-      // Convert each service to include an array of selected machines with quantities
-      const servicesWithMachines = selectedReservation.UserServices.map(service => {
-        console.log("Processing service:", service);
-        return {
-          ...service,
-          selectedMachines: parseMachines(service.EquipmentAvail || '')
-        };
-      });
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        const response = await fetch('/api/services');
+        if (!response.ok) throw new Error('Failed to fetch services');
+        const data = await response.json();
+        setServices(data);
+      } catch (error) {
+        console.error('Error fetching services:', error);
+      }
+    };
+    fetchServices();
+  }, []);
+
+  useEffect(() => {
+    if (selectedReservation) {
+      console.log("selectedReservation received in ReviewReservation:", selectedReservation);
+      console.log("UserServices in selectedReservation:", selectedReservation.UserServices);
+      console.log("Number of UserServices in selectedReservation:", 
+        selectedReservation.UserServices ? selectedReservation.UserServices.length : 0);
       
-      console.log("servicesWithMachines created:", servicesWithMachines);
-      console.log("Number of services with machines:", servicesWithMachines.length);
+      setLocalReservation(selectedReservation);
       
-      setEditedServices(servicesWithMachines);
+      // Make sure UserServices exists and is an array before mapping
+      if (selectedReservation.UserServices && Array.isArray(selectedReservation.UserServices)) {
+        // Convert each service to include an array of selected machines with quantities
+        const servicesWithMachines = selectedReservation.UserServices.map(service => {
+          console.log("Processing service:", service);
+          return {
+            ...service,
+            selectedMachines: parseMachines(service.EquipmentAvail || '')
+          };
+        });
+        
+        console.log("servicesWithMachines created:", servicesWithMachines);
+        console.log("Number of services with machines:", servicesWithMachines.length);
+        
+        setEditedServices(servicesWithMachines);
+      } else {
+        // Handle the case where UserServices is undefined or not an array
+        console.log("UserServices is undefined or not an array");
+        setEditedServices([]);
+      }
+      
+      // Initialize time status state
+      setEditedTimes(selectedReservation.UtilTimes.map(time => ({
+        ...time,
+        DateStatus: time.DateStatus || "Ongoing"
+      })));
+      
+      setComments(selectedReservation.Comments || '');
+      setEditMode(false);
+      setEditingMachineUtilization(false); // Reset machine utilization editing mode
+      setValidationError(null);
+      setHasUnsavedChanges(false);
     } else {
-      // Handle the case where UserServices is undefined or not an array
-      console.log("UserServices is undefined or not an array");
-      setEditedServices([]);
+      console.log("selectedReservation is null or undefined");
     }
-    
-    setComments(selectedReservation.Comments || '');
-    setEditMode(false);
-    setEditingTimes(false); // Reset time editing mode
-    setEditingMachineUtilization(false); // Reset machine utilization editing mode
-    setValidationError(null);
-    setHasUnsavedChanges(false);
-  } else {
-    console.log("selectedReservation is null or undefined");
-  }
-}, [selectedReservation]);
+  }, [selectedReservation]);
 
 
   // Fetch machines from the correct API endpoint
@@ -423,7 +452,23 @@ useEffect(() => {
         );
       }
   
-      // Wait for all equipment updates to complete
+      // Add time status updates
+      if (localReservation.Status === 'Ongoing') {
+        updatePromises.push(
+          fetch(`/api/admin/reservation-update-times/${localReservation.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              utilTimes: editedTimes,
+              updateCost: false // Don't update cost based on times, we're just updating status
+            }),
+          })
+        );
+      }
+  
+      // Wait for all equipment and time updates to complete
       await Promise.all(updatePromises);
   
       // Now save comments and total amount
@@ -460,6 +505,12 @@ useEffect(() => {
         selectedMachines: parseMachines(service.EquipmentAvail || '')
       }));
       
+      // Update the editedTimes state with the updated time status values
+      setEditedTimes(updatedData.UtilTimes.map(time => ({
+        ...time,
+        DateStatus: time.DateStatus || "Ongoing"
+      })));
+      
       setLocalReservation(updatedData);
       setEditedServices(updatedServices);
       setEditMode(false);
@@ -474,52 +525,97 @@ useEffect(() => {
     }
   };
 
-  // Handle saving updated time information
-  const handleSaveTimeChanges = async (updatedTimes: UtilTime[], updatedCost: number) => {
-    if (!localReservation) return;
-    
-    // Check if editing is disabled for this reservation status
-    if (isEditingDisabled(localReservation.Status)) {
-      alert('Cannot update times for reservations in Pending Payment, Paid, or Completed status.');
-      setEditingTimes(false);
-      return;
-    }
-    
-    try {
-      // Call the API to update the times and costs
-      const response = await fetch(`/api/admin/reservation-update-times/${localReservation.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          utilTimes: updatedTimes,
-          totalAmount: updatedCost
-        }),
+  // Updated handleSaveTimeChanges in ReviewReservation component
+const handleSaveTimeChanges = async (updatedTimes: UtilTime[], updatedCost: number, totalDuration: number) => {
+  if (!localReservation) return;
+  
+  // Check if editing is disabled for this reservation status
+  if (isEditingDisabled(localReservation.Status)) {
+    alert('Cannot update times for reservations in Pending Payment, Paid, or Completed status.');
+    setEditingTimes(false);
+    return;
+  }
+  
+  try {
+    // Prepare downtime data if available
+    const downtimeDetails = {
+      totalDowntimeMinutes: 0,
+      totalDeduction: 0
+    };
+
+    // Calculate total downtime minutes from machine utilizations
+    if (localReservation.MachineUtilizations && localReservation.MachineUtilizations.length > 0) {
+      let totalDowntimeMinutes = 0;
+      const originalCost = localReservation.TotalAmntDue 
+        ? (typeof localReservation.TotalAmntDue === 'string' 
+          ? parseFloat(localReservation.TotalAmntDue) 
+          : localReservation.TotalAmntDue) 
+        : 0;
+      
+      // Sum up all downtime minutes
+      localReservation.MachineUtilizations.forEach(machine => {
+        if (machine.DownTimes && Array.isArray(machine.DownTimes)) {
+          machine.DownTimes.forEach(downtime => {
+            totalDowntimeMinutes += (downtime.DTTime || 0);
+          });
+        }
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update times');
+      // If there's downtime and we have total minutes, calculate the deduction
+      if (totalDowntimeMinutes > 0 && totalDuration > 0) {
+        // Calculate the cost per minute
+        const costPerMinute = originalCost / totalDuration;
+        
+        // Calculate the deduction
+        const deduction = totalDowntimeMinutes * costPerMinute;
+        
+        // Update downtime details
+        downtimeDetails.totalDowntimeMinutes = totalDowntimeMinutes;
+        downtimeDetails.totalDeduction = deduction;
       }
-      
-      const updatedData = await response.json();
-      
-      // Update local reservation data
-      setLocalReservation({
-        ...updatedData,
-        UtilTimes: updatedData.UtilTimes,
-        TotalAmntDue: updatedData.TotalAmntDue
-      });
-      
-      // Exit time editing mode
-      setEditingTimes(false);
-      alert('Usage times and cost updated successfully');
-    } catch (error) {
-      console.error('Error updating times:', error);
-      alert(`Failed to update times: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-  };
+    
+    // Call the API to update the times and costs
+    const response = await fetch(`/api/admin/reservation-update-times/${localReservation.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        utilTimes: updatedTimes,
+        totalAmount: updatedCost,
+        downtimeDetails: downtimeDetails
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to update times');
+    }
+    
+    const updatedData = await response.json();
+    
+    // Update local reservation data
+    setLocalReservation({
+      ...updatedData,
+      UtilTimes: updatedData.UtilTimes,
+      TotalAmntDue: updatedData.TotalAmntDue
+    });
+    
+    // Exit time editing mode
+    setEditingTimes(false);
+    
+    // Determine message based on whether downtime was applied
+    const downtimeMessage = downtimeDetails.totalDowntimeMinutes > 0 
+      ? `with ${downtimeDetails.totalDowntimeMinutes} minutes of downtime deducted`
+      : '';
+    
+    toast.success(`Usage times and cost updated successfully ${downtimeMessage}`);
+  } catch (error) {
+    console.error('Error updating times:', error);
+    toast.error(`Failed to update times: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+};
 
   // Handle completion of machine utilization editing
   const handleMachineUtilizationComplete = () => {
@@ -537,23 +633,6 @@ useEffect(() => {
     }
     
     setEditMode(true);
-  };
-
-  // Attempt to enter time editing mode with proper validation
-  const attemptEnterTimeEditMode = () => {
-    if (!localReservation) return;
-    
-    if (isEditingDisabled(localReservation.Status)) {
-      alert('Cannot update times for reservations in Pending Payment, Paid, or Completed status.');
-      return;
-    }
-    
-    if (localReservation.Status !== 'Ongoing') {
-      alert('Usage times can only be updated for ongoing reservations.');
-      return;
-    }
-    
-    setEditingTimes(true);
   };
 
   // Attempt to enter machine utilization editing mode with proper validation
@@ -607,13 +686,18 @@ useEffect(() => {
     setHasUnsavedChanges(true);
   };
 
+  const handleUpdateTimeStatus = (updatedTimes: UtilTime[]) => {
+    setEditedTimes(updatedTimes);
+    setHasUnsavedChanges(true);
+  };
+
   // Track changes to comments
   const handleCommentsChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setComments(e.target.value);
     setHasUnsavedChanges(true);
   };
 
-  // Updated handleApproveReservation function for ReviewReservation component
+  // Updated handleApproveReservation function in ReviewReservation.tsx
 const handleApproveReservation = async () => {
   if (!localReservation) return;
   
@@ -633,36 +717,7 @@ const handleApproveReservation = async () => {
     console.log("Services with machines:", editedServices.filter(s => s.selectedMachines.length > 0).length);
     console.log("All services:", editedServices);
     
-    // 3. Prepare the operating times from UtilTimes
-    const operatingTimes = localReservation.UtilTimes.map(time => {
-      // Convert the StartTime and EndTime to proper format for operating times
-      let startTime = null;
-      let endTime = null;
-      
-      // Handle conversion of date strings or objects to proper format
-      if (time.StartTime) {
-        startTime = typeof time.StartTime === 'string' 
-          ? time.StartTime 
-          : new Date(time.StartTime).toISOString();
-      }
-      
-      if (time.EndTime) {
-        endTime = typeof time.EndTime === 'string' 
-          ? time.EndTime 
-          : new Date(time.EndTime).toISOString();
-      }
-      
-      // Create a standard operating time object
-      return {
-        OTDate: startTime ? new Date(startTime).toISOString().split('T')[0] : null,
-        OTStartTime: startTime,
-        OTEndTime: endTime,
-        OTTypeofProducts: localReservation.BulkofCommodity || "Not specified",
-        OTMachineOp: null // This will be filled in later by machine operators
-      };
-    });
-    
-    // 4. For each UserService with valid equipment, prepare MachineUtilization records
+    // 3. For each UserService with valid equipment, prepare MachineUtilization records
     const machineUtilizations = editedServices
       .filter(service => {
         // Check if service has at least one machine
@@ -673,7 +728,7 @@ const handleApproveReservation = async () => {
         // Check if first machine has a valid name (not empty and not "Not Specified")
         const machineName = service.selectedMachines[0].name.trim();
         return machineName !== '' && 
-               machineName.toLowerCase() !== 'not specified';
+                machineName.toLowerCase() !== 'not specified';
       })
       .map(service => ({
         Machine: service.selectedMachines[0].name, // Just the machine name
@@ -681,16 +736,15 @@ const handleApproveReservation = async () => {
         MachineApproval: false,
         DateReviewed: null,
         ServiceName: service.ServiceAvail,
-        // Add the operating times from the reservation's UtilTimes
-        OperatingTimes: operatingTimes,
-        DownTimes: [],     // Empty arrays for now, will be filled later
+        OperatingTimes: [],  // Empty arrays for now, will be filled later
+        DownTimes: [],
         RepairChecks: []
       }));
     
     console.log("Machine utilizations to create:", machineUtilizations.length);
-    console.log("Machine utilization data with operating times:", machineUtilizations);
+    console.log("Machine utilization data:", machineUtilizations);
     
-    // 5. Create all machine utilization records in a single API call - only if there are any
+    // 4. Create all machine utilization records in a single API call - only if there are any
     if (machineUtilizations.length > 0) {
       console.log("Calling machine utilization API");
       const response = await fetch(`/api/admin/machine-utilization/${localReservation.id}`, {
@@ -712,11 +766,32 @@ const handleApproveReservation = async () => {
       console.log("No valid machine utilizations to create");
     }
     
-    // 6. Now update the status to Approved
-    console.log("Updating status to Approved");
+    // 5. Calculate the initial total cost without any downtime deductions
+    // We'll use the service costs and add them up
+    const initialTotalCost = editedServices.reduce((sum, service) => {
+      const serviceCost = service.CostsAvail 
+        ? (typeof service.CostsAvail === 'string' ? parseFloat(service.CostsAvail) : service.CostsAvail) 
+        : 0;
+      return sum + serviceCost;
+    }, 0);
+    
+    // 6. Now update the status to Approved with the initial total cost
+    console.log("Updating status to Approved with initial cost:", initialTotalCost);
+    // Update the reservation with the calculated total
+    await fetch(`/api/admin/reservation-review/${localReservation.id}?type=total`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        totalAmount: initialTotalCost
+      }),
+    });
+    
+    // 7. Update the status
     await handleStatusUpdate(localReservation.id, 'Approved');
   
-    // 7. Send approval email notification
+    // 8. Send approval email notification
     console.log("Sending email notification");
     try {
       const emailResponse = await fetch('/api/admin-email/approved-request', {
@@ -743,7 +818,7 @@ const handleApproveReservation = async () => {
       // We don't want to fail the whole approval process if just the email fails
     }
     
-    // 8. Fetch the updated reservation data to ensure we have the latest MachineUtilizations
+    // 9. Fetch the updated reservation data to ensure we have the latest MachineUtilizations
     console.log("Fetching updated reservation data");
     const updatedResponse = await fetch(`/api/admin/reservation-review/${localReservation.id}`);
     console.log("Updated data API response status:", updatedResponse.status);
@@ -772,7 +847,7 @@ const handleApproveReservation = async () => {
       console.error("Failed to fetch updated reservation data");
     }
     
-    toast.success('Reservation approved successfully with machine utilization records and operating times');
+    toast.success('Reservation approved successfully with machine utilization records');
     console.log("Approval process complete");
   } catch (error) {
     console.error('Error during reservation approval:', error);
@@ -780,6 +855,31 @@ const handleApproveReservation = async () => {
   } finally {
     setIsLoading(false);
   }
+};
+
+const validateAllUtilTimesComplete = (utilTimes: UtilTime[]) => {
+  if (!utilTimes || !Array.isArray(utilTimes) || utilTimes.length === 0) {
+    return {
+      valid: false,
+      message: "No time slots found to validate."
+    };
+  }
+  
+  const incompleteSlots = utilTimes.filter(
+    time => time.DateStatus !== "Completed" && time.DateStatus !== "Cancelled"
+  );
+  
+  if (incompleteSlots.length > 0) {
+    return {
+      valid: false,
+      message: `${incompleteSlots.length} time slot(s) still marked as Ongoing. All time slots must be marked as Completed or Cancelled before proceeding to payment.`
+    };
+  }
+  
+  return {
+    valid: true,
+    message: "All time slots are properly marked."
+  };
 };
 
 // Add this loading state to component
@@ -835,8 +935,9 @@ return (
                       reservation={localReservation}
                       machines={machines}
                       editMode={editMode}
-                      validationError={null} // Remove the error from here
+                      validationError={null} 
                       onUpdateService={handleUpdateService}
+                      onUpdateTimeStatus={handleUpdateTimeStatus}
                     />
                     
                     <Separator />
@@ -962,12 +1063,14 @@ return (
               <TabsContent value="reservation" className="mt-4 space-y-6">
                 {!editingTimes && !editingMachineUtilization && (
                   <CostBreakdown 
-                    userServices={localReservation.UserServices}
-                    totalAmountDue={localReservation.TotalAmntDue}
-                    machineUtilizations={localReservation.MachineUtilizations || []}
-                    reservationId={localReservation.id}
-                    allowFix={true}
-                  />
+                  userServices={localReservation.UserServices}
+                  totalAmountDue={localReservation.TotalAmntDue}
+                  machineUtilizations={localReservation.MachineUtilizations || []}
+                  reservationId={localReservation.id}
+                  allowFix={true}
+                  reservationStatus={localReservation.Status}
+                  servicePricing={services} // Pass the services pricing data
+                />
                 )}
               </TabsContent>
             </Tabs>
@@ -1015,7 +1118,7 @@ return (
                     ) : (
                       <>
                         {/* Only show edit buttons if reservation is not in a non-editable state */}
-                        {!isEditingDisabled(localReservation.Status) && localReservation.Status !== 'Rejected' && (
+                        {!isEditingDisabled(localReservation.Status) && (
                           <Button 
                             variant="outline" 
                             onClick={attemptEnterEditMode}
@@ -1030,19 +1133,11 @@ return (
                           <>
                             <Button 
                               variant="outline" 
-                              onClick={attemptEnterTimeEditMode}
-                              className="ml-2"
-                            >
-                              <Clock className="h-4 w-4 mr-2" />
-                              Edit Times
-                            </Button>
-                            <Button 
-                              variant="outline" 
                               onClick={attemptEnterMachineUtilizationMode}
                               className="ml-2"
                             >
                               <Database className="h-4 w-4 mr-2" />
-                              Edit Util
+                              Edit Machine Utilization
                             </Button>
                           </>
                         )}
@@ -1110,27 +1205,24 @@ return (
                   {localReservation.Status === 'Ongoing' && !editingMachineUtilization && !editingTimes && (
                     <>
                       <Button
-                        variant="default"
-                        onClick={() => {
-                          // Check if all UtilTimes are marked as Completed or Cancelled
-                          const incompleteTimes = localReservation.UtilTimes.filter(
-                            time => time.DateStatus !== "Completed" && time.DateStatus !== "Cancelled"
-                          );
-                          
-                          if (incompleteTimes.length > 0) {
-                            toast.error("Cannot proceed to payment", {
-                              description: `${incompleteTimes.length} time slot(s) are not yet marked as Completed or Cancelled. 
-                              Please review and update all time slots before proceeding.`,
-                              duration: 5000
-                            });
-                            return;
-                          }
-                          
-                          handleStatusUpdate(localReservation.id, 'Pending Payment');
-                        }}
-                      >
-                        Mark as Pending Payment
-                      </Button>
+  variant="default"
+  onClick={() => {
+    // Check if all UtilTimes are marked as Completed or Cancelled
+    const validation = validateAllUtilTimesComplete(editedTimes);
+    
+    if (!validation.valid) {
+      toast.error("Cannot proceed to payment", {
+        description: validation.message,
+        duration: 5000
+      });
+      return;
+    }
+    
+    handleStatusUpdate(localReservation.id, 'Pending Payment');
+  }}
+>
+  Mark as Pending Payment
+</Button>
                     </>
                   )}
                   
