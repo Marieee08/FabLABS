@@ -474,52 +474,97 @@ useEffect(() => {
     }
   };
 
-  // Handle saving updated time information
-  const handleSaveTimeChanges = async (updatedTimes: UtilTime[], updatedCost: number) => {
-    if (!localReservation) return;
-    
-    // Check if editing is disabled for this reservation status
-    if (isEditingDisabled(localReservation.Status)) {
-      alert('Cannot update times for reservations in Pending Payment, Paid, or Completed status.');
-      setEditingTimes(false);
-      return;
-    }
-    
-    try {
-      // Call the API to update the times and costs
-      const response = await fetch(`/api/admin/reservation-update-times/${localReservation.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          utilTimes: updatedTimes,
-          totalAmount: updatedCost
-        }),
+  // Updated handleSaveTimeChanges in ReviewReservation component
+const handleSaveTimeChanges = async (updatedTimes: UtilTime[], updatedCost: number, totalDuration: number) => {
+  if (!localReservation) return;
+  
+  // Check if editing is disabled for this reservation status
+  if (isEditingDisabled(localReservation.Status)) {
+    alert('Cannot update times for reservations in Pending Payment, Paid, or Completed status.');
+    setEditingTimes(false);
+    return;
+  }
+  
+  try {
+    // Prepare downtime data if available
+    const downtimeDetails = {
+      totalDowntimeMinutes: 0,
+      totalDeduction: 0
+    };
+
+    // Calculate total downtime minutes from machine utilizations
+    if (localReservation.MachineUtilizations && localReservation.MachineUtilizations.length > 0) {
+      let totalDowntimeMinutes = 0;
+      const originalCost = localReservation.TotalAmntDue 
+        ? (typeof localReservation.TotalAmntDue === 'string' 
+          ? parseFloat(localReservation.TotalAmntDue) 
+          : localReservation.TotalAmntDue) 
+        : 0;
+      
+      // Sum up all downtime minutes
+      localReservation.MachineUtilizations.forEach(machine => {
+        if (machine.DownTimes && Array.isArray(machine.DownTimes)) {
+          machine.DownTimes.forEach(downtime => {
+            totalDowntimeMinutes += (downtime.DTTime || 0);
+          });
+        }
       });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update times');
+      // If there's downtime and we have total minutes, calculate the deduction
+      if (totalDowntimeMinutes > 0 && totalDuration > 0) {
+        // Calculate the cost per minute
+        const costPerMinute = originalCost / totalDuration;
+        
+        // Calculate the deduction
+        const deduction = totalDowntimeMinutes * costPerMinute;
+        
+        // Update downtime details
+        downtimeDetails.totalDowntimeMinutes = totalDowntimeMinutes;
+        downtimeDetails.totalDeduction = deduction;
       }
-      
-      const updatedData = await response.json();
-      
-      // Update local reservation data
-      setLocalReservation({
-        ...updatedData,
-        UtilTimes: updatedData.UtilTimes,
-        TotalAmntDue: updatedData.TotalAmntDue
-      });
-      
-      // Exit time editing mode
-      setEditingTimes(false);
-      alert('Usage times and cost updated successfully');
-    } catch (error) {
-      console.error('Error updating times:', error);
-      alert(`Failed to update times: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-  };
+    
+    // Call the API to update the times and costs
+    const response = await fetch(`/api/admin/reservation-update-times/${localReservation.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        utilTimes: updatedTimes,
+        totalAmount: updatedCost,
+        downtimeDetails: downtimeDetails
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to update times');
+    }
+    
+    const updatedData = await response.json();
+    
+    // Update local reservation data
+    setLocalReservation({
+      ...updatedData,
+      UtilTimes: updatedData.UtilTimes,
+      TotalAmntDue: updatedData.TotalAmntDue
+    });
+    
+    // Exit time editing mode
+    setEditingTimes(false);
+    
+    // Determine message based on whether downtime was applied
+    const downtimeMessage = downtimeDetails.totalDowntimeMinutes > 0 
+      ? `with ${downtimeDetails.totalDowntimeMinutes} minutes of downtime deducted`
+      : '';
+    
+    toast.success(`Usage times and cost updated successfully ${downtimeMessage}`);
+  } catch (error) {
+    console.error('Error updating times:', error);
+    toast.error(`Failed to update times: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+};
 
   // Handle completion of machine utilization editing
   const handleMachineUtilizationComplete = () => {
@@ -613,143 +658,165 @@ useEffect(() => {
     setHasUnsavedChanges(true);
   };
 
-  const handleApproveReservation = async () => {
-    if (!localReservation) return;
+  // Updated handleApproveReservation function in ReviewReservation.tsx
+const handleApproveReservation = async () => {
+  if (!localReservation) return;
+  
+  console.log("Starting approval process for reservation:", localReservation.id);
+  
+  // 1. First validate that all required services have machines assigned
+  if (!validateRequiredMachines()) {
+    console.log("Machine validation failed");
+    return;
+  }
+  
+  try {
+    // 2. Set up loading state for better UX
+    setIsLoading(true);
     
-    console.log("Starting approval process for reservation:", localReservation.id);
+    // Log services and machine selections
+    console.log("Services with machines:", editedServices.filter(s => s.selectedMachines.length > 0).length);
+    console.log("All services:", editedServices);
     
-    // 1. First validate that all required services have machines assigned
-    if (!validateRequiredMachines()) {
-      console.log("Machine validation failed");
-      return;
+    // 3. For each UserService with valid equipment, prepare MachineUtilization records
+    const machineUtilizations = editedServices
+      .filter(service => {
+        // Check if service has at least one machine
+        if (service.selectedMachines.length === 0) {
+          return false;
+        }
+        
+        // Check if first machine has a valid name (not empty and not "Not Specified")
+        const machineName = service.selectedMachines[0].name.trim();
+        return machineName !== '' && 
+                machineName.toLowerCase() !== 'not specified';
+      })
+      .map(service => ({
+        Machine: service.selectedMachines[0].name, // Just the machine name
+        ReviewedBy: null,  // This will be filled in later when reviewed
+        MachineApproval: false,
+        DateReviewed: null,
+        ServiceName: service.ServiceAvail,
+        OperatingTimes: [],  // Empty arrays for now, will be filled later
+        DownTimes: [],
+        RepairChecks: []
+      }));
+    
+    console.log("Machine utilizations to create:", machineUtilizations.length);
+    console.log("Machine utilization data:", machineUtilizations);
+    
+    // 4. Create all machine utilization records in a single API call - only if there are any
+    if (machineUtilizations.length > 0) {
+      console.log("Calling machine utilization API");
+      const response = await fetch(`/api/admin/machine-utilization/${localReservation.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(machineUtilizations)
+      });
+      
+      const responseData = await response.json();
+      console.log("API response status:", response.status);
+      console.log("API response:", responseData);
+      
+      if (!response.ok) {
+        throw new Error(responseData.error || 'Failed to create machine utilization records');
+      }
+    } else {
+      console.log("No valid machine utilizations to create");
     }
     
+    // 5. Calculate the initial total cost without any downtime deductions
+    // We'll use the service costs and add them up
+    const initialTotalCost = editedServices.reduce((sum, service) => {
+      const serviceCost = service.CostsAvail 
+        ? (typeof service.CostsAvail === 'string' ? parseFloat(service.CostsAvail) : service.CostsAvail) 
+        : 0;
+      return sum + serviceCost;
+    }, 0);
+    
+    // 6. Now update the status to Approved with the initial total cost
+    console.log("Updating status to Approved with initial cost:", initialTotalCost);
+    // Update the reservation with the calculated total
+    await fetch(`/api/admin/reservation-review/${localReservation.id}?type=total`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        totalAmount: initialTotalCost
+      }),
+    });
+    
+    // 7. Update the status
+    await handleStatusUpdate(localReservation.id, 'Approved');
+  
+    // 8. Send approval email notification
+    console.log("Sending email notification");
     try {
-      // 2. Set up loading state for better UX
-      setIsLoading(true);
+      const emailResponse = await fetch('/api/admin-email/approved-request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          reservationId: localReservation.id.toString(),
+          reservationType: 'utilization' // Specifies this is a regular utilization, not EVC
+        }),
+      });
       
-      // Log services and machine selections
-      console.log("Services with machines:", editedServices.filter(s => s.selectedMachines.length > 0).length);
-      console.log("All services:", editedServices);
+      console.log("Email API response status:", emailResponse.status);
       
-      // 3. For each UserService with valid equipment, prepare MachineUtilization records
-      const machineUtilizations = editedServices
-        .filter(service => {
-          // Check if service has at least one machine
-          if (service.selectedMachines.length === 0) {
-            return false;
-          }
-          
-          // Check if first machine has a valid name (not empty and not "Not Specified")
-          const machineName = service.selectedMachines[0].name.trim();
-          return machineName !== '' && 
-                 machineName.toLowerCase() !== 'not specified';
-        })
-        .map(service => ({
-          Machine: service.selectedMachines[0].name, // Just the machine name
-          ReviewedBy: null,  // This will be filled in later when reviewed
-          MachineApproval: false,
-          DateReviewed: null,
-          ServiceName: service.ServiceAvail,
-          OperatingTimes: [],  // Empty arrays for now, will be filled later
-          DownTimes: [],
-          RepairChecks: []
-        }));
-      
-      console.log("Machine utilizations to create:", machineUtilizations.length);
-      console.log("Machine utilization data:", machineUtilizations);
-      
-      // 4. Create all machine utilization records in a single API call - only if there are any
-      if (machineUtilizations.length > 0) {
-        console.log("Calling machine utilization API");
-        const response = await fetch(`/api/admin/machine-utilization/${localReservation.id}`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(machineUtilizations)
-        });
-        
-        const responseData = await response.json();
-        console.log("API response status:", response.status);
-        console.log("API response:", responseData);
-        
-        if (!response.ok) {
-          throw new Error(responseData.error || 'Failed to create machine utilization records');
-        }
+      if (!emailResponse.ok) {
+        const emailErrorText = await emailResponse.text();
+        console.warn('Email notification failed to send:', emailErrorText);
       } else {
-        console.log("No valid machine utilizations to create");
+        console.log('Approval email sent successfully');
       }
-      
-      // 5. Now update the status to Approved
-      console.log("Updating status to Approved");
-      await handleStatusUpdate(localReservation.id, 'Approved');
-    
-      // 6. Send approval email notification
-      console.log("Sending email notification");
-      try {
-        const emailResponse = await fetch('/api/admin-email/approved-request', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            reservationId: localReservation.id.toString(),
-            reservationType: 'utilization' // Specifies this is a regular utilization, not EVC
-          }),
-        });
-        
-        console.log("Email API response status:", emailResponse.status);
-        
-        if (!emailResponse.ok) {
-          const emailErrorText = await emailResponse.text();
-          console.warn('Email notification failed to send:', emailErrorText);
-        } else {
-          console.log('Approval email sent successfully');
-        }
-      } catch (emailError) {
-        console.error('Error sending approval email:', emailError);
-        // We don't want to fail the whole approval process if just the email fails
-      }
-      
-      // 7. Fetch the updated reservation data to ensure we have the latest MachineUtilizations
-      console.log("Fetching updated reservation data");
-      const updatedResponse = await fetch(`/api/admin/reservation-review/${localReservation.id}`);
-      console.log("Updated data API response status:", updatedResponse.status);
-      
-      if (updatedResponse.ok) {
-        const updatedReservation = await updatedResponse.json();
-        console.log("Updated reservation data received");
-        
-        // Check if MachineUtilizations exist in the response
-        if (updatedReservation.MachineUtilizations) {
-          console.log("MachineUtilizations count:", updatedReservation.MachineUtilizations.length);
-        } else {
-          console.warn("No MachineUtilizations in the updated reservation data");
-        }
-        
-        setLocalReservation(updatedReservation);
-        
-        // Update the edited services with the latest data
-        const updatedServices = updatedReservation.UserServices.map((service) => ({
-          ...service,
-          selectedMachines: parseMachines(service.EquipmentAvail || '')
-        }));
-        
-        setEditedServices(updatedServices);
-      } else {
-        console.error("Failed to fetch updated reservation data");
-      }
-      
-      alert('Reservation approved successfully with machine utilization records');
-      console.log("Approval process complete");
-    } catch (error) {
-      console.error('Error during reservation approval:', error);
-      alert(`Failed to approve reservation: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsLoading(false);
+    } catch (emailError) {
+      console.error('Error sending approval email:', emailError);
+      // We don't want to fail the whole approval process if just the email fails
     }
-  };
+    
+    // 9. Fetch the updated reservation data to ensure we have the latest MachineUtilizations
+    console.log("Fetching updated reservation data");
+    const updatedResponse = await fetch(`/api/admin/reservation-review/${localReservation.id}`);
+    console.log("Updated data API response status:", updatedResponse.status);
+    
+    if (updatedResponse.ok) {
+      const updatedReservation = await updatedResponse.json();
+      console.log("Updated reservation data received");
+      
+      // Check if MachineUtilizations exist in the response
+      if (updatedReservation.MachineUtilizations) {
+        console.log("MachineUtilizations count:", updatedReservation.MachineUtilizations.length);
+      } else {
+        console.warn("No MachineUtilizations in the updated reservation data");
+      }
+      
+      setLocalReservation(updatedReservation);
+      
+      // Update the edited services with the latest data
+      const updatedServices = updatedReservation.UserServices.map((service) => ({
+        ...service,
+        selectedMachines: parseMachines(service.EquipmentAvail || '')
+      }));
+      
+      setEditedServices(updatedServices);
+    } else {
+      console.error("Failed to fetch updated reservation data");
+    }
+    
+    toast.success('Reservation approved successfully with machine utilization records');
+    console.log("Approval process complete");
+  } catch (error) {
+    console.error('Error during reservation approval:', error);
+    toast.error(`Failed to approve reservation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
 // Add this loading state to component
 const [isLoading, setIsLoading] = useState(false);

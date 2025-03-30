@@ -1,97 +1,129 @@
-// src/app/api/admin/update-total/[id]/route.ts
+// src/app/api/admin/reservation-update-times/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
+
+interface UpdateTimesBody {
+  utilTimes: Array<{
+    id: number;
+    DayNum: number | null;
+    StartTime: string | null;
+    EndTime: string | null;
+    DateStatus?: string | null;
+  }>;
+  totalAmount: number;
+  downtimeDetails?: {
+    totalDowntimeMinutes: number;
+    totalDeduction: number;
+  };
+}
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const id = parseInt(params.id);
+    const reservationId = parseInt(params.id);
 
-    if (isNaN(id)) {
+    if (isNaN(reservationId)) {
       return NextResponse.json(
         { error: "Invalid reservation ID" },
         { status: 400 }
       );
     }
 
-    // First check if the request body can be parsed
-    let totalAmount;
-    try {
-      const body = await req.json();
-      totalAmount = body.totalAmount;
-      console.log("Received request body:", body);
-    } catch (parseError) {
-      console.error("Error parsing request body:", parseError);
+    // Parse the request body
+    const body: UpdateTimesBody = await req.json();
+    console.log("Received update times request:", body);
+
+    // Check if the reservation exists
+    const existingReservation = await prisma.utilReq.findUnique({
+      where: { id: reservationId },
+      include: {
+        UtilTimes: true,
+        Comments: true
+      }
+    });
+
+    if (!existingReservation) {
       return NextResponse.json(
-        { error: "Invalid request body" },
+        { error: "Reservation not found" },
+        { status: 404 }
+      );
+    }
+
+    // Validate the request body
+    if (!body.utilTimes || !Array.isArray(body.utilTimes)) {
+      return NextResponse.json(
+        { error: "Invalid utilTimes array" },
         { status: 400 }
       );
     }
 
-    // Validate the total amount
-    if (totalAmount === undefined || totalAmount === null) {
+    if (body.totalAmount === undefined || body.totalAmount === null) {
       return NextResponse.json(
         { error: "Total amount is required" },
         { status: 400 }
       );
     }
 
-    // Convert the total amount to a number if it's a string
-    let processedAmount: number;
-    if (typeof totalAmount === 'string') {
-      processedAmount = parseFloat(totalAmount);
-      if (isNaN(processedAmount)) {
-        return NextResponse.json(
-          { error: "Invalid total amount value" },
-          { status: 400 }
-        );
-      }
-    } else if (typeof totalAmount === 'number') {
-      processedAmount = totalAmount;
-    } else {
-      return NextResponse.json(
-        { error: `Total amount must be a number or numeric string, received ${typeof totalAmount}` },
-        { status: 400 }
-      );
+    // Process downtime information
+    let comments = existingReservation.Comments || "";
+    
+    // Add downtime information to comments if present
+    if (body.downtimeDetails && body.downtimeDetails.totalDowntimeMinutes > 0) {
+      const downtimeNote = `[${new Date().toISOString().split('T')[0]}] Downtime adjustment: ${body.downtimeDetails.totalDowntimeMinutes} minutes resulted in ₱${body.downtimeDetails.totalDeduction.toFixed(2)} deduction.`;
+      
+      comments = comments ? `${comments}\n\n${downtimeNote}` : downtimeNote;
     }
 
-    console.log(`Updating reservation ${id} with total amount: ${processedAmount}`);
+    // Execute transaction to update both times and total amount
+    const result = await prisma.$transaction(async (tx) => {
+      // Update each util time
+      const timeUpdatePromises = body.utilTimes.map(async (time) => {
+        return tx.utilTime.update({
+          where: { id: time.id },
+          data: {
+            StartTime: time.StartTime ? new Date(time.StartTime) : null,
+            EndTime: time.EndTime ? new Date(time.EndTime) : null,
+            DateStatus: time.DateStatus || "Ongoing",
+            DayNum: time.DayNum
+          }
+        });
+      });
 
-    // Check if the reservation exists before updating
-    const existingReservation = await prisma.utilReq.findUnique({
-      where: { id }
+      // Wait for all time updates to complete
+      const updatedTimes = await Promise.all(timeUpdatePromises);
+
+      // Update the total amount and comments
+      const updatedReservation = await tx.utilReq.update({
+        where: { id: reservationId },
+        data: {
+          TotalAmntDue: body.totalAmount,
+          Comments: comments
+        },
+        include: {
+          UtilTimes: true
+        }
+      });
+
+      return updatedReservation;
     });
 
-    if (!existingReservation) {
-      return NextResponse.json(
-        { error: `Reservation with ID ${id} not found` },
-        { status: 404 }
-      );
-    }
-
-    // Update the total amount
-    const updatedReservation = await prisma.utilReq.update({
-      where: { id },
-      data: { 
-        TotalAmntDue: processedAmount
-      }
-    });
-
-    console.log(`Updated reservation total amount: ${updatedReservation.TotalAmntDue}`);
-
+    // Return success response
     return NextResponse.json({
       success: true,
-      updatedTotal: processedAmount,
-      message: `Total amount updated successfully to ${processedAmount}`
+      message: "Times and total amount updated successfully",
+      ...result
     });
   } catch (error) {
-    console.error("Error updating total amount:", error);
+    console.error("Error updating reservation times:", error);
     return NextResponse.json(
-      { error: `Failed to update total amount: ${error instanceof Error ? error.message : 'Unknown error'}` },
+      {
+        error: "Failed to update reservation times",
+        details: error instanceof Error ? error.message : "Unknown error"
+      },
       { status: 500 }
     );
   } finally {
