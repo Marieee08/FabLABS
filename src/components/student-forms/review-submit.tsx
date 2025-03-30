@@ -2,10 +2,11 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { useUser } from "@clerk/nextjs";
 import React, { useEffect, useState, useCallback } from "react";
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Clock, School, Book, User, Settings, HardDrive } from 'lucide-react';
+import { CheckCircle, Clock, School, Book, User, CreditCard, FileText, Settings, Tools } from 'lucide-react';
+import Link from 'next/link';
 
 interface ClientInfo {
   ContactNum: string;
@@ -30,20 +31,28 @@ interface Day {
   endTime: string | null;
 }
 
+interface Material {
+  id: string; 
+  Item: string;
+  ItemQty: number;
+  Description: string;
+}
+
 interface Student {
   id: number;
   name: string;
 }
 
-interface SelectedMachine {
-  id: string;
-  quantity: number;
-}
-
 interface FormData {
   days: Day[];
+  syncTimes?: boolean;
+  unifiedStartTime?: string | null;
+  unifiedEndTime?: string | null;
   ProductsManufactured: string | string[];
-  SelectedMachines?: SelectedMachine[];
+  BulkofCommodity?: string;
+  Equipment: string[] | string;
+  Tools: string;
+  ToolsQty?: number;
   ControlNo?: number;
   LvlSec?: string;
   NoofStudents?: number;
@@ -52,6 +61,7 @@ interface FormData {
   TeacherEmail?: string;
   Topic?: string;
   SchoolYear?: number;
+  NeededMaterials?: Material[];
   Students?: Student[];
   [key: string]: any;
 }
@@ -63,33 +73,13 @@ interface ReviewSubmitProps {
   updateFormData: <K extends keyof FormData>(field: K, value: FormData[K]) => void;
 }
 
-// Fetch machine details
-const fetchMachineDetails = async (selectedMachines: SelectedMachine[]) => {
-  if (selectedMachines.length === 0) return [];
-  
-  try {
-    const response = await fetch('/api/machines', {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to fetch machine details');
-    }
-    
-    const allMachines = await response.json();
-    return allMachines.filter((machine: any) => 
-      selectedMachines.some(sm => sm.id === machine.id)
-    ).map((machine: any) => ({
-      ...machine,
-      selectedQuantity: selectedMachines.find(sm => sm.id === machine.id)?.quantity || 0
-    }));
-  } catch (error) {
-    console.error('Error fetching machine details:', error);
-    return [];
-  }
+const formatDate = (date: Date): string => {
+  return new Date(date).toLocaleDateString('en-US', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
 };
 
 const formatSchoolYear = (year: number | undefined): string => {
@@ -107,21 +97,8 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
   const [accInfo, setAccInfo] = useState<AccInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [submittingReservation, setSubmittingReservation] = useState(false);
-  const [machineDetails, setMachineDetails] = useState<any[]>([]);
 
-  // Fetch machine details when component mounts or selected machines change
-  useEffect(() => {
-    const loadMachineDetails = async () => {
-      if (formData.SelectedMachines && formData.SelectedMachines.length > 0) {
-        const details = await fetchMachineDetails(formData.SelectedMachines);
-        setMachineDetails(details);
-      }
-    };
-
-    loadMachineDetails();
-  }, [formData.SelectedMachines]);
-
-  // Scroll to top effect
+  // NEW: Add this useEffect to scroll to top of the page when component mounts
   useEffect(() => {
     window.scrollTo({
       top: 0,
@@ -157,8 +134,148 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
   
       const token = await getToken();
       
-      // Prepare submission data
+      // Format UtilTimes to match the Prisma model
+      const utilTimes = formData.days.map((day, index) => {
+        // Make sure we have a proper date object
+        const dateObj = day.date instanceof Date ? day.date : new Date(day.date);
+        
+        let startTimeISO = null;
+        let endTimeISO = null;
+        
+        if (day.startTime) {
+          const [hours, minutes] = day.startTime.split(':');
+          const startTimeDate = new Date(dateObj);
+          startTimeDate.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+          startTimeISO = startTimeDate.toISOString();
+        }
+        
+        if (day.endTime) {
+          const [hours, minutes] = day.endTime.split(':');
+          const endTimeDate = new Date(dateObj);
+          endTimeDate.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+          endTimeISO = endTimeDate.toISOString();
+        }
+        
+        return {
+          DayNum: index + 1,
+          StartTime: startTimeISO,
+          EndTime: endTimeISO,
+        };
+      });
+  
+      // Format needed materials to match the model
+      const neededMaterials = formData.NeededMaterials?.map(material => ({
+        Item: material.Item,
+        ItemQty: Number(material.ItemQty),
+        Description: material.Description,
+      })) || [];
+      
+      // Add tools to the needed materials with blank description
+      if (formData.Tools) {
+        console.log('Adding tools to NeededMaterials:', formData.Tools);
+        
+        try {
+          // First, check if it's a JSON string and try to parse it
+          let toolsArray = [];
+          
+          if (typeof formData.Tools === 'string') {
+            // Check if it's a JSON string
+            if (formData.Tools.startsWith('[') && formData.Tools.includes('Tool')) {
+              try {
+                toolsArray = JSON.parse(formData.Tools);
+                console.log('Successfully parsed Tools JSON:', toolsArray);
+              } catch (e) {
+                console.error('Error parsing Tools JSON:', e);
+                toolsArray = [formData.Tools]; // Fallback to treating it as a plain string
+              }
+            } else {
+              toolsArray = [formData.Tools]; // It's a plain string
+            }
+          } else if (Array.isArray(formData.Tools)) {
+            toolsArray = formData.Tools;
+          } else {
+            toolsArray = [String(formData.Tools)];
+          }
+          
+          console.log('Tools array after processing:', toolsArray);
+          
+          // Process the array of tools
+          toolsArray.forEach(tool => {
+            // Check if the tool is an object with a Tool property (from JSON)
+            if (typeof tool === 'object' && tool !== null && 'Tool' in tool) {
+              const toolItem = {
+                Item: tool.Tool,
+                ItemQty: tool.Quantity || 1,
+                Description: ''
+              };
+              console.log('Adding structured tool to NeededMaterials:', toolItem);
+              neededMaterials.push(toolItem);
+            } 
+            // Otherwise handle it as a simple string
+            else if (tool && typeof tool === 'string' && tool.trim() !== '') {
+              const toolItem = {
+                Item: tool,
+                ItemQty: 1,
+                Description: ''
+              };
+              console.log('Adding string tool to NeededMaterials:', toolItem);
+              neededMaterials.push(toolItem);
+            }
+          });
+        } catch (toolsError) {
+          console.error('Error processing tools:', toolsError);
+        }
+      }
+      
+      console.log('Final NeededMaterials array:', neededMaterials);
+  
+      const evcStudents = formData.Students?.map(student => ({
+        Students: student.name
+      })) || [];
+  
+      // Get student information for email
+      const studentName = user?.firstName && user?.lastName 
+        ? `${user.firstName} ${user.lastName}` 
+        : accInfo?.Name || 'Student';
+      
+      const studentEmail = user?.emailAddresses[0]?.emailAddress || accInfo?.email || '';
+      
+      // Create user services for the selected services
+      const userServices = [];
+      
+      // Handle ProductsManufactured (services to be availed)
+      const products = Array.isArray(formData.ProductsManufactured) 
+        ? formData.ProductsManufactured 
+        : formData.ProductsManufactured ? [formData.ProductsManufactured] : [];
+        
+      // Handle Equipment - assuming each service corresponds to a specific equipment
+      const equipment = Array.isArray(formData.Equipment)
+        ? formData.Equipment
+        : formData.Equipment ? [formData.Equipment] : [];
+      
+      // Create user services by matching services with equipment
+      // Assuming there's a one-to-one relationship or we use the first equipment for all services
+      if (products.length > 0) {
+        // If we have more services than equipment, use the first equipment for additional services
+        const defaultEquipment = equipment.length > 0 ? equipment[0] : '';
+        
+        products.forEach((product, index) => {
+          if (product) {
+            // Use the corresponding equipment if available, otherwise use the default
+            const equip = index < equipment.length ? equipment[index] : defaultEquipment;
+            
+            userServices.push({
+              ServiceAvail: product,
+              EquipmentAvail: equip,
+              CostsAvail: 0, // Default values
+              MinsAvail: 0,  // Default values
+            });
+          }
+        });
+      }
+      
       const submissionData = {
+        // EVCReservation base fields
         ControlNo: formData.ControlNo ? Number(formData.ControlNo) : undefined,
         LvlSec: formData.LvlSec || undefined,
         NoofStudents: formData.Students?.length || 0,
@@ -169,27 +286,23 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
         SchoolYear: formData.SchoolYear ? Number(formData.SchoolYear) : undefined,
         EVCStatus: 'Pending Teacher Approval',
         
+        // Related data collections
+        UtilTimes: utilTimes,
+        EVCStudents: evcStudents,
+        NeededMaterials: neededMaterials,
+        UserServices: userServices,
+        
         // Utilization information
         ProductsManufactured: formData.ProductsManufactured,
-        SelectedMachines: formData.SelectedMachines || [],
-        
-        // Students
-        EVCStudents: formData.Students?.map(student => ({ 
-          Students: student.name 
-        })) || [],
-        
-        // Time slots
-        UtilTimes: formData.days.map((day, index) => ({
-          DayNum: index + 1,
-          StartTime: day.startTime ? new Date(day.date.toString() + ' ' + day.startTime).toISOString() : null,
-          EndTime: day.endTime ? new Date(day.date.toString() + ' ' + day.endTime).toISOString() : null,
-        })),
+        Equipment: formData.Equipment,
         
         // Link to user account
         accInfoId: accInfo?.id
       };
   
-      // Send the request
+      console.log('Sending data to API:', JSON.stringify(submissionData, null, 2));
+  
+      // First create the reservation in pending state
       const response = await fetch('/api/user/create-evc-reservation', {
         method: 'POST',
         headers: {
@@ -199,27 +312,42 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
         body: JSON.stringify(submissionData),
       });
       
-      // Handle response
+      // Handle the response
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to submit reservation');
+        const responseText = await response.text();
+        console.log('Raw error response:', responseText);
+        
+        let errorData = null;
+        if (responseText) {
+          try {
+            errorData = JSON.parse(responseText);
+          } catch (e) {
+            console.error('Failed to parse response as JSON:', e);
+          }
+        }
+  
+        const errorMessage = errorData?.details || errorData?.error || 'Failed to submit reservation';
+        throw new Error(errorMessage);
       }
       
+      // Parse the successful response
       const data = await response.json();
+      console.log('Reservation created:', data);
       
-      // Send teacher approval email
+      // Now send the teacher approval email if teacher email is provided
       if (formData.TeacherEmail) {
         try {
-          await fetch('/api/teacher-email/approval-request', {
+          // Send approval request email
+          const approvalResponse = await fetch('/api/teacher-email/approval-request', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${token}`,
             },
             body: JSON.stringify({
-              reservationId: data.id,
-              studentName: user?.firstName + ' ' + user?.lastName || 'Student',
-              studentEmail: user?.emailAddresses[0]?.emailAddress || '',
+              reservationId: data.id, // The created reservation ID
+              studentName,
+              studentEmail,
               studentGrade: formData.LvlSec || 'Not specified',
               teacherEmail: formData.TeacherEmail,
               teacherName: formData.Teacher || 'Teacher',
@@ -235,29 +363,61 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
                 startTime: day.startTime || 'Not specified',
                 endTime: day.endTime || 'Not specified'
               })),
+              materials: formData.NeededMaterials || [],
               students: formData.Students || []
             }),
           });
+          
+          if (!approvalResponse.ok) {
+            const approvalError = await approvalResponse.text();
+            console.error('Teacher approval request failed:', approvalError);
+            setError('Reservation created but teacher approval email failed to send');
+          } else {
+            // Display success message with approval info
+            setSuccessMessage('Your reservation request has been submitted and an approval request has been sent to your teacher.');
+          }
         } catch (emailError) {
-          console.error('Error sending teacher email:', emailError);
+          console.error('Error sending approval email:', emailError);
+          setError('Reservation created but there was an error sending the teacher approval email');
         }
+      } else {
+        // No teacher email provided
+        setSuccessMessage('Your reservation request has been submitted successfully.');
       }
       
-      // Set success message and redirect
-      setSuccessMessage('Reservation submitted successfully!');
+      // Redirect to dashboard after a short delay
       setTimeout(() => {
         router.push('/student-dashboard');
-      }, 2000);
+      }, 3000);
       
     } catch (err) {
       console.error('Submission error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to submit reservation');
+      // Handle error object properly
+      let errorMessage = 'Failed to submit reservation';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (typeof err === 'object' && err !== null) {
+        errorMessage = JSON.stringify(err);
+      }
+      setError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Render loading state
+  // Update the handleSubmit function to use the new state
+  const handleSubmitWithBuffer = async () => {
+    try {
+      setSubmittingReservation(true);
+      await handleSubmit();
+    } finally {
+      // This will only run if we don't redirect
+      setTimeout(() => {
+        setSubmittingReservation(false);
+      }, 3000);
+    }
+  };
+
   if (loading) {
     return (
       <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 pt-0 flex flex-col">
@@ -272,7 +432,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
     );
   }
 
-  // Render submission in progress state
+  // Show buffering screen when submitting
   if (submittingReservation) {
     return (
       <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 pt-0 flex flex-col">
@@ -282,7 +442,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
               <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-6"/>
               <h3 className="text-xl font-semibold text-blue-800 mb-2">Processing Your Reservation</h3>
               <p className="text-gray-600 text-center max-w-md">
-                Please wait while we submit your request and notify your teacher.
+                Please wait while we submit your request and notify your teacher. This may take a few moments.
               </p>
             </div>
           </CardContent>
@@ -294,81 +454,98 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
   return (
     <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 pt-0 flex flex-col">
       <Card className="bg-white shadow-sm border border-gray-200 mt-6">
+        
         <CardContent className="pt-0">
-          {/* Equipment Information */}
+          {/* Utilization Information - Added Section */}
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-3 flex items-center">
-              <Settings className="h-5 w-5 text-blue-600 mr-2" /> Equipment Information
+              <Settings className="h-5 w-5 text-blue-600 mr-2" /> Service Information
             </h3>
             <Card className="border-gray-200 shadow-none">
               <CardContent className="p-4">
                 <div className="grid md:grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm font-medium text-gray-700">Service</p>
+                    <p className="text-sm font-medium text-gray-700">Services to be Availed</p>
                     <div className="mt-1">
-                      <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm">
-                        {typeof formData.ProductsManufactured === 'string' 
-                          ? formData.ProductsManufactured 
-                          : formData.ProductsManufactured[0] || 'Not specified'}
-                      </span>
+                      {Array.isArray(formData.ProductsManufactured) && formData.ProductsManufactured.length > 0 ? (
+                        <div className="flex flex-wrap gap-2">
+                          {formData.ProductsManufactured.map((service, idx) => (
+                            <span key={idx} className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm">
+                              {service}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-gray-500">No services selected</p>
+                      )}
                     </div>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Equipment</p>
+                    {Array.isArray(formData.Equipment) && formData.Equipment.length > 0 ? (
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        {formData.Equipment.map((equipment, idx) => (
+                          <span key={idx} className="bg-green-50 text-green-700 px-3 py-1 rounded-full text-sm">
+                            {equipment}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-gray-800">Not selected</p>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Tools</p>
+                    {formData.Tools ? (
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        {(() => {
+                          // Try to parse the tools if it's a JSON string
+                          let toolsArray = [];
+                          try {
+                            if (typeof formData.Tools === 'string' && 
+                                (formData.Tools.startsWith('[') && formData.Tools.includes('Tool'))) {
+                              toolsArray = JSON.parse(formData.Tools);
+                            } else if (Array.isArray(formData.Tools)) {
+                              toolsArray = formData.Tools;
+                            } else {
+                              toolsArray = [formData.Tools];
+                            }
+                          } catch (e) {
+                            // If parsing fails, treat as a single string
+                            toolsArray = [String(formData.Tools)];
+                          }
+
+                          // Display the tools
+                          return toolsArray.map((tool, idx) => {
+                            let toolName = '';
+                            let quantity = 1;
+                            
+                            // Check if the tool is an object with a Tool property
+                            if (typeof tool === 'object' && tool !== null && 'Tool' in tool) {
+                              toolName = tool.Tool;
+                              quantity = tool.Quantity || 1;
+                            } else {
+                              toolName = String(tool);
+                            }
+                            
+                            return (
+                              <span key={idx} className="bg-amber-50 text-amber-700 px-3 py-1 rounded-full text-sm">
+                                {toolName} {quantity > 1 ? `(${quantity})` : ''}
+                              </span>
+                            );
+                          });
+                        })()}
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-gray-800">No tools selected</p>
+                    )}
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Machines Section */}
-          {formData.SelectedMachines && formData.SelectedMachines.length > 0 && (
-            <div className="mb-6">
-              <h3 className="text-lg font-medium mb-3 flex items-center">
-                <HardDrive className="h-5 w-5 text-blue-600 mr-2" /> Selected Machines
-              </h3>
-              <Card className="border-gray-200 shadow-none">
-                <CardContent className="p-4">
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {machineDetails.map((machine) => (
-                      <div 
-                        key={machine.id} 
-                        className="bg-gray-50 p-4 rounded-lg border border-gray-200"
-                      >
-                        <div className="flex justify-between items-center mb-2">
-                          <h4 className="text-md font-semibold text-blue-800">
-                            {machine.Machine}
-                          </h4>
-                          <div className="flex items-center space-x-2">
-                            <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
-                              {machine.Number || 1} Total
-                            </span>
-                            <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
-                              {machine.selectedQuantity} Selected
-                            </span>
-                          </div>
-                        </div>
-                        <p className="text-sm text-gray-600 mb-2">
-                          {machine.Desc || 'No description available'}
-                        </p>
-                        {machine.Link && (
-                          <a 
-                            href={machine.Link} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline text-sm"
-                          >
-                            More Information
-                          </a>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {/* Rest of the existing sections like Dates, School Info, etc. will remain the same */}
-          
-          {/* Dates and Times (existing code) */}
+          {/* Dates and Times */}
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-3 flex items-center">
               <Clock className="h-5 w-5 text-blue-600 mr-2" /> Selected Dates and Times
@@ -471,6 +648,39 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
             </div>
           )}
 
+          {/* Materials Needed */}
+          {formData.NeededMaterials && formData.NeededMaterials.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-lg font-medium mb-3 flex items-center">
+                <FileText className="h-5 w-5 text-blue-600 mr-2" /> Materials Needed
+              </h3>
+              <Card className="border-gray-200 shadow-none">
+                <CardContent className="p-4">
+                  <div className="overflow-x-auto">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50 border-b">
+                          <th className="p-2 text-left border">Item</th>
+                          <th className="p-2 text-center border">Quantity</th>
+                          <th className="p-2 text-left border">Description</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {formData.NeededMaterials.map((material) => (
+                          <tr key={material.id} className="border-b hover:bg-gray-50">
+                            <td className="p-2 border">{material.Item}</td>
+                            <td className="p-2 border text-center">{material.ItemQty}</td>
+                            <td className="p-2 border">{material.Description}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           {/* Contact Information */}
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-3 flex items-center">
@@ -526,15 +736,8 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
               Previous Step
             </Button>
             <Button
-              onClick={handleSubmit}
-              disabled={
-                isSubmitting || 
-                loading || 
-                !formData.TeacherEmail || 
-                !formData.SelectedMachines?.length || 
-                // Additional check to ensure at least one machine is selected with quantity > 0
-                !formData.SelectedMachines.some(machine => machine.quantity > 0)
-              }
+              onClick={handleSubmitWithBuffer}
+              disabled={isSubmitting || loading || !formData.TeacherEmail}
               className="bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50"
             >
               {isSubmitting ? 'Submitting...' : 'Submit Request'}
