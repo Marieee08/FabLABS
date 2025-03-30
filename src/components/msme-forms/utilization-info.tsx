@@ -31,7 +31,8 @@ interface Service {
   id: string;
   Service: string;
   Machines?: { 
-    machine: { 
+    machine: {
+      Quantity: number; 
       id: string;
       Machine: string;
     } 
@@ -244,11 +245,11 @@ export default function ProcessInformation({
         
         // Process machine data correctly by summing actual quantities
         const machineData = {};
-        data.forEach(service => {
+        data.forEach((service: { Machines: { machine: { Number: number; }; }[]; Service: string | number; }) => {
           let totalMachineQuantity = 0;
           
           if (service.Machines && Array.isArray(service.Machines)) {
-            service.Machines.forEach(machineService => {
+            service.Machines.forEach((machineService: { machine: { Number: number; }; }) => {
               // Sum up the actual quantities (Number field)
               const machineQuantity = machineService.machine.Number || 0;
               totalMachineQuantity += machineQuantity;

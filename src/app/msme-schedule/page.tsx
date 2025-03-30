@@ -14,21 +14,21 @@ import { ArrowRight, ArrowLeft, Clock, AlertCircle, Calendar } from 'lucide-reac
 import { InteractiveMachineCalendarWrapper } from '@/components/msme-forms/interactive-machine-calendar';
 
 // Interface for days with time slots
-interface Day {
+export interface DayInfo {
   date: Date;
   startTime: string | null;
   endTime: string | null;
 }
 
 // Interface for form data
-export interface FormData {
-  days: Day[];
+export interface ScheduleFormData {
+  days: DayInfo[];
   syncTimes: boolean;
   unifiedStartTime: string | null;
   unifiedEndTime: string | null;
 
   // Process fields
-  ProductsManufactured: string | string[];
+  ProductsManufactured: string;  // Changed to string only
   BulkofCommodity: string;
   Equipment: string;
   Tools: string;
@@ -36,7 +36,7 @@ export interface FormData {
   
   // Additional fields
   serviceMachineNumbers?: Record<string, number>;
-  serviceLinks?: {[service: string]: string};
+  serviceLinks?: Record<string, string>;
   Remarks?: string;
   NeededMaterials?: Array<{
     Item: string;
@@ -80,27 +80,31 @@ function timeToMinutes(timeString: string | null): number {
   const match = timeString.match(/(\d{1,2}):(\d{2}) (AM|PM)/);
   if (!match) return -1;
   
-  let [_, hours, minutes, period] = match;
-  let hour = parseInt(hours);
+  let hours = parseInt(match[1]);
+  const minutes = parseInt(match[2]);
+  const period = match[3];
   
   // Convert to 24-hour format for proper comparison
-  if (period === 'PM' && hour !== 12) hour += 12;
-  if (period === 'AM' && hour === 12) hour = 0;
+  if (period === 'PM' && hours !== 12) hours += 12;
+  if (period === 'AM' && hours === 12) hours = 0;
   
-  return hour * 60 + parseInt(minutes);
+  return hours * 60 + minutes;
 }
 
 // Component to select time slots for individual days
-const PerDayTimeSelector: React.FC<{
-  days: Day[];
-  updateDay: (index: number, field: keyof Day, value: any) => void;
-}> = ({ days, updateDay }) => {
+interface PerDayTimeSelectorProps {
+  days: DayInfo[];
+  updateDay: (index: number, field: keyof DayInfo, value: any) => void;
+}
+
+const PerDayTimeSelector: React.FC<PerDayTimeSelectorProps> = ({ days, updateDay }) => {
   return (
     <div className="space-y-6 mt-4">
       <h3 className="text-lg font-medium text-gray-800">Select Time for Each Day</h3>
       
       {days.map((day, index) => {
-        const dateString = new Date(day.date).toLocaleDateString('en-US', {
+        const dateObject = new Date(day.date);
+        const dateString = dateObject.toLocaleDateString('en-US', {
           weekday: 'short',
           month: 'short',
           day: 'numeric',
@@ -167,11 +171,11 @@ const PerDayTimeSelector: React.FC<{
 };
 
 // Improved type for updateFormData to handle nested objects
-type UpdateFormData = <K extends keyof FormData>(field: K, value: FormData[K]) => void;
+type UpdateFormData = <K extends keyof ScheduleFormData>(field: K, value: ScheduleFormData[K]) => void;
 
 export default function Schedule() {
   const [step, setStep] = React.useState(1);
-  const [formData, setFormData] = React.useState<FormData>({
+  const [formData, setFormData] = React.useState<ScheduleFormData>({
     days: [],
     syncTimes: true,
     unifiedStartTime: null,
@@ -204,28 +208,26 @@ export default function Schedule() {
       // Special handling for ProductsManufactured changes
       if (field === 'ProductsManufactured') {
         // Create a deep copy of the previous data
-        const updatedData = JSON.parse(JSON.stringify(prevData));
+        const updatedData = {...prevData};
         
         // Update the ProductsManufactured field
-        updatedData[field] = value;
+        updatedData[field] = value as string;
         
-        // If we have serviceMachineNumbers data, synchronize it with the selected services
+        // If we have serviceMachineNumbers data, synchronize it with the selected service
         if (updatedData.serviceMachineNumbers) {
           const currentMachineNumbers = { ...updatedData.serviceMachineNumbers };
-          const updatedMachineNumbers = {};
+          const updatedMachineNumbers: Record<string, number> = {};
           
-          // Get array of selected services
-          const selectedServices = Array.isArray(value) ? value : [value].filter(Boolean);
+          // Get selected service
+          const selectedService = value as string;
           
-          // Only keep machine numbers for selected services
-          selectedServices.forEach(service => {
-            if (currentMachineNumbers[service] !== undefined) {
-              updatedMachineNumbers[service] = currentMachineNumbers[service];
-            } else {
-              // Initialize with 0 for new services
-              updatedMachineNumbers[service] = 0;
-            }
-          });
+          if (selectedService) {
+            // Keep machine numbers for selected service or initialize with 0
+            updatedMachineNumbers[selectedService] = 
+              currentMachineNumbers[selectedService] !== undefined 
+                ? currentMachineNumbers[selectedService] 
+                : 0;
+          }
           
           updatedData.serviceMachineNumbers = updatedMachineNumbers;
         }
@@ -233,15 +235,13 @@ export default function Schedule() {
         // Similarly update serviceLinks if present
         if (updatedData.serviceLinks) {
           const currentLinks = { ...updatedData.serviceLinks };
-          const updatedLinks = {};
+          const updatedLinks: Record<string, string> = {};
           
-          const selectedServices = Array.isArray(value) ? value : [value].filter(Boolean);
+          const selectedService = value as string;
           
-          selectedServices.forEach(service => {
-            if (currentLinks[service]) {
-              updatedLinks[service] = currentLinks[service];
-            }
-          });
+          if (selectedService && currentLinks[selectedService]) {
+            updatedLinks[selectedService] = currentLinks[selectedService];
+          }
           
           updatedData.serviceLinks = updatedLinks;
         }
@@ -253,7 +253,7 @@ export default function Schedule() {
       if (field === 'serviceLinks' || field === 'serviceMachineNumbers') {
         return {
           ...prevData,
-          [field]: value ? JSON.parse(JSON.stringify(value)) : value
+          [field]: value ? {...value} : value
         };
       }
       
@@ -261,13 +261,14 @@ export default function Schedule() {
       if (field === 'days') {
         // Ensure all days have time info from unified time if sync is on
         if (prevData.syncTimes && prevData.unifiedStartTime && prevData.unifiedEndTime) {
-          const updatedDays = value.map((day: any) => ({
+          const updatedDays = (value as DayInfo[]).map((day) => ({
             ...day,
             startTime: day.startTime || prevData.unifiedStartTime,
             endTime: day.endTime || prevData.unifiedEndTime
           }));
           return { ...prevData, [field]: updatedDays };
         }
+        return { ...prevData, [field]: value };
       }
       
       // Special handling for syncTimes toggle - synchronize all times when enabled
@@ -289,8 +290,8 @@ export default function Schedule() {
       if ((field === 'unifiedStartTime' || field === 'unifiedEndTime') && prevData.syncTimes) {
         const updatedDays = prevData.days.map(day => ({
           ...day,
-          startTime: field === 'unifiedStartTime' ? value : day.startTime,
-          endTime: field === 'unifiedEndTime' ? value : day.endTime
+          startTime: field === 'unifiedStartTime' ? value as string | null : day.startTime,
+          endTime: field === 'unifiedEndTime' ? value as string | null : day.endTime
         }));
         
         return {
@@ -306,7 +307,7 @@ export default function Schedule() {
   };
   
   // Helper function to update individual day's time slots
-  const updateDayTime = (index: number, field: keyof Day, value: any) => {
+  const updateDayTime = (index: number, field: keyof DayInfo, value: any) => {
     const updatedDays = [...formData.days];
     updatedDays[index] = {
       ...updatedDays[index],
@@ -331,18 +332,15 @@ export default function Schedule() {
       
       // Check machine quantity
       const service = formData.ProductsManufactured;
-      const serviceArray = Array.isArray(service) ? service : [service];
       const machineNumbers = formData.serviceMachineNumbers || {};
       
-      for (const svc of serviceArray) {
-        if (!machineNumbers[svc] && machineNumbers[svc] !== 0) {
-          toast({
-            title: "Machine quantity required",
-            description: "Please specify machine quantity for all selected services",
-            variant: "destructive",
-          });
-          return;
-        }
+      if (service && (!machineNumbers[service] && machineNumbers[service] !== 0)) {
+        toast({
+          title: "Machine quantity required",
+          description: "Please specify machine quantity for the selected service",
+          variant: "destructive",
+        });
+        return;
       }
     }
     
@@ -388,11 +386,15 @@ export default function Schedule() {
       }
     }
     
-    // Make sure ProductsManufactured is always an array before moving to the review step
+    // If we're going to review step, make sure we convert ProductsManufactured to array
+    // This adapts to the expected format in the review component
     if (step === 2) {
-      if (!Array.isArray(formData.ProductsManufactured) && formData.ProductsManufactured) {
-        updateFormData('ProductsManufactured', [formData.ProductsManufactured]);
-      }
+      // Prepare form data for review step
+      const reviewFormData = {
+        ...formData,
+        ProductsManufactured: [formData.ProductsManufactured]
+      };
+      setFormData(reviewFormData as unknown as ScheduleFormData);
     }
     
     setStep(prevStep => prevStep + 1);
