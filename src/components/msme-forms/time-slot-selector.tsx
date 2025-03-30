@@ -1,25 +1,29 @@
-// Time Slot Selector Component
+// src/components/msme-forms/time-slot-selector.tsx
+// This is the standalone TimeSlotSelector component referenced in InteractiveMachineCalendar
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent } from "@/components/ui/card";
 import { Clock, Check, AlertCircle, Calendar } from 'lucide-react';
+
+interface DateTimeSelection {
+  date: Date;
+  startTime: string | null;
+  endTime: string | null;
+  slot: 'morning' | 'afternoon' | null;
+}
 
 interface TimeSlotSelectorProps {
   selectedDates: Date[];
   selectedService: string;
   machineQuantityNeeded: number;
-  machineAvailabilityMap: Record<string, { morning: number, afternoon: number, overall: number }>;
-  onTimeSlotSelect: (dateTimeSelections: Array<{
-    date: Date;
-    startTime: string | null;
-    endTime: string | null;
-    slot: 'morning' | 'afternoon' | null;
-  }>) => void;
-  initialSelections?: Array<{
-    date: Date;
-    startTime: string | null;
-    endTime: string | null;
-    slot: 'morning' | 'afternoon' | null;
+  machineAvailabilityMap: Record<string, {
+    morning: number,
+    afternoon: number,
+    allDay: number,
+    overall: number
   }>;
+  onTimeSlotSelect: (dateTimeSelections: DateTimeSelection[]) => void;
+  initialSelections?: DateTimeSelection[];
 }
 
 const DEFAULT_MORNING_START = "08:00 AM";
@@ -36,12 +40,7 @@ const TimeSlotSelector: React.FC<TimeSlotSelectorProps> = ({
   initialSelections = []
 }) => {
   // Initialize state from initial selections or default values
-  const [dateTimeSelections, setDateTimeSelections] = useState<Array<{
-    date: Date;
-    startTime: string | null;
-    endTime: string | null;
-    slot: 'morning' | 'afternoon' | null;
-  }>>(
+  const [dateTimeSelections, setDateTimeSelections] = useState<DateTimeSelection[]>(
     selectedDates.map(date => {
       // Look for initial value
       const initialSelection = initialSelections.find(
@@ -68,7 +67,7 @@ const TimeSlotSelector: React.FC<TimeSlotSelectorProps> = ({
     const existingSelectionsMap = dateTimeSelections.reduce((acc, selection) => {
       acc[selection.date.toDateString()] = selection;
       return acc;
-    }, {});
+    }, {} as Record<string, DateTimeSelection>);
     
     // Create new array with updated date selections
     const newSelections = selectedDates.map(date => {
@@ -130,17 +129,6 @@ const TimeSlotSelector: React.FC<TimeSlotSelectorProps> = ({
         slot
       };
     }
-    
-    setDateTimeSelections(newSelections);
-  };
-  
-  // Handle custom time change
-  const handleTimeChange = (dateIndex: number, field: 'startTime' | 'endTime', value: string) => {
-    const newSelections = [...dateTimeSelections];
-    newSelections[dateIndex] = {
-      ...newSelections[dateIndex],
-      [field]: value
-    };
     
     setDateTimeSelections(newSelections);
   };

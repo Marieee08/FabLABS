@@ -10,7 +10,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, ArrowLeft } from 'lucide-react';
 import { InteractiveMachineCalendarWrapper } from '@/components/msme-forms/interactive-machine-calendar';
-import PerDayTimeSlotSelector from '@/components/msme-forms/per-day-time-selector';
 
 
 // Interface for form data
