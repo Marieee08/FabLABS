@@ -56,6 +56,23 @@ interface Reservation {
   };
 }
 
+interface DownTime {
+  id?: number;
+  DTDate: string | null;
+  DTTypeofProducts: string | null;
+  DTTime: number | null; // Time in minutes
+  Cause: string | null;
+  DTMachineOp: string | null;
+  machineUtilId?: number | null;
+}
+
+interface AdjustedUserService extends UserService {
+  downtimeMinutes?: number;
+  adjustedCost?: number;
+  originalCost?: number;
+}
+
+
 const DashboardUser = () => {
   const router = useRouter();
   const { user, isLoaded } = useUser();
@@ -599,15 +616,15 @@ const DashboardUser = () => {
         </div>
 
 {/* Cost Breakdown Section */}
-<div>
-  <h3 className="font-medium text-gray-900">Cost Breakdown</h3>
-  <div className="mt-2">
-    {selectedReservation.UserServices.length > 0 ? (
-      <div className="space-y-2">
-        {selectedReservation.UserServices.map((service, index) => {
-          // Convert CostsAvail to number if it's not null
-          const cost = service.CostsAvail !== null ? Number(service.CostsAvail) : 0;
-          const duration = service.MinsAvail !== null ? service.MinsAvail : 0;
+        <div>
+            <h3 className="font-medium text-gray-900">Estimated Cost Breakdown</h3>
+            <div className="mt-2">
+              {selectedReservation.UserServices.length > 0 ? (
+                <div className="space-y-2">
+                  {selectedReservation.UserServices.map((service, index) => {
+                    // Convert CostsAvail to number if it's not null
+                    const cost = service.CostsAvail !== null ? Number(service.CostsAvail) : 0;
+                    const duration = service.MinsAvail !== null ? service.MinsAvail : 0;
           
           return (
             <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
