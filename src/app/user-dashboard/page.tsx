@@ -1,4 +1,4 @@
-// src\app\user-dashboard\page.tsx
+// src/app/user-dashboard/page.tsx
 "use client";
 
 import Link from "next/link";
@@ -594,139 +594,331 @@ const DashboardUser = () => {
                 </div>
               </div>
 
-              {/* Modal for reviewing reservations */}
-              <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle className="text-2xl font-semibold">Review Reservation</DialogTitle>
-                  </DialogHeader>
-                  
-                  {selectedReservation && (
-                    <div className="mt-4 space-y-6">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <h3 className="font-medium text-gray-900">Request Date</h3>
-                          <p>{new Date(selectedReservation.RequestDate).toLocaleDateString()}</p>
-                        </div>
-                        <div>
-                          <h3 className="font-medium text-gray-900">Status</h3>
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(selectedReservation.Status)}`}>
-                            {selectedReservation.Status}
-                          </span>
-                        </div>
-                      </div>
+{/* Modal for reviewing reservations */}
+<Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+  <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+    <DialogHeader>
+      <DialogTitle className="text-2xl font-semibold">Review Reservation</DialogTitle>
+    </DialogHeader>
+    
+    {selectedReservation && (
+      <div className="mt-4 space-y-6">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <h3 className="font-medium text-gray-900">Request Date</h3>
+            <p>{new Date(selectedReservation.RequestDate).toLocaleDateString()}</p>
+          </div>
+          <div>
+            <h3 className="font-medium text-gray-900">Status</h3>
+            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(selectedReservation.Status)}`}>
+              {selectedReservation.Status}
+            </span>
+          </div>
+        </div>
 
-                      <div>
-                        <h3 className="font-medium text-gray-900">Services Information</h3>
-                        <div className="mt-2">
-                          <p>
-                            <span className="text-gray-600">Services:</span> 
-                            {getUniqueItems(selectedReservation.UserServices.map(service => service.ServiceAvail))}
-                          </p>
-                          <p>
-                            <span className="text-gray-600">Equipment:</span> 
-                            {getUniqueItems(selectedReservation.UserServices.map(service => service.EquipmentAvail))}
-                          </p>
+        <div>
+          <h3 className="font-medium text-gray-900">Services Information</h3>
+          <div className="mt-2">
+            <p>
+              <span className="text-gray-600">Services:</span> 
+              {getUniqueItems(selectedReservation.UserServices.map(service => service.ServiceAvail))}
+            </p>
+            <p>
+              <span className="text-gray-600">Equipment:</span> 
+              {getUniqueItems(selectedReservation.UserServices.map(service => service.EquipmentAvail))}
+            </p>
+            
+            {selectedReservation.MachineUtilizations && selectedReservation.MachineUtilizations.length > 0 && (
+              <p>
+                <span className="text-gray-600">Machines:</span> 
+                {getUniqueItems(selectedReservation.MachineUtilizations.map(machine => machine.Machine))}
+              </p>
+            )}
+            
+            <p><span className="text-gray-600">Bulk of Commodity:</span> {selectedReservation.BulkofCommodity || 'Not specified'}</p>
+          </div>
+        </div>
+
+        {/* Cost Breakdown Component - Improved version */}
+        <div>
+          <h3 className="font-medium text-gray-900">Cost Breakdown</h3>
+          <div className="mt-4 bg-gray-50 p-4 rounded-lg">
+            <div className="space-y-4">
+              <h4 className="font-medium text-gray-800">Service Costs</h4>
+              
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Service</th>
+                      <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Equipment</th>
+                      <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Minutes</th>
+                      <th scope="col" className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {selectedReservation.UserServices.map((service, index) => (
+                      <tr key={index}>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{service.ServiceAvail}</td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{service.EquipmentAvail || 'N/A'}</td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{service.MinsAvail || '—'}</td>
+                        <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900 text-right">
+                          ₱{service.CostsAvail !== null ? 
+                             (typeof service.CostsAvail === 'string' ? 
+                               parseFloat(service.CostsAvail) : service.CostsAvail as number).toFixed(2) 
+                             : '0.00'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Machine Utilization & Downtime Adjustments */}
+              {selectedReservation.MachineUtilizations && 
+               selectedReservation.MachineUtilizations.some(m => m.DownTimes && m.DownTimes.length > 0) && (
+                <div className="mt-6">
+                  <h4 className="font-medium text-gray-800 mb-2">Downtime Adjustments</h4>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-100">
+                        <tr>
+                          <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Machine</th>
+                          <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                          <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Downtime (min)</th>
+                          <th scope="col" className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cause</th>
+                          <th scope="col" className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Adjustment</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {selectedReservation.MachineUtilizations
+                          .filter(machine => machine.DownTimes && machine.DownTimes.length > 0)
+                          .flatMap(machine => 
+                            machine.DownTimes.map((downtime, dtIndex) => {
+                              // Find the associated service for this machine
+                              const relatedService = selectedReservation.UserServices.find(
+                                service => service.ServiceAvail === machine.ServiceName || 
+                                          service.EquipmentAvail === machine.Machine
+                              );
+                              
+                              // Calculate cost per minute if we can find the service
+                              let costPerMin = 0;
+                              if (relatedService && relatedService.CostsAvail !== null && relatedService.MinsAvail) {
+                                const cost = typeof relatedService.CostsAvail === 'string' ? 
+                                  parseFloat(relatedService.CostsAvail) : 
+                                  relatedService.CostsAvail as number;
+                                costPerMin = cost / relatedService.MinsAvail;
+                              }
+                              
+                              // Calculate the adjustment amount (negative value)
+                              const adjustmentAmount = -(costPerMin * (downtime.DTTime || 0));
+                              
+                              return (
+                                <tr key={`${machine.id}-${dtIndex}`}>
+                                  <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{machine.Machine}</td>
+                                  <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{downtime.DTDate || '—'}</td>
+                                  <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{downtime.DTTime || 0}</td>
+                                  <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">{downtime.Cause || '—'}</td>
+                                  <td className="px-4 py-2 whitespace-nowrap text-sm text-red-600 text-right">
+                                    ₱{adjustmentAmount.toFixed(2)}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+               )
+              }
+
+              {/* Total Section */}
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <div className="flex justify-between items-center">
+                  <span className="font-semibold text-gray-900">Subtotal:</span>
+                  <span className="text-gray-900">
+                    ₱{selectedReservation.UserServices.reduce(
+                      (total, service) => {
+                        if (service.CostsAvail === null) return total;
+                        const cost = typeof service.CostsAvail === 'string' ? 
+                          parseFloat(service.CostsAvail) : 
+                          service.CostsAvail as number;
+                        return total + cost;
+                      }, 
+                      0
+                    ).toFixed(2)}
+                  </span>
+                </div>
+                
+                {/* Calculate total downtime adjustments */}
+                {selectedReservation.MachineUtilizations && 
+                 selectedReservation.MachineUtilizations.some(m => m.DownTimes && m.DownTimes.length > 0) && (
+                  <div className="flex justify-between items-center mt-2">
+                    <span className="font-medium text-gray-900">Downtime Adjustments:</span>
+                    <span className="text-red-600">
+                      {(() => {
+                        let totalAdjustment = 0;
+                        
+                        selectedReservation.MachineUtilizations.forEach(machine => {
+                          if (!machine.DownTimes || machine.DownTimes.length === 0) return;
                           
-                          {selectedReservation.MachineUtilizations && selectedReservation.MachineUtilizations.length > 0 && (
-                            <p>
-                              <span className="text-gray-600">Machines:</span> 
-                              {getUniqueItems(selectedReservation.MachineUtilizations.map(machine => machine.Machine))}
-                            </p>
-                          )}
+                          // Find the associated service for this machine
+                          const relatedService = selectedReservation.UserServices.find(
+                            service => service.ServiceAvail === machine.ServiceName || 
+                                      service.EquipmentAvail === machine.Machine
+                          );
                           
-                          <p><span className="text-gray-600">Bulk of Commodity:</span> {selectedReservation.BulkofCommodity || 'Not specified'}</p>
-                        </div>
-                      </div>
-
-                      {/* Cost Breakdown Section - Using the CostBreakdown component */}
-                      <div>
-                        <h3 className="font-medium text-gray-900">Cost Breakdown</h3>
-                        <CostBreakdown
-                          userServices={selectedReservation.UserServices}
-                          totalAmountDue={selectedReservation.UserServices.reduce(
-                            (total, service) => total + (service.CostsAvail !== null ? Number(service.CostsAvail) : 0), 
-                            0
-                          )}
-                          machineUtilizations={selectedReservation.MachineUtilizations || []}
-                          reservationId={selectedReservation.id}
-                          allowFix={false}
-                        />
-                      </div>
-
-                      <div>
-                        <h3 className="font-medium text-gray-900">Schedule</h3>
-                        <div className="mt-2">
-                          {selectedReservation.UtilTimes.map((time, index) => (
-                            <div key={index} className="mb-2 p-2 bg-gray-50 rounded">
-                              <p><span className="text-gray-600">Day {time.DayNum}:</span></p>
-                              <p className="ml-4">Start: {time.StartTime ? new Date(time.StartTime).toLocaleString() : 'Not set'}</p>
-                              <p className="ml-4">End: {time.EndTime ? new Date(time.EndTime).toLocaleString() : 'Not set'}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <h3 className="font-medium text-gray-900">Tools</h3>
-                        <div className="mt-2">
-                          {selectedReservation.UserTools.length > 0 ? (
-                            <div className="space-y-2">
-                              {selectedReservation.UserTools.map((tool, index) => (
-                                <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                                  <span className="text-gray-600">{tool.ToolUser}</span>
-                                  <span className="font-medium">{tool.ToolQuantity} units</span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-gray-500 italic">No tools specified</p>
-                          )}
-                        </div>
-                      </div>
+                          // Calculate cost per minute if we can find the service
+                          let costPerMin = 0;
+                          if (relatedService && relatedService.CostsAvail !== null && relatedService.MinsAvail) {
+                            const cost = typeof relatedService.CostsAvail === 'string' ? 
+                              parseFloat(relatedService.CostsAvail) : 
+                              relatedService.CostsAvail as number;
+                            costPerMin = cost / relatedService.MinsAvail;
+                          }
+                          
+                          // Sum up all downtime adjustments for this machine
+                          machine.DownTimes.forEach(downtime => {
+                            totalAdjustment -= costPerMin * (downtime.DTTime || 0);
+                          });
+                        });
+                        
+                        return `₱${totalAdjustment.toFixed(2)}`;
+                      })()}
+                    </span>
+                  </div>
+                 )
+                }
+                
+                <div className="flex justify-between items-center mt-4 text-lg font-bold">
+                  <span>Total Amount Due:</span>
+                  <span>
+                    {(() => {
+                      let subtotal = selectedReservation.UserServices.reduce(
+                        (total, service) => {
+                          if (service.CostsAvail === null) return total;
+                          const cost = typeof service.CostsAvail === 'string' ? 
+                            parseFloat(service.CostsAvail) : 
+                            service.CostsAvail as number;
+                          return total + cost;
+                        }, 
+                        0
+                      );
                       
-                      {selectedReservation.MachineUtilizations && selectedReservation.MachineUtilizations.length > 0 && (
-                        <div>
-                          <h3 className="font-medium text-gray-900">Machine Details</h3>
-                          <div className="mt-2">
-                            <div className="space-y-2">
-                              {selectedReservation.MachineUtilizations.map((machine, index) => (
-                                <div key={index} className="p-2 bg-gray-50 rounded">
-                                  <p><span className="text-gray-600">Machine:</span> {machine.Machine}</p>
-                                  {machine.ServiceName && (
-                                    <p><span className="text-gray-600">For Service:</span> {machine.ServiceName}</p>
-                                  )}
-                                  <p><span className="text-gray-600">Approval Status:</span> {
-                                    machine.MachineApproval ? 
-                                      <span className="text-green-600">Approved</span> : 
-                                      <span className="text-yellow-600">Pending Approval</span>
-                                  }</p>
-                                  {machine.DateReviewed && (
-                                    <p><span className="text-gray-600">Reviewed On:</span> {new Date(machine.DateReviewed).toLocaleDateString()}</p>
-                                  )}
-                                  
-                                  {machine.DownTimes && machine.DownTimes.length > 0 && (
-                                    <div className="mt-2 border-t border-gray-200 pt-2">
-                                      <p className="text-amber-600 font-medium">Reported Downtime:</p>
-                                      {machine.DownTimes.map((downtime, dtIndex) => (
-                                        <div key={dtIndex} className="ml-4 mt-1 text-sm">
-                                          <p>Date: {downtime.DTDate || 'Not recorded'}</p>
-                                          <p>Duration: {downtime.DTTime || 0} minutes</p>
-                                          {downtime.Cause && <p>Cause: {downtime.Cause}</p>}
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
+                      let downtimeAdjustments = 0;
+                      
+                      // Calculate downtime adjustments if they exist
+                      if (selectedReservation.MachineUtilizations) {
+                        selectedReservation.MachineUtilizations.forEach(machine => {
+                          if (!machine.DownTimes || machine.DownTimes.length === 0) return;
+                          
+                          // Find the associated service
+                          const relatedService = selectedReservation.UserServices.find(
+                            service => service.ServiceAvail === machine.ServiceName || 
+                                      service.EquipmentAvail === machine.Machine
+                          );
+                          
+                          // Calculate cost per minute
+                          let costPerMin = 0;
+                          if (relatedService && relatedService.CostsAvail !== null && relatedService.MinsAvail) {
+                            const cost = typeof relatedService.CostsAvail === 'string' ? 
+                              parseFloat(relatedService.CostsAvail) : 
+                              relatedService.CostsAvail as number;
+                            costPerMin = cost / relatedService.MinsAvail;
+                          }
+                          
+                          // Sum up all downtime adjustments
+                          machine.DownTimes.forEach(downtime => {
+                            downtimeAdjustments -= costPerMin * (downtime.DTTime || 0);
+                          });
+                        });
+                      }
+                      
+                      const total = subtotal + downtimeAdjustments;
+                      return `₱${total.toFixed(2)}`;
+                    })()}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="font-medium text-gray-900">Schedule</h3>
+          <div className="mt-2">
+            {selectedReservation.UtilTimes.map((time, index) => (
+              <div key={index} className="mb-2 p-2 bg-gray-50 rounded">
+                <p><span className="text-gray-600">Day {time.DayNum}:</span></p>
+                <p className="ml-4">Start: {time.StartTime ? new Date(time.StartTime).toLocaleString() : 'Not set'}</p>
+                <p className="ml-4">End: {time.EndTime ? new Date(time.EndTime).toLocaleString() : 'Not set'}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <h3 className="font-medium text-gray-900">Tools</h3>
+          <div className="mt-2">
+            {selectedReservation.UserTools.length > 0 ? (
+              <div className="space-y-2">
+                {selectedReservation.UserTools.map((tool, index) => (
+                  <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                    <span className="text-gray-600">{tool.ToolUser}</span>
+                    <span className="font-medium">{tool.ToolQuantity} units</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 italic">No tools specified</p>
+            )}
+          </div>
+        </div>
+        
+        {selectedReservation.MachineUtilizations && selectedReservation.MachineUtilizations.length > 0 && (
+          <div>
+            <h3 className="font-medium text-gray-900">Machine Details</h3>
+            <div className="mt-2">
+              <div className="space-y-2">
+                {selectedReservation.MachineUtilizations.map((machine, index) => (
+                  <div key={index} className="p-2 bg-gray-50 rounded">
+                    <p><span className="text-gray-600">Machine:</span> {machine.Machine}</p>
+                    {machine.ServiceName && (
+                      <p><span className="text-gray-600">For Service:</span> {machine.ServiceName}</p>
+                    )}
+                    <p><span className="text-gray-600">Approval Status:</span> {
+                      machine.MachineApproval ? 
+                        <span className="text-green-600">Approved</span> : 
+                        <span className="text-yellow-600">Pending Approval</span>
+                    }</p>
+                    {machine.DateReviewed && (
+                      <p><span className="text-gray-600">Reviewed On:</span> {new Date(machine.DateReviewed).toLocaleDateString()}</p>
+                    )}
+                    
+                    {machine.DownTimes && machine.DownTimes.length > 0 && (
+                      <div className="mt-2 border-t border-gray-200 pt-2">
+                        <p className="text-amber-600 font-medium">Reported Downtime:</p>
+                        {machine.DownTimes.map((downtime, dtIndex) => (
+                          <div key={dtIndex} className="ml-4 mt-1 text-sm">
+                            <p>Date: {downtime.DTDate || 'Not recorded'}</p>
+                            <p>Duration: {downtime.DTTime || 0} minutes</p>
+                            {downtime.Cause && <p>Cause: {downtime.Cause}</p>}
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </DialogContent>
-              </Dialog>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )}
+  </DialogContent>
+</Dialog>
             </div>
           </main>
         </div>
