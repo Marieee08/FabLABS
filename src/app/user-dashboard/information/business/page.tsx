@@ -54,6 +54,8 @@ const BusinessInformationPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isNotBusinessOwner, setIsNotBusinessOwner] = useState(false);
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+  const [pendingCheckboxValue, setPendingCheckboxValue] = useState(false);
 
   const today = new Date();
   const formattedDate = format(today, 'EEEE, dd MMMM yyyy');
@@ -104,10 +106,15 @@ const BusinessInformationPage = () => {
     }
   }, [user, isLoaded]);
 
-  // Handle Not a Business Owner checkbox
-  const handleCheckboxChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newValue = e.target.checked;
-    setIsNotBusinessOwner(newValue);
+    setPendingCheckboxValue(newValue);
+    setIsConfirmModalOpen(true);
+  };
+
+  const confirmCheckboxChange = async () => {
+    setIsConfirmModalOpen(false);
+    setIsNotBusinessOwner(pendingCheckboxValue);
     
     try {
       const response = await fetch('/api/user/update-info', {
@@ -119,24 +126,25 @@ const BusinessInformationPage = () => {
           userId: user?.id,
           type: 'business',
           data: {
-            isNotBusinessOwner: newValue,
-            CompanyName: newValue ? "Not applicable" : null,
-            BusinessOwner: newValue ? "Not applicable" : null,
-            BusinessPermitNum: newValue ? "Not applicable" : null,
-            TINNum: newValue ? "Not applicable" : null,
-            CompanyIDNum: newValue ? "Not applicable" : null,
-            CompanyEmail: newValue ? "Not applicable" : null,
-            ContactPerson: newValue ? "Not applicable" : null,
-            Designation: newValue ? "Not applicable" : null,
-            CompanyAddress: newValue ? "Not applicable" : null,
-            CompanyCity: newValue ? "Not applicable" : null,
-            CompanyProvince: newValue ? "Not applicable" : null,
+            isNotBusinessOwner: pendingCheckboxValue,
+            CompanyName: pendingCheckboxValue ? "Not applicable" : null,
+            // Include all the other fields as in your current handleCheckboxChange
+            BusinessOwner: pendingCheckboxValue ? "Not applicable" : null,
+            BusinessPermitNum: pendingCheckboxValue ? "Not applicable" : null,
+            TINNum: pendingCheckboxValue ? "Not applicable" : null,
+            CompanyIDNum: pendingCheckboxValue ? "Not applicable" : null,
+            CompanyEmail: pendingCheckboxValue ? "Not applicable" : null,
+            ContactPerson: pendingCheckboxValue ? "Not applicable" : null,
+            Designation: pendingCheckboxValue ? "Not applicable" : null,
+            CompanyAddress: pendingCheckboxValue ? "Not applicable" : null,
+            CompanyCity: pendingCheckboxValue ? "Not applicable" : null,
+            CompanyProvince: pendingCheckboxValue ? "Not applicable" : null,
             CompanyZipcode: null,
-            CompanyPhoneNum: newValue ? "Not applicable" : null,
-            CompanyMobileNum: newValue ? "Not applicable" : null,
-            Manufactured: newValue ? "Not applicable" : null,
-            ProductionFrequency: newValue ? "Not applicable" : null,
-            Bulk: newValue ? "Not applicable" : null
+            CompanyPhoneNum: pendingCheckboxValue ? "Not applicable" : null,
+            CompanyMobileNum: pendingCheckboxValue ? "Not applicable" : null,
+            Manufactured: pendingCheckboxValue ? "Not applicable" : null,
+            ProductionFrequency: pendingCheckboxValue ? "Not applicable" : null,
+            Bulk: pendingCheckboxValue ? "Not applicable" : null
           }
         }),
       });
@@ -155,7 +163,7 @@ const BusinessInformationPage = () => {
   
     } catch (error) {
       console.error('Error updating business owner status:', error);
-      setIsNotBusinessOwner(!newValue); // Revert on error
+      setIsNotBusinessOwner(!pendingCheckboxValue); // Revert on error
     }
   };
 
@@ -578,6 +586,55 @@ const BusinessInformationPage = () => {
           isNotBusinessOwner={isNotBusinessOwner}
         />
       </div>
+      {/* Confirmation Modal */}
+{isConfirmModalOpen && (
+  <div 
+    className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+    onClick={() => setIsConfirmModalOpen(false)}
+  >
+    <div 
+      className="bg-white rounded-lg w-full max-w-md p-6"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <h2 className="text-xl font-bold mb-4">
+        {pendingCheckboxValue 
+          ? "Confirm Business Status Change" 
+          : "Restore Business Information"}
+      </h2>
+      
+      <div className="mb-6">
+        {pendingCheckboxValue ? (
+          <p className="text-gray-600">
+            By confirming that you do not own/operate a business, all business information fields will be set to "Not applicable". 
+            <br/><br/>
+            You can change this setting later if needed.
+          </p>
+        ) : (
+          <p className="text-gray-600">
+            By unchecking this option, you'll be able to enter your business information. 
+            <br/><br/>
+            Previous information may need to be re-entered.
+          </p>
+        )}
+      </div>
+      
+      <div className="flex justify-end space-x-4">
+        <button
+          onClick={() => setIsConfirmModalOpen(false)}
+          className="px-4 py-2 border rounded-lg hover:bg-gray-100"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={confirmCheckboxChange}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+        >
+          Confirm
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 };

@@ -594,12 +594,11 @@ const handleGeneratePDF = () => {
         <div>
           <h3 className="text-xl font-semibold mb-4">Machine Utilization</h3>
           
-          <Accordion type="multiple" defaultValue={machineUtilizations.map((_, i) => `item-${i}`)}>
+          <Accordion type="multiple" defaultValue={[]}>
             {machineUtilizations.map((machineUtil, machineIndex) => (
               <AccordionItem value={`item-${machineIndex}`} key={machineIndex}>
                 <AccordionTrigger className="hover:bg-gray-50 px-3 rounded-lg">
                   <span className="font-medium">{machineUtil.Machine || 'Unnamed Machine'}</span>
-                  <span className="text-sm text-gray-500 ml-2">({machineUtil.ServiceName})</span>
                 </AccordionTrigger>
                 <AccordionContent className="px-4 py-2">
                   <div className="space-y-4">
