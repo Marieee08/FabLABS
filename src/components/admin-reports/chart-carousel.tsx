@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { TimeInterval, TimeIntervalSelector } from '@/components/admin-reports/time-interval-selector';
 import { ChevronLeft, ChevronRight, BarChart3, LineChart, PieChart, SmilePlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { generateServicesPdf } from '@/components/admin-reports/services-report-pdf';
 
 // Chart Types
 type ChartType = 'userRoles' | 'services';
@@ -316,7 +317,7 @@ const ServicesChart: React.FC<ChartComponentProps> = ({ data, isLoading }) => {
     );
   }
   
-  // Define colors for the services (you can extend this array for more services)
+  // Define colors for the services
   const colors = ['#4b71b5', '#143370', '#5e86ca', '#a3b9e2', '#2c5282', '#7ea0d4', '#3b5998', '#8da9e1'];
   
   // Sort services by usage (most used first) and add colors
@@ -328,7 +329,15 @@ const ServicesChart: React.FC<ChartComponentProps> = ({ data, isLoading }) => {
     }));
   
   // Calculate total for percentages
-  const total = servicesWithColors.reduce((sum, service) => sum + (service.value || 0), 0);
+  const total = servicesWithColors.reduce((sum, service) => sum + (service.value || 0), 0)
+
+  const handleGeneratePdf = () => {
+    generateServicesPdf({
+      title: 'Services Distribution Report',
+      totalUsages: total,
+      services: servicesWithColors
+    });
+  };
   
   // Calculate stroke dasharray and dashoffset for pie chart
   const calculateStroke = (percentage: number, index: number) => {
@@ -359,8 +368,17 @@ const ServicesChart: React.FC<ChartComponentProps> = ({ data, isLoading }) => {
             <span className="text-sm font-medium text-gray-500">Services Distribution</span>
             <div className="text-2xl font-bold text-[#143370]">{total} Total Usages</div>
           </div>
-          <div className="text-xs text-gray-500">
-            {servicesWithColors.length > 0 && `${Math.min(servicesWithColors.length, 8)} services shown`}
+          <div className="flex items-center space-x-2">
+            <div className="text-xs text-gray-500">
+              {servicesWithColors.length > 0 && `${Math.min(servicesWithColors.length, 8)} services shown`}
+            </div>
+            <Button 
+              onClick={handleGeneratePdf}
+              size="sm"
+              className="bg-[#143370] hover:bg-[#1a4496] text-white"
+            >
+              Generate PDF
+            </Button>
           </div>
         </div>
         

@@ -326,8 +326,421 @@ const ReservationHistory = () => {
 
   // Rest of your code remains mostly the same
   // Displaying the function signatures for reference
-  const handleGeneratePDF = async (reservationId: string, formType: string): Promise<void> => {
-    // Your existing implementation
+  const handleGeneratePDF = async (
+    reservationId: string,
+    formType: string
+  ): Promise<void> => {
+    try {
+      // First check if this is an EVC reservation (if the ID starts with "evc-")
+      const isEVC = reservationId.toString().startsWith('evc-');
+      let detailedData: any;
+     
+      if (isEVC) {
+        // Extract the actual ID for EVC reservations
+        const evcId = reservationId.replace('evc-', '');
+        const response = await fetch(`/api/admin/evc-reservation-review/${evcId}`);
+       
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Failed to fetch EVC details: ${response.status} ${response.statusText}`, errorText);
+          throw new Error(`Failed to fetch EVC details: ${response.status} ${response.statusText}`);
+        }
+       
+        detailedData = await response.json();
+        console.log('EVC Reservation details for PDF generation:', detailedData);
+       
+      if (formType === 'lab-request' || formType === 'lab-reservation') {
+        // Format the needed materials into the required format
+        const materialItems = Array.isArray(detailedData.NeededMaterials)
+          ? detailedData.NeededMaterials.map((material: any) => ({
+              quantity: material.MaterialQty?.toString() || '',
+              item: material.MaterialName || '',
+              description: material.MaterialDesc || '',
+              issuedCondition: '',
+              returnedCondition: ''
+            }))
+          : [];
+        
+        // Format student list - handle both Students and StudentName properties
+        const studentList = Array.isArray(detailedData.EVCStudents)
+          ? detailedData.EVCStudents.map((student: any) => {
+              // Try all possible property names for student name
+              const studentName = student.Students || student.StudentName || student.Name || student.name;
+              return {
+                name: studentName || ''
+              };
+            })
+          : [];
+        
+        console.log('Student list for PDF:', studentList); // Debug log
+        
+        // Format time from UtilTimes if available
+        let inclusiveTime = '';
+        if (Array.isArray(detailedData.UtilTimes) && detailedData.UtilTimes.length > 0) {
+          const firstTime = detailedData.UtilTimes[0];
+          if (firstTime.StartTime && firstTime.EndTime) {
+            const startTime = new Date(firstTime.StartTime);
+            const endTime = new Date(firstTime.EndTime);
+            inclusiveTime = `${startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+          }
+        }
+        
+        // Create lab request form data
+        const labFormData = {
+          campus: 'Eastern Visayas Campus',
+          controlNo: detailedData.ControlNo?.toString() || '',
+          schoolYear: detailedData.SchoolYear?.toString() || new Date().getFullYear().toString(),
+          gradeLevel: detailedData.LvlSec || '',
+          numberOfStudents: detailedData.NoofStudents?.toString() || '',
+          subject: detailedData.Subject || '',
+          concurrentTopic: detailedData.Topic || '',
+          unit: '',
+          teacherInCharge: detailedData.Teacher || '',
+          venue: '',
+          inclusiveTimeOfUse: inclusiveTime,
+          date: detailedData.DateRequested ? new Date(detailedData.DateRequested).toLocaleDateString() : '',
+          materials: materialItems,
+          receivedBy: detailedData.ReceivedBy || '',
+          receivedAndInspectedBy: detailedData.InspectedBy || '',
+          receivedDate: detailedData.ReceivedDate ? new Date(detailedData.ReceivedDate).toLocaleDateString() : '',
+          inspectedDate: detailedData.InspectedDate ? new Date(detailedData.InspectedDate).toLocaleDateString() : '',
+          requestedBy: detailedData.accInfo?.Name || '',
+          dateRequested: detailedData.DateRequested ? new Date(detailedData.DateRequested).toLocaleDateString() : '',
+          students: studentList, // Use the properly formatted student list
+          endorsedBy: detailedData.Teacher || '',
+          approvedBy: detailedData.ApprovedBy || ''
+        };
+        
+        try {
+          if (formType === 'lab-request') {
+            console.log('Generating lab request PDF with data:', labFormData);
+            downloadLabRequestFormPDF(labFormData);
+          } else if (formType === 'lab-reservation') {
+            console.log('Generating lab reservation PDF with data:', labFormData);
+            downloadLabReservationFormPDF(labFormData);
+          }
+        } catch (error) {
+          console.error(`Error in ${formType} PDF generation:`, error);
+          alert(`Error generating ${formType} PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      
+        // After generating, close modal and trigger scroll fix
+        setIsPdfModalOpen(false);
+        setSelectedReservationId(null);
+        setNeedsScrollFix(true);
+        return;
+      } else {
+          // For other form types with EVC data, show not implemented message
+          alert(`${formType} PDF generation for EVC reservations is not yet implemented`);
+          setIsPdfModalOpen(false);
+          setSelectedReservationId(null);
+          setNeedsScrollFix(true);
+          return;
+        }
+      } else {
+        // It's a regular utilization reservation
+        const response = await fetch(`/api/admin/reservation-review/${reservationId}`);
+       
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Failed to fetch utilization details: ${response.status} ${response.statusText}`, errorText);
+          throw new Error(`Failed to fetch details: ${response.status} ${response.statusText}`);
+        }
+       
+        detailedData = await response.json();
+        console.log('Reservation details for PDF generation:', detailedData);
+        
+       
+        // Ensure detailedData has all required properties with defaults
+        detailedData = {
+          ...detailedData,
+          id: detailedData.id || 0,
+          Status: detailedData.Status || 'Pending Admin Approval',
+          RequestDate: detailedData.RequestDate || new Date().toISOString(),
+          TotalAmntDue: detailedData.TotalAmntDue || 0,
+          BulkofCommodity: detailedData.BulkofCommodity || '',
+          UserServices: detailedData.UserServices || [],
+          UserTools: detailedData.UserTools || [],
+          UtilTimes: detailedData.UtilTimes || [],
+          accInfo: {
+            Name: detailedData.accInfo?.Name || 'Name Not Available',
+            email: detailedData.accInfo?.email || 'Email Not Available',
+            Role: detailedData.accInfo?.Role || 'Role Not Specified',
+            ClientInfo: detailedData.accInfo?.ClientInfo || {},
+            BusinessInfo: detailedData.accInfo?.BusinessInfo || {}
+          }
+        };
+      }
+  
+      switch (formType) {
+        case 'utilization-request':
+          try {
+            // Add detailed logging to diagnose the issue
+            console.log('BEFORE GENERATING PDF - Full data object:', detailedData);
+            console.log('BEFORE GENERATING PDF - accInfo available:', detailedData.accInfo);
+            console.log('BEFORE GENERATING PDF - Type of data:', typeof detailedData);
+            console.log('BEFORE GENERATING PDF - Keys in data:', Object.keys(detailedData));
+           
+            console.log('Generating utilization request PDF with data:', {
+              id: detailedData.id,
+              status: detailedData.Status,
+              role: detailedData.accInfo?.Role
+            });
+           
+            downloadPDF(detailedData);
+          } catch (error) {
+            console.error('Error in utilization request PDF generation:', error);
+            alert(`Error generating utilization request: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+          break;
+         
+        case 'job-payment':
+          try {
+            // Create job payment data from reservation details
+            const jobPaymentData = {
+              id: detailedData.id || 0,
+              invoiceNumber: `INV-${detailedData.id || '0'}`,
+              dateIssued: new Date().toISOString(),
+              dueDate: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString(),
+              paymentStatus: detailedData.Status || 'Unpaid',
+              items: detailedData.UserServices?.map((service: any) => ({
+                id: service.id || 'item-' + Math.random().toString(36).substr(2, 9),
+                name: service.ServiceAvail || 'Service',
+                quantity: 1,
+                unitPrice: service.CostsAvail || 0,
+                totalPrice: service.CostsAvail || 0,
+                description: service.EquipmentAvail || 'Equipment'
+              })) || [],
+              subtotal: detailedData.TotalAmntDue || 0,
+              taxRate: 0,
+              taxAmount: 0,
+              totalAmount: detailedData.TotalAmntDue || 0,
+              amountPaid: detailedData.Status === 'Paid' ? (detailedData.TotalAmntDue || 0) : 0,
+              balanceDue: detailedData.Status === 'Paid' ? 0 : (detailedData.TotalAmntDue || 0),
+              client: {
+                name: detailedData.accInfo?.Name || 'Name Not Available',
+                email: detailedData.accInfo?.email || 'Email Not Available',
+                phone: detailedData.accInfo?.ClientInfo?.ContactNum || 'Phone Not Available',
+                address: detailedData.accInfo?.ClientInfo
+                  ? `${detailedData.accInfo.ClientInfo.Address || ''}, ${detailedData.accInfo.ClientInfo.City || ''}, ${detailedData.accInfo.ClientInfo.Province || ''}`
+                  : 'Address Not Available',
+                role: detailedData.accInfo?.Role || 'Role Not Specified'
+              }
+            };
+           
+            downloadJobPaymentPDF(jobPaymentData);
+          } catch (error) {
+            console.error('Error in job payment PDF generation:', error);
+            alert(`Error generating job payment PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+          break;
+         
+        case 'registration':
+          try {
+            // Create registration form data from reservation details
+            if (!detailedData.accInfo?.BusinessInfo) {
+              alert('Cannot generate registration form: No business information available');
+              break;
+            }
+           
+            const businessInfo = detailedData.accInfo.BusinessInfo;
+           
+            // Create client info list - at least add the current user
+            const clientInfoList = [{
+              Name: detailedData.accInfo.Name || '',
+              CompanyIDNo: businessInfo.CompanyIDNum || '',
+              TINNo: businessInfo.TINNum || '',
+              ContactNo: detailedData.accInfo.ClientInfo?.ContactNum || '',
+              Address: detailedData.accInfo.ClientInfo?.Address || '',
+              City: detailedData.accInfo.ClientInfo?.City || '',
+              Province: detailedData.accInfo.ClientInfo?.Province || '',
+              ZipCode: detailedData.accInfo.ClientInfo?.Zipcode?.toString() || ''
+            }];
+           
+            const registrationData = {
+              businessInfo: {
+                CompanyName: businessInfo.CompanyName || '',
+                BusinessOwner: businessInfo.BusinessOwner || '',
+                BusinessPermitNo: businessInfo.BusinessPermitNum || '',
+                TINNo: businessInfo.TINNum || '',
+                Email: businessInfo.CompanyEmail || '',
+                ContactPerson: businessInfo.ContactPerson || '',
+                PositionDesignation: businessInfo.Designation || '',
+                CompanyAddress: businessInfo.CompanyAddress || '',
+                City: businessInfo.CompanyCity || '',
+                Province: businessInfo.CompanyProvince || '',
+                ZipCode: businessInfo.CompanyZipcode?.toString() || '',
+                PhoneNo: businessInfo.CompanyPhoneNum || '',
+                MobileNo: businessInfo.CompanyMobileNum || '',
+                CommodityManufactured: businessInfo.Manufactured || '',
+                ProductionFrequency: businessInfo.ProductionFrequency || '',
+                BulkOfCommodity: businessInfo.Bulk || detailedData.BulkofCommodity || ''
+              },
+              clientInfoList: clientInfoList,
+              numberOfClients: 1 // Default to 1 for now
+            };
+           
+            console.log('Registration form data before PDF generation:', registrationData);
+            downloadRegistrationFormPDF(registrationData);
+          } catch (error) {
+            console.error('Error in registration form PDF generation:', error);
+            alert(`Error generating registration form: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+          break;
+         
+        case 'lab-request':
+          // For normal utilization reservations, create a basic lab request form
+          try {
+            // Format time from UtilTimes if available
+            let inclusiveTime = '';
+            if (Array.isArray(detailedData.UtilTimes) && detailedData.UtilTimes.length > 0) {
+              const firstTime = detailedData.UtilTimes[0];
+              if (firstTime.StartTime && firstTime.EndTime) {
+                const startTime = new Date(firstTime.StartTime);
+                const endTime = new Date(firstTime.EndTime);
+                inclusiveTime = `${startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+              }
+            }
+           
+            // Create material items from UserServices and UserTools
+            const materialItems = [
+              // Convert services to materials
+              ...detailedData.UserServices.map((service: any) => ({
+                quantity: '1',
+                item: service.ServiceAvail || '',
+                description: service.EquipmentAvail || '',
+                issuedCondition: '',
+                returnedCondition: ''
+              })),
+              // Add tools as materials
+              ...detailedData.UserTools.map((tool: any) => ({
+                quantity: tool.ToolQuantity?.toString() || '1',
+                item: tool.ToolUser || '',
+                description: '',
+                issuedCondition: '',
+                returnedCondition: ''
+              }))
+            ];
+           
+            // Create a basic lab request form for non-EVC reservations
+            const labRequestData = {
+              campus: 'Eastern Visayas Campus', // Default value
+              controlNo: `U-${detailedData.id}`,
+              schoolYear: new Date().getFullYear().toString(),
+              gradeLevel: '', // Not applicable for regular utilization
+              numberOfStudents: '1', // Default to 1 for regular utilization
+              subject: '', // Not applicable for regular utilization
+              concurrentTopic: '', // Not applicable for regular utilization
+              unit: '', // Not applicable for regular utilization
+              teacherInCharge: '', // Not applicable for regular utilization
+              venue: 'Fabrication Laboratory',
+              inclusiveTimeOfUse: inclusiveTime,
+              date: new Date(detailedData.RequestDate).toLocaleDateString(),
+              materials: materialItems,
+              receivedBy: '',
+              receivedAndInspectedBy: '',
+              receivedDate: '',
+              inspectedDate: '',
+              requestedBy: detailedData.accInfo?.Name || '',
+              dateRequested: new Date(detailedData.RequestDate).toLocaleDateString(),
+              students: [{ name: detailedData.accInfo?.Name || '' }],
+              endorsedBy: '',
+              approvedBy: ''
+            };
+           
+            console.log('Lab request data for regular utilization:', labRequestData);
+            downloadLabRequestFormPDF(labRequestData);
+          } catch (error) {
+            console.error('Error in lab request PDF generation for regular utilization:', error);
+            alert(`Error generating lab request PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+          break;
+  
+        case 'lab-reservation':
+          // For normal utilization reservations, create a basic lab reservation form
+          try {
+            // Format time from UtilTimes if available
+            let inclusiveTime = '';
+            if (Array.isArray(detailedData.UtilTimes) && detailedData.UtilTimes.length > 0) {
+              const firstTime = detailedData.UtilTimes[0];
+              if (firstTime.StartTime && firstTime.EndTime) {
+                const startTime = new Date(firstTime.StartTime);
+                const endTime = new Date(firstTime.EndTime);
+                inclusiveTime = `${startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+              }
+            }
+           
+            // Create material items from UserServices and UserTools
+            const materialItems = [
+              // Convert services to materials
+              ...detailedData.UserServices.map((service: any) => ({
+                quantity: '1',
+                item: service.ServiceAvail || '',
+                description: service.EquipmentAvail || '',
+                issuedCondition: '',
+                returnedCondition: ''
+              })),
+              // Add tools as materials
+              ...detailedData.UserTools.map((tool: any) => ({
+                quantity: tool.ToolQuantity?.toString() || '1',
+                item: tool.ToolUser || '',
+                description: '',
+                issuedCondition: '',
+                returnedCondition: ''
+              }))
+            ];
+           
+            // Create a basic lab reservation form for non-EVC reservations
+            const labReservationData = {
+              campus: 'Eastern Visayas Campus', // Default value
+              controlNo: `S-${detailedData.id}`,
+              schoolYear: new Date().getFullYear().toString(),
+              gradeLevel: '', // Not applicable for regular utilization
+              numberOfStudents: '1', // Default to 1 for regular utilization
+              subject: '', // Not applicable for regular utilization
+              concurrentTopic: '', // Not applicable for regular utilization
+              unit: '', // Not applicable for regular utilization
+              teacherInCharge: '', // Not applicable for regular utilization
+              venue: 'Fabrication Laboratory',
+              inclusiveTimeOfUse: inclusiveTime,
+              date: new Date(detailedData.RequestDate).toLocaleDateString(),
+              materials: materialItems,
+              receivedBy: '',
+              receivedAndInspectedBy: '',
+              receivedDate: '',
+              inspectedDate: '',
+              requestedBy: detailedData.accInfo?.Name || '',
+              dateRequested: new Date(detailedData.RequestDate).toLocaleDateString(),
+              students: [{ name: detailedData.accInfo?.Name || '' }],
+              endorsedBy: '',
+              approvedBy: ''
+            };
+           
+            console.log('Lab reservation data for regular utilization:', labReservationData);
+            downloadLabReservationFormPDF(labReservationData);
+          } catch (error) {
+            console.error('Error in lab reservation PDF generation for regular utilization:', error);
+            alert(`Error generating lab reservation PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          }
+          break;
+         
+        default:
+          console.error('Unknown form type:', formType);
+      }
+  
+      // Close modal and trigger scroll fix
+      setIsPdfModalOpen(false);
+      setSelectedReservationId(null);
+      setNeedsScrollFix(true);
+    } catch (error) {
+      console.error('Error in overall PDF generation process:', error);
+      alert(`Failed to generate PDF: ${error instanceof Error ? error.message : 'Unknown error. Please try again.'}`);
+     
+      // Still need to close modal and fix scroll
+      setIsPdfModalOpen(false);
+      setSelectedReservationId(null);
+      setNeedsScrollFix(true);
+    }
   };
 
   const handleStatusUpdate = async (
