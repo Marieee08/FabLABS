@@ -423,30 +423,6 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
         }
       }
     }
-
-    useEffect(() => {
-      if (selectedService && servicesData.length > 0) {
-        const service = servicesData.find(s => s.Service === selectedService);
-        
-        if (service && service.Machines) {
-          // Add isAvailable check to only include available machines
-          const machines = service.Machines
-            .filter(m => m.machine.isAvailable !== false) // Filter out unavailable machines
-            .map(m => ({
-              id: m.machine.id,
-              Machine: m.machine.Machine,
-              isAvailable: true,
-              Number: m.machine.Number || 1
-            }));
-          
-          setMachinesForService(machines);
-        } else {
-          setMachinesForService([]);
-        }
-      } else {
-        setMachinesForService([]);
-      }
-    }, [selectedService, servicesData]);
     
     const style = {
       backgroundColor,

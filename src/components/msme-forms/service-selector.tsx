@@ -7,7 +7,8 @@ interface Service {
   id: string;
   Service: string;
   Machines?: { 
-    machine: { 
+    machine: {
+      isAvailable: boolean; 
       id: string;
       Machine: string;
       Number?: number;
@@ -72,6 +73,7 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+  
 
   const handleServiceChange = (service: string) => {
     const currentServices = selectedServices || [];
@@ -105,6 +107,47 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
   const filteredServices = services.filter(service => 
     service.Service.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  filteredServices.map((service) => {
+    // ADD THIS CODE HERE for calculating machine counts
+    const totalMachines = service.Machines?.reduce((sum, m) => sum + (m.machine.Number || 1), 0) || 0;
+    const availableMachines = service.Machines?.reduce((sum, m) => 
+      m.machine.isAvailable !== false ? sum + (m.machine.Number || 1) : sum, 0) || 0;
+    const machineCount = availableMachines;
+    const isServiceAvailable = !service.Machines || service.Machines.length === 0 || machineCount > 0;
+    
+    return (
+      <div 
+        key={service.id} 
+        className={`
+          px-4 py-3 hover:bg-blue-50 flex items-center 
+          ${!isServiceAvailable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} 
+          ${isServiceSelected(service.Service) ? 'bg-blue-50' : ''}
+        `}
+        onClick={() => isServiceAvailable && handleServiceChange(service.Service)}
+      >
+        {/* checkbox part */}
+        <div className="flex-grow">
+          <span className={isServiceSelected(service.Service) ? "font-medium text-blue-800" : ""}>
+            {service.Service}
+          </span>
+          
+          {/* REPLACE THIS PART with improved machine count display */}
+          {service.Machines && service.Machines.length > 0 && (
+            <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${
+              machineCount > 0 
+                ? 'bg-blue-100 text-blue-700' 
+                : 'bg-red-100 text-red-700'
+            }`}>
+              {machineCount > 0 
+                ? `${machineCount}/${totalMachines} machines available` 
+                : 'No machines available'}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  })
 
   return (
     <div ref={dropdownRef} className="relative">
@@ -159,35 +202,39 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
               <div className="p-4 text-center text-gray-500">No matching services</div>
             ) : (
               filteredServices.map((service) => {
-                const machineCount = service.Machines?.reduce((sum, m) => sum + (m.machine.Number || 1), 0) || 0;
+                // ADD THIS CODE HERE for calculating machine counts
+                const totalMachines = service.Machines?.reduce((sum, m) => sum + (m.machine.Number || 1), 0) || 0;
+                const availableMachines = service.Machines?.reduce((sum, m) => 
+                  m.machine.isAvailable !== false ? sum + (m.machine.Number || 1) : sum, 0) || 0;
+                const machineCount = availableMachines;
+                const isServiceAvailable = !service.Machines || service.Machines.length === 0 || machineCount > 0;
                 
                 return (
                   <div 
                     key={service.id} 
                     className={`
-                      px-4 py-3 hover:bg-blue-50 flex items-center cursor-pointer transition-colors
+                      px-4 py-3 hover:bg-blue-50 flex items-center 
+                      ${!isServiceAvailable ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} 
                       ${isServiceSelected(service.Service) ? 'bg-blue-50' : ''}
                     `}
-                    onClick={() => handleServiceChange(service.Service)}
+                    onClick={() => isServiceAvailable && handleServiceChange(service.Service)}
                   >
-                    <div className={`
-                      w-5 h-5 mr-3 flex-shrink-0 border rounded ${
-                        isServiceSelected(service.Service) 
-                          ? "bg-blue-500 border-blue-500 flex items-center justify-center" 
-                          : "border-gray-300"
-                      }`}
-                    >
-                      {isServiceSelected(service.Service) && <Check size={16} className="text-white" />}
-                    </div>
+                    {/* checkbox part */}
                     <div className="flex-grow">
                       <span className={isServiceSelected(service.Service) ? "font-medium text-blue-800" : ""}>
                         {service.Service}
                       </span>
                       
-                      {/* Show machine count */}
-                      {machineCount > 0 && (
-                        <span className="ml-2 bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full">
-                          {machineCount} {machineCount === 1 ? 'machine' : 'machines'}
+                      {/* REPLACE THIS PART with improved machine count display */}
+                      {service.Machines && service.Machines.length > 0 && (
+                        <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${
+                          machineCount > 0 
+                            ? 'bg-blue-100 text-blue-700' 
+                            : 'bg-red-100 text-red-700'
+                        }`}>
+                          {machineCount > 0 
+                            ? `${machineCount}/${totalMachines} machines available` 
+                            : 'No machines available'}
                         </span>
                       )}
                     </div>

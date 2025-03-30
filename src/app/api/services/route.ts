@@ -38,22 +38,24 @@ function validateServiceData(data: any) {
 export async function GET() {
   try {
     // Fetch services with complete machine data including Number field
+    // When returning service data, ensure machine.isAvailable is included in the response
     const services = await prisma.service.findMany({
       include: {
         Machines: {
-          select: {
+          include: {
             machine: {
               select: {
                 id: true,
                 Machine: true,
-                Number: true  // This field contains the quantity of each machine
+                Number: true,
+                isAvailable: true  // Make sure this field is included
               }
             }
           }
         }
       }
     });
-    
+
     // Return the response with proper headers
     return NextResponse.json(services, {
       status: 200,
