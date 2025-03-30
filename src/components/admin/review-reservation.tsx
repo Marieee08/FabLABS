@@ -984,7 +984,7 @@ return (
                     ) : (
                       <>
                         {/* Only show edit buttons if reservation is not in a non-editable state */}
-                        {!isEditingDisabled(localReservation.Status) && (
+                        {!isEditingDisabled(localReservation.Status) && localReservation.Status !== 'Rejected' && (
                           <Button 
                             variant="outline" 
                             onClick={attemptEnterEditMode}
