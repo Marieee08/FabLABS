@@ -552,113 +552,156 @@ const DashboardUser = () => {
                 </div>
               </div>
 
-              {/* Modal for reviewing reservations */}
-              <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-                  <DialogHeader>
-                    <DialogTitle className="text-2xl font-semibold">Review Reservation</DialogTitle>
-                  </DialogHeader>
-                  
-                  {selectedReservation && (
-                    <div className="mt-4 space-y-6">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <h3 className="font-medium text-gray-900">Request Date</h3>
-                          <p>{new Date(selectedReservation.RequestDate).toLocaleDateString()}</p>
-                        </div>
-                        <div>
-                          <h3 className="font-medium text-gray-900">Status</h3>
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(selectedReservation.Status)}`}>
-                            {selectedReservation.Status}
-                          </span>
-                        </div>
-                      </div>
+{/* Modal for reviewing reservations */}
+<Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+  <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+    <DialogHeader>
+      <DialogTitle className="text-2xl font-semibold">Review Reservation</DialogTitle>
+    </DialogHeader>
+    
+    {selectedReservation && (
+      <div className="mt-4 space-y-6">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <h3 className="font-medium text-gray-900">Request Date</h3>
+            <p>{new Date(selectedReservation.RequestDate).toLocaleDateString()}</p>
+          </div>
+          <div>
+            <h3 className="font-medium text-gray-900">Status</h3>
+            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(selectedReservation.Status)}`}>
+              {selectedReservation.Status}
+            </span>
+          </div>
+        </div>
 
-                      <div>
-                        <h3 className="font-medium text-gray-900">Services Information</h3>
-                        <div className="mt-2">
-                          <p>
-                            <span className="text-gray-600">Services:</span> 
-                            {getUniqueItems(selectedReservation.UserServices.map(service => service.ServiceAvail))}
-                          </p>
-                          <p>
-                            <span className="text-gray-600">Equipment:</span> 
-                            {getUniqueItems(selectedReservation.UserServices.map(service => service.EquipmentAvail))}
-                          </p>
-                          
-                          {/* Display machine utilizations if available */}
-                          {selectedReservation.MachineUtilizations && selectedReservation.MachineUtilizations.length > 0 && (
-                            <p>
-                              <span className="text-gray-600">Machines:</span> 
-                              {getUniqueItems(selectedReservation.MachineUtilizations.map(machine => machine.Machine))}
-                            </p>
-                          )}
-                          
-                          <p><span className="text-gray-600">Bulk of Commodity:</span> {selectedReservation.BulkofCommodity || 'Not specified'}</p>
-                        </div>
-                      </div>
+        <div>
+          <h3 className="font-medium text-gray-900">Services Information</h3>
+          <div className="mt-2">
+            <p>
+              <span className="text-gray-600">Services:</span> 
+              {getUniqueItems(selectedReservation.UserServices.map(service => service.ServiceAvail))}
+            </p>
+            <p>
+              <span className="text-gray-600">Equipment:</span> 
+              {getUniqueItems(selectedReservation.UserServices.map(service => service.EquipmentAvail))}
+            </p>
+            
+            {/* Display machine utilizations if available */}
+            {selectedReservation.MachineUtilizations && selectedReservation.MachineUtilizations.length > 0 && (
+              <p>
+                <span className="text-gray-600">Machines:</span> 
+                {getUniqueItems(selectedReservation.MachineUtilizations.map(machine => machine.Machine))}
+              </p>
+            )}
+            
+            <p><span className="text-gray-600">Bulk of Commodity:</span> {selectedReservation.BulkofCommodity || 'Not specified'}</p>
+          </div>
+        </div>
 
-                      <div>
-                        <h3 className="font-medium text-gray-900">Schedule</h3>
-                        <div className="mt-2">
-                          {selectedReservation.UtilTimes.map((time, index) => (
-                            <div key={index} className="mb-2 p-2 bg-gray-50 rounded">
-                              <p><span className="text-gray-600">Day {time.DayNum}:</span></p>
-                              <p className="ml-4">Start: {time.StartTime ? new Date(time.StartTime).toLocaleString() : 'Not set'}</p>
-                              <p className="ml-4">End: {time.EndTime ? new Date(time.EndTime).toLocaleString() : 'Not set'}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+{/* Cost Breakdown Section */}
+<div>
+  <h3 className="font-medium text-gray-900">Cost Breakdown</h3>
+  <div className="mt-2">
+    {selectedReservation.UserServices.length > 0 ? (
+      <div className="space-y-2">
+        {selectedReservation.UserServices.map((service, index) => {
+          // Convert CostsAvail to number if it's not null
+          const cost = service.CostsAvail !== null ? Number(service.CostsAvail) : 0;
+          const duration = service.MinsAvail !== null ? service.MinsAvail : 0;
+          
+          return (
+            <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+              <div>
+                <p className="font-medium">{service.ServiceAvail}</p>
+                {service.EquipmentAvail && (
+                  <p className="text-sm text-gray-600">Equipment: {service.EquipmentAvail}</p>
+                )}
+              </div>
+              <div className="text-right">
+                <p className="font-medium">₱{cost.toFixed(2)}</p>
+                {duration > 0 && (
+                  <p className="text-sm text-gray-600">{duration} minutes</p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+        {/* Total Cost */}
+        <div className="flex items-center justify-between bg-blue-50 p-3 rounded border border-blue-100 mt-4">
+          <p className="font-bold text-gray-900">Total Estimated Cost</p>
+          <p className="font-bold text-blue-800">
+            ₱{selectedReservation.UserServices.reduce((total, service) => 
+              total + (service.CostsAvail !== null ? Number(service.CostsAvail) : 0), 0).toFixed(2)}
+          </p>
+        </div>
+      </div>
+    ) : (
+      <p className="text-gray-500 italic">No cost information available</p>
+    )}
+  </div>
+</div>
 
-                      <div>
-                        <h3 className="font-medium text-gray-900">Tools</h3>
-                        <div className="mt-2">
-                          {selectedReservation.UserTools.length > 0 ? (
-                            <div className="space-y-2">
-                              {selectedReservation.UserTools.map((tool, index) => (
-                                <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                                  <span className="text-gray-600">{tool.ToolUser}</span>
-                                  <span className="font-medium">{tool.ToolQuantity} units</span>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-gray-500 italic">No tools specified</p>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Machine Utilization Details */}
-                      {selectedReservation.MachineUtilizations && selectedReservation.MachineUtilizations.length > 0 && (
-                        <div>
-                          <h3 className="font-medium text-gray-900">Machine Details</h3>
-                          <div className="mt-2">
-                            <div className="space-y-2">
-                              {selectedReservation.MachineUtilizations.map((machine, index) => (
-                                <div key={index} className="p-2 bg-gray-50 rounded">
-                                  <p><span className="text-gray-600">Machine:</span> {machine.Machine}</p>
-                                  {machine.ServiceName && (
-                                    <p><span className="text-gray-600">For Service:</span> {machine.ServiceName}</p>
-                                  )}
-                                  <p><span className="text-gray-600">Approval Status:</span> {
-                                    machine.MachineApproval ? 
-                                      <span className="text-green-600">Approved</span> : 
-                                      <span className="text-yellow-600">Pending Approval</span>
-                                  }</p>
-                                  {machine.DateReviewed && (
-                                    <p><span className="text-gray-600">Reviewed On:</span> {new Date(machine.DateReviewed).toLocaleDateString()}</p>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </DialogContent>
-              </Dialog>
+        <div>
+          <h3 className="font-medium text-gray-900">Schedule</h3>
+          <div className="mt-2">
+            {selectedReservation.UtilTimes.map((time, index) => (
+              <div key={index} className="mb-2 p-2 bg-gray-50 rounded">
+                <p><span className="text-gray-600">Day {time.DayNum}:</span></p>
+                <p className="ml-4">Start: {time.StartTime ? new Date(time.StartTime).toLocaleString() : 'Not set'}</p>
+                <p className="ml-4">End: {time.EndTime ? new Date(time.EndTime).toLocaleString() : 'Not set'}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <h3 className="font-medium text-gray-900">Tools</h3>
+          <div className="mt-2">
+            {selectedReservation.UserTools.length > 0 ? (
+              <div className="space-y-2">
+                {selectedReservation.UserTools.map((tool, index) => (
+                  <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                    <span className="text-gray-600">{tool.ToolUser}</span>
+                    <span className="font-medium">{tool.ToolQuantity} units</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-gray-500 italic">No tools specified</p>
+            )}
+          </div>
+        </div>
+        
+        {/* Machine Utilization Details */}
+        {selectedReservation.MachineUtilizations && selectedReservation.MachineUtilizations.length > 0 && (
+          <div>
+            <h3 className="font-medium text-gray-900">Machine Details</h3>
+            <div className="mt-2">
+              <div className="space-y-2">
+                {selectedReservation.MachineUtilizations.map((machine, index) => (
+                  <div key={index} className="p-2 bg-gray-50 rounded">
+                    <p><span className="text-gray-600">Machine:</span> {machine.Machine}</p>
+                    {machine.ServiceName && (
+                      <p><span className="text-gray-600">For Service:</span> {machine.ServiceName}</p>
+                    )}
+                    <p><span className="text-gray-600">Approval Status:</span> {
+                      machine.MachineApproval ? 
+                        <span className="text-green-600">Approved</span> : 
+                        <span className="text-yellow-600">Pending Approval</span>
+                    }</p>
+                    {machine.DateReviewed && (
+                      <p><span className="text-gray-600">Reviewed On:</span> {new Date(machine.DateReviewed).toLocaleDateString()}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )}
+  </DialogContent>
+</Dialog>
 
               <div className="bg-white rounded-lg text-blue-800 pl-4 py-4 mt-4 shadow-md border border-[#5e86ca]">
                 <p className="text-xl font-bold text-[#143370]">History</p>
