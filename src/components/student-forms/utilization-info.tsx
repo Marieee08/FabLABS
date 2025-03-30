@@ -1,7 +1,7 @@
 // src\components\student-forms\utilization-info.tsx
-import React, { useState, useEffect, useCallback, useRef, ChangeEvent } from 'react';
-import ToolsSelector from '@/components/msme-forms/tools-selector';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ServiceSelector from '@/components/msme-forms/service-selector';
+import { CheckCircle, AlertCircle } from 'lucide-react';
 
 interface Service {
   id: string;
@@ -10,29 +10,21 @@ interface Service {
     machine: { 
       id: string;
       Machine: string;
+      Number?: number;
+      isAvailable?: boolean;
+      Desc?: string;
     } 
   }[];
 }
 
-interface Day {
-  date: Date;
-  startTime: string | null;
-  endTime: string | null;
-}
-
-interface Material {
-  Item: string;
-  ItemQty: number;
-  Description: string;
+interface SelectedMachine {
+  id: string;
+  quantity: number;
 }
 
 interface FormData {
-  days: Day[];
   ProductsManufactured: string | string[];
-  BulkofCommodity: string;
-  Equipment: string[] | string;
-  Tools: string;
-  NeededMaterials: Material[];
+  SelectedMachines?: SelectedMachine[];
   [key: string]: any;
 }
 
@@ -49,263 +41,265 @@ export default function UtilizationInfo({
   updateFormData, 
   standalonePage = false 
 }: UtilizationInfoProps) {
-  const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
-  const [touchedFields, setTouchedFields] = useState<Set<keyof FormData>>(new Set());
   const [services, setServices] = useState<Service[]>([]);
   const [isLoadingServices, setIsLoadingServices] = useState(true);
   const [serviceError, setServiceError] = useState<string | null>(null);
-  const [availableEquipment, setAvailableEquipment] = useState<string[]>([]);
-  
-  // Updated fetchServices function
-useEffect(() => {
-  const fetchServices = async () => {
-    setIsLoadingServices(true);
-    setServiceError(null);
-    
-    try {
-      // Add error handling for the fetch itself
-      const response = await fetch('/api/services', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          // Add cache control to prevent cached responses
-          'Cache-Control': 'no-cache, no-store, must-revalidate'
-        },
-      });
-      
-      // Check if the response is valid before trying to parse JSON
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        console.error('Service API returned error status:', response.status, errorData);
-        throw new Error(`Failed to fetch services: ${response.status} ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      
-      // Validate the data structure
-      if (!Array.isArray(data)) {
-        console.error('Unexpected API response format:', data);
-        throw new Error('Invalid service data format received');
-      }
-      
-      setServices(data);
-      setIsLoadingServices(false);
-    } catch (err) {
-      console.error('Services fetch error:', err);
-      setServiceError(err instanceof Error ? err.message : 'Failed to load services. Please try again.');
-      setIsLoadingServices(false);
-    }
-  };
+  const [availableMachines, setAvailableMachines] = useState<{[service: string]: any[]}>({});
+  const [errors, setErrors] = useState<{[key: string]: string}>({});
 
-  fetchServices();
-}, []);
-
-  // Store services in a ref to avoid unnecessary re-renders
-  const servicesRef = useRef(services);
-  
-  // Update ref when services change
+  // Fetch services and process machine data
   useEffect(() => {
-    servicesRef.current = services;
-  }, [services]);
-  
-  // Update available equipment based on selected services
-  useEffect(() => {
-    if (formData.ProductsManufactured && formData.ProductsManufactured.length > 0) {
-      // Find all machines associated with the selected services
-      const selectedServices = servicesRef.current.filter(service => 
-        Array.isArray(formData.ProductsManufactured) && 
-        formData.ProductsManufactured.includes(service.Service)
-      );
+    const fetchServices = async () => {
+      setIsLoadingServices(true);
+      setServiceError(null);
       
-      // Extract unique machine names from the selected services
-      const machines = selectedServices.flatMap(service => 
-        service.Machines?.map(m => m.machine.Machine) || []
-      );
-      
-      // Remove duplicates
-      const uniqueMachines = [...new Set(machines)];
-      
-      setAvailableEquipment(uniqueMachines);
-      
-      // Reset equipment if current selections are not available
-      if (Array.isArray(formData.Equipment)) {
-        const validEquipment = formData.Equipment.filter(eq => uniqueMachines.includes(eq));
-        if (validEquipment.length !== formData.Equipment.length) {
-          updateFormData('Equipment', validEquipment);
+      try {
+        const response = await fetch('/api/services', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+          },
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch services: ${response.status}`);
         }
-      } else if (typeof formData.Equipment === 'string' && formData.Equipment && !uniqueMachines.includes(formData.Equipment)) {
-        updateFormData('Equipment', []);
+        
+        const data = await response.json();
+        
+        // Process machine data
+        const machinesByService: {[service: string]: any[]} = {};
+        
+        data.forEach((service: Service) => {
+          if (service.Machines && service.Machines.length > 0) {
+            // Filter and map machines, keeping only available ones
+            const availableMachinesForService = service.Machines
+              .filter(m => m.machine.isAvailable !== false && (m.machine.Number || 0) > 0)
+              .map(m => ({
+                id: m.machine.id,
+                name: m.machine.Machine,
+                quantity: m.machine.Number || 0,
+                description: m.machine.Desc || ''
+              }));
+            
+            if (availableMachinesForService.length > 0) {
+              machinesByService[service.Service] = availableMachinesForService;
+            }
+          }
+        });
+        
+        setServices(data);
+        setAvailableMachines(machinesByService);
+        setIsLoadingServices(false);
+      } catch (err) {
+        console.error('Services fetch error:', err);
+        setServiceError(err instanceof Error ? err.message : 'Failed to load services');
+        setIsLoadingServices(false);
       }
-    } else {
-      setAvailableEquipment([]);
-      updateFormData('Equipment', []);
-    }
-  }, [formData.ProductsManufactured, updateFormData]);
+    };
 
-  // Validate fields
-  const validateField = useCallback((fieldName: keyof FormData, value: any) => {
-    let error = '';
-
-    if (fieldName === 'ProductsManufactured') {
-      if (!value || (Array.isArray(value) && value.length === 0)) {
-        error = 'Please select at least one service';
-      }
-    }
-
-    setErrors(prev => ({
-      ...prev,
-      [fieldName]: error
-    }));
-
-    return !error;
+    fetchServices();
   }, []);
-
-  // Mark field as touched on blur
-  const handleBlur = useCallback((fieldName: keyof FormData) => {
-    setTouchedFields(prev => {
-      const newTouchedFields = new Set(prev);
-      newTouchedFields.add(fieldName);
-      return newTouchedFields;
-    });
-    validateField(fieldName, formData[fieldName]);
-  }, [formData, validateField]);
 
   // Handle service selection
   const handleServiceChange = useCallback((services: string[]) => {
-    updateFormData('ProductsManufactured', services);
-    validateField('ProductsManufactured', services);
-  }, [updateFormData, validateField]);
+    // Reset selected machines when services change
+    const selectedService = services[0] || '';
+    
+    updateFormData('ProductsManufactured', selectedService);
+    updateFormData('SelectedMachines', []);
+    
+    // Validate service selection
+    setErrors(prev => ({
+      ...prev,
+      service: selectedService ? '' : 'Please select a service'
+    }));
+  }, [updateFormData]);
 
-  // Toggle equipment selection
-  const toggleEquipment = (equipmentName: string) => {
-    let currentEquipment: string[] = [];
+  // Handle machine selection with quantity
+  const handleMachineSelection = useCallback((machineId: string, quantity: number) => {
+    const currentService = Array.isArray(formData.ProductsManufactured) 
+      ? formData.ProductsManufactured[0] 
+      : formData.ProductsManufactured;
     
-    if (Array.isArray(formData.Equipment)) {
-      currentEquipment = [...formData.Equipment];
-    } else if (typeof formData.Equipment === 'string' && formData.Equipment) {
-      currentEquipment = [formData.Equipment];
+    if (!currentService) {
+      setErrors(prev => ({
+        ...prev,
+        machines: 'Please select a service first'
+      }));
+      return;
     }
+
+    const selectedMachines = formData.SelectedMachines || [];
     
-    const index = currentEquipment.indexOf(equipmentName);
+    // Find the machine in the current selection
+    const existingMachineIndex = selectedMachines.findIndex(m => m.id === machineId);
     
-    if (index > -1) {
-      // Remove if already selected
-      currentEquipment.splice(index, 1);
+    let updatedMachines: SelectedMachine[];
+    if (existingMachineIndex !== -1) {
+      // If machine exists, update its quantity or remove if quantity is 0
+      updatedMachines = quantity > 0
+        ? selectedMachines.map((m, index) => 
+            index === existingMachineIndex ? { id: machineId, quantity } : m
+          )
+        : selectedMachines.filter(m => m.id !== machineId);
     } else {
-      // Add if not selected
-      currentEquipment.push(equipmentName);
+      // Add new machine if quantity is greater than 0
+      if (quantity > 0) {
+        updatedMachines = [...selectedMachines, { id: machineId, quantity }];
+      } else {
+        updatedMachines = selectedMachines;
+      }
     }
     
-    updateFormData('Equipment', currentEquipment);
-  };
+    updateFormData('SelectedMachines', updatedMachines);
+    
+    // Clear machine selection error if machines are selected
+    setErrors(prev => ({
+      ...prev,
+      machines: updatedMachines.length > 0 ? '' : 'Please select at least one machine'
+    }));
+  }, [formData.ProductsManufactured, formData.SelectedMachines, updateFormData]);
 
-  // Get CSS classes for form fields
-  const getInputClassName = useCallback((fieldName: keyof FormData) => {
-    const baseClasses = "mt-1 block w-full border rounded-md shadow-sm p-3";
-    const errorClasses = touchedFields.has(fieldName) && errors[fieldName] 
-      ? "border-red-500 focus:ring-red-500 focus:border-red-500" 
-      : "border-gray-300 focus:ring-blue-500 focus:border-blue-500";
-    return `${baseClasses} ${errorClasses}`;
-  }, [touchedFields, errors]);
-
-  // Check if an equipment is selected
-  const isEquipmentSelected = (equipmentName: string) => {
-    if (Array.isArray(formData.Equipment)) {
-      return formData.Equipment.includes(equipmentName);
-    } else if (typeof formData.Equipment === 'string') {
-      return formData.Equipment === equipmentName;
+  // Render machine selection for the current service
+  const renderMachineSelection = () => {
+    const currentService = Array.isArray(formData.ProductsManufactured) 
+      ? formData.ProductsManufactured[0] 
+      : formData.ProductsManufactured;
+    
+    if (!currentService) {
+      return (
+        <div className="p-4 bg-gray-50 rounded-lg text-center text-gray-600">
+          Please select a service first to see available machines
+        </div>
+      );
     }
-    return false;
+
+    const serviceMachines = availableMachines[currentService] || [];
+    
+    if (serviceMachines.length === 0) {
+      return (
+        <div className="p-4 bg-yellow-50 rounded-lg text-center text-yellow-700">
+          <AlertCircle className="h-6 w-6 mx-auto mb-2" />
+          No machines currently available for the selected service
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {serviceMachines.map((machine) => {
+          // Find the selected machine and its quantity
+          const selectedMachine = (formData.SelectedMachines || [])
+            .find(m => m.id === machine.id);
+          
+          const currentQuantity = selectedMachine ? selectedMachine.quantity : 0;
+          const maxQuantity = machine.quantity;
+
+          return (
+            <div 
+              key={machine.id}
+              className={`
+                border rounded-lg p-4 transition-all duration-200
+                ${currentQuantity > 0 
+                  ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-300' 
+                  : 'bg-white border-gray-300 hover:border-blue-300'}
+              `}
+            >
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-semibold text-gray-800">{machine.name}</h4>
+                <div className="text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded-full">
+                  {machine.quantity} available
+                </div>
+              </div>
+              
+              <p className="text-xs text-gray-600 mb-3">{machine.description}</p>
+              
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={() => handleMachineSelection(machine.id, Math.max(0, currentQuantity - 1))}
+                  disabled={currentQuantity <= 0}
+                  className={`
+                    p-1.5 rounded border 
+                    ${currentQuantity > 0 
+                      ? 'bg-gray-200 hover:bg-gray-300' 
+                      : 'bg-gray-100 cursor-not-allowed'}
+                  `}
+                >
+                  -
+                </button>
+                
+                <span className="font-medium text-gray-800 w-8 text-center">
+                  {currentQuantity}
+                </span>
+                
+                <button
+                  onClick={() => handleMachineSelection(machine.id, Math.min(maxQuantity, currentQuantity + 1))}
+                  disabled={currentQuantity >= maxQuantity}
+                  className={`
+                    p-1.5 rounded border 
+                    ${currentQuantity < maxQuantity 
+                      ? 'bg-blue-200 hover:bg-blue-300' 
+                      : 'bg-gray-100 cursor-not-allowed'}
+                  `}
+                >
+                  +
+                </button>
+              </div>
+              
+              {currentQuantity > 0 && (
+                <div className="mt-2 text-green-600 flex items-center">
+                  <CheckCircle className="h-5 w-5 mr-2" />
+                  <span>Selected: {currentQuantity} machine(s)</span>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
   };
 
   return (
-    <div className="w-full mx-auto">
-      <div className="space-y-5 h-full">
-        {/* Services Selection */}
-        <div className="relative">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Services to be availed<span className="text-red-500 ml-1">*</span>
-          </label>
-          
-          {isLoadingServices ? (
-            <div className="py-3 text-gray-500">Loading services...</div>
-          ) : serviceError ? (
-            <div className="py-3 text-red-500">{serviceError}</div>
-          ) : (
-            <ServiceSelector 
-              selectedServices={Array.isArray(formData.ProductsManufactured) ? formData.ProductsManufactured : []}
-              onChange={handleServiceChange}
-              onBlur={() => handleBlur('ProductsManufactured')}
-              hasError={touchedFields.has('ProductsManufactured') && !!errors.ProductsManufactured}
-              errorMessage={errors.ProductsManufactured}
-            />
-          )}
-        </div>
-
-        {/* Equipment Selection (Simple checkbox-based selection) */}
-        <div className="relative">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Equipment
-            {availableEquipment.length > 0 && <span className="text-red-500 ml-1">*</span>}
-          </label>
-          
-          {availableEquipment.length > 0 ? (
-            <div className="flex flex-wrap gap-2 border rounded-lg p-3 bg-gray-50">
-              {availableEquipment.map(equipment => (
-                <div key={equipment} className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id={`equipment-${equipment}`}
-                    checked={isEquipmentSelected(equipment)}
-                    onChange={() => toggleEquipment(equipment)}
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                  />
-                  <label
-                    htmlFor={`equipment-${equipment}`}
-                    className="ml-2 block text-gray-700 text-sm font-medium"
-                  >
-                    {equipment}
-                  </label>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="mt-1 text-sm text-gray-500">
-              {formData.ProductsManufactured && Array.isArray(formData.ProductsManufactured) && 
-               formData.ProductsManufactured.length > 0 
-                ? "No equipment available for selected services" 
-                : "Please select services first to see available equipment"}
-            </p>
-          )}
-          
-          {/* Display selected equipment summary */}
-          {Array.isArray(formData.Equipment) && formData.Equipment.length > 0 && (
-            <div className="mt-2 p-2 bg-blue-50 border border-blue-100 rounded-md">
-              <p className="text-sm text-blue-700 font-medium">Selected Equipment:</p>
-              <div className="mt-1 flex flex-wrap gap-1">
-                {formData.Equipment.map((item, index) => (
-                  <span key={index} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                    {item}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Tools Selection */}
-        <div className="relative">
-          <label htmlFor="Tools" className="block text-sm font-medium text-gray-700 mb-2">
-            Tools
-          </label>
-          <ToolsSelector
-            id="Tools"
-            value={formData.Tools}
-            onChange={(value) => updateFormData('Tools', value)}
-            onBlur={() => handleBlur('Tools')}
-            className={getInputClassName('Tools')}
+    <div className="w-full mx-auto space-y-6">
+      {/* Services Selection */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Services to be availed<span className="text-red-500 ml-1">*</span>
+        </label>
+        
+        {isLoadingServices ? (
+          <div className="py-3 text-gray-500">Loading services...</div>
+        ) : serviceError ? (
+          <div className="py-3 text-red-500">{serviceError}</div>
+        ) : (
+          <ServiceSelector 
+            selectedServices={
+              typeof formData.ProductsManufactured === 'string' 
+                ? [formData.ProductsManufactured] 
+                : formData.ProductsManufactured
+            }
+            onChange={handleServiceChange}
+            hasError={!!errors.service}
+            errorMessage={errors.service}
+            singleSelect={true}
           />
-        </div>
+        )}
+      </div>
+
+      {/* Machine Selection */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Select Machines<span className="text-red-500 ml-1">*</span>
+        </label>
+        {renderMachineSelection()}
+        {errors.machines && (
+          <p className="mt-2 text-sm text-red-500 flex items-center">
+            <AlertCircle className="h-4 w-4 mr-2" />
+            {errors.machines}
+          </p>
+        )}
       </div>
     </div>
   );
