@@ -1,4 +1,3 @@
-
 // src\app\user-dashboard\page.tsx
 "use client";
 
@@ -11,6 +10,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import RoleGuard from '@/components/auth/role-guard';
 import { useRouter } from 'next/navigation';
 import { Loader } from 'lucide-react';
+import CostBreakdown from '@/components/admin/cost-breakdown';
+
+// Interface for DownTime
+interface DownTime {
+  id?: number;
+  DTDate: string | null;
+  DTTypeofProducts: string | null;
+  DTTime: number | null;
+  Cause: string | null;
+  DTMachineOp: string | null;
+  machineUtilId?: number | null;
+}
 
 interface UserService {
   id: string;
@@ -39,6 +50,7 @@ interface MachineUtilization {
   MachineApproval: boolean | null;
   DateReviewed: Date | null;
   ServiceName: string | null;
+  DownTimes: DownTime[];
 }
 
 interface Reservation {
@@ -55,23 +67,6 @@ interface Reservation {
     email: string;
   };
 }
-
-interface DownTime {
-  id?: number;
-  DTDate: string | null;
-  DTTypeofProducts: string | null;
-  DTTime: number | null; // Time in minutes
-  Cause: string | null;
-  DTMachineOp: string | null;
-  machineUtilId?: number | null;
-}
-
-interface AdjustedUserService extends UserService {
-  downtimeMinutes?: number;
-  adjustedCost?: number;
-  originalCost?: number;
-}
-
 
 const DashboardUser = () => {
   const router = useRouter();
@@ -106,14 +101,11 @@ const DashboardUser = () => {
     }
   };
 
-  // Helper function to get unique items from arrays
   const getUniqueItems = (items: (string | null)[]): string => {
-    // Filter out null values and create a Set to remove duplicates
     const uniqueItems = Array.from(new Set(items.filter(Boolean) as string[]));
     return uniqueItems.join(', ');
   };
 
-  // useEffect to fetch reservations
   useEffect(() => {
     const fetchReservations = async () => {
       setIsReservationsLoading(true);
@@ -122,14 +114,11 @@ const DashboardUser = () => {
         if (response.ok) {
           const data = await response.json();
           
-          // Process the reservations to consolidate services and machines with same names
           const processedData = data.map((reservation: Reservation) => {
-            // Process UserServices to consolidate duplicates
             if (reservation.UserServices && Array.isArray(reservation.UserServices)) {
               const serviceMap = new Map();
               
               reservation.UserServices.forEach((service: UserService) => {
-                // Create a composite key that combines service name and equipment name
                 const key = `${service.ServiceAvail}___${service.EquipmentAvail}`;
                 
                 if (!serviceMap.has(key)) {
@@ -137,31 +126,28 @@ const DashboardUser = () => {
                 }
               });
               
-              // Update UserServices with consolidated list
               reservation.UserServices = Array.from(serviceMap.values());
             }
             
-            // Process MachineUtilizations to consolidate duplicate machines
             if (reservation.MachineUtilizations && Array.isArray(reservation.MachineUtilizations)) {
               const machineMap = new Map();
               
               reservation.MachineUtilizations.forEach((machine: MachineUtilization) => {
-                // Skip null machine names
                 if (!machine.Machine) return;
                 
-                // Create a key from the machine name
                 const key = machine.Machine;
                 
                 if (!machineMap.has(key)) {
-                  machineMap.set(key, machine);
+                  machineMap.set(key, {
+                    ...machine,
+                    DownTimes: machine.DownTimes || []
+                  });
                 }
               });
               
-              // Update MachineUtilizations with consolidated list
               reservation.MachineUtilizations = Array.from(machineMap.values());
             }
             
-            // Process UserTools to consolidate duplicates and sum quantities
             if (reservation.UserTools && Array.isArray(reservation.UserTools)) {
               const toolMap = new Map();
               
@@ -171,21 +157,29 @@ const DashboardUser = () => {
                 if (!toolMap.has(key)) {
                   toolMap.set(key, { ...tool });
                 } else {
-                  // For tools, sum the quantities if they're the same tool
                   const existingTool = toolMap.get(key);
                   existingTool.ToolQuantity += tool.ToolQuantity;
                   toolMap.set(key, existingTool);
                 }
               });
               
-              // Update UserTools with consolidated list
               reservation.UserTools = Array.from(toolMap.values());
             }
             
             return reservation;
           });
           
-          setReservations(processedData);
+          const processedDataWithDowntimes = processedData.map((reservation: Reservation) => {
+            if (reservation.MachineUtilizations) {
+              reservation.MachineUtilizations = reservation.MachineUtilizations.map(machine => ({
+                ...machine,
+                DownTimes: machine.DownTimes || []
+              }));
+            }
+            return reservation;
+          });
+          
+          setReservations(processedDataWithDowntimes);
         }
       } catch (error) {
         console.error('Failed to fetch reservations:', error);
@@ -197,7 +191,6 @@ const DashboardUser = () => {
     fetchReservations();
   }, []);
 
-  // useEffect to get user role
   useEffect(() => {
     const fetchUserRole = async () => {
       if (!isLoaded || !user) {
@@ -221,18 +214,56 @@ const DashboardUser = () => {
     fetchUserRole();
   }, [user, isLoaded]);
 
-  const handleReviewClick = (reservation: Reservation) => {
-    setSelectedReservation(reservation);
-    setIsModalOpen(true);
+  const handleReviewClick = async (reservation: Reservation) => {
+    try {
+      setIsLoading(true);
+      
+      // Fetch the latest reservation data including machine utilizations
+      const response = await fetch(`/api/user/fetch-reservation/${reservation.id}?includeMachineUtilizations=true`);
+      
+      if (response.ok) {
+        const updatedReservation = await response.json();
+        
+        // Ensure DownTimes array exists for each machine utilization
+        if (updatedReservation.MachineUtilizations) {
+          updatedReservation.MachineUtilizations = updatedReservation.MachineUtilizations.map((machine: any) => ({
+            ...machine,
+            DownTimes: machine.DownTimes || [] // Ensure DownTimes exists
+          }));
+        }
+        
+        setSelectedReservation(updatedReservation);
+      } else {
+        // Fallback to the original reservation if fetch fails
+        console.warn('Using fallback reservation data');
+        setSelectedReservation({
+          ...reservation,
+          MachineUtilizations: reservation.MachineUtilizations?.map(m => ({
+            ...m,
+            DownTimes: m.DownTimes || []
+          })) || []
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch updated reservation:', error);
+      setSelectedReservation({
+        ...reservation,
+        MachineUtilizations: reservation.MachineUtilizations?.map(m => ({
+          ...m,
+          DownTimes: m.DownTimes || []
+        })) || []
+      });
+    } finally {
+      setIsLoading(false);
+      setIsModalOpen(true);
+    }
   };
 
-  // Navigation handler with loading state
   const handleNavigation = (href: string) => {
     setIsLoading(true);
     router.push(href);
   };
 
-  // Reservation Loading Skeleton
   const ReservationSkeleton = () => (
     <div className="animate-pulse">
       <table className="min-w-full divide-y divide-gray-200 rounded-xl">
@@ -277,7 +308,6 @@ const DashboardUser = () => {
   return (
     <RoleGuard allowedRoles={['MSME']}>
       <div className="flex h-screen overflow-hidden bg-[#f1f5f9]">
-        {/* Loading Overlay */}
         {isLoading && (
           <div className="fixed inset-0 bg-white bg-opacity-70 z-50 flex items-center justify-center">
             <div className="flex flex-col items-center">
@@ -467,263 +497,236 @@ const DashboardUser = () => {
               <h2 className="text-[#143370] text-3xl font-bold font-qanelas3">Dashboard</h2>
               <p className="text-sm text-[#143370] mb-4 font-poppins1">{formattedDate}</p>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 mb-4">
-
               </div>
 
               <div className="bg-white rounded-lg text-blue-800 px-4 py-4 shadow-md border border-[#5e86ca]">
                 <p className="text-xl font-bold text-[#143370]">Pending Reservations</p>
                 <p className="text-sm text-[#143370] mb-4">Here are your pending reservations!</p>
                 <div className="overflow-x-auto rounded-lg bg-blue-100 shadow-ld">
-                  
-                {isReservationsLoading ? (
-                  <ReservationSkeleton />
-                ) : (
-                  reservations.length === 0 ? (
-                    <div className="bg-blue-50 p-6 rounded-lg text-center">
-                      <p className="text-blue-800">You don't have any pending Reservations at the moment.</p>
-                      <a 
-                        href="/services"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          handleNavigation('/services');
-                        }}
-                        className="mt-4 inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                      >
-                        Create a New Order
-                      </a>
-                    </div>
+                  {isReservationsLoading ? (
+                    <ReservationSkeleton />
                   ) : (
-                    <table className="min-w-full divide-y divide-gray-200 rounded-xl">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Services</th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Equipment/Machines</th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {reservations.map((reservation) => (
-                          <tr key={reservation.id}>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="flex items-center">
-                                <div>
-                                  <div className="text-sm font-medium text-gray-500">
-                                    {new Date(reservation.RequestDate).toLocaleDateString()}
+                    reservations.length === 0 ? (
+                      <div className="bg-blue-50 p-6 rounded-lg text-center">
+                        <p className="text-blue-800">You don't have any pending Reservations at the moment.</p>
+                        <a 
+                          href="/services"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleNavigation('/services');
+                          }}
+                          className="mt-4 inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                        >
+                          Create a New Order
+                        </a>
+                      </div>
+                    ) : (
+                      <table className="min-w-full divide-y divide-gray-200 rounded-xl">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Services</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Equipment/Machines</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {reservations.map((reservation) => (
+                            <tr key={reservation.id}>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center">
+                                  <div>
+                                    <div className="text-sm font-medium text-gray-500">
+                                      {new Date(reservation.RequestDate).toLocaleDateString()}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            </td>
+                              </td>
 
-                            <td className="px-4 py-4 whitespace-nowrap">
-                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(reservation.Status)}`}>
-                                {reservation.Status}
-                              </span>
-                            </td>
+                              <td className="px-4 py-4 whitespace-nowrap">
+                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(reservation.Status)}`}>
+                                  {reservation.Status}
+                                </span>
+                              </td>
 
-                            <td className="px-4 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900">
-                                {/* Display unique service names */}
-                                {getUniqueItems(reservation.UserServices.map(service => service.ServiceAvail))}
-                              </div>
-                            </td>
-
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              {reservation.MachineUtilizations && reservation.MachineUtilizations.length > 0 ? (
-                                <div className="text-sm font-medium text-gray-900">
-                                  {/* Display unique machine names */}
-                                  {getUniqueItems(reservation.MachineUtilizations.map(machine => machine.Machine))}
+                              <td className="px-4 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900">
+                                  {getUniqueItems(reservation.UserServices.map(service => service.ServiceAvail))}
                                 </div>
-                              ) : (
-                                <div className="text-sm font-medium text-gray-900">
-                                  {/* Display unique equipment names */}
-                                  {getUniqueItems(reservation.UserServices.map(service => service.EquipmentAvail))}
-                                </div>
-                              )}
-                            </td>
+                              </td>
 
-                            <td className="px-6 py-4 whitespace-nowrap font-medium text-sm text-gray-500">
-                              {reservation.accInfo.email}
-                            </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                {reservation.MachineUtilizations && reservation.MachineUtilizations.length > 0 ? (
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {getUniqueItems(reservation.MachineUtilizations.map(machine => machine.Machine))}
+                                  </div>
+                                ) : (
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {getUniqueItems(reservation.UserServices.map(service => service.EquipmentAvail))}
+                                  </div>
+                                )}
+                              </td>
 
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                              <a
-                                href="#"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  handleReviewClick(reservation);
-                                }}
-                                className="ml-2 text-blue-600 hover:text-blue-900"
-                              >
-                                Review
-                              </a>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )
-                )}
+                              <td className="px-6 py-4 whitespace-nowrap font-medium text-sm text-gray-500">
+                                {reservation.accInfo.email}
+                              </td>
+
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <a
+                                  href="#"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    handleReviewClick(reservation);
+                                  }}
+                                  className="ml-2 text-blue-600 hover:text-blue-900"
+                                >
+                                  Review
+                                </a>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )
+                  )}
                 </div>
               </div>
 
-{/* Modal for reviewing reservations */}
-<Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-  <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-    <DialogHeader>
-      <DialogTitle className="text-2xl font-semibold">Review Reservation</DialogTitle>
-    </DialogHeader>
-    
-    {selectedReservation && (
-      <div className="mt-4 space-y-6">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <h3 className="font-medium text-gray-900">Request Date</h3>
-            <p>{new Date(selectedReservation.RequestDate).toLocaleDateString()}</p>
-          </div>
-          <div>
-            <h3 className="font-medium text-gray-900">Status</h3>
-            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(selectedReservation.Status)}`}>
-              {selectedReservation.Status}
-            </span>
-          </div>
-        </div>
+              {/* Modal for reviewing reservations */}
+              <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+                <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle className="text-2xl font-semibold">Review Reservation</DialogTitle>
+                  </DialogHeader>
+                  
+                  {selectedReservation && (
+                    <div className="mt-4 space-y-6">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <h3 className="font-medium text-gray-900">Request Date</h3>
+                          <p>{new Date(selectedReservation.RequestDate).toLocaleDateString()}</p>
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-gray-900">Status</h3>
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(selectedReservation.Status)}`}>
+                            {selectedReservation.Status}
+                          </span>
+                        </div>
+                      </div>
 
-        <div>
-          <h3 className="font-medium text-gray-900">Services Information</h3>
-          <div className="mt-2">
-            <p>
-              <span className="text-gray-600">Services:</span> 
-              {getUniqueItems(selectedReservation.UserServices.map(service => service.ServiceAvail))}
-            </p>
-            <p>
-              <span className="text-gray-600">Equipment:</span> 
-              {getUniqueItems(selectedReservation.UserServices.map(service => service.EquipmentAvail))}
-            </p>
-            
-            {/* Display machine utilizations if available */}
-            {selectedReservation.MachineUtilizations && selectedReservation.MachineUtilizations.length > 0 && (
-              <p>
-                <span className="text-gray-600">Machines:</span> 
-                {getUniqueItems(selectedReservation.MachineUtilizations.map(machine => machine.Machine))}
-              </p>
-            )}
-            
-            <p><span className="text-gray-600">Bulk of Commodity:</span> {selectedReservation.BulkofCommodity || 'Not specified'}</p>
-          </div>
-        </div>
+                      <div>
+                        <h3 className="font-medium text-gray-900">Services Information</h3>
+                        <div className="mt-2">
+                          <p>
+                            <span className="text-gray-600">Services:</span> 
+                            {getUniqueItems(selectedReservation.UserServices.map(service => service.ServiceAvail))}
+                          </p>
+                          <p>
+                            <span className="text-gray-600">Equipment:</span> 
+                            {getUniqueItems(selectedReservation.UserServices.map(service => service.EquipmentAvail))}
+                          </p>
+                          
+                          {selectedReservation.MachineUtilizations && selectedReservation.MachineUtilizations.length > 0 && (
+                            <p>
+                              <span className="text-gray-600">Machines:</span> 
+                              {getUniqueItems(selectedReservation.MachineUtilizations.map(machine => machine.Machine))}
+                            </p>
+                          )}
+                          
+                          <p><span className="text-gray-600">Bulk of Commodity:</span> {selectedReservation.BulkofCommodity || 'Not specified'}</p>
+                        </div>
+                      </div>
 
-{/* Cost Breakdown Section */}
-        <div>
-            <h3 className="font-medium text-gray-900">Estimated Cost Breakdown</h3>
-            <div className="mt-2">
-              {selectedReservation.UserServices.length > 0 ? (
-                <div className="space-y-2">
-                  {selectedReservation.UserServices.map((service, index) => {
-                    // Convert CostsAvail to number if it's not null
-                    const cost = service.CostsAvail !== null ? Number(service.CostsAvail) : 0;
-                    const duration = service.MinsAvail !== null ? service.MinsAvail : 0;
-          
-          return (
-            <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-              <div>
-                <p className="font-medium">{service.ServiceAvail}</p>
-                {service.EquipmentAvail && (
-                  <p className="text-sm text-gray-600">Equipment: {service.EquipmentAvail}</p>
-                )}
-              </div>
-              <div className="text-right">
-                <p className="font-medium">₱{cost.toFixed(2)}</p>
-                {duration > 0 && (
-                  <p className="text-sm text-gray-600">{duration} minutes</p>
-                )}
-              </div>
-            </div>
-          );
-        })}
-        {/* Total Cost */}
-        <div className="flex items-center justify-between bg-blue-50 p-3 rounded border border-blue-100 mt-4">
-          <p className="font-bold text-gray-900">Total Estimated Cost</p>
-          <p className="font-bold text-blue-800">
-            ₱{selectedReservation.UserServices.reduce((total, service) => 
-              total + (service.CostsAvail !== null ? Number(service.CostsAvail) : 0), 0).toFixed(2)}
-          </p>
-        </div>
-      </div>
-    ) : (
-      <p className="text-gray-500 italic">No cost information available</p>
-    )}
-  </div>
-</div>
+                      {/* Cost Breakdown Section - Using the CostBreakdown component */}
+                      <div>
+                        <h3 className="font-medium text-gray-900">Cost Breakdown</h3>
+                        <CostBreakdown
+                          userServices={selectedReservation.UserServices}
+                          totalAmountDue={selectedReservation.UserServices.reduce(
+                            (total, service) => total + (service.CostsAvail !== null ? Number(service.CostsAvail) : 0), 
+                            0
+                          )}
+                          machineUtilizations={selectedReservation.MachineUtilizations || []}
+                          reservationId={selectedReservation.id}
+                          allowFix={false}
+                        />
+                      </div>
 
-        <div>
-          <h3 className="font-medium text-gray-900">Schedule</h3>
-          <div className="mt-2">
-            {selectedReservation.UtilTimes.map((time, index) => (
-              <div key={index} className="mb-2 p-2 bg-gray-50 rounded">
-                <p><span className="text-gray-600">Day {time.DayNum}:</span></p>
-                <p className="ml-4">Start: {time.StartTime ? new Date(time.StartTime).toLocaleString() : 'Not set'}</p>
-                <p className="ml-4">End: {time.EndTime ? new Date(time.EndTime).toLocaleString() : 'Not set'}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+                      <div>
+                        <h3 className="font-medium text-gray-900">Schedule</h3>
+                        <div className="mt-2">
+                          {selectedReservation.UtilTimes.map((time, index) => (
+                            <div key={index} className="mb-2 p-2 bg-gray-50 rounded">
+                              <p><span className="text-gray-600">Day {time.DayNum}:</span></p>
+                              <p className="ml-4">Start: {time.StartTime ? new Date(time.StartTime).toLocaleString() : 'Not set'}</p>
+                              <p className="ml-4">End: {time.EndTime ? new Date(time.EndTime).toLocaleString() : 'Not set'}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
 
-        <div>
-          <h3 className="font-medium text-gray-900">Tools</h3>
-          <div className="mt-2">
-            {selectedReservation.UserTools.length > 0 ? (
-              <div className="space-y-2">
-                {selectedReservation.UserTools.map((tool, index) => (
-                  <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
-                    <span className="text-gray-600">{tool.ToolUser}</span>
-                    <span className="font-medium">{tool.ToolQuantity} units</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-500 italic">No tools specified</p>
-            )}
-          </div>
-        </div>
-        
-        {/* Machine Utilization Details */}
-        {selectedReservation.MachineUtilizations && selectedReservation.MachineUtilizations.length > 0 && (
-          <div>
-            <h3 className="font-medium text-gray-900">Machine Details</h3>
-            <div className="mt-2">
-              <div className="space-y-2">
-                {selectedReservation.MachineUtilizations.map((machine, index) => (
-                  <div key={index} className="p-2 bg-gray-50 rounded">
-                    <p><span className="text-gray-600">Machine:</span> {machine.Machine}</p>
-                    {machine.ServiceName && (
-                      <p><span className="text-gray-600">For Service:</span> {machine.ServiceName}</p>
-                    )}
-                    <p><span className="text-gray-600">Approval Status:</span> {
-                      machine.MachineApproval ? 
-                        <span className="text-green-600">Approved</span> : 
-                        <span className="text-yellow-600">Pending Approval</span>
-                    }</p>
-                    {machine.DateReviewed && (
-                      <p><span className="text-gray-600">Reviewed On:</span> {new Date(machine.DateReviewed).toLocaleDateString()}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    )}
-  </DialogContent>
-</Dialog>
-
-              <div className="bg-white rounded-lg text-blue-800 pl-4 py-4 mt-4 shadow-md border border-[#5e86ca]">
-                <p className="text-xl font-bold text-[#143370]">History</p>
-                <p className="text-sm text-[#143370] mb-4">Here's a summary of your previous transactions!</p>
-              </div>
+                      <div>
+                        <h3 className="font-medium text-gray-900">Tools</h3>
+                        <div className="mt-2">
+                          {selectedReservation.UserTools.length > 0 ? (
+                            <div className="space-y-2">
+                              {selectedReservation.UserTools.map((tool, index) => (
+                                <div key={index} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                                  <span className="text-gray-600">{tool.ToolUser}</span>
+                                  <span className="font-medium">{tool.ToolQuantity} units</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-gray-500 italic">No tools specified</p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {selectedReservation.MachineUtilizations && selectedReservation.MachineUtilizations.length > 0 && (
+                        <div>
+                          <h3 className="font-medium text-gray-900">Machine Details</h3>
+                          <div className="mt-2">
+                            <div className="space-y-2">
+                              {selectedReservation.MachineUtilizations.map((machine, index) => (
+                                <div key={index} className="p-2 bg-gray-50 rounded">
+                                  <p><span className="text-gray-600">Machine:</span> {machine.Machine}</p>
+                                  {machine.ServiceName && (
+                                    <p><span className="text-gray-600">For Service:</span> {machine.ServiceName}</p>
+                                  )}
+                                  <p><span className="text-gray-600">Approval Status:</span> {
+                                    machine.MachineApproval ? 
+                                      <span className="text-green-600">Approved</span> : 
+                                      <span className="text-yellow-600">Pending Approval</span>
+                                  }</p>
+                                  {machine.DateReviewed && (
+                                    <p><span className="text-gray-600">Reviewed On:</span> {new Date(machine.DateReviewed).toLocaleDateString()}</p>
+                                  )}
+                                  
+                                  {machine.DownTimes && machine.DownTimes.length > 0 && (
+                                    <div className="mt-2 border-t border-gray-200 pt-2">
+                                      <p className="text-amber-600 font-medium">Reported Downtime:</p>
+                                      {machine.DownTimes.map((downtime, dtIndex) => (
+                                        <div key={dtIndex} className="ml-4 mt-1 text-sm">
+                                          <p>Date: {downtime.DTDate || 'Not recorded'}</p>
+                                          <p>Duration: {downtime.DTTime || 0} minutes</p>
+                                          {downtime.Cause && <p>Cause: {downtime.Cause}</p>}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
             </div>
           </main>
         </div>
