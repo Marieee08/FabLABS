@@ -31,7 +31,8 @@ interface Service {
   id: string;
   Service: string;
   Machines?: { 
-    machine: { 
+    machine: {
+      Quantity: number; 
       id: string;
       Machine: string;
     } 
@@ -53,14 +54,17 @@ interface MachineQuantitySelectorProps {
   servicesMachineData: Record<string, { machineCount: number }>;
   onChange: (machineNumbers: Record<string, number>) => void;
   initialValues?: Record<string, number>;
+  onMachineDataUpdate?: (machineData: Record<string, { machineCount: number, hasMachines: boolean }>) => void;
 }
 
 const MachineQuantitySelector: React.FC<MachineQuantitySelectorProps> = ({
   selectedServices,
   servicesMachineData,
   onChange,
-  initialValues = {}
+  initialValues = {},
+  onMachineDataUpdate  // Add this prop
 }) => {
+
   // Initialize state with provided initial values
   const [machineNumbers, setMachineNumbers] = useState<Record<string, number>>(() => {
     // Use provided initial values or default to empty object
@@ -70,6 +74,47 @@ const MachineQuantitySelector: React.FC<MachineQuantitySelectorProps> = ({
   // Use a ref to track previous initialValues to avoid unnecessary updates
   const prevInitialValuesRef = useRef<string>(JSON.stringify(initialValues));
   
+  // Inside MachineQuantitySelector component
+  
+  useEffect(() => {
+    // Fetch fresh machine data when displaying this component
+    const fetchMachineAvailability = async () => {
+      try {
+        const response = await fetch('/api/services');
+        if (!response.ok) throw new Error('Failed to fetch machine data');
+        const data = await response.json();
+        
+        // Update machine availability for current services
+        const newMachineData = {};
+        data.forEach((service: { Service: string; Machines: any[]; }) => {
+          if (selectedServices.includes(service.Service)) {
+            // Count only available machines
+            const availableMachines = service.Machines?.reduce((sum, m) => 
+              m.machine.isAvailable !== false ? sum + (m.machine.Number || 1) : sum, 0) || 0;
+            
+            newMachineData[service.Service] = {
+              machineCount: availableMachines,
+              hasMachines: availableMachines > 0
+            };
+          }
+        });
+        
+        // Call the callback with the new data if it exists
+        if (onMachineDataUpdate) {
+          onMachineDataUpdate(newMachineData);
+        }
+        
+      } catch (error) {
+        console.error('Error fetching machine availability:', error);
+      }
+    };
+    
+    if (selectedServices.length > 0) {
+      fetchMachineAvailability();
+    }
+  }, [selectedServices, onMachineDataUpdate]); 
+
+
   // Update state when initialValues change (e.g., when navigating back from review)
   useEffect(() => {
     const currentInitialValuesString = JSON.stringify(initialValues);
@@ -80,6 +125,7 @@ const MachineQuantitySelector: React.FC<MachineQuantitySelectorProps> = ({
       setMachineNumbers({ ...initialValues });
       prevInitialValuesRef.current = currentInitialValuesString;
     }
+    
   }, [initialValues]);
   
   // Handle machine quantity change
@@ -205,6 +251,9 @@ export default function ProcessInformation({
       service.Service === selectedService
     );
 
+
+    
+
     console.log("Selected Service Object:", selectedServiceObject);
     
     const machineDetails = selectedServiceObject ? [{
@@ -244,11 +293,11 @@ export default function ProcessInformation({
         
         // Process machine data correctly by summing actual quantities
         const machineData = {};
-        data.forEach(service => {
+        data.forEach((service: { Machines: { machine: { Number: number; }; }[]; Service: string | number; }) => {
           let totalMachineQuantity = 0;
           
           if (service.Machines && Array.isArray(service.Machines)) {
-            service.Machines.forEach(machineService => {
+            service.Machines.forEach((machineService: { machine: { Number: number; }; }) => {
               // Sum up the actual quantities (Number field)
               const machineQuantity = machineService.machine.Number || 0;
               totalMachineQuantity += machineQuantity;
@@ -544,11 +593,12 @@ export default function ProcessInformation({
                 <>
                   {hasMachines ? (
                     <MachineQuantitySelector
-                      selectedServices={[selectedService]}
-                      servicesMachineData={servicesMachineData}
-                      onChange={handleMachineNumbersChange}
-                      initialValues={formData.serviceMachineNumbers || {}}
-                    />
+                    selectedServices={[selectedService]}
+                    servicesMachineData={servicesMachineData}
+                    onChange={handleMachineNumbersChange}
+                    initialValues={formData.serviceMachineNumbers || {}}
+                    onMachineDataUpdate={(newData) => setServicesMachineData(newData)}
+                  />
                   ) : (
                     <div className="p-4 border rounded-md bg-gray-50">
                       <p className="text-sm text-gray-500">The selected service doesn't have any machines available.</p>

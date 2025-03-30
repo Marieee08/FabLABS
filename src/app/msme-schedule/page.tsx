@@ -1,3 +1,5 @@
+// Modified Schedule.tsx to correctly implement per-day time selection
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -8,24 +10,25 @@ import ReviewSubmit from '@/components/msme-forms/review-submit';
 import { toast } from "@/components/ui/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, ArrowLeft } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Clock, AlertCircle, Calendar } from 'lucide-react';
 import { InteractiveMachineCalendarWrapper } from '@/components/msme-forms/interactive-machine-calendar';
-import PerDayTimeSlotSelector from '@/components/msme-forms/per-day-time-selector';
 
+// Interface for days with time slots
+export interface DayInfo {
+  date: Date;
+  startTime: string | null;
+  endTime: string | null;
+}
 
 // Interface for form data
-export interface FormData {
-  days: {
-    date: Date;
-    startTime: string | null;
-    endTime: string | null;
-  }[];
+export interface ScheduleFormData {
+  days: DayInfo[];
   syncTimes: boolean;
   unifiedStartTime: string | null;
   unifiedEndTime: string | null;
 
   // Process fields
-  ProductsManufactured: string | string[];
+  ProductsManufactured: string;  // Changed to string only
   BulkofCommodity: string;
   Equipment: string;
   Tools: string;
@@ -33,7 +36,7 @@ export interface FormData {
   
   // Additional fields
   serviceMachineNumbers?: Record<string, number>;
-  serviceLinks?: {[service: string]: string};
+  serviceLinks?: Record<string, string>;
   Remarks?: string;
   NeededMaterials?: Array<{
     Item: string;
@@ -43,12 +46,136 @@ export interface FormData {
   [key: string]: any; // Index signature for dynamic access
 }
 
+// Time options for dropdown menus
+const START_TIME_OPTIONS = [
+  { value: "--:-- AM", label: "Select Time" },
+  { value: "08:00 AM", label: "08:00 AM" },
+  { value: "09:00 AM", label: "09:00 AM" },
+  { value: "10:00 AM", label: "10:00 AM" },
+  { value: "11:00 AM", label: "11:00 AM" },
+  { value: "12:00 PM", label: "12:00 PM" },
+  { value: "01:00 PM", label: "01:00 PM" },
+  { value: "02:00 PM", label: "02:00 PM" },
+  { value: "03:00 PM", label: "03:00 PM" },
+  { value: "04:00 PM", label: "04:00 PM" }
+];
+
+const END_TIME_OPTIONS = [
+  { value: "--:-- AM", label: "Select Time" },
+  { value: "09:00 AM", label: "09:00 AM" },
+  { value: "10:00 AM", label: "10:00 AM" },
+  { value: "11:00 AM", label: "11:00 AM" },
+  { value: "12:00 PM", label: "12:00 PM" },
+  { value: "01:00 PM", label: "01:00 PM" },
+  { value: "02:00 PM", label: "02:00 PM" },
+  { value: "03:00 PM", label: "03:00 PM" },
+  { value: "04:00 PM", label: "04:00 PM" },
+  { value: "05:00 PM", label: "05:00 PM" }
+];
+
+// Helper function to convert time string to minutes for comparison
+function timeToMinutes(timeString: string | null): number {
+  if (!timeString || timeString === '--:-- AM' || timeString === '--:-- PM') return -1;
+  
+  const match = timeString.match(/(\d{1,2}):(\d{2}) (AM|PM)/);
+  if (!match) return -1;
+  
+  let hours = parseInt(match[1]);
+  const minutes = parseInt(match[2]);
+  const period = match[3];
+  
+  // Convert to 24-hour format for proper comparison
+  if (period === 'PM' && hours !== 12) hours += 12;
+  if (period === 'AM' && hours === 12) hours = 0;
+  
+  return hours * 60 + minutes;
+}
+
+// Component to select time slots for individual days
+interface PerDayTimeSelectorProps {
+  days: DayInfo[];
+  updateDay: (index: number, field: keyof DayInfo, value: any) => void;
+}
+
+const PerDayTimeSelector: React.FC<PerDayTimeSelectorProps> = ({ days, updateDay }) => {
+  return (
+    <div className="space-y-6 mt-4">
+      <h3 className="text-lg font-medium text-gray-800">Select Time for Each Day</h3>
+      
+      {days.map((day, index) => {
+        const dateObject = new Date(day.date);
+        const dateString = dateObject.toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+        
+        const hasTimeError = day.startTime && day.endTime && 
+          timeToMinutes(day.startTime) >= timeToMinutes(day.endTime);
+
+        return (
+          <div key={index} className="p-4 border rounded-lg bg-white shadow-sm">
+            <div className="flex items-center mb-3">
+              <Calendar className="h-5 w-5 text-blue-600 mr-2" />
+              <h4 className="font-medium text-gray-800">{dateString}</h4>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Start Time<span className="text-red-500 ml-1">*</span>
+                </label>
+                <select
+                  className="border rounded-md p-2 w-full border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  value={day.startTime || "--:-- AM"}
+                  onChange={(e) => updateDay(index, 'startTime', e.target.value)}
+                >
+                  {START_TIME_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  End Time<span className="text-red-500 ml-1">*</span>
+                </label>
+                <select
+                  className="border rounded-md p-2 w-full border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  value={day.endTime || "--:-- AM"}
+                  onChange={(e) => updateDay(index, 'endTime', e.target.value)}
+                >
+                  {END_TIME_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            
+            {hasTimeError && (
+              <div className="mt-2 flex items-start text-red-500 text-sm">
+                <AlertCircle className="h-4 w-4 mr-1 mt-0.5 flex-shrink-0" />
+                <span>End time must be after start time</span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 // Improved type for updateFormData to handle nested objects
-type UpdateFormData = <K extends keyof FormData>(field: K, value: FormData[K]) => void;
+type UpdateFormData = <K extends keyof ScheduleFormData>(field: K, value: ScheduleFormData[K]) => void;
 
 export default function Schedule() {
   const [step, setStep] = React.useState(1);
-  const [formData, setFormData] = React.useState<FormData>({
+  const [formData, setFormData] = React.useState<ScheduleFormData>({
     days: [],
     syncTimes: true,
     unifiedStartTime: null,
@@ -81,28 +208,26 @@ export default function Schedule() {
       // Special handling for ProductsManufactured changes
       if (field === 'ProductsManufactured') {
         // Create a deep copy of the previous data
-        const updatedData = JSON.parse(JSON.stringify(prevData));
+        const updatedData = {...prevData};
         
         // Update the ProductsManufactured field
-        updatedData[field] = value;
+        updatedData[field] = value as string;
         
-        // If we have serviceMachineNumbers data, synchronize it with the selected services
+        // If we have serviceMachineNumbers data, synchronize it with the selected service
         if (updatedData.serviceMachineNumbers) {
           const currentMachineNumbers = { ...updatedData.serviceMachineNumbers };
-          const updatedMachineNumbers = {};
+          const updatedMachineNumbers: Record<string, number> = {};
           
-          // Get array of selected services
-          const selectedServices = Array.isArray(value) ? value : [value].filter(Boolean);
+          // Get selected service
+          const selectedService = value as string;
           
-          // Only keep machine numbers for selected services
-          selectedServices.forEach(service => {
-            if (currentMachineNumbers[service] !== undefined) {
-              updatedMachineNumbers[service] = currentMachineNumbers[service];
-            } else {
-              // Initialize with 0 for new services
-              updatedMachineNumbers[service] = 0;
-            }
-          });
+          if (selectedService) {
+            // Keep machine numbers for selected service or initialize with 0
+            updatedMachineNumbers[selectedService] = 
+              currentMachineNumbers[selectedService] !== undefined 
+                ? currentMachineNumbers[selectedService] 
+                : 0;
+          }
           
           updatedData.serviceMachineNumbers = updatedMachineNumbers;
         }
@@ -110,15 +235,13 @@ export default function Schedule() {
         // Similarly update serviceLinks if present
         if (updatedData.serviceLinks) {
           const currentLinks = { ...updatedData.serviceLinks };
-          const updatedLinks = {};
+          const updatedLinks: Record<string, string> = {};
           
-          const selectedServices = Array.isArray(value) ? value : [value].filter(Boolean);
+          const selectedService = value as string;
           
-          selectedServices.forEach(service => {
-            if (currentLinks[service]) {
-              updatedLinks[service] = currentLinks[service];
-            }
-          });
+          if (selectedService && currentLinks[selectedService]) {
+            updatedLinks[selectedService] = currentLinks[selectedService];
+          }
           
           updatedData.serviceLinks = updatedLinks;
         }
@@ -130,7 +253,7 @@ export default function Schedule() {
       if (field === 'serviceLinks' || field === 'serviceMachineNumbers') {
         return {
           ...prevData,
-          [field]: value ? JSON.parse(JSON.stringify(value)) : value
+          [field]: value ? {...value} : value
         };
       }
       
@@ -138,18 +261,60 @@ export default function Schedule() {
       if (field === 'days') {
         // Ensure all days have time info from unified time if sync is on
         if (prevData.syncTimes && prevData.unifiedStartTime && prevData.unifiedEndTime) {
-          const updatedDays = value.map((day: any) => ({
+          const updatedDays = (value as DayInfo[]).map((day) => ({
             ...day,
             startTime: day.startTime || prevData.unifiedStartTime,
             endTime: day.endTime || prevData.unifiedEndTime
           }));
           return { ...prevData, [field]: updatedDays };
         }
+        return { ...prevData, [field]: value };
+      }
+      
+      // Special handling for syncTimes toggle - synchronize all times when enabled
+      if (field === 'syncTimes' && value === true && prevData.unifiedStartTime && prevData.unifiedEndTime) {
+        const updatedDays = prevData.days.map(day => ({
+          ...day,
+          startTime: prevData.unifiedStartTime,
+          endTime: prevData.unifiedEndTime
+        }));
+        
+        return {
+          ...prevData,
+          [field]: value,
+          days: updatedDays
+        };
+      }
+      
+      // Special handling for unified time changes - apply to all days if sync is on
+      if ((field === 'unifiedStartTime' || field === 'unifiedEndTime') && prevData.syncTimes) {
+        const updatedDays = prevData.days.map(day => ({
+          ...day,
+          startTime: field === 'unifiedStartTime' ? value as string | null : day.startTime,
+          endTime: field === 'unifiedEndTime' ? value as string | null : day.endTime
+        }));
+        
+        return {
+          ...prevData,
+          [field]: value,
+          days: updatedDays
+        };
       }
       
       // For all other fields, just do the simple update
       return { ...prevData, [field]: value };
     });
+  };
+  
+  // Helper function to update individual day's time slots
+  const updateDayTime = (index: number, field: keyof DayInfo, value: any) => {
+    const updatedDays = [...formData.days];
+    updatedDays[index] = {
+      ...updatedDays[index],
+      [field]: value
+    };
+    
+    updateFormData('days', updatedDays);
   };
   
   const nextStep = () => {
@@ -167,18 +332,15 @@ export default function Schedule() {
       
       // Check machine quantity
       const service = formData.ProductsManufactured;
-      const serviceArray = Array.isArray(service) ? service : [service];
       const machineNumbers = formData.serviceMachineNumbers || {};
       
-      for (const svc of serviceArray) {
-        if (!machineNumbers[svc] && machineNumbers[svc] !== 0) {
-          toast({
-            title: "Machine quantity required",
-            description: "Please specify machine quantity for all selected services",
-            variant: "destructive",
-          });
-          return;
-        }
+      if (service && (!machineNumbers[service] && machineNumbers[service] !== 0)) {
+        toast({
+          title: "Machine quantity required",
+          description: "Please specify machine quantity for the selected service",
+          variant: "destructive",
+        });
+        return;
       }
     }
     
@@ -195,7 +357,9 @@ export default function Schedule() {
       
       // Check if all dates have time information
       const missingTimeInfo = formData.days.some(
-        day => !day.startTime || !day.endTime
+        day => !day.startTime || !day.endTime || 
+               day.startTime === '--:-- AM' || 
+               day.endTime === '--:-- AM'
       );
       
       if (missingTimeInfo) {
@@ -206,13 +370,31 @@ export default function Schedule() {
         });
         return;
       }
+      
+      // Check if any day has invalid time (end before start)
+      const invalidTimeOrder = formData.days.some(
+        day => timeToMinutes(day.startTime) >= timeToMinutes(day.endTime)
+      );
+      
+      if (invalidTimeOrder) {
+        toast({
+          title: "Invalid time selection",
+          description: "End time must be after start time for all dates",
+          variant: "destructive",
+        });
+        return;
+      }
     }
     
-    // Make sure ProductsManufactured is always an array before moving to the review step
+    // If we're going to review step, make sure we convert ProductsManufactured to array
+    // This adapts to the expected format in the review component
     if (step === 2) {
-      if (!Array.isArray(formData.ProductsManufactured) && formData.ProductsManufactured) {
-        updateFormData('ProductsManufactured', [formData.ProductsManufactured]);
-      }
+      // Prepare form data for review step
+      const reviewFormData = {
+        ...formData,
+        ProductsManufactured: [formData.ProductsManufactured]
+      };
+      setFormData(reviewFormData as unknown as ScheduleFormData);
     }
     
     setStep(prevStep => prevStep + 1);
@@ -222,6 +404,24 @@ export default function Schedule() {
     console.log("Moving back to previous step with formData:", formData);
     setStep(prevStep => prevStep - 1);
   };
+
+  // Check if there are time validation errors in the unified time selectors
+  const hasUnifiedTimeError = formData.unifiedStartTime && formData.unifiedEndTime && 
+    timeToMinutes(formData.unifiedStartTime) >= timeToMinutes(formData.unifiedEndTime);
+  
+  // Check if there are time validation errors in any individual day
+  const hasAnyDayTimeError = !formData.syncTimes && formData.days.some(day => 
+    day.startTime && day.endTime && timeToMinutes(day.startTime) >= timeToMinutes(day.endTime)
+  );
+  
+  // Check if all time selections are valid for the next step validation
+  const allTimesValid = formData.syncTimes
+    ? (formData.unifiedStartTime && formData.unifiedEndTime && !hasUnifiedTimeError)
+    : formData.days.every(day => 
+        day.startTime && day.endTime && 
+        day.startTime !== '--:-- AM' && day.endTime !== '--:-- AM' &&
+        timeToMinutes(day.startTime) < timeToMinutes(day.endTime)
+      );
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
@@ -289,10 +489,13 @@ export default function Schedule() {
                     {/* Time selection */}
                     {formData.days.length > 0 && (
                       <div className="mt-6 p-6 bg-gray-50 rounded-lg border border-gray-200">
-                        <div className="flex items-center mb-4">
-                          <h3 className="text-lg font-semibold text-gray-800">Set Times for All Dates</h3>
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center">
+                            <Clock className="h-5 w-5 text-blue-600 mr-2" />
+                            <h3 className="text-lg font-semibold text-gray-800">Time Selection</h3>
+                          </div>
                           
-                          <div className="ml-auto flex items-center gap-2">
+                          <div className="flex items-center gap-2">
                             <span className="text-sm text-gray-700">Use same time for all dates</span>
                             <div className="relative inline-block w-10 mr-2 align-middle select-none">
                               <input
@@ -310,66 +513,61 @@ export default function Schedule() {
                           </div>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-6">
-                          {/* Start Time Selection */}
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Start Time<span className="text-red-500 ml-1">*</span>
-                            </label>
-                            <div className="flex space-x-3">
+                        {/* Unified time selection */}
+                        {formData.syncTimes ? (
+                          <div className="grid grid-cols-2 gap-6">
+                            {/* Start Time Selection */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Start Time<span className="text-red-500 ml-1">*</span>
+                              </label>
                               <select
                                 className="border rounded-md p-2 w-full border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                                 value={formData.unifiedStartTime || '--:-- AM'}
                                 onChange={(e) => updateFormData('unifiedStartTime', e.target.value)}
                                 required={true}
                               >
-                                <option value="--:-- AM">Select Time</option>
-                                <option value="08:00 AM">08:00 AM</option>
-                                <option value="09:00 AM">09:00 AM</option>
-                                <option value="10:00 AM">10:00 AM</option>
-                                <option value="11:00 AM">11:00 AM</option>
-                                <option value="12:00 PM">12:00 PM</option>
-                                <option value="01:00 PM">01:00 PM</option>
-                                <option value="02:00 PM">02:00 PM</option>
-                                <option value="03:00 PM">03:00 PM</option>
-                                <option value="04:00 PM">04:00 PM</option>
+                                {START_TIME_OPTIONS.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
                               </select>
                             </div>
-                          </div>
-                          
-                          {/* End Time Selection */}
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              End Time<span className="text-red-500 ml-1">*</span>
-                            </label>
-                            <div className="flex space-x-3">
+                            
+                            {/* End Time Selection */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                End Time<span className="text-red-500 ml-1">*</span>
+                              </label>
                               <select
                                 className="border rounded-md p-2 w-full border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                                 value={formData.unifiedEndTime || '--:-- AM'}
                                 onChange={(e) => updateFormData('unifiedEndTime', e.target.value)}
                                 required={true}
                               >
-                                <option value="--:-- AM">Select Time</option>
-                                <option value="09:00 AM">09:00 AM</option>
-                                <option value="10:00 AM">10:00 AM</option>
-                                <option value="11:00 AM">11:00 AM</option>
-                                <option value="12:00 PM">12:00 PM</option>
-                                <option value="01:00 PM">01:00 PM</option>
-                                <option value="02:00 PM">02:00 PM</option>
-                                <option value="03:00 PM">03:00 PM</option>
-                                <option value="04:00 PM">04:00 PM</option>
-                                <option value="05:00 PM">05:00 PM</option>
+                                {END_TIME_OPTIONS.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
                               </select>
                             </div>
+                            
+                            {/* Validation error */}
+                            {hasUnifiedTimeError && (
+                              <div className="col-span-2 mt-2 flex items-start text-red-500 text-sm">
+                                <AlertCircle className="h-4 w-4 mr-1 mt-0.5 flex-shrink-0" />
+                                <span>End time must be after start time</span>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                        
-                        {/* Validation error */}
-                        {formData.unifiedStartTime && formData.unifiedEndTime && 
-                         timeToMinutes(formData.unifiedStartTime) >= timeToMinutes(formData.unifiedEndTime) && (
-                          <div className="mt-2 text-red-500 text-sm">
-                            End time must be after start time
-                          </div>
+                        ) : (
+                          // Per-day time selection
+                          <PerDayTimeSelector 
+                            days={formData.days} 
+                            updateDay={updateDayTime} 
+                          />
                         )}
                       </div>
                     )}
@@ -388,10 +586,7 @@ export default function Schedule() {
                         onClick={nextStep} 
                         disabled={
                           formData.days.length === 0 || 
-                          !formData.unifiedStartTime || 
-                          !formData.unifiedEndTime ||
-                          (formData.unifiedStartTime && formData.unifiedEndTime && 
-                           timeToMinutes(formData.unifiedStartTime) >= timeToMinutes(formData.unifiedEndTime))
+                          !allTimesValid
                         }
                         className="flex items-center gap-2"
                       >
@@ -418,21 +613,4 @@ export default function Schedule() {
       </div>
     </div>
   );
-}
-
-// Helper function to convert time string to minutes for comparison
-function timeToMinutes(timeString: string | null): number {
-  if (!timeString || timeString === '--:-- AM' || timeString === '--:-- PM') return -1;
-  
-  const match = timeString.match(/(\d{1,2}):(\d{2}) (AM|PM)/);
-  if (!match) return -1;
-  
-  let [_, hours, minutes, period] = match;
-  let hour = parseInt(hours);
-  
-  // Convert to 24-hour format for proper comparison
-  if (period === 'PM' && hour !== 12) hour += 12;
-  if (period === 'AM' && hour === 12) hour = 0;
-  
-  return hour * 60 + parseInt(minutes);
 }

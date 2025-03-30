@@ -47,7 +47,8 @@ interface Service {
   id: string;
   Service: string;
   Machines?: { 
-    machine: { 
+    machine: {
+      isAvailable: boolean; 
       id: string;
       Machine: string;
       Number?: number;
