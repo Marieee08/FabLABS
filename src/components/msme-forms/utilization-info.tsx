@@ -206,6 +206,9 @@ export default function ProcessInformation({
       service.Service === selectedService
     );
 
+
+    
+
     console.log("Selected Service Object:", selectedServiceObject);
     
     const machineDetails = selectedServiceObject ? [{
