@@ -256,16 +256,18 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
           )}
           
           <div className="flex justify-between items-center pt-2">
-            <span className="font-bold text-lg">Total</span>
-            <div className="text-right">
-              <span className="font-bold text-lg">{formatPrice(calculatedTotal)}</span>
-              {hasDiscrepancy && (
-                <div className="text-xs text-amber-600 mt-1">
-                  Total recalculated (stored: {formatPrice(storedTotal)})
-                </div>
-              )}
-            </div>
+          <span className="font-bold text-lg">Total</span>
+          <div className="text-right">
+            <span className="font-bold text-lg">
+              {formatPrice(calculatedTotal)}
+            </span>
+            {hasDiscrepancy && (
+              <div className="text-xs text-amber-600 mt-1">
+                {totalDowntimeMinutes > 0 ? "Adjusted for downtime" : "Recalculated from services"}
+              </div>
+            )}
           </div>
+        </div>
 
           {hasDiscrepancy && allowFix && reservationId && (
             <div className="mt-3 p-2 rounded bg-amber-50 space-y-2">
