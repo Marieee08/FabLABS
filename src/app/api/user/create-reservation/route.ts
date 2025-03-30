@@ -150,10 +150,15 @@ export async function POST(request: Request) {
         if (costDetail) serviceCost = costDetail.totalCost || 0;
       }
       
+      // Set equipment availability - Change this to "None" when there are no machines
+      const equipmentAvail = machines.length === 0 
+        ? 'None' 
+        : (machines.length === 1 ? machines[0] : 'Not Specified');
+      
       // Create service entries
       return Array.from({length: machineQuantity || 0}, (_, index) => ({
         ServiceAvail: service,
-        EquipmentAvail: machines.length === 1 ? machines[0] : 'Not Specified',
+        EquipmentAvail: equipmentAvail,
         CostsAvail: serviceCost / (machineQuantity || 1),
         MinsAvail: totalMinutes,
         Files: serviceLink

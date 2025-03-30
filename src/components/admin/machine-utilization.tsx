@@ -165,45 +165,60 @@ const MachineUtilization: React.FC<MachineUtilizationProps> = ({
       };
   
       // Helper function to initialize data from services when API fails
-      const initializeFromServices = () => {
-        // Extract machine names from the EquipmentAvail field
-        const initialUtilizations = userServices.flatMap(service => {
-          const machines = service.EquipmentAvail 
-            ? service.EquipmentAvail.split(',')
-                .map(m => m.split(':')[0].trim())
-                .filter(m => m.length > 0)
-            : [];
-          
-          return machines.map(machine => ({
-            Machine: machine,
-            ReviewedBy: null,
-            MachineApproval: null,
-            DateReviewed: null,
-            ServiceName: service.ServiceAvail,
-            utilReqId: reservationId,
-            OperatingTimes: [],
-            DownTimes: [],
-            RepairChecks: []
-          }));
-        });
-  
-        // If no machines found, create empty placeholder
-        if (initialUtilizations.length === 0) {
-          initialUtilizations.push({
-            Machine: "No machines assigned",
-            ReviewedBy: null,
-            MachineApproval: null,
-            DateReviewed: null,
-            ServiceName: "Unspecified",
-            utilReqId: reservationId,
-            OperatingTimes: [],
-            DownTimes: [],
-            RepairChecks: []
-          });
-        }
-  
-        setMachineUtilizations(initialUtilizations);
-      };
+const initializeFromServices = () => {
+  // Extract machine names from the EquipmentAvail field
+  const initialUtilizations = userServices.flatMap(service => {
+    if (!service.EquipmentAvail || service.EquipmentAvail.trim() === '') {
+      return []; // Skip services with no equipment
+    }
+    
+    // Skip if the equipment is just "Not Specified"
+    if (service.EquipmentAvail.trim().toLowerCase() === 'not specified') {
+      return [];
+    }
+    
+    const machines = service.EquipmentAvail 
+      .split(',')
+      .map(m => {
+        // Split by colon to handle legacy data that might have quantities
+        const parts = m.trim().split(':');
+        return parts[0].trim();
+      })
+      .filter(m => m.length > 0 && m.toLowerCase() !== 'not specified');
+    
+    return machines.map(machine => ({
+      Machine: machine,
+      ReviewedBy: null,
+      MachineApproval: null,
+      DateReviewed: null,
+      ServiceName: service.ServiceAvail,
+      utilReqId: reservationId,
+      OperatingTimes: [],
+      DownTimes: [],
+      RepairChecks: []
+    }));
+  });
+
+  // If no valid machines found, create a placeholder message (optional)
+  if (initialUtilizations.length === 0) {
+    console.log('No valid machines found for utilization data');
+    // You can choose to not create a placeholder, or create one with an informative message
+    // Placeholder option:
+    // initialUtilizations.push({
+    //   Machine: "No valid machines assigned",
+    //   ReviewedBy: null,
+    //   MachineApproval: null,
+    //   DateReviewed: null,
+    //   ServiceName: "Unspecified",
+    //   utilReqId: reservationId,
+    //   OperatingTimes: [],
+    //   DownTimes: [],
+    //   RepairChecks: []
+    // });
+  }
+
+  setMachineUtilizations(initialUtilizations);
+};
   
       fetchMachineUtilization();
     }, [reservationId, userServices]);
@@ -579,12 +594,11 @@ const handleGeneratePDF = () => {
         <div>
           <h3 className="text-xl font-semibold mb-4">Machine Utilization</h3>
           
-          <Accordion type="multiple" defaultValue={machineUtilizations.map((_, i) => `item-${i}`)}>
+          <Accordion type="multiple" defaultValue={[]}>
             {machineUtilizations.map((machineUtil, machineIndex) => (
               <AccordionItem value={`item-${machineIndex}`} key={machineIndex}>
                 <AccordionTrigger className="hover:bg-gray-50 px-3 rounded-lg">
                   <span className="font-medium">{machineUtil.Machine || 'Unnamed Machine'}</span>
-                  <span className="text-sm text-gray-500 ml-2">({machineUtil.ServiceName})</span>
                 </AccordionTrigger>
                 <AccordionContent className="px-4 py-2">
                   <div className="space-y-4">

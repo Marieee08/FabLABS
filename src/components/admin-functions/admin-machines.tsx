@@ -36,7 +36,7 @@ export default function AdminServices() {
     Machine: '',
     Image: '',
     Desc: '',
-    Number: undefined, 
+    Number: 1,
     Instructions: '',
     Link: '',
     isAvailable: true,
@@ -45,14 +45,48 @@ export default function AdminServices() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  
+  // Enhanced loading states
   const [isLoading, setIsLoading] = useState(false);
+  const [isDataLoading, setIsDataLoading] = useState(true);
+  const [isToggling, setIsToggling] = useState<Record<string, boolean>>({});
+  // Simplified loading state
+  // Removed actionInProgress state as it's no longer needed
+  const [imageUploading, setImageUploading] = useState(false);
 
   useEffect(() => {
-    fetchMachines();
-    fetchServices();
+    fetchData();
   }, []);
 
+  const fetchData = async () => {
+    setIsDataLoading(true);
+    setError(null);
+    
+    try {
+      // Use Promise.all to fetch both machines and services in parallel
+      const [machinesResponse, servicesResponse] = await Promise.all([
+        fetch('/api/machines?includeServices=true'),
+        fetch('/api/services')
+      ]);
+      
+      if (!machinesResponse.ok) throw new Error('Failed to fetch machines');
+      if (!servicesResponse.ok) throw new Error('Failed to fetch services');
+      
+      const machinesData = await machinesResponse.json();
+      const servicesData = await servicesResponse.json();
+      
+      setMachines(machinesData);
+      setAllServices(servicesData);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load data');
+    } finally {
+      setIsDataLoading(false);
+    }
+  };
+
   const fetchMachines = async () => {
+    setIsDataLoading(true);
     try {
       const response = await fetch('/api/machines?includeServices=true');
       if (!response.ok) throw new Error('Failed to fetch machines');
@@ -60,24 +94,19 @@ export default function AdminServices() {
       setMachines(data);
     } catch (error) {
       console.error('Error fetching machines:', error);
-      alert('Failed to load machines. Please try again later.');
+      setError(error instanceof Error ? error.message : 'Failed to fetch machines');
+    } finally {
+      setIsDataLoading(false);
     }
   };
 
-  const fetchServices = async () => {
-    try {
-      const response = await fetch('/api/services');
-      if (!response.ok) throw new Error('Failed to fetch services');
-      const data = await response.json();
-      setAllServices(data);
-    } catch (error) {
-      console.error('Error fetching services:', error);
-      alert('Failed to load services. Please try again later.');
-    }
-  };
-
+  // Error state for form validation and API errors
+  const [error, setError] = useState<string | null>(null);
 
   const toggleAvailability = async (id: string, currentStatus: boolean) => {
+    // Set toggling state for this specific machine
+    setIsToggling(prev => ({ ...prev, [id]: true }));
+    
     try {
       const response = await fetch(`/api/machines/${id}`, {
         method: 'PATCH',
@@ -96,9 +125,16 @@ export default function AdminServices() {
           machine.id === id ? updatedMachine : machine
         )
       );
+      
+      // Success handled by UI update
     } catch (error) {
       console.error('Toggle error:', error);
-      alert('Failed to update machine availability.');
+      setError(error instanceof Error ? error.message : 'Failed to update machine availability');
+    } finally {
+      // Add a small delay to avoid UI flicker
+      setTimeout(() => {
+        setIsToggling(prev => ({ ...prev, [id]: false }));
+      }, 300);
     }
   };
 
@@ -113,26 +149,21 @@ export default function AdminServices() {
       if (!response.ok) {
         const errorData = await response.json();
         console.warn('Image deletion warning:', errorData);
-        // We don't throw here as we don't want to block machine deletion if image deletion fails
-      } else {
-        console.log('Image deleted successfully');
       }
     } catch (error) {
       console.error('Error deleting image:', error);
-      // Again, we don't rethrow as the machine deletion should proceed
     }
   };
   
   const deleteMachine = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this machine? This action cannot be undone.')) return;
+    const machineToDelete = machines.find(machine => machine.id === id);
+    if (!machineToDelete) return;
+    
+    if (!window.confirm(`Are you sure you want to delete "${machineToDelete.Machine}"? This action cannot be undone.`)) return;
     
     setIsDeletingMap(prev => ({ ...prev, [id]: true }));
     
     try {
-      // Find the machine to get its image path
-      const machineToDelete = machines.find(machine => machine.id === id);
-      if (!machineToDelete) throw new Error('Machine not found');
-      
       // Delete the machine first
       const response = await fetch(`/api/machines/${id}`, {
         method: 'DELETE',
@@ -149,12 +180,16 @@ export default function AdminServices() {
       }
       
       setMachines(prevMachines => prevMachines.filter(machine => machine.id !== id));
+      // Success handled by UI update
       
     } catch (error) {
       console.error('Delete error:', error);
-      alert(error instanceof Error ? error.message : 'Failed to delete machine');
+      setError(error instanceof Error ? error.message : 'Failed to delete machine');
     } finally {
-      setIsDeletingMap(prev => ({ ...prev, [id]: false }));
+      // Add a small delay to avoid UI flicker
+      setTimeout(() => {
+        setIsDeletingMap(prev => ({ ...prev, [id]: false }));
+      }, 300);
     }
   };
 
@@ -165,13 +200,12 @@ export default function AdminServices() {
         Machine: machine.Machine,
         Image: machine.Image,
         Desc: machine.Desc,
-        Number: machine.Number, // Added Number field
+        Number: machine.Number ?? 1,
         Instructions: machine.Instructions || '',
         Link: machine.Link || '',
         isAvailable: machine.isAvailable,
         Services: machine.Services
       });
-      // Update selected services based on the machine's current services
       setSelectedServices(machine.Services.map(service => service.id));
       setImagePreview(machine.Image);
     } else {
@@ -179,7 +213,7 @@ export default function AdminServices() {
         Machine: '',
         Image: '',
         Desc: '',
-        Number: undefined, // Added Number field
+        Number: 1,
         Instructions: '',
         Link: '',
         isAvailable: true,
@@ -193,25 +227,31 @@ export default function AdminServices() {
   };
 
   const closeModal = () => {
+    // If form is being submitted, don't allow closing
+    if (isLoading) return;
+    
     setIsModalOpen(false);
-    setEditingMachine(null);
-    setFormData({
-      Machine: '',
-      Image: '',
-      Desc: '',
-      Number: undefined, // Added Number field
-      Instructions: '',
-      Link: '',
-      isAvailable: true,
-      Services: []
-    });
-    setSelectedServices([]);
+    
+    // Small delay to allow modal close animation
+    setTimeout(() => {
+      setEditingMachine(null);
+      setFormData({
+        Machine: '',
+        Image: '',
+        Desc: '',
+        Number: 1,
+        Instructions: '',
+        Link: '',
+        isAvailable: true,
+        Services: []
+      });
+      setSelectedServices([]);
+    }, 300);
   };
 
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    // Convert to number or undefined if empty
-    const numValue = value === '' ? undefined : parseInt(value, 10);
+    const numValue = value === '' || parseInt(value) < 1 ? 1 : parseInt(value, 10);
     setFormData(prev => ({ ...prev, Number: numValue }));
   };
 
@@ -223,6 +263,7 @@ export default function AdminServices() {
   const handleImageUpload = async () => {
     if (!imageFile) return null;
   
+    setImageUploading(true);
     const formData = new FormData();
     formData.append('file', imageFile);
   
@@ -241,14 +282,22 @@ export default function AdminServices() {
       return data.path;
     } catch (error) {
       console.error('Upload error:', error);
-      alert(`Failed to upload image: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setError(`Failed to upload image: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return null;
+    } finally {
+      setImageUploading(false);
     }
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        setError('Image size exceeds 5MB limit');
+        return;
+      }
+      
       setImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -277,7 +326,7 @@ export default function AdminServices() {
         Machine: formData.Machine,
         Image: imageUrl,
         Desc: formData.Desc,
-        Number: formData.Number, // Added Number field
+        Number: formData.Number ?? 1,
         Instructions: formData.Instructions || null,
         Link: formData.Link || null,
         isAvailable: formData.isAvailable ?? true,
@@ -289,16 +338,6 @@ export default function AdminServices() {
         : '/api/machines';
       
       const method = editingMachine ? 'PUT' : 'POST';
-  
-      // Detailed logging of the request
-      console.log('Making request:', {
-        endpoint,
-        method,
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        payload: JSON.stringify(payload, null, 2)
-      });
 
       const response = await fetch(endpoint, {
         method,
@@ -307,31 +346,18 @@ export default function AdminServices() {
         },
         body: JSON.stringify(payload),
       });
-  
-      // Log the response details
-      console.log('Response status:', response.status);
-      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-
-      const responseText = await response.text();
-      console.log('Raw response:', responseText);
 
       let responseData;
+      const responseText = await response.text();
+      
       try {
         responseData = responseText ? JSON.parse(responseText) : null;
-        console.log('Parsed response data:', responseData);
       } catch (parseError) {
         console.error('JSON Parse Error:', parseError);
         throw new Error(`Failed to parse response: ${responseText}`);
       }
 
       if (!response.ok) {
-        // Log more details about the error
-        console.error('Response not OK:', {
-          status: response.status,
-          statusText: response.statusText,
-          data: responseData
-        });
-
         throw new Error(
           responseData?.error || 
           (responseData?.errors && Array.isArray(responseData.errors) 
@@ -341,9 +367,9 @@ export default function AdminServices() {
         );
       }
 
-      console.log('Successfully saved machine:', responseData);
       await fetchMachines();
       closeModal();
+      // Success handled by UI update
       
     } catch (error) {
       console.error('Detailed error information:', {
@@ -352,26 +378,72 @@ export default function AdminServices() {
         stack: error instanceof Error ? error.stack : null
       });
       
-      alert(error instanceof Error ? error.message : 'Failed to save machine');
+      setError(error instanceof Error ? error.message : 'Failed to save machine');
     } finally {
-      setIsLoading(false);
+      // Small delay to show completion animation
+      setTimeout(() => {
+        setIsLoading(false);
+      }, 300);
     }
   };
+
+  // Loading skeleton components
+  const MachinesSkeleton = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {[1, 2, 3, 4, 5, 6].map((item) => (
+        <div key={item} className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-100 animate-pulse">
+          <div className="p-4 border-b border-gray-100 flex justify-between">
+            <div className="h-6 bg-gray-200 rounded w-1/2"></div>
+            <div className="h-6 bg-gray-200 rounded w-1/4"></div>
+          </div>
+          <div className="h-56 bg-gray-200"></div>
+          <div className="p-4">
+            <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
+            <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
+            <div className="h-4 bg-gray-200 rounded w-full mb-4"></div>
+            <div className="h-5 bg-gray-200 rounded w-1/3 mb-2"></div>
+            <div className="space-y-2">
+              <div className="h-4 bg-gray-200 rounded w-full"></div>
+              <div className="h-4 bg-gray-200 rounded w-full"></div>
+              <div className="h-4 bg-gray-200 rounded w-full"></div>
+            </div>
+          </div>
+          <div className="border-t border-gray-100 p-4 bg-gray-50 flex justify-end space-x-2">
+            <div className="h-8 w-8 bg-gray-200 rounded-md"></div>
+            <div className="h-8 w-8 bg-gray-200 rounded-md"></div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  // Loading is now handled by a simple spinner like in AdminTools
 
   return (
     <main className="min-h-screen">
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center mb-8">
           <h2 className="text-2xl font-bold text-[#143370]">Machines</h2>
-          <button
+          <Button
             onClick={() => openModal()}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg flex items-center transition-colors"
+            className="bg-[#143370] hover:bg-[#0d2451] text-white"
+            disabled={isDataLoading}
           >
             <Plus size={18} className="mr-2" /> Add New Machine
-          </button>
+          </Button>
         </div>
         
-        {machines.length === 0 ? (
+        {error && (
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4">
+            {error}
+          </div>
+        )}
+        
+        {isDataLoading ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#143370]"></div>
+          </div>
+        ) : machines.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-lg shadow-sm">
             <p className="text-gray-500 mb-4">No machines found</p>
             <button
@@ -384,48 +456,75 @@ export default function AdminServices() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {machines.map(machine => (
-              <div key={machine.id} className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-100 hover:shadow-md transition-shadow">
+              <div 
+                key={machine.id} 
+                className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-100 hover:shadow-md transition-all duration-200"
+              >
                 {/* Machine Header */}
-<div className="flex justify-between items-center p-4 border-b border-gray-100">
-  <div className="flex flex-col">
-    <h2 className="text-lg font-semibold text-gray-800 truncate" title={machine.Machine}>
-      {machine.Machine}
-    </h2>
-    {machine.Number !== null && machine.Number !== undefined && (
-      <span className="text-xs text-gray-500">
-        Quantity: {machine.Number}
-      </span>
-    )}
-  </div>
-  <div className="flex items-center space-x-2">
-    <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-      machine.isAvailable 
-        ? 'bg-green-100 text-green-800' 
-        : 'bg-red-100 text-red-800'
-    }`}>
-      {machine.isAvailable ? 'Available' : 'Unavailable'}
-    </span>
-    <Switch
-      checked={machine.isAvailable}
-      onCheckedChange={() => toggleAvailability(machine.id, machine.isAvailable)}
-      className="data-[state=checked]:bg-green-600"
-    />
-  </div>
-</div>
+                <div className="flex justify-between items-start p-4 border-b border-gray-100">
+                  <div className="flex flex-col max-w-[60%]">
+                    <h2 className="text-lg font-semibold text-gray-800 truncate" title={machine.Machine}>
+                      {machine.Machine}
+                    </h2>
+                    {machine.Number !== null && machine.Number !== undefined && (
+                      <span className="text-xs text-gray-500">
+                        Quantity: {machine.Number}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                      machine.isAvailable 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {machine.isAvailable ? 'Available' : 'Unavailable'}
+                    </span>
+                    <div className="relative">
+                      {isToggling[machine.id] ? (
+                        <div className="h-5 w-10 bg-gray-200 rounded-full flex items-center justify-center">
+                          <div className="h-3 w-3 bg-blue-600 rounded-full animate-pulse"></div>
+                        </div>
+                      ) : (
+                        <Switch
+                          checked={machine.isAvailable}
+                          onCheckedChange={() => toggleAvailability(machine.id, machine.isAvailable)}
+                          className="data-[state=checked]:bg-green-600 transition-colors duration-200"
+                          disabled={isToggling[machine.id]}
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
                 
                 {/* Machine Image */}
-                <div className="relative h-56">
+                <div className="relative h-56 overflow-hidden">
                   <img 
                     src={machine.Image} 
                     alt={machine.Machine} 
-                    className="w-full h-full object-cover" 
+                    className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-300" 
+                    loading="lazy"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      const parent = target.parentElement;
+                      
+                      target.style.display = 'none';
+                      
+                      const placeholder = document.createElement('div');
+                      placeholder.className = 'w-full h-full flex items-center justify-center bg-gray-100 text-gray-500';
+                      placeholder.textContent = 'No image available';
+                      
+                      if (parent) {
+                        parent.appendChild(placeholder);
+                      }
+                    }}
                   />
                   {machine.Link && (
                     <a 
                       href={machine.Link} 
                       target="_blank" 
                       rel="noopener noreferrer" 
-                      className="absolute top-2 right-2 bg-black bg-opacity-70 text-white p-2 rounded-full hover:bg-opacity-90"
+                      className="absolute top-2 right-2 bg-black bg-opacity-70 text-white p-2 rounded-full hover:bg-opacity-90 transition-all duration-200 transform hover:scale-110"
                       title="Watch Video"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -442,25 +541,25 @@ export default function AdminServices() {
                   </p>
                   
                   {machine.Instructions && (
-  <div className="mb-4">
-    <h3 className="text-sm font-medium text-gray-700 mb-2">Instructions:</h3>
-    <p className="text-gray-600 text-sm whitespace-pre-line line-clamp-3" title={machine.Instructions}>
-      {machine.Instructions}
-    </p>
-  </div>
-)}
+                    <div className="mb-4">
+                      <h3 className="text-sm font-medium text-gray-700 mb-2">Instructions:</h3>
+                      <p className="text-gray-600 text-sm whitespace-pre-line line-clamp-3" title={machine.Instructions}>
+                        {machine.Instructions}
+                      </p>
+                    </div>
+                  )}
                   
                   {/* Services Section */}
                   {machine.Services && machine.Services.length > 0 && (
                     <div className="mb-4">
                       <h3 className="text-sm font-medium text-gray-700 mb-2">Services:</h3>
-                      <div className="max-h-40 overflow-y-auto pr-1">
+                      <div className="max-h-40 overflow-y-auto pr-1 custom-scrollbar">
                         <ul className="divide-y divide-gray-100">
                           {machine.Services.map((service, index) => (
                             <li key={service.id || index} className="flex justify-between items-center py-2">
                               <span className="text-gray-800 text-sm">{service.Service}</span>
                               <span className="text-green-600 font-medium text-sm">
-                                ₱{service.Costs ? parseFloat(service.Costs).toFixed(2) : '0.00'}
+                                ₱{service.Costs ? parseFloat(service.Costs.toString()).toFixed(2) : '0.00'}
                                 {service.Per && <span className="text-xs text-gray-500 ml-1">/{service.Per}</span>}
                               </span>
                             </li>
@@ -477,6 +576,7 @@ export default function AdminServices() {
                     onClick={() => openModal(machine)}
                     className="bg-blue-100 text-blue-600 hover:bg-blue-200 p-2 rounded-md transition-colors"
                     title="Edit"
+                    disabled={isDeletingMap[machine.id]}
                   >
                     <Edit size={18} />
                   </button>
@@ -504,13 +604,23 @@ export default function AdminServices() {
     
         {/* Modal for Add/Edit Machine */}
         {isModalOpen && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 transition-opacity duration-300"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                closeModal();
+              }
+            }}
+          >
+            <div 
+              className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col animate-fadeIn"
+            >
               <div className="sticky top-0 bg-white z-10 flex justify-between items-center p-5 border-b">
                 <h2 className="text-xl font-bold text-gray-800">{editingMachine ? 'Edit' : 'Add'} Machine</h2>
                 <button 
                   onClick={closeModal} 
-                  className="text-gray-500 hover:text-gray-700 focus:outline-none"
+                  className="text-gray-500 hover:text-gray-700 focus:outline-none transition-colors"
+                  disabled={isLoading}
                 >
                   <X size={24} />
                 </button>
@@ -529,58 +639,55 @@ export default function AdminServices() {
                       name="Machine"
                       value={formData.Machine || ''}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                       required
+                      disabled={isLoading}
                     />
                   </div>
 
-                      {/* Number Input */}
-<div className="space-y-2">
-  <label htmlFor="Number" className="block text-sm font-medium text-gray-700">
-    Number of Machines
-  </label>
-  <div className="flex items-center space-x-2">
-    <Button 
-      type="button"
-      variant="outline"
-      size="icon"
-      onClick={() => {
-        const currentValue = formData.Number || 1;
-        if (currentValue > 1) {
-          setFormData(prev => ({ ...prev, Number: currentValue - 1 }));
-        }
-      }}
-    >
-      <Minus className="h-4 w-4" />
-    </Button>
-    <Input
-      id="Number"
-      name="Number"
-      type="number"
-      value={formData.Number === undefined ? 1 : formData.Number}
-      onChange={(e) => {
-        const value = e.target.value;
-        const numValue = value === '' || parseInt(value) < 1 ? 1 : parseInt(value);
-        setFormData(prev => ({ ...prev, Number: numValue }));
-      }}
-      className="w-20 text-center"
-      min="1"
-      required
-    />
-    <Button 
-      type="button"
-      variant="outline"
-      size="icon"
-      onClick={() => {
-        const currentValue = formData.Number || 1;
-        setFormData(prev => ({ ...prev, Number: currentValue + 1 }));
-      }}
-    >
-      <Plus className="h-4 w-4" />
-    </Button>
-  </div>
-</div>
-  
+                  {/* Number Input */}
+                  <div className="space-y-2">
+                    <label htmlFor="Number" className="block text-sm font-medium text-gray-700">
+                      Number of Machines
+                    </label>
+                    <div className="flex items-center space-x-2">
+                      <Button 
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => {
+                          const currentValue = formData.Number || 1;
+                          if (currentValue > 1) {
+                            setFormData(prev => ({ ...prev, Number: currentValue - 1 }));
+                          }
+                        }}
+                      >
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <Input
+                        id="Number"
+                        name="Number"
+                        type="number"
+                        value={formData.Number === undefined ? 1 : formData.Number}
+                        onChange={handleNumberChange}
+                        className="w-20 text-center"
+                        min="1"
+                        required
+                      />
+                      <Button 
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={() => {
+                          const currentValue = formData.Number || 1;
+                          setFormData(prev => ({ ...prev, Number: currentValue + 1 }));
+                        }}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  
                   {/* Description Input */}
                   <div>
                     <label htmlFor="Desc" className="block text-sm font-medium text-gray-700 mb-1">
@@ -596,7 +703,7 @@ export default function AdminServices() {
                       required
                     />
                   </div>
-  
+                  
                   {/* Instructions Input */}
                   <div>
                     <label htmlFor="Instructions" className="block text-sm font-medium text-gray-700 mb-1">
@@ -613,39 +720,39 @@ export default function AdminServices() {
                   </div>
 
                   {/* Image Upload */}
-<div>
-  <label htmlFor="image" className="block text-sm font-medium text-gray-700 mb-1">
-    Machine Image
-  </label>
-  {editingMachine && imagePreview && (
-    <div className="text-sm text-gray-600 mb-2">
-      Current image: {editingMachine.Image.split('/').pop()}
-    </div>
-  )}
-  <input
-    type="file"
-    id="image"
-    name="image"
-    accept="image/*"
-    onChange={handleImageChange}
-    className="w-full text-sm text-gray-500
-      file:mr-4 file:py-2 file:px-4
-      file:rounded-md file:border-0
-      file:text-sm file:font-medium
-      file:bg-blue-50 file:text-blue-700
-      hover:file:bg-blue-100"
-  />
-  {imagePreview && (
-    <div className="mt-2 relative h-40 bg-gray-100 rounded-md overflow-hidden">
-      <img 
-        src={imagePreview} 
-        alt="Preview" 
-        className="w-full h-full object-contain" 
-      />
-    </div>
-  )}
-</div>
-  
+                  <div>
+                    <label htmlFor="image" className="block text-sm font-medium text-gray-700 mb-1">
+                      Machine Image
+                    </label>
+                    {editingMachine && imagePreview && (
+                      <div className="text-sm text-gray-600 mb-2">
+                        Current image: {editingMachine.Image.split('/').pop()}
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      id="image"
+                      name="image"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="w-full text-sm text-gray-500
+                        file:mr-4 file:py-2 file:px-4
+                        file:rounded-md file:border-0
+                        file:text-sm file:font-medium
+                        file:bg-blue-50 file:text-blue-700
+                        hover:file:bg-blue-100"
+                    />
+                    {imagePreview && (
+                      <div className="mt-2 relative h-40 bg-gray-100 rounded-md overflow-hidden">
+                        <img 
+                          src={imagePreview} 
+                          alt="Preview" 
+                          className="w-full h-full object-contain" 
+                        />
+                      </div>
+                    )}
+                  </div>
+                  
                   {/* Services Input */}
                   <div>
                     <div className="flex items-center mb-1">
@@ -668,7 +775,7 @@ export default function AdminServices() {
                       placeholder="Select services..."
                     />
                   </div>
-  
+                  
                   {/* Video URL Input */}
                   <div>
                     <label htmlFor="Link" className="block text-sm font-medium text-gray-700 mb-1">

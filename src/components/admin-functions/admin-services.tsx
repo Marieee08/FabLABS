@@ -62,7 +62,7 @@ const AdminServices = () => {
   const [services, setServices] = useState<Service[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
@@ -71,6 +71,8 @@ const AdminServices = () => {
   }, []);
 
   const fetchServices = async () => {
+    setIsLoading(true);
+    setError(null);
     try {
       const response = await fetch('/api/services');
       if (!response.ok) {
@@ -81,6 +83,8 @@ const AdminServices = () => {
     } catch (error) {
       console.error('Error fetching services:', error);
       setError(error instanceof Error ? error.message : 'Failed to fetch services');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -134,7 +138,10 @@ const AdminServices = () => {
   };
 
   const handleDeleteService = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this service?')) return;
+    const serviceToDelete = services.find(service => service.id === id);
+    if (!serviceToDelete) return;
+    
+    if (!window.confirm(`Are you sure you want to delete "${serviceToDelete.Service}"?`)) return;
     
     try {
       const response = await fetch(`/api/services/${id}`, {
@@ -268,11 +275,16 @@ const AdminServices = () => {
   const DynamicIcon = ({ iconName }: { iconName: string | null }) => {
     if (!iconName) return <Info className="h-4 w-4" />;
     
-    const formattedIconName = iconName.charAt(0).toUpperCase() + iconName.slice(1);
+    // Convert kebab-case to PascalCase
+    const formattedIconName = iconName
+      .split('-')
+      .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+      .join('');
+    
     const IconComponent = (LucideIcons as any)[formattedIconName];
     
     if (!IconComponent) {
-      console.warn(`Icon "${iconName}" not found`);
+      console.warn(`Icon "${iconName}" not found, using default Info icon`);
       return <Info className="h-4 w-4" />;
     }
     
@@ -301,80 +313,94 @@ const AdminServices = () => {
         </div>
       )}
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Service</TableHead>
-            <TableHead>Information</TableHead>
-            <TableHead>Cost</TableHead>
-            <TableHead>Associated Machines</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {services.map((service) => (
-            <TableRow key={service.id}>
-              <TableCell className="font-medium">
-                <div className="flex items-center gap-2">
-                  <DynamicIcon iconName={service.Icon} />
-                  {service.Service}
-                </div>
-              </TableCell>
-              <TableCell className="max-w-md truncate">{service.Info}</TableCell>
-              <TableCell>
-                <div className="flex items-center gap-2">
-                  <CircleDollarSign className="h-4 w-4" />
-                  {(!service.Costs || service.Costs === 0) ? (
-                    <span>Free</span>
-                  ) : (
-                    <span>
-                      ₱{Number(service.Costs).toLocaleString()} / {service.Per}
-                    </span>
-                  )}
-                </div>
-              </TableCell>
-              <TableCell>
-                {service.Machines?.map(m => m.machine.Machine).join(', ') || '-'}
-              </TableCell>
-              <TableCell className="text-right">
-                <DropdownMenu
-                  open={openMenuId === service.id}
-                  onOpenChange={(open) => {
-                    setOpenMenuId(open ? service.id : null);
-                  }}
-                >
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="h-8 w-8 p-0">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem
-                      onClick={() => {
-                        setEditingService(service);
-                        setError(null);
-                        setIsDialogOpen(true);
-                        setOpenMenuId(null);
-                      }}
-                      className="cursor-pointer"
-                    >
-                      <Edit className="mr-2 h-4 w-4" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => handleDeleteService(service.id)}
-                      className="cursor-pointer text-red-600"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </TableCell>
+      {isLoading ? (
+        <div className="flex justify-center items-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#143370]"></div>
+        </div>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Service</TableHead>
+              <TableHead>Information</TableHead>
+              <TableHead>Cost</TableHead>
+              <TableHead>Associated Machines</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {services.length > 0 ? (
+              services.map((service) => (
+                <TableRow key={service.id}>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      <DynamicIcon iconName={service.Icon} />
+                      {service.Service}
+                    </div>
+                  </TableCell>
+                  <TableCell className="max-w-md truncate">{service.Info}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <CircleDollarSign className="h-4 w-4" />
+                      {(!service.Costs || service.Costs === 0) ? (
+                        <span>Free</span>
+                      ) : (
+                        <span>
+                          ₱{Number(service.Costs).toLocaleString()} / {service.Per}
+                        </span>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {service.Machines?.map(m => m.machine.Machine).join(', ') || '-'}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu
+                      open={openMenuId === service.id}
+                      onOpenChange={(open) => {
+                        setOpenMenuId(open ? service.id : null);
+                      }}
+                    >
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setEditingService(service);
+                            setError(null);
+                            setIsDialogOpen(true);
+                            setOpenMenuId(null);
+                          }}
+                          className="cursor-pointer"
+                        >
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleDeleteService(service.id)}
+                          className="cursor-pointer text-red-600"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={5} className="text-center py-6">
+                  No services available. Add your first service to get started.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
