@@ -1,594 +1,425 @@
+// Modified Schedule.tsx to correctly implement per-day time selection
 
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import ProgressBar from '@/components/msme-forms/progress-bar';
 import Navbar from '@/components/custom/navbar';
+import ProcessInformation from '@/components/msme-forms/utilization-info';
+import ReviewSubmit from '@/components/msme-forms/review-submit';
+import { toast } from "@/components/ui/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Steps, Step, StepStatus } from "@/components/ui/steps";
-import { ArrowRight, ArrowLeft, CheckCircle, AlertCircle, Calendar, Clock } from 'lucide-react';
-import { toast } from "@/components/ui/use-toast";
-import { useAuth } from '@clerk/nextjs';
+import { ArrowRight, ArrowLeft, Clock, AlertCircle, Calendar } from 'lucide-react';
+import { InteractiveMachineCalendarWrapper } from '@/components/msme-forms/interactive-machine-calendar';
 
-// Import our new components
-import ServiceSelection from '@/components/msme-forms/service-selector';
-import ScheduleCalendar from '@/components/msme-forms/schedule-calendar';
-import DayTimeMachineCard, { DaySelectionData } from '@/components/msme-forms/time-machine-card';
-import BatchActions from '@/components/msme-forms/batch-actions';
-import CostReview from '@/components/msme-forms/cost-review';
-
-// Service selection data interface
-interface ServiceSelectionData {
-  serviceId: string;
-  serviceName: string;
-  googleDriveLink: string;
-  requiresFiles: boolean;
-}
-
-// Calendar selected date interface
-interface SelectedDate {
-  date: Date;
-  availableMorning: boolean;
-  availableAfternoon: boolean;
-}
-
-// Full day selection with time and machines interface
-interface DaySelectionData {
+// Interface for days with time slots
+interface Day {
   date: Date;
   startTime: string | null;
   endTime: string | null;
-  machineQuantity: number;
-  availableMorning: boolean;
-  availableAfternoon: boolean;
-  maxMachines: number;
 }
 
-// Define our form data interface
-interface ScheduleFormData {
-  // Service information
-  serviceId: string;
-  serviceName: string;
-  googleDriveLink: string;
+// Interface for form data
+export interface FormData {
+  days: Day[];
+  syncTimes: boolean;
+  unifiedStartTime: string | null;
+  unifiedEndTime: string | null;
+
+  // Process fields
+  ProductsManufactured: string | string[];
+  BulkofCommodity: string;
+  Equipment: string;
+  Tools: string;
+  ToolsQty?: number;
   
-  // Selected days with time and machine details
-  daySelections: DaySelectionData[];
-  
-  // Additional information
-  remarks: string;
-  
-  // Cost calculation
-  totalCost: number;
+  // Additional fields
+  serviceMachineNumbers?: Record<string, number>;
+  serviceLinks?: {[service: string]: string};
+  Remarks?: string;
+  NeededMaterials?: Array<{
+    Item: string;
+    ItemQty: number;
+    Description: string;
+  }>;
+  [key: string]: any; // Index signature for dynamic access
 }
 
-const MsmeSchedulePage: React.FC = () => {
-  const router = useRouter();
-  const { getToken } = useAuth();
-  const [step, setStep] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
-  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+// Time options for dropdown menus
+const START_TIME_OPTIONS = [
+  { value: "--:-- AM", label: "Select Time" },
+  { value: "08:00 AM", label: "08:00 AM" },
+  { value: "09:00 AM", label: "09:00 AM" },
+  { value: "10:00 AM", label: "10:00 AM" },
+  { value: "11:00 AM", label: "11:00 AM" },
+  { value: "12:00 PM", label: "12:00 PM" },
+  { value: "01:00 PM", label: "01:00 PM" },
+  { value: "02:00 PM", label: "02:00 PM" },
+  { value: "03:00 PM", label: "03:00 PM" },
+  { value: "04:00 PM", label: "04:00 PM" }
+];
+
+const END_TIME_OPTIONS = [
+  { value: "--:-- AM", label: "Select Time" },
+  { value: "09:00 AM", label: "09:00 AM" },
+  { value: "10:00 AM", label: "10:00 AM" },
+  { value: "11:00 AM", label: "11:00 AM" },
+  { value: "12:00 PM", label: "12:00 PM" },
+  { value: "01:00 PM", label: "01:00 PM" },
+  { value: "02:00 PM", label: "02:00 PM" },
+  { value: "03:00 PM", label: "03:00 PM" },
+  { value: "04:00 PM", label: "04:00 PM" },
+  { value: "05:00 PM", label: "05:00 PM" }
+];
+
+// Helper function to convert time string to minutes for comparison
+function timeToMinutes(timeString: string | null): number {
+  if (!timeString || timeString === '--:-- AM' || timeString === '--:-- PM') return -1;
   
-  // Initialize form data
-  const [formData, setFormData] = useState<ScheduleFormData>({
-    serviceId: '',
-    serviceName: '',
-    googleDriveLink: '',
-    daySelections: [],
-    remarks: '',
-    totalCost: 0
+  const match = timeString.match(/(\d{1,2}):(\d{2}) (AM|PM)/);
+  if (!match) return -1;
+  
+  let [_, hours, minutes, period] = match;
+  let hour = parseInt(hours);
+  
+  // Convert to 24-hour format for proper comparison
+  if (period === 'PM' && hour !== 12) hour += 12;
+  if (period === 'AM' && hour === 12) hour = 0;
+  
+  return hour * 60 + parseInt(minutes);
+}
+
+// Component to select time slots for individual days
+const PerDayTimeSelector: React.FC<{
+  days: Day[];
+  updateDay: (index: number, field: keyof Day, value: any) => void;
+}> = ({ days, updateDay }) => {
+  return (
+    <div className="space-y-6 mt-4">
+      <h3 className="text-lg font-medium text-gray-800">Select Time for Each Day</h3>
+      
+      {days.map((day, index) => {
+        const dateString = new Date(day.date).toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+        
+        const hasTimeError = day.startTime && day.endTime && 
+          timeToMinutes(day.startTime) >= timeToMinutes(day.endTime);
+
+        return (
+          <div key={index} className="p-4 border rounded-lg bg-white shadow-sm">
+            <div className="flex items-center mb-3">
+              <Calendar className="h-5 w-5 text-blue-600 mr-2" />
+              <h4 className="font-medium text-gray-800">{dateString}</h4>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Start Time<span className="text-red-500 ml-1">*</span>
+                </label>
+                <select
+                  className="border rounded-md p-2 w-full border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  value={day.startTime || "--:-- AM"}
+                  onChange={(e) => updateDay(index, 'startTime', e.target.value)}
+                >
+                  {START_TIME_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  End Time<span className="text-red-500 ml-1">*</span>
+                </label>
+                <select
+                  className="border rounded-md p-2 w-full border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  value={day.endTime || "--:-- AM"}
+                  onChange={(e) => updateDay(index, 'endTime', e.target.value)}
+                >
+                  {END_TIME_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            
+            {hasTimeError && (
+              <div className="mt-2 flex items-start text-red-500 text-sm">
+                <AlertCircle className="h-4 w-4 mr-1 mt-0.5 flex-shrink-0" />
+                <span>End time must be after start time</span>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+// Improved type for updateFormData to handle nested objects
+type UpdateFormData = <K extends keyof FormData>(field: K, value: FormData[K]) => void;
+
+export default function Schedule() {
+  const [step, setStep] = React.useState(1);
+  const [formData, setFormData] = React.useState<FormData>({
+    days: [],
+    syncTimes: true,
+    unifiedStartTime: null,
+    unifiedEndTime: null,
+
+    // Initialize ProcessInfo fields
+    ProductsManufactured: '',
+    BulkofCommodity: '',
+    Equipment: '',
+    Tools: '',
+    ToolsQty: 0,
+    
+    // Initialize additional fields
+    serviceMachineNumbers: {},
+    serviceLinks: {},
+    Remarks: '',
   });
   
-  const [minMachineQuantity, setMinMachineQuantity] = useState(1);
-  const [selectedDates, setSelectedDates] = useState<SelectedDate[]>([]);
-  const [maxGlobalMachineQuantity, setMaxGlobalMachineQuantity] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
   
-  // Update service selection
-  const handleServiceSelection = (serviceData: ServiceSelectionData) => {
-    setFormData(prev => ({
-      ...prev,
-      serviceId: serviceData.serviceId,
-      serviceName: serviceData.serviceName,
-      googleDriveLink: serviceData.googleDriveLink
-    }));
-  };
-  
-  // Handle calendar date selection
-  const handleDateSelect = (dates: SelectedDate[]) => {
-    setSelectedDates(dates);
-    
-    // When dates change, update daySelections to add new dates or remove deselected ones
-    setFormData(prev => {
-      // Keep existing selections for dates that are still selected
-      const existingSelections = prev.daySelections.filter(daySelection => 
-        dates.some(date => date.date.toDateString() === daySelection.date.toDateString())
-      );
+  // Debug effect to track form data changes
+  useEffect(() => {
+    console.log("Form data updated:", formData);
+  }, [formData]);
+
+  const updateFormData: UpdateFormData = (field, value) => {
+    setFormData(prevData => {
+      console.log(`Updating ${String(field)}:`, value);
       
-      // Add new date selections
-      const newDates = dates.filter(date => 
-        !prev.daySelections.some(daySelection => 
-          daySelection.date.toDateString() === date.date.toDateString()
-        )
-      );
-      
-      const newSelections = newDates.map(date => ({
-        date: date.date,
-        startTime: null,
-        endTime: null,
-        machineQuantity: minMachineQuantity,
-        availableMorning: date.availableMorning,
-        availableAfternoon: date.availableAfternoon,
-        maxMachines: maxGlobalMachineQuantity
-      }));
-      
-      return {
-        ...prev,
-        daySelections: [...existingSelections, ...newSelections]
-      };
-    });
-  };
-  
-  // Update a specific day's time and machine selection
-  const handleDayUpdate = (updatedDay: DaySelectionData, index: number) => {
-    setFormData(prev => {
-      const updatedSelections = [...prev.daySelections];
-      updatedSelections[index] = updatedDay;
-      return {
-        ...prev,
-        daySelections: updatedSelections
-      };
-    });
-  };
-  
-  // Remove a day from selections
-  const handleDayRemove = (index: number) => {
-    setFormData(prev => {
-      const updatedSelections = [...prev.daySelections];
-      const removedDate = updatedSelections[index].date;
-      updatedSelections.splice(index, 1);
-      
-      // Also remove from selectedDates
-      setSelectedDates(selectedDates.filter(date => 
-        date.date.toDateString() !== removedDate.toDateString()
-      ));
-      
-      return {
-        ...prev,
-        daySelections: updatedSelections
-      };
-    });
-  };
-  
-  // Batch apply time slots to all selected days
-  const handleApplyTimeSlots = (startTime: string, endTime: string) => {
-    // Validate that the selected times work for each day's availability
-    const errors: string[] = [];
-    
-    formData.daySelections.forEach((day, index) => {
-      const isStartMorning = parseInt(startTime.split(':')[0]) < 12;
-      const isEndAfternoon = parseInt(endTime.split(':')[0]) >= 12;
-      
-      // Check if we need morning availability
-      if (isStartMorning && !day.availableMorning) {
-        errors.push(`Day ${index + 1} (${day.date.toLocaleDateString()}) doesn't have morning availability`);
-      }
-      
-      // Check if we need afternoon availability
-      if (isEndAfternoon && !day.availableAfternoon) {
-        errors.push(`Day ${index + 1} (${day.date.toLocaleDateString()}) doesn't have afternoon availability`);
-      }
-    });
-    
-    if (errors.length > 0) {
-      setValidationErrors(errors);
-      return;
-    }
-    
-    // Apply times to all days
-    setFormData(prev => {
-      const updatedSelections = prev.daySelections.map(day => {
-        // Only update if the day can accommodate these times
-        const isStartMorning = parseInt(startTime.split(':')[0]) < 12;
-        const isEndAfternoon = parseInt(endTime.split(':')[0]) >= 12;
+      // Special handling for ProductsManufactured changes
+      if (field === 'ProductsManufactured') {
+        // Create a deep copy of the previous data
+        const updatedData = JSON.parse(JSON.stringify(prevData));
         
-        // Skip if day can't accommodate the times
-        if ((isStartMorning && !day.availableMorning) || 
-            (isEndAfternoon && !day.availableAfternoon)) {
-          return day;
-        }
+        // Update the ProductsManufactured field
+        updatedData[field] = value;
         
-        return {
-          ...day,
-          startTime,
-          endTime
-        };
-      });
-      
-      return {
-        ...prev,
-        daySelections: updatedSelections
-      };
-    });
-    
-    // Clear validation errors
-    setValidationErrors([]);
-    
-    toast({
-      title: "Time slots applied",
-      description: "Time slots have been applied to eligible days",
-    });
-  };
-  
-  // Batch apply machine quantity to all selected days
-  const handleApplyMachineQuantity = (quantity: number) => {
-    setFormData(prev => {
-      const updatedSelections = prev.daySelections.map(day => {
-        // Use the minimum of requested quantity and max available machines
-        const actualQuantity = Math.min(quantity, day.maxMachines);
-        
-        return {
-          ...day,
-          machineQuantity: actualQuantity
-        };
-      });
-      
-      return {
-        ...prev,
-        daySelections: updatedSelections
-      };
-    });
-    
-    toast({
-      title: "Machine quantity applied",
-      description: "Machine quantity has been applied to all days",
-    });
-  };
-  
-  // Handle remarks input
-  const handleRemarksChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setFormData(prev => ({
-      ...prev,
-      remarks: e.target.value
-    }));
-  };
-  
-  // Handle cost calculation
-  const handleCostCalculated = (totalCost: number) => {
-    setFormData(prev => ({
-      ...prev,
-      totalCost
-    }));
-  };
-  
-  // Validate each step before proceeding
-  const validateStep = (currentStep: number): boolean => {
-    setValidationErrors([]);
-    const errors: string[] = [];
-    
-    switch(currentStep) {
-      case 1: // Service selection validation
-        if (!formData.serviceId) {
-          errors.push("Please select a service");
-        }
-        
-        // If service requires files, validate the Google Drive link
-        const linkRegex = /https:\/\/drive\.google\.com\/.+/i;
-        if (formData.serviceName && 
-            ['3D Printing', 'Laser Cutting', 'CNC Machining', 'PCB Manufacturing'].includes(formData.serviceName) && 
-            (!formData.googleDriveLink || !linkRegex.test(formData.googleDriveLink))) {
-          errors.push("Please provide a valid Google Drive link for the selected service");
-        }
-        break;
-        
-      case 2: // Date selection validation
-        if (selectedDates.length === 0) {
-          errors.push("Please select at least one date");
-        }
-        break;
-        
-      case 3: // Time and machine selection validation
-        // Check if all selected days have start and end times
-        formData.daySelections.forEach((day, index) => {
-          if (!day.startTime || !day.endTime) {
-            errors.push(`Please select start and end times for day ${index + 1} (${day.date.toLocaleDateString()})`);
-          }
+        // If we have serviceMachineNumbers data, synchronize it with the selected services
+        if (updatedData.serviceMachineNumbers) {
+          const currentMachineNumbers = { ...updatedData.serviceMachineNumbers };
+          const updatedMachineNumbers = {};
           
-          if (day.machineQuantity <= 0) {
-            errors.push(`Please select at least one machine for day ${index + 1} (${day.date.toLocaleDateString()})`);
-          }
+          // Get array of selected services
+          const selectedServices = Array.isArray(value) ? value : [value].filter(Boolean);
+          
+          // Only keep machine numbers for selected services
+          selectedServices.forEach(service => {
+            if (currentMachineNumbers[service] !== undefined) {
+              updatedMachineNumbers[service] = currentMachineNumbers[service];
+            } else {
+              // Initialize with 0 for new services
+              updatedMachineNumbers[service] = 0;
+            }
+          });
+          
+          updatedData.serviceMachineNumbers = updatedMachineNumbers;
+        }
+        
+        // Similarly update serviceLinks if present
+        if (updatedData.serviceLinks) {
+          const currentLinks = { ...updatedData.serviceLinks };
+          const updatedLinks = {};
+          
+          const selectedServices = Array.isArray(value) ? value : [value].filter(Boolean);
+          
+          selectedServices.forEach(service => {
+            if (currentLinks[service]) {
+              updatedLinks[service] = currentLinks[service];
+            }
+          });
+          
+          updatedData.serviceLinks = updatedLinks;
+        }
+        
+        return updatedData;
+      }
+      
+      // Special handling for serviceLinks and serviceMachineNumbers to perform deep copies
+      if (field === 'serviceLinks' || field === 'serviceMachineNumbers') {
+        return {
+          ...prevData,
+          [field]: value ? JSON.parse(JSON.stringify(value)) : value
+        };
+      }
+      
+      // Special handling for days to preserve time info
+      if (field === 'days') {
+        // Ensure all days have time info from unified time if sync is on
+        if (prevData.syncTimes && prevData.unifiedStartTime && prevData.unifiedEndTime) {
+          const updatedDays = value.map((day: any) => ({
+            ...day,
+            startTime: day.startTime || prevData.unifiedStartTime,
+            endTime: day.endTime || prevData.unifiedEndTime
+          }));
+          return { ...prevData, [field]: updatedDays };
+        }
+      }
+      
+      // Special handling for syncTimes toggle - synchronize all times when enabled
+      if (field === 'syncTimes' && value === true && prevData.unifiedStartTime && prevData.unifiedEndTime) {
+        const updatedDays = prevData.days.map(day => ({
+          ...day,
+          startTime: prevData.unifiedStartTime,
+          endTime: prevData.unifiedEndTime
+        }));
+        
+        return {
+          ...prevData,
+          [field]: value,
+          days: updatedDays
+        };
+      }
+      
+      // Special handling for unified time changes - apply to all days if sync is on
+      if ((field === 'unifiedStartTime' || field === 'unifiedEndTime') && prevData.syncTimes) {
+        const updatedDays = prevData.days.map(day => ({
+          ...day,
+          startTime: field === 'unifiedStartTime' ? value : day.startTime,
+          endTime: field === 'unifiedEndTime' ? value : day.endTime
+        }));
+        
+        return {
+          ...prevData,
+          [field]: value,
+          days: updatedDays
+        };
+      }
+      
+      // For all other fields, just do the simple update
+      return { ...prevData, [field]: value };
+    });
+  };
+  
+  // Helper function to update individual day's time slots
+  const updateDayTime = (index: number, field: keyof Day, value: any) => {
+    const updatedDays = [...formData.days];
+    updatedDays[index] = {
+      ...updatedDays[index],
+      [field]: value
+    };
+    
+    updateFormData('days', updatedDays);
+  };
+  
+  const nextStep = () => {
+    // Validate the current step
+    if (step === 1) {
+      // Check if a service is selected
+      if (!formData.ProductsManufactured) {
+        toast({
+          title: "Service required",
+          description: "Please select a service before continuing",
+          variant: "destructive",
         });
-        break;
+        return;
+      }
+      
+      // Check machine quantity
+      const service = formData.ProductsManufactured;
+      const serviceArray = Array.isArray(service) ? service : [service];
+      const machineNumbers = formData.serviceMachineNumbers || {};
+      
+      for (const svc of serviceArray) {
+        if (!machineNumbers[svc] && machineNumbers[svc] !== 0) {
+          toast({
+            title: "Machine quantity required",
+            description: "Please specify machine quantity for all selected services",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
     }
     
-    setValidationErrors(errors);
-    return errors.length === 0;
-  };
-  
-  // Navigation between steps
-  const goToNextStep = () => {
-    if (validateStep(step)) {
-      setStep(prev => prev + 1);
-      window.scrollTo(0, 0);
+    if (step === 2) {
+      // Check if dates are selected
+      if (formData.days.length === 0) {
+        toast({
+          title: "Date selection required",
+          description: "Please select at least one date",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Check if all dates have time information
+      const missingTimeInfo = formData.days.some(
+        day => !day.startTime || !day.endTime || 
+               day.startTime === '--:-- AM' || 
+               day.endTime === '--:-- AM'
+      );
+      
+      if (missingTimeInfo) {
+        toast({
+          title: "Time selection required",
+          description: "Please specify start and end times for all dates",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Check if any day has invalid time (end before start)
+      const invalidTimeOrder = formData.days.some(
+        day => timeToMinutes(day.startTime) >= timeToMinutes(day.endTime)
+      );
+      
+      if (invalidTimeOrder) {
+        toast({
+          title: "Invalid time selection",
+          description: "End time must be after start time for all dates",
+          variant: "destructive",
+        });
+        return;
+      }
     }
+    
+    // Make sure ProductsManufactured is always an array before moving to the review step
+    if (step === 2) {
+      if (!Array.isArray(formData.ProductsManufactured) && formData.ProductsManufactured) {
+        updateFormData('ProductsManufactured', [formData.ProductsManufactured]);
+      }
+    }
+    
+    setStep(prevStep => prevStep + 1);
   };
   
-  const goToPrevStep = () => {
-    setStep(prev => prev - 1);
-    window.scrollTo(0, 0);
+  const prevStep = () => {
+    console.log("Moving back to previous step with formData:", formData);
+    setStep(prevStep => prevStep - 1);
   };
 
-  // Handle final submission
-  const handleSubmit = async () => {
-    if (!validateStep(step)) {
-      return;
-    }
-    
-    setIsLoading(true);
-    
-    try {
-      const token = await getToken();
-      
-      // Convert day selections to the format expected by the API
-      const processedDays = formData.daySelections.map(day => ({
-        date: day.date.toISOString(),
-        startTime: day.startTime,
-        endTime: day.endTime,
-        machineQuantity: day.machineQuantity
-      }));
-      
-      // Prepare payload for API
-      const payload = {
-        serviceId: formData.serviceId,
-        serviceName: formData.serviceName,
-        googleDriveLink: formData.googleDriveLink,
-        days: processedDays,
-        remarks: formData.remarks,
-        totalCost: formData.totalCost
-      };
-      
-      // Send to API
-      const response = await fetch('/api/user/create-reservation', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create reservation');
-      }
-      
-      // Handle success
-      toast({
-        title: "Reservation created successfully",
-        description: "Your service has been scheduled",
-        variant: "success"
-      });
-      
-      // Redirect to dashboard
-      router.push('/user-dashboard');
-      
-    } catch (error) {
-      console.error('Reservation submission error:', error);
-      
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : 'Failed to create reservation',
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Check if there are time validation errors in the unified time selectors
+  const hasUnifiedTimeError = formData.unifiedStartTime && formData.unifiedEndTime && 
+    timeToMinutes(formData.unifiedStartTime) >= timeToMinutes(formData.unifiedEndTime);
   
-  // Render content based on current step
-  const renderStepContent = () => {
-    switch (step) {
-      case 1:
-        return (
-          <div className="space-y-6">
-            <ServiceSelection 
-              onSelection={handleServiceSelection}
-              initialSelection={{
-                serviceId: formData.serviceId,
-                serviceName: formData.serviceName,
-                googleDriveLink: formData.googleDriveLink,
-                requiresFiles: ['3D Printing', 'Laser Cutting', 'CNC Machining', 'PCB Manufacturing'].includes(formData.serviceName)
-              }}
-            />
-          </div>
-        );
-        
-      case 2:
-        return (
-          <div className="space-y-6">
-            <ScheduleCalendar
-              serviceId={formData.serviceId}
-              onDateSelect={handleDateSelect}
-              minMachineQuantity={minMachineQuantity}
-              initialSelectedDates={selectedDates}
-              maxSelectableDates={5}
-            />
-          </div>
-        );
-        
-      case 3:
-        return (
-          <div className="space-y-6">
-            {validationErrors.length > 0 && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4 mr-2" />
-                <AlertDescription>
-                  <ul className="list-disc pl-5">
-                    {validationErrors.map((error, index) => (
-                      <li key={index}>{error}</li>
-                    ))}
-                  </ul>
-                </AlertDescription>
-              </Alert>
-            )}
-            
-            <BatchActions
-              selectedDays={formData.daySelections}
-              onApplyTimeSlots={handleApplyTimeSlots}
-              onApplyMachineQuantity={handleApplyMachineQuantity}
-              maxGlobalMachineQuantity={maxGlobalMachineQuantity}
-              validationErrors={validationErrors}
-            />
-            
-            <div className="space-y-4">
-              <h3 className="text-xl font-semibold flex items-center">
-                <Clock className="mr-2 h-5 w-5 text-blue-600" />
-                Time & Machine Selection
-              </h3>
-              
-              {formData.daySelections.length > 0 ? (
-                formData.daySelections.map((day, index) => (
-                  <DayTimeMachineCard
-                    key={day.date.toISOString()}
-                    dayData={day}
-                    onUpdate={(updatedDay) => handleDayUpdate(updatedDay, index)}
-                    onRemove={() => handleDayRemove(index)}
-                    disabled={isLoading}
-                  />
-                ))
-              ) : (
-                <div className="text-center p-12 bg-gray-50 rounded-lg border border-gray-200">
-                  <Calendar className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-4 text-lg font-medium text-gray-900">No dates selected</h3>
-                  <p className="mt-2 text-sm text-gray-500">
-                    Go back to the previous step to select dates for your reservation.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        );
-        
-      case 4:
-        return (
-          <div className="space-y-6">
-            <h3 className="text-xl font-semibold">Review Your Reservation</h3>
-            
-            {/* Service Summary */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Service Details</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="font-medium text-gray-700">Selected Service</h4>
-                    <p className="text-gray-900">{formData.serviceName || "No service selected"}</p>
-                  </div>
-                  
-                  {formData.googleDriveLink && (
-                    <div>
-                      <h4 className="font-medium text-gray-700">Google Drive Link</h4>
-                      <p className="text-blue-600 break-all">{formData.googleDriveLink}</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* Date and Time Summary */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Schedule Details</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {formData.daySelections.map((day, index) => (
-                    <div key={index} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                      <div className="flex justify-between">
-                        <h4 className="font-medium text-gray-900">
-                          {day.date.toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            month: 'long', 
-                            day: 'numeric'
-                          })}
-                        </h4>
-                        <span className="text-sm text-blue-600 font-medium">
-                          {day.machineQuantity} machine{day.machineQuantity !== 1 ? 's' : ''}
-                        </span>
-                      </div>
-                      
-                      <p className="mt-2 text-gray-700">
-                        {day.startTime && day.endTime ? (
-                          <>
-                            <Clock className="inline-block mr-2 h-4 w-4" />
-                            <span>
-                              {formatTimeDisplay(day.startTime)} - {formatTimeDisplay(day.endTime)}
-                            </span>
-                          </>
-                        ) : (
-                          <span className="text-red-500">No time selected</span>
-                        )}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-            
-            {/* Cost Summary */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Cost Estimate</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <CostReview
-                  selectedServices={[formData.serviceName]}
-                  days={formData.daySelections.map(day => ({
-                    date: day.date,
-                    startTime: day.startTime,
-                    endTime: day.endTime
-                  }))}
-                  serviceMachineNumbers={{ [formData.serviceName]: Math.max(...formData.daySelections.map(d => d.machineQuantity), 0) }}
-                  onCostCalculated={handleCostCalculated}
-                />
-              </CardContent>
-            </Card>
-            
-            {/* Additional Remarks */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Additional Information</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Textarea
-                  placeholder="Add any special requirements or notes for your reservation..."
-                  value={formData.remarks}
-                  onChange={handleRemarksChange}
-                  className="min-h-32 resize-none"
-                  disabled={isLoading}
-                />
-              </CardContent>
-            </Card>
-          </div>
-        );
-        
-      default:
-        return null;
-    }
-  };
+  // Check if there are time validation errors in any individual day
+  const hasAnyDayTimeError = !formData.syncTimes && formData.days.some(day => 
+    day.startTime && day.endTime && timeToMinutes(day.startTime) >= timeToMinutes(day.endTime)
+  );
   
-  // Helper function to format time display
-  const formatTimeDisplay = (time: string) => {
-    if (!time) return '';
-    
-    const [hour, minute] = time.split(':').map(part => parseInt(part));
-    const isPM = hour >= 12;
-    const displayHour = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-    const amPm = isPM ? 'PM' : 'AM';
-    
-    return `${displayHour}:${minute.toString().padStart(2, '0')} ${amPm}`;
-  };
+  // Check if all time selections are valid for the next step validation
+  const allTimesValid = formData.syncTimes
+    ? (formData.unifiedStartTime && formData.unifiedEndTime && !hasUnifiedTimeError)
+    : formData.days.every(day => 
+        day.startTime && day.endTime && 
+        day.startTime !== '--:-- AM' && day.endTime !== '--:-- AM' &&
+        timeToMinutes(day.startTime) < timeToMinutes(day.endTime)
+      );
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
@@ -600,94 +431,175 @@ const MsmeSchedulePage: React.FC = () => {
           <p className="text-gray-600 mt-2 max-w-3xl mx-auto">Complete the form below to schedule your service appointment</p>
         </div>
         
-        {/* Steps indicator */}
-        <div className="mb-8">
-          <Steps 
-            currentStep={step}
-            status={isLoading ? 'loading' : undefined}
-          >
-            <Step 
-              title="Select Service" 
-              status={step > 1 ? 'complete' : step === 1 ? 'current' : 'incomplete'} 
-            />
-            <Step 
-              title="Choose Dates" 
-              status={step > 2 ? 'complete' : step === 2 ? 'current' : 'incomplete'} 
-            />
-            <Step 
-              title="Set Times & Machines" 
-              status={step > 3 ? 'complete' : step === 3 ? 'current' : 'incomplete'} 
-            />
-            <Step 
-              title="Review & Submit" 
-              status={step > 4 ? 'complete' : step === 4 ? 'current' : 'incomplete'} 
-            />
-          </Steps>
-        </div>
-        
         {/* Main form card */}
         <Card className="shadow-lg border border-gray-200">
+          <CardHeader className="border-b bg-gradient-to-r from-blue-50 to-gray-50 py-6">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-xl text-blue-800">Service Scheduling</CardTitle>
+              <span className="text-sm font-medium text-gray-500">Step {step} of 3</span>
+            </div>
+          </CardHeader>
+          
           <CardContent className="pt-8 pb-6 px-8">
-            {/* Display validation errors at the top */}
-            {validationErrors.length > 0 && (
-              <Alert variant="destructive" className="mb-6">
-                <AlertCircle className="h-4 w-4 mr-2" />
-                <AlertDescription>
-                  <ul className="list-disc pl-5">
-                    {validationErrors.map((error, index) => (
-                      <li key={index}>{error}</li>
-                    ))}
-                  </ul>
-                </AlertDescription>
-              </Alert>
-            )}
+            <ProgressBar currentStep={step} totalSteps={3} />
             
-            {/* Current step content */}
-            {renderStepContent()}
-            
-            {/* Navigation buttons */}
-            <div className="mt-8 flex justify-between">
-              {step > 1 ? (
-                <Button
-                  onClick={goToPrevStep}
-                  variant="outline"
-                  disabled={isLoading}
-                  className="flex items-center"
-                >
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Previous Step
-                </Button>
+            <div className="mt-8 w-full">
+              {isLoading ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                  <p className="mt-4 text-gray-600">Loading data...</p>
+                </div>
               ) : (
-                <div></div> // Empty div to maintain spacing
-              )}
-              
-              {step < 4 ? (
-                <Button
-                  onClick={goToNextStep}
-                  disabled={isLoading}
-                  className="flex items-center"
-                >
-                  Next Step
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleSubmit}
-                  disabled={isLoading}
-                  className="flex items-center bg-green-600 hover:bg-green-700"
-                >
-                  {isLoading ? (
-                    <>
-                      <div className="mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      Submitting...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="mr-2 h-4 w-4" />
-                      Submit Reservation
-                    </>
-                  )}
-                </Button>
+                step === 1 ? (
+                  <div className="space-y-8">
+                    <h2 className="text-xl font-semibold text-gray-800 mb-4">Service Information</h2>
+                    <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+                      <ProcessInformation 
+                        formData={formData} 
+                        updateFormData={updateFormData} 
+                        nextStep={() => {}} 
+                        prevStep={() => {}} 
+                        standalonePage={false} 
+                      />
+                    </div>
+                    
+                    <div className="mt-6 flex justify-end">
+                      <Button 
+                        onClick={nextStep} 
+                        disabled={!formData.ProductsManufactured}
+                        className="flex items-center gap-2"
+                      >
+                        Continue to Date Selection
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ) : step === 2 ? (
+                  <div className="space-y-8">
+                    <h2 className="text-xl font-semibold text-gray-800 mb-4">Date and Time Selection</h2>
+                    
+                    {/* Machine availability calendar with integrated date selection */}
+                    <InteractiveMachineCalendarWrapper
+                      formData={formData}
+                      updateFormData={updateFormData}
+                    />
+                    
+                    {/* Time selection */}
+                    {formData.days.length > 0 && (
+                      <div className="mt-6 p-6 bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center">
+                            <Clock className="h-5 w-5 text-blue-600 mr-2" />
+                            <h3 className="text-lg font-semibold text-gray-800">Time Selection</h3>
+                          </div>
+                          
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-700">Use same time for all dates</span>
+                            <div className="relative inline-block w-10 mr-2 align-middle select-none">
+                              <input
+                                type="checkbox"
+                                id="syncTimes"
+                                checked={formData.syncTimes}
+                                onChange={(e) => updateFormData('syncTimes', e.target.checked)}
+                                className="checked:bg-blue-500 outline-none focus:outline-none right-4 checked:right-0 duration-200 ease-in absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer"
+                              />
+                              <label
+                                htmlFor="syncTimes"
+                                className="block overflow-hidden h-6 rounded-full bg-gray-300 cursor-pointer"
+                              ></label>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Unified time selection */}
+                        {formData.syncTimes ? (
+                          <div className="grid grid-cols-2 gap-6">
+                            {/* Start Time Selection */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Start Time<span className="text-red-500 ml-1">*</span>
+                              </label>
+                              <select
+                                className="border rounded-md p-2 w-full border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                                value={formData.unifiedStartTime || '--:-- AM'}
+                                onChange={(e) => updateFormData('unifiedStartTime', e.target.value)}
+                                required={true}
+                              >
+                                {START_TIME_OPTIONS.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            
+                            {/* End Time Selection */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-1">
+                                End Time<span className="text-red-500 ml-1">*</span>
+                              </label>
+                              <select
+                                className="border rounded-md p-2 w-full border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                                value={formData.unifiedEndTime || '--:-- AM'}
+                                onChange={(e) => updateFormData('unifiedEndTime', e.target.value)}
+                                required={true}
+                              >
+                                {END_TIME_OPTIONS.map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            
+                            {/* Validation error */}
+                            {hasUnifiedTimeError && (
+                              <div className="col-span-2 mt-2 flex items-start text-red-500 text-sm">
+                                <AlertCircle className="h-4 w-4 mr-1 mt-0.5 flex-shrink-0" />
+                                <span>End time must be after start time</span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          // Per-day time selection
+                          <PerDayTimeSelector 
+                            days={formData.days} 
+                            updateDay={updateDayTime} 
+                          />
+                        )}
+                      </div>
+                    )}
+                    
+                    <div className="mt-6 flex justify-between">
+                      <Button 
+                        onClick={prevStep} 
+                        variant="outline"
+                        className="flex items-center gap-2"
+                      >
+                        <ArrowLeft className="h-4 w-4" />
+                        Back to Service Information
+                      </Button>
+                      
+                      <Button 
+                        onClick={nextStep} 
+                        disabled={
+                          formData.days.length === 0 || 
+                          !allTimesValid
+                        }
+                        className="flex items-center gap-2"
+                      >
+                        Continue to Review
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <ReviewSubmit 
+                    formData={formData} 
+                    prevStep={prevStep}
+                    updateFormData={updateFormData}
+                  />
+                )
               )}
             </div>
           </CardContent>
@@ -699,6 +611,4 @@ const MsmeSchedulePage: React.FC = () => {
       </div>
     </div>
   );
-};
-
-export default MsmeSchedulePage;
+}
