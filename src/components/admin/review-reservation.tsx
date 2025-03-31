@@ -192,34 +192,34 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
   };
 
   // Status change handlers with confirmation dialogs
-  const handleMarkAsOngoing = () => {
-    if (!localReservation) return;
-  
-    // Check if any service requires machines but doesn't have them assigned
-    const hasUnassignedRequiredMachines = editedServices.some(service => {
-      const requiresMachines = serviceRequiresMachines(service.ServiceAvail);
-      const hasMachinesAssigned = service.selectedMachines.length > 0;
-      return requiresMachines && !hasMachinesAssigned;
+const handleMarkAsOngoing = () => {
+  if (!localReservation) return;
+
+  // Check if any service requires machines but doesn't have them assigned
+  const hasUnassignedRequiredMachines = editedServices.some(service => {
+    const requiresMachines = serviceRequiresMachines(service.ServiceAvail);
+    const hasMachinesAssigned = service.selectedMachines.length > 0;
+    return requiresMachines && !hasMachinesAssigned;
+  });
+
+  if (hasUnassignedRequiredMachines) {
+    // Show modal instead of confirmation dialog
+    setConfirmationDialog({
+      isOpen: true,
+      action: 'Assign Machines',
+      message: 'Please assign machines to all required services before marking as Ongoing.',
+      onConfirm: () => {} // Empty function since we just want to show a message
     });
-  
-    if (hasUnassignedRequiredMachines) {
-      // Show modal instead of confirmation dialog
-      setConfirmationDialog({
-        isOpen: true,
-        action: 'Assign Machines',
-        message: 'Please assign machines to all required services before marking as Ongoing.',
-        onConfirm: () => {} // Empty function since we just want to show a message
-      });
-      return;
-    }
-  
-    // Proceed with original confirmation if machines are assigned
-    showConfirmation(
-      'Mark as Ongoing',
-      'Are you sure you want to mark this reservation as Ongoing? This will start the utilization process.',
-      () => handleStatusUpdate(localReservation.id, 'Ongoing')
-    );
-  };
+    return;
+  }
+
+  // Proceed with original confirmation if machines are assigned
+  showConfirmation(
+    'Mark as Ongoing',
+    'Are you sure you want to mark this reservation as Ongoing? This will start the utilization process.',
+    () => handleStatusUpdate(localReservation.id, 'Ongoing')
+  );
+};
 
   const handleMarkAsPendingPayment = () => {
     if (!localReservation) return;
@@ -327,51 +327,13 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
       return;
     }
   
-    // Find corresponding services for each machine utilization to get quantities
-    const machineToServiceMap = new Map();
-    
-    // First, map machines from services to their quantities
-    if (localReservation.UserServices && Array.isArray(localReservation.UserServices)) {
-      localReservation.UserServices.forEach(service => {
-        // Get machine information from the service
-        const machines = typeof service.EquipmentAvail === 'string' ? 
-          service.EquipmentAvail.split(',').map(m => m.trim()) : [];
-        
-        // For each machine, store the service that uses it
-        machines.forEach(machineName => {
-          if (machineName && machineName.toLowerCase() !== 'not specified') {
-            // Store reference to the service for this machine
-            machineToServiceMap.set(machineName, {
-              serviceName: service.ServiceAvail,
-              quantity: service.MinsAvail || 1, // Use MinsAvail as quantity or default to 1
-              cost: service.CostsAvail || 0
-            });
-          }
-        });
-      });
-    }
-  
-    console.log("Machine to service map:", Object.fromEntries(machineToServiceMap));
-  
     // Transform each machine utilization to the PDF format
     localReservation.MachineUtilizations.forEach((machineUtil) => {
-      // Get machine name, defaulting to Unknown if not present
-      const machineName = machineUtil.Machine || 'Unknown Machine';
-      
-      // Get service info from the map we created above
-      const serviceInfo = machineToServiceMap.get(machineName) || {
-        quantity: 1,
-        serviceName: machineUtil.ServiceName || 'Unspecified',
-        cost: 0
-      };
-  
       const pdfData = {
         id: machineUtil.id || localReservation.id,
-        Machine: machineName,
-        MachineQuantity: serviceInfo.quantity.toString(), // Add machine quantity
-        ReviewedBy: machineUtil.ReviwedBy || 'Unknown',
-        ServiceName: machineUtil.ServiceName || serviceInfo.serviceName || 'Unspecified',
-        ServiceCost: serviceInfo.cost,
+        Machine: machineUtil.Machine || 'Unknown Machine',
+        ReviewedBy: machineUtil.ReviwedBy || 'Unknown', // Note the spelling 'ReviwedBy' to match your interface
+        ServiceName: machineUtil.ServiceName || 'Unspecified',
         OperatingTimes: (machineUtil.OperatingTimes || []).map(ot => ({
           OTDate: ot.OTDate,
           OTTypeofProducts: ot.OTTypeofProducts || '',
@@ -395,8 +357,6 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
           RPPersonnel: rc.RPPersonnel || ''
         }))
       };
-  
-      console.log("Generating PDF with data:", pdfData);
   
       // Generate PDF for each machine
       downloadMachineUtilPDF(pdfData);
