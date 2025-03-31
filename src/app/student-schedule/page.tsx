@@ -238,7 +238,6 @@ export default function Schedule() {
             formData={formData} 
             updateFormData={updateFormData} 
             nextStep={nextStep} 
-            prevStep={prevStep} 
           />
         );
       case 2:
@@ -277,6 +276,7 @@ export default function Schedule() {
               formData={formData}
               setFormData={setFormData}
               nextStep={nextStep}
+              prevStep={prevStep} 
               isDateBlocked={isDateBlocked}
               maxDates={MAX_DATES}
             />
