@@ -6,6 +6,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,7 @@ import TimeEditor from './time-editor';
 import { downloadMachineUtilPDF } from "@/components/admin-functions/pdf/machine-utilization-pdf";
 import CostBreakdown from './cost-breakdown'; // Import the new CostBreakdown component
 import { toast } from 'sonner';
-import MachineUtilization from './machine-utilization';
+import  MachineUtilization from './machine-utilization';
 
 // Updated interface definitions
 interface UserService {
@@ -172,6 +173,92 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
   const [comments, setComments] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  const [confirmationDialog, setConfirmationDialog] = useState({
+    isOpen: false,
+    action: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
+  // Helper function to show confirmation dialog
+  const showConfirmation = (action: string, message: string, onConfirm: () => void) => {
+    setConfirmationDialog({
+      isOpen: true,
+      action,
+      message,
+      onConfirm,
+    });
+  };
+
+  // Status change handlers with confirmation dialogs
+  const handleMarkAsOngoing = () => {
+    if (!localReservation) return;
+    showConfirmation(
+      'Mark as Ongoing',
+      'Are you sure you want to mark this reservation as Ongoing? This will start the utilization process.',
+      () => handleStatusUpdate(localReservation.id, 'Ongoing')
+    );
+  };
+
+  const handleMarkAsPendingPayment = () => {
+    if (!localReservation) return;
+    // Check if all UtilTimes are marked as Completed or Cancelled
+    const incompleteTimes = localReservation.UtilTimes.filter(
+      time => time.DateStatus !== "Completed" && time.DateStatus !== "Cancelled"
+    );
+    
+    if (incompleteTimes.length > 0) {
+      toast.error("Cannot proceed to payment", {
+        description: `${incompleteTimes.length} time slot(s) are not yet marked as Completed or Cancelled. 
+        Please review and update all time slots before proceeding.`,
+        duration: 5000
+      });
+      return;
+    }
+    
+    showConfirmation(
+      'Mark as Pending Payment',
+      'Are you sure you want to mark this reservation as Pending Payment? This will notify the client to proceed with payment.',
+      () => handleStatusUpdate(localReservation.id, 'Pending Payment')
+    );
+  };
+
+  const handleMarkAsCompleted = () => {
+    if (!localReservation) return;
+    showConfirmation(
+      'Mark as Completed',
+      'Are you sure you want to mark this reservation as Completed? This will finalize the process.',
+      () => handleStatusUpdate(localReservation.id, 'Completed')
+    );
+  };
+
+  const handleAcceptReservation = () => {
+    if (!localReservation) return;
+    showConfirmation(
+      'Accept Reservation',
+      'Are you sure you want to accept this reservation? This will approve the request and notify the client.',
+      handleApproveReservation
+    );
+  };
+
+  const handleRejectReservation = () => {
+    if (!localReservation) return;
+    showConfirmation(
+      'Reject Reservation',
+      'Are you sure you want to reject this reservation? This action cannot be undone.',
+      () => handleStatusUpdate(localReservation.id, 'Rejected')
+    );
+  };
+
+  const handleCancelReservation = () => {
+    if (!localReservation) return;
+    showConfirmation(
+      'Cancel Reservation',
+      'Are you sure you want to cancel this reservation? This action cannot be undone.',
+      () => handleStatusUpdate(localReservation.id, 'Cancelled')
+    );
+  };
   const isEditingDisabled = (status: string): boolean => {
     const nonEditableStatuses = ['Pending Payment', 'Paid', 'Completed'];
     return nonEditableStatuses.includes(status);
@@ -786,8 +873,9 @@ const handleApproveReservation = async () => {
 const [isLoading, setIsLoading] = useState(false);
 
 return (
+  <>
   <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-    <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle className="text-2xl font-semibold">Reservation Details</DialogTitle>
       </DialogHeader>
@@ -973,14 +1061,13 @@ return (
             </Tabs>
 
             <DialogFooter className="mt-6">
-              <div className="w-full flex flex-col">
-                {/* Add validation error message here, above all buttons */}
-                {validationError && (
-                  <Alert variant="destructive" className="mb-4 w-full">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{validationError}</AlertDescription>
-                  </Alert>
-                )}
+            <div className="w-full flex flex-col">
+              {validationError && (
+                <Alert variant="destructive" className="mb-4 w-full">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{validationError}</AlertDescription>
+                </Alert>
+              )}
               
               <div className="flex w-full justify-between">
                 {localReservation && !editingTimes && !editingMachineUtilization && (
@@ -1063,19 +1150,18 @@ return (
                 
                 {/* Status flow section in the DialogFooter */}
                 <div className="flex gap-4">
-                  {/* Updated status flow to include "Pending Admin Approval" status */}
                   {(localReservation.Status === 'Pending' || localReservation.Status === 'Pending Admin Approval') && (
                     <>
                       <Button
                         variant="destructive"
-                        onClick={() => handleStatusUpdate(localReservation.id, 'Rejected')}
+                        onClick={handleRejectReservation}
                         disabled={isLoading}
                       >
                         Reject Reservation
                       </Button>
                       <Button
                         variant="default"
-                        onClick={handleApproveReservation}
+                        onClick={handleAcceptReservation}
                         disabled={isLoading}
                       >
                         {isLoading ? (
@@ -1094,13 +1180,13 @@ return (
                     <>
                       <Button
                         variant="destructive"
-                        onClick={() => handleStatusUpdate(localReservation.id, 'Cancelled')}
+                        onClick={handleCancelReservation}
                       >
                         Cancel Reservation
                       </Button>
                       <Button
                         variant="default"
-                        onClick={() => handleStatusUpdate(localReservation.id, 'Ongoing')}
+                        onClick={handleMarkAsOngoing}
                       >
                         Mark as Ongoing
                       </Button>
@@ -1108,30 +1194,12 @@ return (
                   )}
 
                   {localReservation.Status === 'Ongoing' && !editingMachineUtilization && !editingTimes && (
-                    <>
-                      <Button
-                        variant="default"
-                        onClick={() => {
-                          // Check if all UtilTimes are marked as Completed or Cancelled
-                          const incompleteTimes = localReservation.UtilTimes.filter(
-                            time => time.DateStatus !== "Completed" && time.DateStatus !== "Cancelled"
-                          );
-                          
-                          if (incompleteTimes.length > 0) {
-                            toast.error("Cannot proceed to payment", {
-                              description: `${incompleteTimes.length} time slot(s) are not yet marked as Completed or Cancelled. 
-                              Please review and update all time slots before proceeding.`,
-                              duration: 5000
-                            });
-                            return;
-                          }
-                          
-                          handleStatusUpdate(localReservation.id, 'Pending Payment');
-                        }}
-                      >
-                        Mark as Pending Payment
-                      </Button>
-                    </>
+                    <Button
+                      variant="default"
+                      onClick={handleMarkAsPendingPayment}
+                    >
+                      Mark as Pending Payment
+                    </Button>
                   )}
                   
                   {localReservation.Status === 'Pending Payment' && (
@@ -1144,7 +1212,7 @@ return (
                   {localReservation.Status === 'Paid' && (
                     <Button
                       variant="default"
-                      onClick={() => handleStatusUpdate(localReservation.id, 'Completed')}
+                      onClick={handleMarkAsCompleted}
                     >
                       Mark as Completed
                     </Button>
@@ -1157,6 +1225,30 @@ return (
         )}
       </DialogContent>
     </Dialog>
+
+      <Dialog open={confirmationDialog.isOpen} onOpenChange={(open) => setConfirmationDialog(prev => ({...prev, isOpen: open}))}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm {confirmationDialog.action}</DialogTitle>
+            <DialogDescription>{confirmationDialog.message}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmationDialog(prev => ({...prev, isOpen: false}))}>
+              Cancel
+            </Button>
+            <Button 
+              variant="default" 
+              onClick={() => {
+                confirmationDialog.onConfirm();
+                setConfirmationDialog(prev => ({...prev, isOpen: false}));
+              }}
+            >
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
