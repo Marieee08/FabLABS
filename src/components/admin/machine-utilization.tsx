@@ -106,122 +106,174 @@ const MachineUtilization: React.FC<MachineUtilizationProps> = ({
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
     const [saving, setSaving] = useState<boolean>(false);
-  
-    // Fetch machine utilization data on component mount
-    useEffect(() => {
-      const fetchMachineUtilization = async () => {
-        try {
-          setLoading(true);
-          
-          // Check if the API endpoint is accessible
-          try {
-            const response = await fetch(`/api/admin/machine-utilization/${reservationId}`);
-            
-            if (!response.ok) {
-              throw new Error(`API responded with status: ${response.status}`);
-            }
-            
-            const data = await response.json();
-            
-            if (data.length === 0) {
-              // If no machine utilization records exist, create initial ones from user services
-              initializeFromServices();
-            } else {
-              // Format dates in the received data
-              const formattedData = data.map((util: MachineUtilization) => ({
-                ...util,
-                DateReviewed: util.DateReviewed ? new Date(util.DateReviewed).toISOString().split('T')[0] : null,
-                OperatingTimes: util.OperatingTimes.map((ot: OperatingTime) => ({
-                  ...ot,
-                  OTDate: ot.OTDate ? new Date(ot.OTDate).toISOString().split('T')[0] : null,
-                  OTStartTime: ot.OTStartTime ? new Date(ot.OTStartTime).toISOString().split('T')[1].substring(0, 5) : null,
-                  OTEndTime: ot.OTEndTime ? new Date(ot.OTEndTime).toISOString().split('T')[1].substring(0, 5) : null,
-                })),
-                DownTimes: util.DownTimes.map((dt: DownTime) => ({
-                  ...dt,
-                  DTDate: dt.DTDate ? new Date(dt.DTDate).toISOString().split('T')[0] : null,
-                })),
-                RepairChecks: util.RepairChecks.map((rc: RepairCheck) => ({
-                  ...rc,
-                  RepairDate: rc.RepairDate ? new Date(rc.RepairDate).toISOString().split('T')[0] : null,
-                }))
-              }));
 
-              setMachineUtilizations(formattedData);
-            }
-          } catch (error) {
-            // If API fails, initialize empty data structures
-            console.error('API error:', error);
-            initializeFromServices();
-            setError('API not available. Working in offline mode.');
-          }
-          
-          setLoading(false);
-        } catch (err) {
-          console.error('Error in fetchMachineUtilization:', err);
-          setError('Failed to initialize machine utilization data. Please try again.');
-          setLoading(false);
+    const validHours = Array.from({ length: 10 }, (_, i) => i + 8);
+    const formatHour = (hour) => {
+      return hour === 12 ? '12 PM' : hour < 12 ? `${hour} AM` : `${hour - 12} PM`;
+    };
+    const allMinutes = Array.from({ length: 60 }, (_, i) => i);
+    const formatMinute = (minute) => {
+      return minute.toString().padStart(2, '0');
+    };
+    const parseTimeString = (timeString) => {
+      if (!timeString) return { hour: 8, minute: 0 };
+      
+      try {
+        // Handle ISO format (e.g., "2023-05-15T09:30:00.000Z")
+        if (timeString.includes('T')) {
+          const date = new Date(timeString);
+          return {
+            hour: date.getHours(),
+            minute: date.getMinutes()
+          };
+        } 
+        // Handle HH:MM format (e.g., "09:30")
+        else if (timeString.includes(':')) {
+          const [hours, minutes] = timeString.split(':').map(Number);
+          return { 
+            hour: isNaN(hours) ? 8 : hours, 
+            minute: isNaN(minutes) ? 0 : minutes 
+          };
         }
-      };
+        // Default fallback
+        return { hour: 8, minute: 0 };
+      } catch (e) {
+        console.error('Error parsing time string:', e);
+        return { hour: 8, minute: 0 };
+      }
+    };
+    // More reliable time string creation
+    const createTimeString = (hour, minute) => {
+      // Ensure we're working with numbers
+      const h = typeof hour === 'string' ? parseInt(hour, 10) : hour;
+      const m = typeof minute === 'string' ? parseInt(minute, 10) : minute;
+      
+      // Validate and constrain values
+      const validHour = isNaN(h) ? 8 : Math.max(0, Math.min(23, h));
+      const validMinute = isNaN(m) ? 0 : Math.max(0, Math.min(59, m));
+      
+      // Format with padding
+      return `${validHour.toString().padStart(2, '0')}:${validMinute.toString().padStart(2, '0')}`;
+    };
+    const handleHourChange = (machineIndex, otIndex, timeField, newHour) => {
+      const machineUtil = machineUtilizations[machineIndex];
+      if (!machineUtil) return;
+      
+      const operatingTime = machineUtil.OperatingTimes[otIndex];
+      if (!operatingTime) return;
+      
+      const currentTime = timeField === 'OTStartTime' 
+        ? operatingTime.OTStartTime
+        : operatingTime.OTEndTime;
+      
+      const { minute } = parseTimeString(currentTime);
+      
+      // Validate working hours (8:00 AM to 5:00 PM)
+      if (newHour < 8 || newHour > 17) {
+        alert('Operating times must be between 8:00 AM and 5:00 PM');
+        return;
+      }
+      
+      const newTimeString = createTimeString(newHour, minute);
+      handleUpdateOperatingTime(machineIndex, otIndex, timeField, newTimeString);
+    };
+    const handleMinuteChange = (machineIndex, otIndex, timeField, newMinute) => {
+      const machineUtil = machineUtilizations[machineIndex];
+      if (!machineUtil) return;
+      
+      const operatingTime = machineUtil.OperatingTimes[otIndex];
+      if (!operatingTime) return;
+      
+      const currentTime = timeField === 'OTStartTime' 
+        ? operatingTime.OTStartTime
+        : operatingTime.OTEndTime;
+      
+      const { hour } = parseTimeString(currentTime);
+      
+      // Check if the resulting time is within working hours
+      if (hour < 8 || hour > 17) {
+        alert('Operating times must be between 8:00 AM and 5:00 PM');
+        return;
+      }
+      
+      const newTimeString = createTimeString(hour, newMinute);
+      handleUpdateOperatingTime(machineIndex, otIndex, timeField, newTimeString);
+    };
   
-      // Helper function to initialize data from services when API fails
-const initializeFromServices = () => {
-  // Extract machine names from the EquipmentAvail field
-  const initialUtilizations = userServices.flatMap(service => {
-    if (!service.EquipmentAvail || service.EquipmentAvail.trim() === '') {
-      return []; // Skip services with no equipment
-    }
-    
-    // Skip if the equipment is just "Not Specified"
-    if (service.EquipmentAvail.trim().toLowerCase() === 'not specified') {
-      return [];
-    }
-    
-    const machines = service.EquipmentAvail 
-      .split(',')
-      .map(m => {
-        // Split by colon to handle legacy data that might have quantities
-        const parts = m.trim().split(':');
-        return parts[0].trim();
-      })
-      .filter(m => m.length > 0 && m.toLowerCase() !== 'not specified');
-    
-    return machines.map(machine => ({
-      Machine: machine,
-      ReviewedBy: null,
-      MachineApproval: null,
-      DateReviewed: null,
-      ServiceName: service.ServiceAvail,
-      utilReqId: reservationId,
-      OperatingTimes: [],
-      DownTimes: [],
-      RepairChecks: []
-    }));
-  });
+useEffect(() => {
+  const fetchMachineUtilization = async () => {
+    try {
+      setLoading(true);
+      
+      try {
+        const response = await fetch(`/api/admin/machine-utilization/${reservationId}`);
+        
+        if (!response.ok) {
+          throw new Error(`API responded with status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.length === 0) {
+          // If no machine utilization records exist, create initial ones from user services
+          initializeFromServices();
+        } else {
+          // Format dates in the received data
+          const formattedData = data.map((util: MachineUtilization) => ({
+            ...util,
+            DateReviewed: util.DateReviewed ? new Date(util.DateReviewed).toISOString().split('T')[0] : null,
+            OperatingTimes: util.OperatingTimes.map((ot: OperatingTime) => ({
+              ...ot,
+              OTDate: ot.OTDate ? new Date(ot.OTDate).toISOString().split('T')[0] : null,
+              // Properly extract just HH:MM from datetime strings
+              OTStartTime: ot.OTStartTime ? formatTimeStringFromISO(ot.OTStartTime) : null,
+              OTEndTime: ot.OTEndTime ? formatTimeStringFromISO(ot.OTEndTime) : null,
+            })),
+            DownTimes: util.DownTimes.map((dt: DownTime) => ({
+              ...dt,
+              DTDate: dt.DTDate ? new Date(dt.DTDate).toISOString().split('T')[0] : null,
+            })),
+            RepairChecks: util.RepairChecks.map((rc: RepairCheck) => ({
+              ...rc,
+              RepairDate: rc.RepairDate ? new Date(rc.RepairDate).toISOString().split('T')[0] : null,
+            }))
+          }));
 
-  // If no valid machines found, create a placeholder message (optional)
-  if (initialUtilizations.length === 0) {
-    console.log('No valid machines found for utilization data');
-    // You can choose to not create a placeholder, or create one with an informative message
-    // Placeholder option:
-    // initialUtilizations.push({
-    //   Machine: "No valid machines assigned",
-    //   ReviewedBy: null,
-    //   MachineApproval: null,
-    //   DateReviewed: null,
-    //   ServiceName: "Unspecified",
-    //   utilReqId: reservationId,
-    //   OperatingTimes: [],
-    //   DownTimes: [],
-    //   RepairChecks: []
-    // });
-  }
+          setMachineUtilizations(formattedData);
+        }
+      } catch (error) {
+        console.error('API error:', error);
+        initializeFromServices();
+        setError('API not available. Working in offline mode.');
+      }
+      
+      setLoading(false);
+    } catch (err) {
+      console.error('Error in fetchMachineUtilization:', err);
+      setError('Failed to initialize machine utilization data. Please try again.');
+      setLoading(false);
+    }
+  };
 
-  setMachineUtilizations(initialUtilizations);
-};
-  
-      fetchMachineUtilization();
-    }, [reservationId, userServices]);
+  const formatTimeStringFromISO = (isoString: string): string => {
+    try {
+      const date = new Date(isoString);
+      // Format as HH:MM
+      return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+    } catch (e) {
+      console.error('Error formatting ISO time string:', e);
+      // If parsing fails, try to extract time part from string if possible
+      if (isoString.includes('T') && isoString.includes(':')) {
+        const timePart = isoString.split('T')[1];
+        return timePart.substring(0, 5); // Get HH:MM part
+      }
+      return "08:00"; // Fallback
+    }
+  };
+
+  fetchMachineUtilization();
+}, [reservationId, userServices]);
+
   
     // Add a new operating time to a machine utilization
     const handleAddOperatingTime = (machineIndex: number) => {
@@ -339,8 +391,18 @@ const initializeFromServices = () => {
       });
     };
   
-    // Update operating time information
     const handleUpdateOperatingTime = (machineIndex: number, otIndex: number, field: string, value: any) => {
+      // Special handling for time fields
+      if (field === 'OTStartTime' || field === 'OTEndTime') {
+        // Check if the time is within working hours
+        if (value < '08:00' || value > '17:00') {
+          // Don't update state if outside working hours - show alert
+          alert('Operating times must be between 8:00 AM and 5:00 PM');
+          return; // Exit without updating
+        }
+      }
+    
+      // If we get here, either it's not a time field or the time is valid
       setMachineUtilizations(prev => {
         const updated = [...prev];
         (updated[machineIndex].OperatingTimes[otIndex] as any)[field] = value;
@@ -409,171 +471,272 @@ const handleGeneratePDF = () => {
     downloadMachineUtilPDF(pdfData);
   });
 };
-  
-    // Handle saving all machine utilization data
-    const handleSaveAll = async () => {
-      try {
-        setSaving(true);
-        
-        // Get the current user's name
-        // This is a placeholder - replace with your actual method of getting the current admin's name
-        const currentUserName = "Admin"; // Replace with actual user name from your auth system
-        
-        // Get current date for automatic DateReviewed field
-        const currentDate = new Date().toISOString();
-        
-        // Prepare data for submission with safer date handling
-        const preparedData = machineUtilizations.map(util => {
-          return {
-            ...util,
-            // Automatically set ReviewedBy to current admin
-            ReviewedBy: currentUserName,
-            ReviwedBy: currentUserName, // Using the misspelled field name from the schema 
-            // Automatically set DateReviewed to now
-            DateReviewed: currentDate,
-            // Remove MachineApproval
-            MachineApproval: null,
-            // Process operating times
-            OperatingTimes: util.OperatingTimes.map(ot => {
-              // Safely process OTDate
-              let otDate = null;
-              if (ot.OTDate) {
-                try {
-                  otDate = new Date(ot.OTDate).toISOString();
-                } catch (e) {
-                  console.warn("Invalid date format for OTDate:", ot.OTDate);
-                }
-              }
-              
-              // Safely process start time
-              let otStartTime = null;
-              if (ot.OTDate && ot.OTStartTime) {
-                try {
-                  // Make sure the time format is valid (HH:MM)
-                  if (/^\d{1,2}:\d{2}$/.test(ot.OTStartTime)) {
-                    otStartTime = new Date(`${ot.OTDate}T${ot.OTStartTime}:00`).toISOString();
-                  } else {
-                    console.warn("Invalid time format for OTStartTime:", ot.OTStartTime);
-                  }
-                } catch (e) {
-                  console.warn("Error combining OTDate and OTStartTime:", ot.OTDate, ot.OTStartTime);
-                }
-              }
-              
-              // Safely process end time
-              let otEndTime = null;
-              if (ot.OTDate && ot.OTEndTime) {
-                try {
-                  // Make sure the time format is valid (HH:MM)
-                  if (/^\d{1,2}:\d{2}$/.test(ot.OTEndTime)) {
-                    otEndTime = new Date(`${ot.OTDate}T${ot.OTEndTime}:00`).toISOString();
-                  } else {
-                    console.warn("Invalid time format for OTEndTime:", ot.OTEndTime);
-                  }
-                } catch (e) {
-                  console.warn("Error combining OTDate and OTEndTime:", ot.OTDate, ot.OTEndTime);
-                }
-              }
-              
-              return {
-                ...ot,
-                OTDate: otDate,
-                OTStartTime: otStartTime,
-                OTEndTime: otEndTime
-              };
-            }),
-            DownTimes: util.DownTimes.map(dt => {
-              // Safely process DTDate
-              let dtDate = null;
-              if (dt.DTDate) {
-                try {
-                  dtDate = new Date(dt.DTDate).toISOString();
-                } catch (e) {
-                  console.warn("Invalid date format for DTDate:", dt.DTDate);
-                }
-              }
-              
-              return {
-                ...dt,
-                DTDate: dtDate
-              };
-            }),
-            RepairChecks: util.RepairChecks.map(rc => {
-              // Safely process RepairDate
-              let repairDate = null;
-              if (rc.RepairDate) {
-                try {
-                  repairDate = new Date(rc.RepairDate).toISOString();
-                } catch (e) {
-                  console.warn("Invalid date format for RepairDate:", rc.RepairDate);
-                }
-              }
-              
-              return {
-                ...rc,
-                RepairDate: repairDate
-              };
-            })
-          };
-        });
 
-        console.log('Sending data to server:', JSON.stringify(preparedData, null, 2));
-
-        try {
-          const response = await fetch(`/api/admin/machine-utilization/${reservationId}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(preparedData),
-          });
-
-          if (!response.ok) {
-            // Try to get more detailed error information
-            const errorData = await response.json().catch(() => ({}));
-            throw new Error(`API responded with status: ${response.status}. Details: ${JSON.stringify(errorData)}`);
+// Update the handleSaveAll function in MachineUtilization.tsx to use the correct field name
+const handleSaveAll = async () => {
+  try {
+    setSaving(true);
+    
+    // Get the current date in proper ISO format
+    const currentDateTime = new Date().toISOString();
+    
+    // Clone the data to avoid mutation
+    const preparedData = JSON.parse(JSON.stringify(machineUtilizations));
+    
+    // Process each machine utilization record
+    for (const util of preparedData) {
+      // Set proper ISO datetime for DateReviewed
+      util.DateReviewed = currentDateTime;
+      
+      // IMPORTANT: Use the correct field name (ReviwedBy, not ReviewedBy) as per schema
+      util.ReviwedBy = util.ReviwedBy || util.ReviewedBy || "Admin";
+      
+      // If ReviewedBy was used (incorrect field), delete it to avoid confusion
+      if (util.hasOwnProperty('ReviewedBy')) {
+        delete util.ReviewedBy;
+      }
+      
+      // Process operating times
+      if (util.OperatingTimes && util.OperatingTimes.length > 0) {
+        for (const ot of util.OperatingTimes) {
+          // Remove temporary fields for new records
+          if (ot.isNew) {
+            delete ot.id;
+            delete ot.isNew;
           }
-
-          // Get the updated data from the response
-          const updatedData = await response.json();
           
-          // Update the local state with the data returned from the server
-          setMachineUtilizations(updatedData.map((util: MachineUtilization) => ({
+          // Format dates and times as proper ISO strings if they exist
+          if (ot.OTDate) {
+            try {
+              // Create a Date object from the date string (YYYY-MM-DD)
+              const [year, month, day] = ot.OTDate.split('-').map(Number);
+              const baseDate = new Date(year, month - 1, day);
+              
+              // Format OTDate as ISO string (just the date part)
+              const isoDate = baseDate.toISOString();
+              
+              // Process start time if it exists (format: HH:MM)
+              if (ot.OTStartTime) {
+                const [hours, minutes] = ot.OTStartTime.split(':').map(Number);
+                if (!isNaN(hours) && !isNaN(minutes)) {
+                  // Create a new date object with the correct date and time
+                  const startDateTime = new Date(year, month - 1, day, hours, minutes);
+                  ot.OTStartTime = startDateTime.toISOString();
+                }
+              }
+              
+              // Process end time if it exists (format: HH:MM)
+              if (ot.OTEndTime) {
+                const [hours, minutes] = ot.OTEndTime.split(':').map(Number);
+                if (!isNaN(hours) && !isNaN(minutes)) {
+                  // Create a new date object with the correct date and time
+                  const endDateTime = new Date(year, month - 1, day, hours, minutes);
+                  ot.OTEndTime = endDateTime.toISOString();
+                }
+              }
+              
+              // Set the date part
+              ot.OTDate = isoDate;
+            } catch (e) {
+              console.error('Error formatting operating time:', e);
+            }
+          }
+        }
+      }
+      
+      // Process dates in down times
+      if (util.DownTimes && util.DownTimes.length > 0) {
+        for (const dt of util.DownTimes) {
+          if (dt.isNew) {
+            delete dt.id;
+            delete dt.isNew;
+          }
+          
+          // Format DTDate as ISO string if it exists
+          if (dt.DTDate) {
+            try {
+              const [year, month, day] = dt.DTDate.split('-').map(Number);
+              const dateObj = new Date(year, month - 1, day);
+              dt.DTDate = dateObj.toISOString();
+            } catch (e) {
+              console.error('Error formatting down time date:', e);
+            }
+          }
+        }
+      }
+      
+      // Process dates in repair checks
+      if (util.RepairChecks && util.RepairChecks.length > 0) {
+        for (const rc of util.RepairChecks) {
+          if (rc.isNew) {
+            delete rc.id;
+            delete rc.isNew;
+          }
+          
+          // Format RepairDate as ISO string if it exists
+          if (rc.RepairDate) {
+            try {
+              const [year, month, day] = rc.RepairDate.split('-').map(Number);
+              const dateObj = new Date(year, month - 1, day);
+              rc.RepairDate = dateObj.toISOString();
+            } catch (e) {
+              console.error('Error formatting repair check date:', e);
+            }
+          }
+        }
+      }
+    }
+    
+    // Log the data we're about to send (helpful for debugging)
+    console.log('Sending to API:', JSON.stringify(preparedData, null, 2));
+    
+    // Send to API
+    try {
+      const response = await fetch(`/api/admin/machine-utilization/${reservationId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(preparedData),
+      });
+      
+      if (!response.ok) {
+        const responseText = await response.text();
+        throw new Error(`API error: ${response.status} - ${responseText}`);
+      }
+      
+      const responseData = await response.json();
+      
+      // Format the returned data for display
+      const formattedResponseData = responseData.map((util) => ({
+        ...util,
+        DateReviewed: util.DateReviewed ? new Date(util.DateReviewed).toISOString().split('T')[0] : null,
+        // Make sure we use ReviwedBy from response, but also set ReviewedBy for UI compatibility
+        ReviwedBy: util.ReviwedBy,
+        ReviewedBy: util.ReviwedBy, // For UI compatibility
+        OperatingTimes: util.OperatingTimes.map((ot) => ({
+          ...ot,
+          OTDate: ot.OTDate ? new Date(ot.OTDate).toISOString().split('T')[0] : null,
+          // Extract just the time part (HH:MM) from the ISO string
+          OTStartTime: ot.OTStartTime ? formatTimeStringFromISO(ot.OTStartTime) : null,
+          OTEndTime: ot.OTEndTime ? formatTimeStringFromISO(ot.OTEndTime) : null
+        })),
+        DownTimes: util.DownTimes.map((dt) => ({
+          ...dt,
+          DTDate: dt.DTDate ? new Date(dt.DTDate).toISOString().split('T')[0] : null
+        })),
+        RepairChecks: util.RepairChecks.map((rc) => ({
+          ...rc,
+          RepairDate: rc.RepairDate ? new Date(rc.RepairDate).toISOString().split('T')[0] : null
+        }))
+      }));
+      
+      // Helper function to format time string from ISO format
+      function formatTimeStringFromISO(isoString) {
+        try {
+          const date = new Date(isoString);
+          return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+        } catch (e) {
+          console.error('Error formatting time from ISO:', e);
+          return "08:00"; // Fallback
+        }
+      }
+      
+      setMachineUtilizations(formattedResponseData);
+      
+      setSaving(false);
+      alert('Data saved successfully');
+      onSave();
+    } catch (error) {
+      console.error('API Error:', error);
+      setSaving(false);
+      alert('Error saving data: ' + (error instanceof Error ? error.message : 'Unknown error'));
+    }
+  } catch (err) {
+    console.error('Error in save operation:', err);
+    setSaving(false);
+    setError('Failed to save data. Please try again.');
+  }
+};
+
+// Also update the useEffect for fetching data to handle the field name difference
+useEffect(() => {
+  const fetchMachineUtilization = async () => {
+    try {
+      setLoading(true);
+      
+      try {
+        const response = await fetch(`/api/admin/machine-utilization/${reservationId}`);
+        
+        if (!response.ok) {
+          throw new Error(`API responded with status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.length === 0) {
+          // If no machine utilization records exist, create initial ones from user services
+          initializeFromServices();
+        } else {
+          // Format dates in the received data
+          const formattedData = data.map((util: MachineUtilization) => ({
             ...util,
+            // Handle the field name inconsistency by setting both fields
+            ReviwedBy: util.ReviwedBy,
+            ReviewedBy: util.ReviwedBy, // For UI compatibility
             DateReviewed: util.DateReviewed ? new Date(util.DateReviewed).toISOString().split('T')[0] : null,
             OperatingTimes: util.OperatingTimes.map((ot: OperatingTime) => ({
               ...ot,
               OTDate: ot.OTDate ? new Date(ot.OTDate).toISOString().split('T')[0] : null,
-              OTStartTime: ot.OTStartTime ? new Date(ot.OTStartTime).toISOString().split('T')[1].substring(0, 5) : null,
-              OTEndTime: ot.OTEndTime ? new Date(ot.OTEndTime).toISOString().split('T')[1].substring(0, 5) : null
+              // Properly extract just HH:MM from datetime strings
+              OTStartTime: ot.OTStartTime ? formatTimeStringFromISO(ot.OTStartTime) : null,
+              OTEndTime: ot.OTEndTime ? formatTimeStringFromISO(ot.OTEndTime) : null,
             })),
             DownTimes: util.DownTimes.map((dt: DownTime) => ({
               ...dt,
-              DTDate: dt.DTDate ? new Date(dt.DTDate).toISOString().split('T')[0] : null
+              DTDate: dt.DTDate ? new Date(dt.DTDate).toISOString().split('T')[0] : null,
             })),
             RepairChecks: util.RepairChecks.map((rc: RepairCheck) => ({
               ...rc,
-              RepairDate: rc.RepairDate ? new Date(rc.RepairDate).toISOString().split('T')[0] : null
+              RepairDate: rc.RepairDate ? new Date(rc.RepairDate).toISOString().split('T')[0] : null,
             }))
-          })));
+          }));
 
-          // Show success message
-          setSaving(false);
-          alert('Machine utilization data saved successfully');
-          onSave(); // Notify parent component that save is complete
-        } catch (error) {
-          console.error('API Error:', error);
-          
-          // Let user know we're in offline mode but save appeared successful
-          setSaving(false);
-          alert('Error saving data: ' + (error instanceof Error ? error.message : String(error)));
+          setMachineUtilizations(formattedData);
         }
-      } catch (err) {
-        console.error('Error in save operation:', err);
-        setError('Failed to save machine utilization data. Please try again.');
-        setSaving(false);
+      } catch (error) {
+        console.error('API error:', error);
+        initializeFromServices();
+        setError('API not available. Working in offline mode.');
       }
-    };
+      
+      setLoading(false);
+    } catch (err) {
+      console.error('Error in fetchMachineUtilization:', err);
+      setError('Failed to initialize machine utilization data. Please try again.');
+      setLoading(false);
+    }
+  };
+
+  // Helper function to format time string from ISO format
+  const formatTimeStringFromISO = (isoString: string): string => {
+    try {
+      const date = new Date(isoString);
+      // Format as HH:MM
+      return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+    } catch (e) {
+      console.error('Error formatting ISO time string:', e);
+      // If parsing fails, try to extract time part from string if possible
+      if (isoString.includes('T') && isoString.includes(':')) {
+        const timePart = isoString.split('T')[1];
+        return timePart.substring(0, 5); // Get HH:MM part
+      }
+      return "08:00"; // Fallback
+    }
+  };
+
+  fetchMachineUtilization();
+}, [reservationId, userServices]);
   
     if (loading) {
       return <div className="flex justify-center items-center p-8">Loading machine utilization data...</div>;
@@ -623,92 +786,156 @@ const handleGeneratePDF = () => {
 
                     <Separator />
 
-                    {/* Operating Times */}
+                    {/* Operating Times Section - Fixed Layout */}
                     <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <h4 className="font-medium flex items-center">
-                          <Clock className="h-4 w-4 mr-2" />
-                          Operating Times
-                        </h4>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => handleAddOperatingTime(machineIndex)}
-                        >
-                          <Plus className="h-4 w-4 mr-1" />
-                          Add Time
-                        </Button>
-                      </div>
-                      
-                      {machineUtil.OperatingTimes.length === 0 ? (
-                        <p className="text-gray-500 italic text-sm">No operating times recorded</p>
-                      ) : (
-                        <div className="space-y-4">
-                          {machineUtil.OperatingTimes.map((operatingTime, otIndex) => (
-                            <div key={`op-time-${machineIndex}-${otIndex}-${operatingTime.id || 'new'}`} className="bg-blue-50 p-3 rounded-lg relative">
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="absolute top-2 right-2 h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-100"
-                                onClick={() => handleRemoveOperatingTime(machineIndex, otIndex)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                              
-                              <div className="grid grid-cols-2 gap-4 mb-3">
-                                <div>
-                                  <label className="block text-xs font-medium mb-1">Date</label>
-                                  <Input 
-                                    type="date"
-                                    value={operatingTime.OTDate || ''}
-                                    onChange={(e) => handleUpdateOperatingTime(machineIndex, otIndex, 'OTDate', e.target.value)}
-                                    className="w-full"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium mb-1">Type of Products</label>
-                                  <Input 
-                                    value={operatingTime.OTTypeofProducts || ''}
-                                    onChange={(e) => handleUpdateOperatingTime(machineIndex, otIndex, 'OTTypeofProducts', e.target.value)}
-                                    className="w-full"
-                                  />
-                                </div>
-                              </div>
-                              
-                              <div className="grid grid-cols-3 gap-4 mb-3">
-                                <div>
-                                  <label className="block text-xs font-medium mb-1">Start Time</label>
-                                  <Input 
-                                    type="time"
-                                    value={operatingTime.OTStartTime || ''}
-                                    onChange={(e) => handleUpdateOperatingTime(machineIndex, otIndex, 'OTStartTime', e.target.value)}
-                                    className="w-full"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium mb-1">End Time</label>
-                                  <Input 
-                                    type="time"
-                                    value={operatingTime.OTEndTime || ''}
-                                    onChange={(e) => handleUpdateOperatingTime(machineIndex, otIndex, 'OTEndTime', e.target.value)}
-                                    className="w-full"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="block text-xs font-medium mb-1">Machine Operator</label>
-                                  <Input 
-                                    value={operatingTime.OTMachineOp || ''}
-                                    onChange={(e) => handleUpdateOperatingTime(machineIndex, otIndex, 'OTMachineOp', e.target.value)}
-                                    placeholder="Enter operator name"
-                                    className="w-full"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+  <div className="flex justify-between items-center mb-2">
+    <h4 className="font-medium flex items-center">
+      <Clock className="h-4 w-4 mr-2" />
+      Operating Times
+    </h4>
+    <Button 
+      variant="outline" 
+      size="sm" 
+      onClick={() => handleAddOperatingTime(machineIndex)}
+    >
+      <Plus className="h-4 w-4 mr-1" />
+      Add Time
+    </Button>
+  </div>
+  
+  {machineUtil.OperatingTimes.length === 0 ? (
+    <p className="text-gray-500 italic text-sm">No operating times recorded</p>
+  ) : (
+    <div className="space-y-4">
+      {machineUtil.OperatingTimes.map((operatingTime, otIndex) => (
+        <div key={`op-time-${machineIndex}-${otIndex}-${operatingTime.id || 'new'}`} className="bg-blue-50 p-3 rounded-lg relative">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="absolute top-2 right-2 h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-100"
+            onClick={() => handleRemoveOperatingTime(machineIndex, otIndex)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+          
+          <div className="grid grid-cols-2 gap-4 mb-3">
+            <div>
+              <label className="block text-xs font-medium mb-1">Date</label>
+              <Input 
+                type="date"
+                value={operatingTime.OTDate || ''}
+                onChange={(e) => handleUpdateOperatingTime(machineIndex, otIndex, 'OTDate', e.target.value)}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1">Type of Products</label>
+              <Input 
+                value={operatingTime.OTTypeofProducts || ''}
+                onChange={(e) => handleUpdateOperatingTime(machineIndex, otIndex, 'OTTypeofProducts', e.target.value)}
+                className="w-full"
+              />
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-3 gap-4 mb-3">
+  <div>
+    <label className="block text-xs font-medium mb-1">Start Time</label>
+    <div className="flex space-x-2">
+      <Select 
+        value={parseTimeString(operatingTime.OTStartTime).hour.toString()}
+        onValueChange={(value) => handleHourChange(machineIndex, otIndex, 'OTStartTime', parseInt(value))}
+      >
+        <SelectTrigger className="w-[110px]">
+          <SelectValue placeholder="Hour" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {validHours.map(hour => (
+              <SelectItem key={`start-hour-${hour}`} value={hour.toString()}>
+                {formatHour(hour)}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+      
+      <Select 
+        value={parseTimeString(operatingTime.OTStartTime).minute.toString()}
+        onValueChange={(value) => handleMinuteChange(machineIndex, otIndex, 'OTStartTime', parseInt(value))}
+      >
+        <SelectTrigger className="w-[100px]">
+          <SelectValue placeholder="Minute" />
+        </SelectTrigger>
+        <SelectContent className="h-[200px] overflow-y-auto">
+          <SelectGroup>
+            {allMinutes.map(minute => (
+              <SelectItem key={`start-min-${minute}`} value={minute.toString()}>
+                {formatMinute(minute)}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+    </div>
+  </div>
+  
+  <div>
+    <label className="block text-xs font-medium mb-1">End Time</label>
+    <div className="flex space-x-2">
+      <Select 
+        value={parseTimeString(operatingTime.OTEndTime).hour.toString()}
+        onValueChange={(value) => handleHourChange(machineIndex, otIndex, 'OTEndTime', parseInt(value))}
+      >
+        <SelectTrigger className="w-[110px]">
+          <SelectValue placeholder="Hour" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectGroup>
+            {validHours.map(hour => (
+              <SelectItem key={`end-hour-${hour}`} value={hour.toString()}>
+                {formatHour(hour)}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+      
+      <Select 
+        value={parseTimeString(operatingTime.OTEndTime).minute.toString()}
+        onValueChange={(value) => handleMinuteChange(machineIndex, otIndex, 'OTEndTime', parseInt(value))}
+      >
+        <SelectTrigger className="w-[100px]">
+          <SelectValue placeholder="Minute" />
+        </SelectTrigger>
+        <SelectContent className="h-[200px] overflow-y-auto">
+          <SelectGroup>
+            {allMinutes.map(minute => (
+              <SelectItem key={`end-min-${minute}`} value={minute.toString()}>
+                {formatMinute(minute)}
+              </SelectItem>
+            ))}
+          </SelectGroup>
+        </SelectContent>
+      </Select>
+    </div>
+  </div>
+  
+  <div>
+    <label className="block text-xs font-medium mb-1">Machine Operator</label>
+    <Input 
+      value={operatingTime.OTMachineOp || ''}
+      onChange={(e) => handleUpdateOperatingTime(machineIndex, otIndex, 'OTMachineOp', e.target.value)}
+      placeholder="Enter operator name"
+      className="w-full"
+    />
+  </div>
+</div>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
 
                     <Separator />
 
@@ -791,6 +1018,8 @@ const handleGeneratePDF = () => {
                                     onChange={(e) => handleUpdateDownTime(machineIndex, dtIndex, 'Cause', e.target.value)}
                                     className="w-full"
                                     rows={2}
+                                    min="08:00" 
+                                    max="17:00"
                                   />
                                 </div>
                               </div>
@@ -850,6 +1079,8 @@ const handleGeneratePDF = () => {
                                     value={repairCheck.Service || ''}
                                     onChange={(e) => handleUpdateRepairCheck(machineIndex, rcIndex, 'Service', e.target.value)}
                                     className="w-full"
+                                    min="08:00" 
+                                    max="17:00"
                                   />
                                 </div>
                                 <div>
@@ -871,6 +1102,8 @@ const handleGeneratePDF = () => {
                                     value={repairCheck.PartsReplaced || ''}
                                     onChange={(e) => handleUpdateRepairCheck(machineIndex, rcIndex, 'PartsReplaced', e.target.value)}
                                     className="w-full"
+                                    min="08:00" 
+                                    max="17:00"
                                   />
                                 </div>
                                 <div>
