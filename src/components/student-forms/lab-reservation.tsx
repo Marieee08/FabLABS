@@ -352,14 +352,19 @@ export default function LabReservation({ formData, updateFormData, nextStep, pre
       newErrors.service = "Please select a service";
     }
     
-    // Validate machine selection
-    if (selectedMachines.length === 0) {
+    // Validate machine selection only if the service has machines available
+    const currentService = selectedService;
+    const hasMachinesForService = currentService && 
+      availableMachines[currentService] && 
+      availableMachines[currentService].length > 0;
+      
+    if (hasMachinesForService && selectedMachines.length === 0) {
       newErrors.machines = "Please select at least one machine";
     }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [formData, students, currentYear, selectedService, selectedMachines]);
+  }, [formData, students, currentYear, selectedService, selectedMachines, availableMachines]);
 
   // Handle form submission
   const handleSubmit = (e: React.FormEvent) => {
