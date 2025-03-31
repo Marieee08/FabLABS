@@ -194,6 +194,26 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
   // Status change handlers with confirmation dialogs
   const handleMarkAsOngoing = () => {
     if (!localReservation) return;
+  
+    // Check if any service requires machines but doesn't have them assigned
+    const hasUnassignedRequiredMachines = editedServices.some(service => {
+      const requiresMachines = serviceRequiresMachines(service.ServiceAvail);
+      const hasMachinesAssigned = service.selectedMachines.length > 0;
+      return requiresMachines && !hasMachinesAssigned;
+    });
+  
+    if (hasUnassignedRequiredMachines) {
+      // Show modal instead of confirmation dialog
+      setConfirmationDialog({
+        isOpen: true,
+        action: 'Assign Machines',
+        message: 'Please assign machines to all required services before marking as Ongoing.',
+        onConfirm: () => {} // Empty function since we just want to show a message
+      });
+      return;
+    }
+  
+    // Proceed with original confirmation if machines are assigned
     showConfirmation(
       'Mark as Ongoing',
       'Are you sure you want to mark this reservation as Ongoing? This will start the utilization process.',
