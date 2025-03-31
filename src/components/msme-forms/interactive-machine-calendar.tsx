@@ -60,12 +60,13 @@ interface InteractiveMachineCalendarProps {
   selectedService: string;
   machineQuantityNeeded: number;
   onDateSelect: (dates: Date[]) => void;
-  selectedDates: Date[];
-  servicesData: Service[];
+  selectedDates?: Date[];
+  servicesData?: Service[];
   maxDates?: number;
 }
 
-const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
+
+export const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
   selectedService,
   machineQuantityNeeded,
   onDateSelect,
@@ -532,43 +533,37 @@ useEffect(() => {
   };
   
   // Custom toolbar component
-  const CustomToolbar = (toolbar: any) => {
-    const goToBack = () => {
-      const newDate = new Date(toolbar.date);
-      newDate.setMonth(newDate.getMonth() - 1);
-      toolbar.onNavigate('prev');
-      setCurrentDate(newDate);
-    };
-    
-    const goToNext = () => {
-      const newDate = new Date(toolbar.date);
-      newDate.setMonth(newDate.getMonth() + 1);
-      toolbar.onNavigate('next');
-      setCurrentDate(newDate);
-    };
+    const CustomToolbar = (toolbar: any) => {
+      const goToBack = () => {
+        toolbar.onNavigate('PREV'); // Use 'PREV' instead of 'prev'
+      };
+      
+      const goToNext = () => {
+        toolbar.onNavigate('NEXT'); // Use 'NEXT' instead of 'next'
+      };
 
     return (
       <div className="rbc-toolbar py-2 px-3 flex flex-row items-center justify-between border-b border-gray-200 bg-white relative">
         <div className="flex items-center">
-          <div className="flex items-center">
-            <button 
-              onClick={goToBack} 
-              className="p-1 rounded-l border border-gray-200 hover:bg-gray-50 transition-colors"
-              aria-label="Previous month"
-            >
-              <ChevronLeft className="h-4 w-4 text-gray-600" />
-            </button>
-          </div>
-          
-          <span className="font-semibold mx-3 text-gray-800 text-base">{toolbar.label}</span>
+        <div className="flex items-center">
           <button 
-              onClick={goToNext} 
-              className="p-1 rounded-r border-t border-r border-b border-gray-200 hover:bg-gray-50 transition-colors"
-              aria-label="Next month"
-            >
-              <ChevronRight className="h-4 w-4 text-gray-600" />
-            </button>
+            onClick={goToBack} 
+            className="p-1 rounded-l border border-gray-200 hover:bg-gray-50 transition-colors"
+            aria-label="Previous month"
+          >
+            <ChevronLeft className="h-4 w-4 text-gray-600" />
+          </button>
         </div>
+        
+        <span className="font-semibold mx-3 text-gray-800 text-base">{toolbar.label}</span>
+        <button 
+            onClick={goToNext} 
+            className="p-1 rounded-r border-t border-r border-b border-gray-200 hover:bg-gray-50 transition-colors"
+            aria-label="Next month"
+          >
+            <ChevronRight className="h-4 w-4 text-gray-600" />
+          </button>
+      </div>
         
         {/* Empty middle space */}
         <div className="flex-grow"></div>
