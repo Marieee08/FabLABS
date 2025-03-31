@@ -357,7 +357,9 @@ const ReservationHistory = () => {
               item: material.MaterialName || '',
               description: material.MaterialDesc || '',
               issuedCondition: '',
-              returnedCondition: ''
+              returnedCondition: '',
+              machineName: material.MachineName || '',       // Add machine name
+              machineQuantity: material.MachineQty?.toString() || '' // Add machine quantity
             }))
           : [];
         
@@ -610,7 +612,9 @@ const ReservationHistory = () => {
                 item: service.ServiceAvail || '',
                 description: service.EquipmentAvail || '',
                 issuedCondition: '',
-                returnedCondition: ''
+                returnedCondition: '',
+                machineName: service.MachineName || '',       // Add machine name
+                machineQuantity: service.MachineQty?.toString() || '' // Add machine quantity
               })),
               // Add tools as materials
               ...detailedData.UserTools.map((tool: any) => ({
@@ -618,7 +622,9 @@ const ReservationHistory = () => {
                 item: tool.ToolUser || '',
                 description: '',
                 issuedCondition: '',
-                returnedCondition: ''
+                returnedCondition: '',
+                machineName: '', // No machine name for tools
+                machineQuantity: '' // No machine quantity for tools
               }))
             ];
            
@@ -678,7 +684,9 @@ const ReservationHistory = () => {
                 item: service.ServiceAvail || '',
                 description: service.EquipmentAvail || '',
                 issuedCondition: '',
-                returnedCondition: ''
+                returnedCondition: '',
+                machineName: service.MachineName || '',       // Add machine name
+                machineQuantity: service.MachineQty?.toString() || '' // Add machine quantity
               })),
               // Add tools as materials
               ...detailedData.UserTools.map((tool: any) => ({
@@ -686,7 +694,9 @@ const ReservationHistory = () => {
                 item: tool.ToolUser || '',
                 description: '',
                 issuedCondition: '',
-                returnedCondition: ''
+                returnedCondition: '',
+                machineName: '', // No machine name for tools
+                machineQuantity: '' // No machine quantity for tools
               }))
             ];
            

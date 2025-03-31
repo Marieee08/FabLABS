@@ -13,6 +13,8 @@ interface MaterialItem {
   description: string;
   issuedCondition: string;
   returnedCondition: string;
+  machineName?: string;    // Add machine name field
+  machineQuantity?: string; // Add machine quantity field
 }
 
 
@@ -432,10 +434,11 @@ export const downloadLabRequestFormPDF = (formData: LabRequestFormData): void =>
       let currentX = margin;
      
       // Add header cells
-      addCell('Quantity', currentX, colQuantity, headerHeight);
+      addCell('Quantity)', currentX, colQuantity, headerHeight);
       currentX += colQuantity;
-     
-      addCell('Item', currentX, colItem, headerHeight);
+      
+      // For the Item header cell:
+      addCell('Item)', currentX, colItem, headerHeight);
       currentX += colItem;
      
       addCell('Description', currentX, colDesc, headerHeight);
@@ -457,13 +460,23 @@ export const downloadLabRequestFormPDF = (formData: LabRequestFormData): void =>
         currentX = margin;
        
         // Get data for the current row
-        const rowData = materialsData[i] || { quantity: '', item: '', description: '', issuedCondition: '', returnedCondition: '' };
+        const rowData = materialsData[i] || { 
+          quantity: '', 
+          item: '', 
+          description: '', 
+          issuedCondition: '', 
+          returnedCondition: '',
+          machineName: '',
+          machineQuantity: ''
+        };
        
         // Add cells for this row
-        addCell(rowData.quantity, currentX, colQuantity, rowHeight, 'center', 9, false);
+        const quantityText = rowData.quantity + (rowData.machineQuantity ? `\n${rowData.machineQuantity}` : '');
+        addCell(quantityText, currentX, colQuantity, rowHeight, 'center', 9, false);
         currentX += colQuantity;
        
-        addCell(rowData.item, currentX, colItem, rowHeight, 'left', 9, false);
+        const itemText = rowData.item + (rowData.machineName ? `\n${rowData.machineName}` : '');
+        addCell(itemText, currentX, colItem, rowHeight, 'left', 9, false);
         currentX += colItem;
        
         addCell(rowData.description, currentX, colDesc, rowHeight, 'left', 9, false);
