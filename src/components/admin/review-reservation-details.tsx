@@ -395,32 +395,32 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
                     </p>
                   </div>
                   <div>
-                    {editMode && reservation.Status === 'Ongoing' ? (
-                      <Select
-                        value={time.DateStatus || "Ongoing"}
-                        onValueChange={(value) => handleStatusChange(index, value)}
-                      >
-                        <SelectTrigger className="w-32">
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {statusOptions.map(option => (
-                            <SelectItem key={option.value} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                        time.DateStatus === "Completed" ? "bg-green-100 text-green-800 border border-green-200" :
-                        time.DateStatus === "Cancelled" ? "bg-red-100 text-red-800 border border-red-200" :
-                        "bg-blue-100 text-blue-800 border border-blue-200"
-                      }`}>
-                        {time.DateStatus || "Ongoing"}
-                      </span>
-                    )}
-                  </div>
+  {editMode && reservation.Status !== 'Approved' && reservation.Status === 'Ongoing' ? (
+    <Select
+      value={time.DateStatus || "Ongoing"}
+      onValueChange={(value) => handleStatusChange(index, value)}
+    >
+      <SelectTrigger className="w-32">
+        <SelectValue placeholder="Select status" />
+      </SelectTrigger>
+      <SelectContent>
+        {statusOptions.map(option => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  ) : reservation.Status !== 'Approved' ? (
+    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+      time.DateStatus === "Completed" ? "bg-green-100 text-green-800 border border-green-200" :
+      time.DateStatus === "Cancelled" ? "bg-red-100 text-red-800 border border-red-200" :
+      "bg-blue-100 text-blue-800 border border-blue-200"
+    }`}>
+      {time.DateStatus || "Ongoing"}
+    </span>
+  ) : null}
+</div>
                 </div>
               </div>
             );
