@@ -1,5 +1,4 @@
 'use client';
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import ProgressBar from '@/components/msme-forms/progress-bar';
 import Navbar from '@/components/custom/navbar';
@@ -35,7 +34,6 @@ interface FormData {
   syncTimes: boolean;
   unifiedStartTime: string | null;
   unifiedEndTime: string | null;
-
   // UtilizationInfo fields
   ProductsManufactured: string | string[];
   BulkofCommodity: string;
@@ -43,7 +41,6 @@ interface FormData {
   Tools: string;
   serviceLinks?: {[service: string]: string};
   Remarks?: string;
-
   ControlNo?: number;
   LvlSec: string;
   NoofStudents: number;
@@ -82,7 +79,6 @@ export default function Schedule() {
     syncTimes: false,
     unifiedStartTime: null,
     unifiedEndTime: null,
-
     // Initialize UtilizationInfo fields
     ProductsManufactured: "",  // Changed to string instead of array for simplicity
     BulkofCommodity: '',
@@ -90,7 +86,6 @@ export default function Schedule() {
     Tools: '',
     serviceLinks: {},
     Remarks: '',
-
     LvlSec: '',
     NoofStudents: 0,
     Subject: '',
@@ -274,6 +269,7 @@ export default function Schedule() {
             
             <DateTimeSelection
               formData={formData}
+              updateFormData={updateFormData}
               setFormData={setFormData}
               nextStep={nextStep}
               prevStep={prevStep} 
