@@ -518,14 +518,15 @@ export default function DateTimeSelection({
       )}
       
       {/* Navigation buttons - only show when in standalone mode */}
+
       {standalonePage && (
         <div className="mt-4 flex justify-end">
           <Button
             onClick={handleNext}
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium"
-            disabled={formData.days.length === 0}
+            disabled={formData.days.length === 0 || isSubmitting}
           >
-            Continue to Next Step
+            {isSubmitting ? "Processing..." : "Continue to Next Step"}
           </Button>
         </div>
       )}
