@@ -321,7 +321,7 @@ export default function Schedule() {
             
             <div className="mt-8 w-full">
               {currentStep}
-            </div>
+             </div>
           </CardContent>
         </Card>
         
