@@ -384,10 +384,18 @@ const SurveyForm = () => {
       });
       
       if (!response.ok) {
+        // Log the error response
+        const errorText = await response.text();
+        console.error('Survey submission error:', errorText);
+        
         throw new Error('Failed to submit survey');
       }
       
-      router.push('/survey/thank-you');
+      // Add a console log to verify this point is reached
+      console.log('Survey submitted successfully, navigating to thank you page');
+      
+      // Use replace instead of push to prevent going back to survey page
+      router.replace('/survey/thank-you');
     } catch (error) {
       console.error('Error submitting survey:', error);
       toast({
