@@ -6,73 +6,79 @@ const prisma = new PrismaClient();
 
 export async function GET(req: NextRequest) {
   try {
-    // Fetch UtilReq (utilization reservations)
-    const utilReservations = await prisma.utilReq.findMany({
-      select: {
-        id: true,
-        Status: true,
-        RequestDate: true,
-        MachineUtilizations: {
-          select: {
-            id: true,
-            Machine: true,
-            ServiceName: true
-          }
-        },
-        UserServices: {
-          select: {
-            id: true,
-            EquipmentAvail: true,
-            ServiceAvail: true
-          }
-        },
-        UtilTimes: {
-          select: {
-            id: true,
-            DayNum: true,
-            StartTime: true,
-            EndTime: true
+    // Fetch all utilization and EVC reservations with extensive logging
+    const [utilReservations, evcReservations] = await Promise.all([
+      prisma.utilReq.findMany({
+        include: {
+          MachineUtilizations: true,
+          UserServices: true,
+          UtilTimes: true,
+          // Include this to see full context
+          accInfo: {
+            select: {
+              Name: true,
+              Role: true
+            }
           }
         }
-      },
-    });
+      }),
+      prisma.eVCReservation.findMany({
+        include: {
+          NeededMaterials: true,
+          UtilTimes: true,
+          accInfo: {
+            select: {
+              Name: true,
+              Role: true
+            }
+          }
+        }
+      })
+    ]);
 
-    console.log("Raw utilization data:", JSON.stringify(utilReservations, null, 2));
+    // Logging for debugging
+    console.log('UTIL RESERVATIONS DETAILS:', JSON.stringify(utilReservations.map(ur => ({
+      id: ur.id,
+      status: ur.Status,
+      userRole: ur.accInfo?.Role,
+      userName: ur.accInfo?.Name,
+      machineUtils: ur.MachineUtilizations.map(mu => mu.Machine),
+      userServices: ur.UserServices.map(us => us.EquipmentAvail)
+    })), null, 2));
 
-    // Transform UtilReq data into the expected format (without personal information)
+    console.log('EVC RESERVATIONS DETAILS:', JSON.stringify(evcReservations.map(er => ({
+      id: er.id,
+      status: er.EVCStatus,
+      userRole: er.accInfo?.Role,
+      userName: er.accInfo?.Name,
+      neededMaterials: er.NeededMaterials.map(nm => nm.Item)
+    })), null, 2));
+
+    // Transform reservations (similar to previous implementation)
     const formattedUtilReservations = utilReservations.map((reservation) => {
-      // Get all machine names from UserServices
-      const userServiceMachines = reservation.UserServices
-        .filter(service => service.EquipmentAvail && service.EquipmentAvail !== "Not Specified")
-        .map(service => service.EquipmentAvail);
+      // Combine machine sources
+      const machinesFromUtils = reservation.MachineUtilizations
+        .filter(mu => mu.Machine && mu.Machine !== 'Not Specified')
+        .map(mu => mu.Machine);
+      
+      const machinesFromServices = reservation.UserServices
+        .filter(us => us.EquipmentAvail && us.EquipmentAvail !== 'Not Specified')
+        .map(us => us.EquipmentAvail);
 
-      // Get all machine names from MachineUtilizations
-      const machineUtilMachines = reservation.MachineUtilizations
-        ?.filter(machine => machine.Machine && machine.Machine !== "Not Specified")
-        .map(machine => machine.Machine) || [];
+      const allMachines = [...new Set([...machinesFromUtils, ...machinesFromServices])];
 
-      // Combine all machine names and remove duplicates
-      const allMachines = [...new Set([...userServiceMachines, ...machineUtilMachines])];
-
-      // Format machines for display
-      const machines = allMachines.length > 0 
-        ? allMachines 
-        : ["Not specified"];
-
-      // Determine the date from UtilTimes if available, otherwise use RequestDate
       const firstTime = reservation.UtilTimes.length > 0 ? reservation.UtilTimes[0] : null;
       const date = firstTime && firstTime.StartTime 
         ? new Date(firstTime.StartTime).toISOString() 
         : reservation.RequestDate.toISOString();
 
-      // Format all time slots
       const timeSlots = reservation.UtilTimes.map(time => ({
         id: time.id,
         dayNum: time.DayNum,
         startTime: time.StartTime ? new Date(time.StartTime).toISOString() : null,
         endTime: time.EndTime ? new Date(time.EndTime).toISOString() : null,
         duration: time.StartTime && time.EndTime 
-          ? (new Date(time.EndTime).getTime() - new Date(time.StartTime).getTime()) / (1000 * 60) // duration in minutes
+          ? (new Date(time.EndTime).getTime() - new Date(time.StartTime).getTime()) / (1000 * 60)
           : null
       }));
 
@@ -80,16 +86,54 @@ export async function GET(req: NextRequest) {
         id: reservation.id.toString(),
         date: date,
         status: reservation.Status,
-        machines: machines, // Array of machines
+        machines: allMachines.length > 0 ? allMachines : ["Not specified"],
         type: 'utilization',
-        timeSlots: timeSlots
+        timeSlots: timeSlots,
+        userRole: reservation.accInfo?.Role,
+        userName: reservation.accInfo?.Name
       };
     });
 
-    // Debugging
-    console.log("Formatted reservation data:", JSON.stringify(formattedUtilReservations, null, 2));
+    const formattedEVCReservations = evcReservations.map((reservation) => {
+      const machines = reservation.NeededMaterials
+        .filter(material => material.Item && material.Item !== "Not Specified")
+        .map(material => material.Item);
 
-    return NextResponse.json(formattedUtilReservations);
+      const firstTime = reservation.UtilTimes.length > 0 ? reservation.UtilTimes[0] : null;
+      const date = firstTime && firstTime.StartTime 
+        ? new Date(firstTime.StartTime).toISOString() 
+        : reservation.DateRequested
+          ? reservation.DateRequested.toISOString() 
+          : new Date().toISOString();
+
+      const timeSlots = reservation.UtilTimes.map(time => ({
+        id: time.id,
+        dayNum: time.DayNum,
+        startTime: time.StartTime ? new Date(time.StartTime).toISOString() : null,
+        endTime: time.EndTime ? new Date(time.EndTime).toISOString() : null,
+        duration: time.StartTime && time.EndTime 
+          ? (new Date(time.EndTime).getTime() - new Date(time.StartTime).getTime()) / (1000 * 60)
+          : null
+      }));
+
+      return {
+        id: `evc-${reservation.id}`,
+        date: date,
+        status: reservation.EVCStatus,
+        machines: machines.length > 0 ? machines : ["Not specified"],
+        type: 'evc',
+        timeSlots: timeSlots,
+        userRole: reservation.accInfo?.Role,
+        userName: reservation.accInfo?.Name
+      };
+    });
+
+    const allReservations = [
+      ...formattedUtilReservations, 
+      ...formattedEVCReservations
+    ];
+
+    return NextResponse.json(allReservations);
   } catch (error) {
     console.error("Error fetching calendar reservations:", error);
     return NextResponse.json(
