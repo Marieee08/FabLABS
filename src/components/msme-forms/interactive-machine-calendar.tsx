@@ -133,10 +133,11 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
       const service = servicesData.find(s => s.Service === selectedService);
       
       if (service && service.Machines) {
+        // Preserve the isAvailable property from the service data
         const machines = service.Machines.map(m => ({
           id: m.machine.id,
           Machine: m.machine.Machine,
-          isAvailable: true,
+          isAvailable: m.machine.isAvailable, // Keep the original availability
           Number: m.machine.Number || 1
         }));
         
@@ -150,57 +151,62 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
   }, [selectedService, servicesData]);
 
   // Calculate machine availability for each date based on reservations
-  useEffect(() => {
-    if (!selectedService || machinesForService.length === 0) {
-      setMachineAvailabilityMap({});
-      return;
-    }
+// In the InteractiveMachineCalendar component, update this useEffect
+// that calculates machine availability for each date
 
-    // Calculate total machines available for this service
-    const totalMachinesForService = machinesForService.reduce((sum, machine) => sum + (machine.Number || 1), 0);
+useEffect(() => {
+  if (!selectedService || machinesForService.length === 0) {
+    setMachineAvailabilityMap({});
+    return;
+  }
+
+  // Calculate total machines available for this service
+  // UPDATED: Only count machines that are actually available (isAvailable !== false)
+  const totalMachinesForService = machinesForService.reduce((sum, machine) => 
+    machine.isAvailable !== false ? sum + (machine.Number || 1) : sum, 0);
+  
+  // Create a map to track machine usage by date
+  const dateUsageMap: Record<string, number> = {};
+  
+  // Process each reservation to determine machine usage by date
+  reservations.forEach(reservation => {
+    // Check if this reservation involves any machines from our service
+    const reservedMachines = reservation.machines.filter(machineName => 
+      machinesForService.some(m => m.id === machineName || m.Machine === machineName)
+    );
     
-    // Create a map to track machine usage by date
-    const dateUsageMap: Record<string, number> = {};
-    
-    // Process each reservation to determine machine usage by date
-    reservations.forEach(reservation => {
-      // Check if this reservation involves any machines from our service
-      const reservedMachines = reservation.machines.filter(machineName => 
-        machinesForService.some(m => m.id === machineName || m.Machine === machineName)
-      );
-      
-      if (reservedMachines.length > 0) {
-        // Use reservation date or extract from time slots
-        let dateStr = '';
-        if (reservation.timeSlots && reservation.timeSlots.length > 0 && reservation.timeSlots[0].startTime) {
-          dateStr = new Date(reservation.timeSlots[0].startTime).toDateString();
-        } else if (reservation.date) {
-          dateStr = new Date(reservation.date).toDateString();
-        }
-        
-        if (dateStr) {
-          // Count each machine separately
-          dateUsageMap[dateStr] = (dateUsageMap[dateStr] || 0) + reservedMachines.length;
-        }
+    if (reservedMachines.length > 0) {
+      // Use reservation date or extract from time slots
+      let dateStr = '';
+      if (reservation.timeSlots && reservation.timeSlots.length > 0 && reservation.timeSlots[0].startTime) {
+        dateStr = new Date(reservation.timeSlots[0].startTime).toDateString();
+      } else if (reservation.date) {
+        dateStr = new Date(reservation.date).toDateString();
       }
-    });
-    
-    // Create the availability map (total - used = available)
-    const availabilityMap: Record<string, number> = {};
-    
-    // Pre-populate availability map with a 3-month range
-    const today = new Date();
-    const threeMonthsLater = new Date();
-    threeMonthsLater.setMonth(today.getMonth() + 3);
-    
-    for (let date = new Date(today); date <= threeMonthsLater; date.setDate(date.getDate() + 1)) {
-      const dateStr = new Date(date).toDateString();
-      availabilityMap[dateStr] = totalMachinesForService - (dateUsageMap[dateStr] || 0);
+      
+      if (dateStr) {
+        // Count each machine separately
+        dateUsageMap[dateStr] = (dateUsageMap[dateStr] || 0) + reservedMachines.length;
+      }
     }
-    
-    setMachineAvailabilityMap(availabilityMap);
-    
-  }, [machinesForService, reservations, selectedService]);
+  });
+  
+  // Create the availability map (total - used = available)
+  const availabilityMap: Record<string, number> = {};
+  
+  // Pre-populate availability map with a 3-month range
+  const today = new Date();
+  const threeMonthsLater = new Date();
+  threeMonthsLater.setMonth(today.getMonth() + 3);
+  
+  for (let date = new Date(today); date <= threeMonthsLater; date.setDate(date.getDate() + 1)) {
+    const dateStr = new Date(date).toDateString();
+    availabilityMap[dateStr] = totalMachinesForService - (dateUsageMap[dateStr] || 0);
+  }
+  
+  setMachineAvailabilityMap(availabilityMap);
+  
+}, [machinesForService, reservations, selectedService]);
 
   // Process reservations and blocked dates into calendar events
   useEffect(() => {
@@ -589,8 +595,9 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
     const availableMachines = machineAvailabilityMap[dateStr] || 0;
     const isSelectable = !isDateDisabled(value);
     const isSelected = selectedDates.some(d => d.toDateString() === dateStr);
+    const isCurrentMonth = value.getMonth() === currentDate.getMonth();
     
-    // Show date availability indicator
+    // Show date availability indicator only for current month dates that are selectable
     return (
       <div 
         className={`relative day-cell-wrapper ${isSelectable ? 'selectable' : 'disabled'} ${isSelected ? 'selected' : ''}`}
@@ -601,7 +608,7 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
         }}
       >
         {children}
-        {isSelectable && !isSelected && (
+        {isSelectable && !isSelected && isCurrentMonth && (
           <div className="absolute bottom-1 right-1 bg-white rounded-full px-1.5 py-0.5 text-xs font-medium text-blue-600 shadow-sm border border-blue-100 z-10">
             {availableMachines} free
           </div>
@@ -614,6 +621,28 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
       </div>
     );
   };
+
+  const additionalStyles = `
+  /* Hide "free" indicators for dates outside current month */
+  .rbc-off-range .day-cell-wrapper .absolute.bottom-1.right-1 {
+    display: none;
+  }
+  
+  /* Make selected dates stand out more */
+  .selected-date {
+    box-shadow: inset 0 0 0 2px #16A34A !important;
+  }
+  
+  /* Clean up the calendar bottom area */
+  .rbc-row:last-child {
+    margin-bottom: 8px;
+  }
+  
+  /* Give more space to the calendar cells */
+  .rbc-month-row {
+    min-height: 100px;
+  }
+`;
 
   // Tooltips for info about the calendar
   const availabilityInfo = useMemo(() => {

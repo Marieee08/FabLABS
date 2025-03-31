@@ -9,6 +9,9 @@ import { toast } from "@/components/ui/use-toast";
 import DateTimeSelection from '@/components/msme-forms/date-time-selection';
 import LabReservation from '@/components/student-forms/lab-reservation';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Calendar, Info } from "lucide-react";
+import MachineCalendar from '@/components/user/machine-calendar';
 
 const MAX_DATES = 5;
 
@@ -65,6 +68,13 @@ interface BlockedDate {
 
 interface CalendarDate extends Date {}
 
+interface Machine {
+  id: string;
+  Machine: string;
+  isAvailable: boolean;
+  Number?: number;
+}
+
 export default function Schedule() {
   // Use memoized initial state to avoid re-creating on each render
   const initialFormData = useMemo<FormData>(() => ({
@@ -95,6 +105,8 @@ export default function Schedule() {
   const [formData, setFormData] = useState<FormData>(initialFormData);
   const [blockedDates, setBlockedDates] = useState<CalendarDate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showMachineCalendar, setShowMachineCalendar] = useState(false);
+  const [machines, setMachines] = useState<Machine[]>([]);
 
   // Use useCallback to memoize the fetching function
   const fetchBlockedDates = useCallback(async () => {
@@ -132,10 +144,26 @@ export default function Schedule() {
     }
   }, []);
 
+  // Fetch machines for calendar
+  const fetchMachines = useCallback(async () => {
+    try {
+      const response = await fetch('/api/machines');
+      if (!response.ok) {
+        throw new Error(`Failed to fetch machines: ${response.status}`);
+      }
+      
+      const machinesData = await response.json();
+      setMachines(machinesData);
+    } catch (error) {
+      console.error('Error fetching machines:', error);
+    }
+  }, []);
+
   // Load blocked dates on component mount
   useEffect(() => {
     fetchBlockedDates();
-  }, [fetchBlockedDates]);
+    fetchMachines();
+  }, [fetchBlockedDates, fetchMachines]);
 
   // Memoize the date checking function for better performance
   const isDateBlocked = useCallback((date: Date) => {
@@ -177,6 +205,11 @@ export default function Schedule() {
     });
   }, []);
 
+  // Machine calendar toggle
+  const toggleMachineCalendar = useCallback(() => {
+    setShowMachineCalendar(prev => !prev);
+  }, []);
+
   // Memoize the step title to avoid recalculation
   const getStepTitle = useCallback(() => {
     switch(step) {
@@ -205,17 +238,45 @@ export default function Schedule() {
             formData={formData} 
             updateFormData={updateFormData} 
             nextStep={nextStep} 
-            prevStep={prevStep} 
           />
         );
       case 2:
         return (
           <div className="border rounded-lg bg-white p-6 shadow-sm">
-            <h2 className="text-xl font-semibold text-blue-700 mb-6">Select Date & Time</h2>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold text-blue-700">Select Date & Time</h2>
+              
+              {/* Machine Calendar Button */}
+              <Button
+                onClick={toggleMachineCalendar}
+                variant="outline"
+                className="flex items-center gap-2 border-blue-300 text-blue-600 hover:bg-blue-50"
+              >
+                <Calendar className="h-4 w-4" />
+                {showMachineCalendar ? "Hide Machine Calendar" : "View Machine Availability"}
+              </Button>
+            </div>
+            
+            {/* Machine Calendar Modal */}
+            {showMachineCalendar && (
+              <div className="mb-6 border rounded-lg shadow-sm overflow-hidden">
+                <div className="bg-blue-50 p-3 border-b border-blue-100 flex items-start gap-2">
+                  <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-blue-800">
+                    Check machine availability before selecting your dates. This calendar shows when machines are reserved or unavailable.
+                  </p>
+                </div>
+                <div className="h-[500px]">
+                  <MachineCalendar machines={machines} isOpen={true} />
+                </div>
+              </div>
+            )}
+            
             <DateTimeSelection
               formData={formData}
               setFormData={setFormData}
               nextStep={nextStep}
+              prevStep={prevStep} 
               isDateBlocked={isDateBlocked}
               maxDates={MAX_DATES}
             />
@@ -240,7 +301,7 @@ export default function Schedule() {
           />
         );
     }
-  }, [step, isLoading, formData, nextStep, prevStep, updateFormData, isDateBlocked]);
+  }, [step, isLoading, formData, nextStep, prevStep, updateFormData, isDateBlocked, showMachineCalendar, toggleMachineCalendar, machines]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">

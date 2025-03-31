@@ -279,6 +279,7 @@ const handleMarkAsOngoing = () => {
       () => handleStatusUpdate(localReservation.id, 'Cancelled')
     );
   };
+  
   const isEditingDisabled = (status: string): boolean => {
     const nonEditableStatuses = ['Pending Payment', 'Paid', 'Completed'];
     return nonEditableStatuses.includes(status);
