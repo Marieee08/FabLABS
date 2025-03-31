@@ -76,7 +76,6 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose, is
         // Filter to only include approved and ongoing reservations
         const filteredReservations = reservationsData.filter((res: Reservation) => 
           ['Approved', 'Ongoing'].includes(res.status) && 
-          res.type !== 'evc' &&
           res.machines.some(machine => machine !== 'Not specified' && machine)
         );
         
@@ -441,9 +440,7 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose, is
         aria-label="Select Machine"
       >
         <option value="all">All Machines</option>
-        {machines
-          .filter(machine => machine.id !== 'EVC Lab' && machine.Machine !== 'EVC Lab')
-          .map(machine => (
+        {machines.map(machine => (
             <option key={machine.id} value={machine.id} disabled={!machine.isAvailable}>
               {machine.Machine} {!machine.isAvailable ? '(Unavailable)' : ''}
             </option>
