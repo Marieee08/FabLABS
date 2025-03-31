@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef, ChangeEvent } from 'react';
-import { ChevronDown, ChevronUp, CheckCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, CheckCircle, AlertCircle } from 'lucide-react';
 import ToolsSelector from '@/components/msme-forms/tools-selector';
 import ServiceSelector from '@/components/msme-forms/service-selector';
 import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
 
 interface Day {
   date: Date;
@@ -96,6 +97,16 @@ const MachineQuantitySelector: React.FC<MachineQuantitySelectorProps> = ({
               machineCount: availableMachines,
               hasMachines: availableMachines > 0
             };
+            
+            // Auto-populate machine numbers with default of 1 if not already set
+            if (availableMachines > 0 && 
+               (!machineNumbers[service.Service] || machineNumbers[service.Service] === 0)) {
+              // Create a new object to avoid direct state mutation
+              const updatedMachineNumbers = { ...machineNumbers };
+              updatedMachineNumbers[service.Service] = 1; // Set default to 1
+              setMachineNumbers(updatedMachineNumbers);
+              onChange(updatedMachineNumbers); // Notify parent of the change
+            }
           }
         });
         
@@ -112,7 +123,8 @@ const MachineQuantitySelector: React.FC<MachineQuantitySelectorProps> = ({
     if (selectedServices.length > 0) {
       fetchMachineAvailability();
     }
-  }, [selectedServices, onMachineDataUpdate]); 
+  }, [selectedServices, onMachineDataUpdate, machineNumbers, onChange]);
+  
 
 
   // Update state when initialValues change (e.g., when navigating back from review)
@@ -495,16 +507,67 @@ export default function ProcessInformation({
   }, [selectedService, formData, hasMachines]);
 
   // Handle next button click
-  const handleNext = useCallback(() => {
-    if (validateForm()) {
-      // Make sure ProductsManufactured is always an array before proceeding
-      if (!Array.isArray(formData.ProductsManufactured) && formData.ProductsManufactured) {
-        updateFormData('ProductsManufactured', [formData.ProductsManufactured]);
-      }
-      
-      nextStep();
+  
+const handleNext = useCallback(() => {
+  // Get all field errors first
+  const newErrors: Partial<Record<keyof FormData, string>> = {};
+  let isValid = true;
+
+  // Required field validation
+  if (!selectedService) {
+    newErrors.ProductsManufactured = 'Please select a service';
+    isValid = false;
+  }
+
+  // Only validate machine numbers if service has machines
+  if (selectedService && hasMachines) {
+    // Check if machine quantity is specified correctly
+    const machineQuantity = formData.serviceMachineNumbers?.[selectedService] || 0;
+    if (machineQuantity <= 0) {
+      newErrors.serviceMachineNumbers = 'Please specify at least 1 machine';
+      isValid = false;
     }
-  }, [nextStep, validateForm, formData.ProductsManufactured, updateFormData]);
+    
+    // Validate BulkofCommodity for non-Benchmarking services with machines
+    if (selectedService !== 'Benchmarking' && !formData.BulkofCommodity) {
+      newErrors.BulkofCommodity = 'This field is required';
+      isValid = false;
+    }
+  }
+  
+  // Update errors state
+  setErrors(prev => {
+    if (JSON.stringify(prev) === JSON.stringify(newErrors)) {
+      return prev;
+    }
+    return newErrors;
+  });
+  
+  // Set all fields as touched
+  setTouchedFields(() => {
+    return new Set(Object.keys(formData) as Array<keyof FormData>);
+  });
+  
+  // Show toast error if validation fails
+  if (!isValid) {
+    // If using React Toastify
+    toast({
+      title: "Required Fields Missing",
+      description: "Please fill in all required fields before continuing.",
+      variant: "destructive",
+    });
+    return;
+  }
+  
+  // Success case: format data and proceed
+  // Make sure ProductsManufactured is always an array before proceeding
+  if (!Array.isArray(formData.ProductsManufactured) && formData.ProductsManufactured) {
+    updateFormData('ProductsManufactured', [formData.ProductsManufactured]);
+  }
+  
+  nextStep();
+}, [nextStep, validateForm, formData, hasMachines, selectedService, updateFormData, toast]);
+
 
   // Get CSS class for input fields
   const getInputClassName = useCallback((fieldName: keyof FormData) => {
@@ -609,32 +672,74 @@ export default function ProcessInformation({
             </div>
           ) : null}
 
-          {/* Links for selected service that has machines */}
-          {selectedService && hasMachines && (
-            <div className="mt-4 space-y-4">
-              <h3 className="text-sm font-medium text-gray-700">Resource Links</h3>
-              <p className="text-xs text-gray-500">Add Google Drive or other resource links for your selected service</p>
-              
-              {/* Find the service in the services array */}
-              {(() => {
-                const serviceInfo = servicesRef.current.find(s => s.Service === selectedService);
-                const serviceHasMachines = serviceInfo?.Machines && serviceInfo.Machines.length > 0;
-                
-                return serviceHasMachines ? (
-                  <div key={selectedService} className="p-4 border rounded-md bg-gray-50">
-                    <h4 className="text-sm font-medium mb-2">{selectedService}</h4>
-                    <input
-                      type="text"
-                      placeholder="Paste Google Drive or resource link here"
-                      className="w-full p-2 border rounded"
-                      value={formData.serviceLinks?.[selectedService] || ''}
-                      onChange={(e) => handleLinkChange(selectedService, e.target.value)}
-                    />
-                  </div>
-                ) : null;
-              })()}
+          
+        {/* Links for selected service that has machines */}
+        {selectedService && hasMachines && (
+          <div className="mt-4 space-y-4">
+            <h3 className="text-sm font-medium text-gray-700">Resource Links</h3>
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-md mb-4">
+              <p className="text-sm text-amber-800">
+                <strong>Required:</strong> Please provide a Google Drive link containing your project files 
+                (3D models, technical drawings, etc.). These files are necessary for assessment and fabrication.
+              </p>
+              <p className="text-xs text-amber-700 mt-2">
+                Example: https://drive.google.com/drive/folders/your-folder-id
+              </p>
             </div>
-          )}
+            
+            {/* Find the service in the services array */}
+            {(() => {
+              const serviceInfo = servicesRef.current.find(s => s.Service === selectedService);
+              const serviceHasMachines = serviceInfo?.Machines && serviceInfo.Machines.length > 0;
+              
+              return serviceHasMachines ? (
+                <div key={selectedService} className="p-4 border rounded-md bg-gray-50">
+                  <h4 className="text-sm font-medium mb-2">{selectedService}</h4>
+                  <input
+                    type="text"
+                    placeholder="Paste Google Drive or resource link here"
+                    className={`w-full p-2 border rounded ${
+                      !formData.serviceLinks?.[selectedService] && touchedFields.has('serviceLinks') ? 
+                      'border-red-300 bg-red-50' : 'border-gray-300'
+                    }`}
+                    value={formData.serviceLinks?.[selectedService] || ''}
+                    onChange={(e) => {
+                      handleLinkChange(selectedService, e.target.value);
+                      // Mark as touched
+                      setTouchedFields(prev => {
+                        const newTouchedFields = new Set(prev);
+                        newTouchedFields.add('serviceLinks');
+                        return newTouchedFields;
+                      });
+                    }}
+                    onBlur={() => {
+                      // Validate link (could be more sophisticated)
+                      if (!formData.serviceLinks?.[selectedService]) {
+                        setErrors(prev => ({
+                          ...prev,
+                          serviceLinks: 'Please provide a resource link for your project files'
+                        }));
+                      } else {
+                        // Clear error if valid
+                        setErrors(prev => {
+                          const newErrors = { ...prev };
+                          delete newErrors.serviceLinks;
+                          return newErrors;
+                        });
+                      }
+                    }}
+                  />
+                  {!formData.serviceLinks?.[selectedService] && touchedFields.has('serviceLinks') && (
+                    <div className="mt-2 text-sm text-red-500 flex items-start">
+                      <AlertCircle className="h-4 w-4 mr-1 mt-0.5 flex-shrink-0" />
+                      <span>Please provide a resource link</span>
+                    </div>
+                  )}
+                </div>
+              ) : null;
+            })()}
+          </div>
+        )}
 
           {/* Bulk of Commodity */}
           <div className={`transition-opacity duration-300 ${isFieldDisabled('BulkofCommodity') ? 'opacity-50' : 'opacity-100'}`}>

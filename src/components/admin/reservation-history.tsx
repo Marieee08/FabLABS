@@ -136,6 +136,47 @@ interface DetailedEVCReservation {
   };
 }
 
+interface MaterialItem {
+  quantity: string;
+  item: string;
+  description: string;
+  issuedCondition: string;
+  returnedCondition: string;
+  machineName?: string;    // Add machine name field
+  machineQuantity?: string; // Add machine quantity field
+}
+
+
+interface StudentInfo {
+  name: string;
+}
+
+
+interface LabRequestFormData {
+  campus: string;
+  controlNo: string;
+  schoolYear: string;
+  gradeLevel: string;
+  numberOfStudents: string;
+  subject: string;
+  concurrentTopic: string;
+  unit: string;
+  teacherInCharge: string;
+  venue: string;
+  inclusiveTimeOfUse: string;
+  date: string;
+  materials: MaterialItem[];
+  receivedBy: string;
+  receivedAndInspectedBy: string;
+  receivedDate: string;
+  inspectedDate: string;
+  requestedBy: string;
+  dateRequested: string;
+  students: StudentInfo[];
+  endorsedBy: string;
+  approvedBy: string;
+}
+
 const ReservationHistory = () => {
   // State definitions
   const [activeTab, setActiveTab] = useState('all');
@@ -349,19 +390,19 @@ const ReservationHistory = () => {
         detailedData = await response.json();
         console.log('EVC Reservation details for PDF generation:', detailedData);
        
-      if (formType === 'lab-request' || formType === 'lab-reservation') {
-        // Format the needed materials into the required format
-        const materialItems = Array.isArray(detailedData.NeededMaterials)
-          ? detailedData.NeededMaterials.map((material: any) => ({
-              quantity: material.MaterialQty?.toString() || '',
-              item: material.MaterialName || '',
-              description: material.MaterialDesc || '',
-              issuedCondition: '',
-              returnedCondition: '',
-              machineName: material.MachineName || '',       // Add machine name
-              machineQuantity: material.MachineQty?.toString() || '' // Add machine quantity
-            }))
-          : [];
+        if (formType === 'lab-request' || formType === 'lab-reservation') {
+          // Format the needed materials into the required format
+          const materialItems = Array.isArray(detailedData.NeededMaterials)
+            ? detailedData.NeededMaterials.map((material: any) => ({
+                quantity: material.ItemQty?.toString() || '',
+                item: material.Item || '',
+                description: material.Description || '',
+                issuedCondition: material.Issued || '',
+                returnedCondition: material.Returned || '',
+                machineName: material.Item || '', // Use Item as machine name
+                machineQuantity: material.ItemQty?.toString() || '' // Use ItemQty as machine quantity
+              }))
+            : [];
         
         // Format student list - handle both Students and StudentName properties
         const studentList = Array.isArray(detailedData.EVCStudents)
@@ -590,78 +631,95 @@ const ReservationHistory = () => {
           }
           break;
          
-        case 'lab-request':
-          // For normal utilization reservations, create a basic lab request form
-          try {
-            // Format time from UtilTimes if available
-            let inclusiveTime = '';
-            if (Array.isArray(detailedData.UtilTimes) && detailedData.UtilTimes.length > 0) {
-              const firstTime = detailedData.UtilTimes[0];
-              if (firstTime.StartTime && firstTime.EndTime) {
-                const startTime = new Date(firstTime.StartTime);
-                const endTime = new Date(firstTime.EndTime);
-                inclusiveTime = `${startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+          // Updated section of handleGeneratePDF function specifically for lab-request form handling
+          case 'lab-request':
+            // For normal utilization reservations, create a properly formatted lab request form
+            try {
+              // Format time from UtilTimes if available
+              let inclusiveTime = '';
+              if (Array.isArray(detailedData.UtilTimes) && detailedData.UtilTimes.length > 0) {
+                const firstTime = detailedData.UtilTimes[0];
+                if (firstTime.StartTime && firstTime.EndTime) {
+                  const startTime = new Date(firstTime.StartTime);
+                  const endTime = new Date(firstTime.EndTime);
+                  inclusiveTime = `${startTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - ${endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+                }
               }
-            }
-           
-            // Create material items from UserServices and UserTools
-            const materialItems = [
-              // Convert services to materials
-              ...detailedData.UserServices.map((service: any) => ({
-                quantity: '1',
-                item: service.ServiceAvail || '',
-                description: service.EquipmentAvail || '',
-                issuedCondition: '',
-                returnedCondition: '',
-                machineName: service.MachineName || '',       // Add machine name
-                machineQuantity: service.MachineQty?.toString() || '' // Add machine quantity
-              })),
+              
+              // Create material items from UserServices with property names that match the UI component
+              const materialItems = [];
+              
+              // Process UserServices to create material items with consistent property names
+              if (Array.isArray(detailedData.UserServices)) {
+                for (const service of detailedData.UserServices) {
+                  // Create a material item for each service
+                  materialItems.push({
+                    quantity: service.MinsAvail?.toString() || '1',
+                    item: service.ServiceAvail || '',
+                    description: service.EquipmentAvail || '',
+                    issuedCondition: '',
+                    returnedCondition: '',
+                    // Use the same property names as in your UI component
+                    Item: service.ServiceAvail || '', // This is what your PDF code will look at
+                    ItemQty: service.MinsAvail || 1,  // This is what your PDF code will look at
+                    Description: service.EquipmentAvail || ''
+                  });
+                }
+              }
+              
               // Add tools as materials
-              ...detailedData.UserTools.map((tool: any) => ({
-                quantity: tool.ToolQuantity?.toString() || '1',
-                item: tool.ToolUser || '',
-                description: '',
-                issuedCondition: '',
-                returnedCondition: '',
-                machineName: '', // No machine name for tools
-                machineQuantity: '' // No machine quantity for tools
-              }))
-            ];
-           
-            // Create a basic lab request form for non-EVC reservations
-            const labRequestData = {
-              campus: 'Eastern Visayas Campus', // Default value
-              controlNo: `U-${detailedData.id}`,
-              schoolYear: new Date().getFullYear().toString(),
-              gradeLevel: '', // Not applicable for regular utilization
-              numberOfStudents: '1', // Default to 1 for regular utilization
-              subject: '', // Not applicable for regular utilization
-              concurrentTopic: '', // Not applicable for regular utilization
-              unit: '', // Not applicable for regular utilization
-              teacherInCharge: '', // Not applicable for regular utilization
-              venue: 'Fabrication Laboratory',
-              inclusiveTimeOfUse: inclusiveTime,
-              date: new Date(detailedData.RequestDate).toLocaleDateString(),
-              materials: materialItems,
-              receivedBy: '',
-              receivedAndInspectedBy: '',
-              receivedDate: '',
-              inspectedDate: '',
-              requestedBy: detailedData.accInfo?.Name || '',
-              dateRequested: new Date(detailedData.RequestDate).toLocaleDateString(),
-              students: [{ name: detailedData.accInfo?.Name || '' }],
-              endorsedBy: '',
-              approvedBy: ''
-            };
-           
-            console.log('Lab request data for regular utilization:', labRequestData);
-            downloadLabRequestFormPDF(labRequestData);
-          } catch (error) {
-            console.error('Error in lab request PDF generation for regular utilization:', error);
-            alert(`Error generating lab request PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
-          }
-          break;
-  
+              if (Array.isArray(detailedData.UserTools)) {
+                for (const tool of detailedData.UserTools) {
+                  materialItems.push({
+                    quantity: tool.ToolQuantity?.toString() || '1',
+                    item: tool.ToolUser || '',
+                    description: '',
+                    issuedCondition: '',
+                    returnedCondition: '',
+                    // Use the same property names as in your UI component
+                    Item: tool.ToolUser || '',
+                    ItemQty: tool.ToolQuantity || 1,
+                    Description: ''
+                  });
+                }
+              }
+              
+              // Create a lab request form data object 
+              const labRequestData = {
+                campus: 'Eastern Visayas Campus',
+                controlNo: `U-${detailedData.id}`,
+                schoolYear: new Date().getFullYear().toString(),
+                gradeLevel: '',
+                numberOfStudents: '1',
+                subject: '',
+                concurrentTopic: '',
+                unit: '',
+                teacherInCharge: '',
+                venue: 'Fabrication Laboratory',
+                inclusiveTimeOfUse: inclusiveTime,
+                date: new Date(detailedData.RequestDate).toLocaleDateString(),
+                materials: materialItems,
+                receivedBy: '',
+                receivedAndInspectedBy: '',
+                receivedDate: '',
+                inspectedDate: '',
+                requestedBy: detailedData.accInfo?.Name || '',
+                dateRequested: new Date(detailedData.RequestDate).toLocaleDateString(),
+                students: [{ name: detailedData.accInfo?.Name || '' }],
+                endorsedBy: '',
+                approvedBy: ''
+              };
+              
+              console.log('Lab request data with material items:', labRequestData);
+              console.log('Material items with consistent property names:', materialItems);
+              
+              downloadLabRequestFormPDF(labRequestData);
+            } catch (error) {
+              console.error('Error in lab request PDF generation for regular utilization:', error);
+              alert(`Error generating lab request PDF: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            }
+            break;
+            
         case 'lab-reservation':
           // For normal utilization reservations, create a basic lab reservation form
           try {

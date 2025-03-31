@@ -80,6 +80,7 @@ const generatePrintPDF = (formData: LabRequestFormData): void => {
   while (studentsData.length < 5) {
     studentsData.push({ name: '' });
   }
+  
 };
 
 
@@ -434,11 +435,11 @@ export const downloadLabRequestFormPDF = (formData: LabRequestFormData): void =>
       let currentX = margin;
      
       // Add header cells
-      addCell('Quantity)', currentX, colQuantity, headerHeight);
+      addCell('Quantity', currentX, colQuantity, headerHeight);
       currentX += colQuantity;
       
-      // For the Item header cell:
-      addCell('Item)', currentX, colItem, headerHeight);
+      // Update Item header to Machine
+      addCell('Item', currentX, colItem, headerHeight);
       currentX += colItem;
      
       addCell('Description', currentX, colDesc, headerHeight);
@@ -456,40 +457,44 @@ export const downloadLabRequestFormPDF = (formData: LabRequestFormData): void =>
       const numDataRows = 12; // Regular rows
      
       // Add data rows
-      for (let i = 0; i < numDataRows; i++) {
-        currentX = margin;
-       
-        // Get data for the current row
-        const rowData = materialsData[i] || { 
-          quantity: '', 
-          item: '', 
-          description: '', 
-          issuedCondition: '', 
-          returnedCondition: '',
-          machineName: '',
-          machineQuantity: ''
-        };
-       
-        // Add cells for this row
-        const quantityText = rowData.quantity + (rowData.machineQuantity ? `\n${rowData.machineQuantity}` : '');
-        addCell(quantityText, currentX, colQuantity, rowHeight, 'center', 9, false);
-        currentX += colQuantity;
-       
-        const itemText = rowData.item + (rowData.machineName ? `\n${rowData.machineName}` : '');
-        addCell(itemText, currentX, colItem, rowHeight, 'left', 9, false);
-        currentX += colItem;
-       
-        addCell(rowData.description, currentX, colDesc, rowHeight, 'left', 9, false);
-        currentX += colDesc;
-       
-        addCell(rowData.issuedCondition, currentX, colIssued, rowHeight, 'left', 9, false);
-        currentX += colIssued;
-       
-        addCell(rowData.returnedCondition, currentX, colReturned, rowHeight, 'left', 9, false);
-       
-        y += rowHeight;
-      }
-     
+// In the MATERIALS SECTION, update the data rows part to:
+
+// Add data rows
+for (let i = 0; i < numDataRows; i++) {
+  currentX = margin;
+ 
+  // Get data for the current row
+  const rowData = materialsData[i] || { 
+    quantity: '', 
+    item: '', 
+    description: '', 
+    issuedCondition: '', 
+    returnedCondition: '',
+    machineName: '',
+    machineQuantity: ''
+  };
+ 
+  // Display machine quantity in quantity column if available, otherwise use regular quantity
+  const quantityValue = rowData.machineQuantity ? rowData.machineQuantity : rowData.quantity;
+  addCell(quantityValue, currentX, colQuantity, rowHeight, 'center', 9, false);
+  currentX += colQuantity;
+ 
+  // Display machine name in item column if available, otherwise use regular item
+  const itemValue = rowData.machineName ? rowData.machineName : rowData.item;
+  addCell(itemValue, currentX, colItem, rowHeight, 'left', 9, false);
+  currentX += colItem;
+ 
+  addCell(rowData.description, currentX, colDesc, rowHeight, 'left', 9, false);
+  currentX += colDesc;
+ 
+  addCell(rowData.issuedCondition, currentX, colIssued, rowHeight, 'left', 9, false);
+  currentX += colIssued;
+ 
+  addCell(rowData.returnedCondition, currentX, colReturned, rowHeight, 'left', 9, false);
+ 
+  y += rowHeight;
+}
+
       // Special rows for receiving signatures
       const sigRowHeight = 15;
      

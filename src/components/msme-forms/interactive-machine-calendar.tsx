@@ -505,30 +505,60 @@ useEffect(() => {
       className: className.trim()
     };
   };
+
+  const calculateDailyMachineAvailability = (date: Date) => {
+    const dateStr = date.toDateString();
+    
+    // Validate service and machine data exist
+    if (!selectedService || !machinesForService.length) return true;
+  
+    // Get total available machines for this service
+    const totalMachinesForService = machinesForService.reduce((sum, machine) => 
+      machine.isAvailable !== false ? sum + (machine.Number || 1) : sum, 0);
+  
+    // Get all reservations for this date
+    const dayReservations = reservations.filter(reservation => 
+      reservation.timeSlots.some(slot => 
+        new Date(slot.startTime).toDateString() === dateStr
+      ) &&
+      // Ensure the reservation uses machines from this service
+      reservation.machines.some(machineName => 
+        machinesForService.some(m => m.id === machineName || m.Machine === machineName)
+      )
+    );
+  
+    // Count total machines used on this day for this service
+    const totalMachinesUsed = dayReservations.reduce((total, reservation) => {
+      const serviceMachinesUsed = reservation.machines.filter(machineName => 
+        machinesForService.some(m => m.id === machineName || m.Machine === machineName)
+      );
+      return total + serviceMachinesUsed.length;
+    }, 0);
+  
+    // Check if machines needed exceed total available
+    return totalMachinesUsed + machineQuantityNeeded <= totalMachinesForService;
+  };
+  
   
   // Determine if a date should be disabled
   const isDateDisabled = (date: Date): boolean => {
     const dateStr = date.toDateString();
     const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-    const isToday = moment(date).isSame(moment(), 'day');
     const isPastDate = moment(date).isBefore(moment(), 'day');
     const isBlocked = blockedDates.some(d => new Date(d.date).toDateString() === dateStr);
     
-    // Get availability for this date
-    const availableMachines = machineAvailabilityMap[dateStr] || 0;
-    const hasEnoughMachines = availableMachines >= machineQuantityNeeded;
-    
-    // Dates should be disabled if:
-    // 1. It's a weekend
-    // 2. It's in the past
-    // 3. It's blocked by admin
-    // 4. Not enough machines are available
-    // 5. It's beyond the 1-month future limit
     const oneMonthLater = new Date();
     oneMonthLater.setMonth(oneMonthLater.getMonth() + 1);
     const isTooFarInFuture = date > oneMonthLater;
+  
+    // Check machine availability specifically
+    const hasEnoughMachines = calculateDailyMachineAvailability(date);
     
-    return isWeekend || isPastDate || isBlocked || !hasEnoughMachines || isTooFarInFuture;
+    return isWeekend || 
+           isPastDate || 
+           isBlocked || 
+           !hasEnoughMachines || 
+           isTooFarInFuture;
   };
   
   // Custom toolbar component
@@ -949,6 +979,7 @@ useEffect(() => {
 };
 
 // Wrapper component that can be used in the MSME scheduling flow
+
 export const InteractiveMachineCalendarWrapper = ({ 
   formData, 
   updateFormData 
@@ -998,7 +1029,7 @@ export const InteractiveMachineCalendarWrapper = ({
       ? formData.ProductsManufactured[0]
       : '';
 
-  // Determine machine quantity needed
+  // Determine machine quantity needed - defaults to 0 if no machines are tied to the service
   const machineQuantityNeeded = selectedService && formData.serviceMachineNumbers 
     ? formData.serviceMachineNumbers[selectedService] || 0
     : 0;
@@ -1020,15 +1051,10 @@ export const InteractiveMachineCalendarWrapper = ({
               <div className="p-6 text-center">
                 <AlertCircle className="h-10 w-10 text-amber-500 mx-auto mb-3" />
                 <h3 className="text-lg font-medium text-gray-900 mb-1">Service Selection Required</h3>
-                <p className="text-gray-600 mb-4">Please select a service and specify machine quantity first</p>
-              </div>
-            ) : machineQuantityNeeded <= 0 ? (
-              <div className="p-6 text-center">
-                <AlertCircle className="h-10 w-10 text-amber-500 mx-auto mb-3" />
-                <h3 className="text-lg font-medium text-gray-900 mb-1">Machine Quantity Required</h3>
-                <p className="text-gray-600 mb-4">Please specify how many machines you need for this service</p>
+                <p className="text-gray-600 mb-4">Please select a service first</p>
               </div>
             ) : (
+              // Show calendar for all services, regardless of machine quantity
               <InteractiveMachineCalendar
                 selectedService={selectedService}
                 machineQuantityNeeded={machineQuantityNeeded}

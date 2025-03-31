@@ -226,13 +226,26 @@ const ReviewEVCReservation: React.FC<ReviewEVCReservationProps> = ({
                   <h3 className="font-medium text-gray-900 mb-2">Needed Materials</h3>
                   <div className="space-y-2">
                     {selectedReservation.NeededMaterials && selectedReservation.NeededMaterials.length > 0 ? (
-                      selectedReservation.NeededMaterials.map((material, index) => (
-                        <div key={index} className="bg-gray-50 p-3 rounded-lg">
-                          <p><span className="text-gray-600">Material:</span> {material.MaterialName || 'Not specified'}</p>
-                          <p><span className="text-gray-600">Quantity:</span> {material.MaterialQty || 0}</p>
-                          {material.MaterialDesc && <p><span className="text-gray-600">Description:</span> {material.MaterialDesc}</p>}
-                        </div>
-                      ))
+                      <div className="bg-gray-50 p-3 rounded-lg">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead>
+                            <tr>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Machine</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Quantity</th>
+                              <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Description</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {selectedReservation.NeededMaterials.map((material, index) => (
+                              <tr key={index}>
+                                <td className="px-3 py-2 text-sm text-gray-700">{material.MaterialName || material.Item || 'Not specified'}</td>
+                                <td className="px-3 py-2 text-sm text-gray-700">{material.MaterialQty || material.ItemQty || '0'}</td>
+                                <td className="px-3 py-2 text-sm text-gray-700">{material.MaterialDesc || material.Description || 'No description'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     ) : (
                       <p className="text-gray-500 italic">No materials listed</p>
                     )}
