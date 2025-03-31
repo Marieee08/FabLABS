@@ -21,7 +21,7 @@ interface DateTimeSelectionProps {
   formData: FormData;
   setFormData: React.Dispatch<React.SetStateAction<FormData>>;
   nextStep: () => void;
-  prevStep: () => void; // Add this missing prop
+  prevStep: () => void; // Make sure this is here
   isDateBlocked: (date: Date) => boolean;
   standalonePage?: boolean;
 }
@@ -56,6 +56,7 @@ export default function DateTimeSelection({
   formData, 
   setFormData, 
   nextStep, 
+  prevStep, // Add this
   isDateBlocked,
   standalonePage = true 
 }: DateTimeSelectionProps) {
@@ -329,6 +330,7 @@ export default function DateTimeSelection({
     return [...formData.days].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [formData.days]);
 
+
   return (
     <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 pt-0 flex flex-col">
       {/* Calendar and Error Section */}
@@ -522,11 +524,13 @@ export default function DateTimeSelection({
       {standalonePage && (
       <div className="mt-4 flex justify-between">
         <Button
-          onClick={prevStep} // This will use the prop passed from parent
+          onClick={prevStep}  // Use the prop function directly
           className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-md font-medium"
         >
           Previous
         </Button>
+
+
         <Button
           onClick={handleNext}
           className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium"
