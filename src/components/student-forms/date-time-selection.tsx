@@ -21,8 +21,9 @@ interface DateTimeSelectionProps {
   formData: FormData;
   setFormData: React.Dispatch<React.SetStateAction<FormData>>;
   nextStep: () => void;
+  prevStep: () => void; // Add this missing prop
   isDateBlocked: (date: Date) => boolean;
-  standalonePage?: boolean; // New prop to determine if this is a standalone page
+  standalonePage?: boolean;
 }
 
 const MAX_DATES = 5;
@@ -517,19 +518,25 @@ export default function DateTimeSelection({
         </div>
       )}
       
-      {/* Navigation buttons - only show when in standalone mode */}
-
+      {/* Navigation buttons - show both Previous and Next buttons */}
       {standalonePage && (
-        <div className="mt-4 flex justify-end">
-          <Button
-            onClick={handleNext}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium"
-            disabled={formData.days.length === 0 || isSubmitting}
-          >
-            {isSubmitting ? "Processing..." : "Continue to Next Step"}
-          </Button>
-        </div>
-      )}
+      <div className="mt-4 flex justify-between">
+        <Button
+          onClick={prevStep} // This will use the prop passed from parent
+          className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-md font-medium"
+        >
+          Previous
+        </Button>
+        <Button
+          onClick={handleNext}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-md font-medium"
+          disabled={formData.days.length === 0}
+        >
+          Continue to Next Step
+        </Button>
+      </div>
+    )}
+
     </div>
   );
 }
