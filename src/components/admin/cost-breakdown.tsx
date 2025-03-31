@@ -79,6 +79,10 @@ interface CostBreakdownProps {
   allowFix?: boolean;
   reservationStatus?: string;
   servicePricing?: ServicePricing[]; // Add the services pricing information
+  defaultPricePerMin?: number;
+  defaultPricingUnit?: string;
+  minutesPerHour?: number;
+  minutesPerDay?: number;
 }
 
 const CostBreakdown: React.FC<CostBreakdownProps> = ({
@@ -88,7 +92,11 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
   reservationId,
   allowFix = false,
   reservationStatus = '',
-  servicePricing = [] 
+  servicePricing = [],
+  defaultPricePerMin = 0,
+  defaultPricingUnit = 'hour',
+  minutesPerHour = 60,
+  minutesPerDay = 1440
 }) => {
   const [isFixing, setIsFixing] = useState(false);
   const [fixError, setFixError] = useState<string | null>(null);
@@ -185,10 +193,10 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
       
       // Handle overnight operations (end time is earlier than start time)
       if (durationMinutes < 0) {
-        durationMinutes += 1440; // Add 24 hours (1440 minutes)
+        durationMinutes += minutesPerDay; // Add 24 hours
       }
       
-      console.log(`Calculated duration: ${durationMinutes} minutes (${durationMinutes/60} hours)`);
+      console.log(`Calculated duration: ${durationMinutes} minutes (${durationMinutes/minutesPerHour} hours)`);
       return durationMinutes;
     } catch (e) {
       console.error("Error calculating time duration:", e);
@@ -209,8 +217,9 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
 
     // Implementation of booked costs calculation - use pricing from Service model
     const calculatedServices = userServices.map(service => {
-      // Get booked minutes
+      // Use the exact MinsAvail from the database with no modification
       const bookedMinutes = service.MinsAvail || 0;
+      console.log(`Service: ${service.ServiceAvail}, Using database MinsAvail: ${bookedMinutes}`);
       
       // Find matching service pricing
       const pricing = servicePricing.find(p => 
@@ -219,26 +228,28 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
       
       // Get base cost from service pricing if available
       const baseCostPerUnit = pricing ? 
-        (typeof pricing.Costs === 'string' ? parseFloat(pricing.Costs) : (pricing.Costs || 0)) : 
-        (typeof service.CostsAvail === 'string' ? parseFloat(service.CostsAvail) : (service.CostsAvail || 0));
+        (typeof pricing.Costs === 'string' ? parseFloat(pricing.Costs) : (pricing.Costs || defaultPricePerMin)) : 
+        (typeof service.CostsAvail === 'string' ? parseFloat(service.CostsAvail) : (service.CostsAvail || defaultPricePerMin));
       
-      // Get pricing unit (hour is default)
-      const pricingUnit = pricing?.Per || 'hour';
+      // Get pricing unit (use default if not specified)
+      const pricingUnit = pricing?.Per || defaultPricingUnit;
       
-      // Calculate cost based on pricing unit and booked minutes
+      // Calculate cost based on pricing unit and booked minutes - simple conversion
       let adjustedCost;
       if (pricingUnit.toLowerCase() === 'min') {
+        // If rate is per minute, just multiply
         adjustedCost = baseCostPerUnit * Number(bookedMinutes);
       } else if (pricingUnit.toLowerCase() === 'day') {
-        adjustedCost = baseCostPerUnit * (Number(bookedMinutes) / 1440); // 1440 minutes in a day
+        // If rate is per day, convert minutes to days
+        adjustedCost = baseCostPerUnit * (Number(bookedMinutes) / minutesPerDay);
       } else {
-        // Default is per hour
-        adjustedCost = baseCostPerUnit * (Number(bookedMinutes) / 60);
+        // Default is per hour, convert minutes to hours
+        adjustedCost = baseCostPerUnit * (Number(bookedMinutes) / minutesPerHour);
       }
 
       return {
         ...service,
-        bookedMinutes: Number(bookedMinutes),
+        bookedMinutes: Number(bookedMinutes), // Store exactly what's in MinsAvail
         originalCost: baseCostPerUnit,
         adjustedCost,
         downtimeMinutes: null,
@@ -292,6 +303,150 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
     }
   };
 
+  const calculateOperationTimeCosts = () => {
+    console.log("DEBUGGING: Calculating operation time costs");
+    
+    // For debugging: log all machine utilizations first
+    console.log("All machine utilizations:");
+    machineUtilizations.forEach(util => {
+      console.log(`Machine: ${util.Machine}, Service: ${util.ServiceName}, ID: ${util.id}`);
+      console.log(`Operating Times: ${util.OperatingTimes.length}`);
+      
+      // Log each operating time
+      util.OperatingTimes.forEach((time, idx) => {
+        console.log(`  Time ${idx+1}: ${time.OTStartTime} → ${time.OTEndTime}`);
+      });
+    });
+    
+    // Process each user service
+    const adjustedServices = userServices.map(service => {
+      console.log(`\nProcessing service: ${service.ServiceAvail}, Equipment: ${service.EquipmentAvail}`);
+      
+      // Find matching machine utilization for this service
+      const matchingUtilization = machineUtilizations.find(util => 
+        (util.Machine && service.EquipmentAvail && 
+         util.Machine.toLowerCase().includes(service.EquipmentAvail.toLowerCase())) || 
+        (util.ServiceName && service.ServiceAvail && 
+         util.ServiceName.toLowerCase().includes(service.ServiceAvail.toLowerCase()))
+      );
+      
+      console.log(`Found matching utilization: ${matchingUtilization ? 'Yes' : 'No'}`);
+      
+      // Calculate operation minutes from operating times
+      let operationMinutes = 0;
+      
+      if (matchingUtilization && matchingUtilization.OperatingTimes && 
+          matchingUtilization.OperatingTimes.length > 0) {
+        
+        // Get unique operating times to avoid duplicates
+        const uniqueOpTimes = getUniqueOperatingTimes(matchingUtilization.OperatingTimes);
+        console.log(`Found ${uniqueOpTimes.length} unique operating times`);
+        
+        // Sum up the duration of all operating times
+        operationMinutes = uniqueOpTimes.reduce((total, opTime) => {
+          if (!opTime.OTStartTime || !opTime.OTEndTime) {
+            console.warn("Missing start or end time for operation time:", opTime);
+            return total;
+          }
+          
+          // Parse the start and end times
+          const startTime = parseMachineUtilizationTime(opTime.OTStartTime);
+          const endTime = parseMachineUtilizationTime(opTime.OTEndTime);
+          console.log(`Parsed times: ${startTime} to ${endTime}`);
+          
+          // Calculate the duration in minutes
+          const duration = calculateDurationMinutes(startTime, endTime);
+          return total + duration;
+        }, 0);
+        
+        console.log(`Total operation minutes calculated: ${operationMinutes}`);
+      } else {
+        // Fallback: try to extract minutes from service/equipment description
+        const extractedMinutes = extractMinutesFromServiceDisplay(
+          service.ServiceAvail, 
+          service.EquipmentAvail
+        );
+        
+        if (extractedMinutes > 0) {
+          console.log(`Using extracted minutes from description: ${extractedMinutes}`);
+          operationMinutes = extractedMinutes;
+        } else {
+          // If no operation times or extracted minutes, use booked minutes as fallback
+          console.log(`No operation times found, using booked minutes fallback: ${service.MinsAvail || 0}`);
+          operationMinutes = service.MinsAvail || 0;
+        }
+      }
+      
+      // Get pricing info for the service (use default if not found)
+      const servicePricingInfo = servicePricing.find(s => 
+        s.Service.toLowerCase() === service.ServiceAvail.toLowerCase()
+      ) || { Costs: defaultPricePerMin, Per: defaultPricingUnit };
+      
+      // Get cost rate
+      const ratePerUnit = Number(servicePricingInfo.Costs) || defaultPricePerMin;
+      const pricingUnit = servicePricingInfo.Per || defaultPricingUnit;
+      
+      // Calculate cost - simple conversion only
+      let adjustedCost;
+      if (pricingUnit.toLowerCase() === 'min') {
+        // If rate is per minute, just multiply
+        adjustedCost = ratePerUnit * operationMinutes;
+      } else if (pricingUnit.toLowerCase() === 'day') {
+        // If rate is per day, convert minutes to days
+        adjustedCost = ratePerUnit * (operationMinutes / minutesPerDay);
+      } else {
+        // Default is per hour, convert minutes to hours
+        adjustedCost = ratePerUnit * (operationMinutes / minutesPerHour);
+      }
+      
+      // Calculate rate per minute for display
+      const ratePerMinute = pricingUnit.toLowerCase() === 'min' 
+        ? ratePerUnit 
+        : pricingUnit.toLowerCase() === 'day' 
+          ? ratePerUnit / minutesPerDay 
+          : ratePerUnit / minutesPerHour;
+      
+      return {
+        ...service,
+        operationMinutes: operationMinutes,
+        adjustedCost: adjustedCost,
+        ratePerMinute: ratePerMinute,
+        originalCost: ratePerUnit,
+        pricingUnit: pricingUnit,
+        downtimeMinutes: null,
+        adjustedMins: null,
+        originalMins: null,
+        bookedMinutes: null
+      } as AdjustedUserService;
+    });
+    
+    console.log('Adjusted Services:', adjustedServices);
+    setAdjustedUserServices(adjustedServices);
+  };
+
+  const getUniqueOperatingTimes = (operatingTimes: OperatingTime[]) => {
+    const seen = new Set();
+    return operatingTimes.filter(op => {
+      const key = `${op.OTDate}-${op.OTStartTime}-${op.OTEndTime}-${op.OTMachineOp}`;
+      if (seen.has(key)) {
+        console.warn("Removing duplicate operating time:", key);
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+  };
+
+  // Helper function for cost calculation - simple conversion only
+  const calculateCostFromMinutes = (minutes: number, baseCost: number, unit?: string) => {
+    const pricingUnit = unit?.toLowerCase() || defaultPricingUnit;
+    switch(pricingUnit) {
+      case 'min': return baseCost * minutes;
+      case 'day': return baseCost * (minutes / minutesPerDay);
+      default: return baseCost * (minutes / minutesPerHour); // hour
+    }
+  };
+
   const calculateCorrectTotalBookedMinutes = (): number => {
     if (!adjustedUserServices || !Array.isArray(adjustedUserServices)) {
       return 0;
@@ -305,7 +460,7 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
   };
 
   const correctTotalBookedMinutes = calculateCorrectTotalBookedMinutes();
-  const correctTotalBookedHours = (correctTotalBookedMinutes / 60).toFixed(1);
+  const correctTotalBookedHours = (correctTotalBookedMinutes / minutesPerHour).toFixed(1);
   
   // Calculate total from adjusted services
   const calculatedTotal = adjustedUserServices.reduce((sum, service) => {
@@ -329,184 +484,6 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
   const totalBookedMinutes = adjustedUserServices.reduce((sum, service) => 
     sum + (service.bookedMinutes || 0), 0);
 
-  // Calculate total downtime minutes
-  const totalDowntimeMinutes = adjustedUserServices.reduce((sum, service) => 
-    sum + (service.downtimeMinutes || 0), 0);
-  
-  // Calculate total downtime deduction
-  const totalDowntimeDeduction = adjustedUserServices.reduce((sum, service) => {
-    const originalCost = service.originalCost || 0;
-    const adjustedCost = service.adjustedCost || 0;
-    return sum + (originalCost - adjustedCost);
-  }, 0);
-    
-  // Function to fix the total in the database
-  const handleFixTotal = async () => {
-    if (!reservationId) return;
-    
-    try {
-      setIsFixing(true);
-      setFixError(null);
-      setFixSuccess(false);
-      
-      console.log(`Sending update request for reservation ${reservationId} with total: ${calculatedTotal}`);
-      
-      // Call the API to update the total in the database
-      const response = await fetch(`/api/admin/update-total/${reservationId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          totalAmount: calculatedTotal,
-          // Include adjusted service details
-          adjustedServices: adjustedUserServices.map(service => ({
-            id: service.id,
-            originalCost: service.originalCost,
-            adjustedCost: service.adjustedCost,
-            downtimeMinutes: service.downtimeMinutes
-          })),
-          // Include downtime summary
-          downtimeDetails: {
-            totalDowntimeMinutes,
-            totalDeduction: totalDowntimeDeduction
-          }
-        }),
-      });
-      
-      const result = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to update total amount');
-      }
-      
-      console.log('Update successful:', result);
-      setFixSuccess(true);
-      toast.success('Total amount updated successfully with downtime deductions');
-      
-      // Wait 1 second before reloading to show success message
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
-      
-    } catch (error) {
-      console.error('Error fixing total:', error);
-      setFixError(error instanceof Error ? error.message : 'Unknown error');
-      toast.error(`Failed to update: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setIsFixing(false);
-    }
-  };
-
-  // Add this special debug function to help diagnose the issue
-  const debugMachineUtilizations = () => {
-    console.log("=== DEBUG MACHINE UTILIZATIONS ===");
-    console.log("Total machine utilizations:", machineUtilizations.length);
-    
-    machineUtilizations.forEach((util, index) => {
-      console.log(`\nMachine #${index + 1}: ${util.Machine} (Service: ${util.ServiceName})`);
-      console.log(`Operating Times: ${util.OperatingTimes.length}`);
-      
-      util.OperatingTimes.forEach((ot, otIndex) => {
-        console.log(`  Time #${otIndex + 1}: ${ot.OTStartTime} to ${ot.OTEndTime} (${ot.OTDate})`);
-      });
-    });
-    
-    console.log("\n=== DEBUG USER SERVICES ===");
-    userServices.forEach((service, index) => {
-      console.log(`Service #${index + 1}: ${service.ServiceAvail} (Equipment: ${service.EquipmentAvail})`);
-    });
-  };
-
-  const calculateOperationTimeCosts = () => {
-    // Track total minutes per machine-service combination
-    const machineMinutes = new Map<string, number>();
-
-    machineUtilizations.forEach(util => {
-      if (!util.Machine || !util.ServiceName) return;
-
-      const machineKey = `${util.Machine}|${util.ServiceName}`;
-      
-      // Always process each machine-service combo
-      let machineTotal = 0;
-      
-      util.OperatingTimes.forEach(op => {
-        if (!op.OTStartTime || !op.OTEndTime) return;
-        
-        // Use the parsed time method to calculate duration
-        const startTime = parseMachineUtilizationTime(op.OTStartTime);
-        const endTime = parseMachineUtilizationTime(op.OTEndTime);
-        
-        const minutes = calculateDurationMinutes(startTime, endTime);
-        
-        machineTotal += minutes;
-        console.log(`Added ${minutes} mins for ${util.Machine} from ${startTime} to ${endTime}`);
-      });
-
-      machineMinutes.set(machineKey, machineTotal);
-    });
-
-    // Calculate grand total minutes only once
-    const grandTotalMinutes = Array.from(machineMinutes.values()).reduce((sum, mins) => sum + mins, 0);
-
-    // Get pricing info for the service
-    const servicePricingInfo = servicePricing.find(s => 
-      s.Service.toLowerCase() === '3d printing'
-    ) || { Costs: 0.07, Per: 'min' };
-
-    // Calculate costs
-    const ratePerMin = Number(servicePricingInfo.Costs) || 0.07;
-    const baseRatePerHour = 4.50; // ₱4.50/hour
-    const baseRatePerMin = baseRatePerHour / 60;
-
-    const adjustedServices = userServices.map(service => {
-      // Calculate service-specific totals 
-      const serviceMinutes = Array.from(machineMinutes.entries())
-        .filter(([key]) => key.includes(service.ServiceAvail))
-        .reduce((sum, [, mins]) => sum + mins, 0);
-
-      return {
-        ...service,
-        operationMinutes: serviceMinutes,
-        adjustedCost: (ratePerMin + baseRatePerMin) * serviceMinutes,
-        ratePerMinute: ratePerMin + baseRatePerMin,
-        originalCost: servicePricingInfo.Costs,
-        pricingUnit: servicePricingInfo.Per || 'min',
-        downtimeMinutes: null,
-        adjustedMins: null,
-        originalMins: null,
-        bookedMinutes: null
-      } as AdjustedUserService;
-    });
-
-    console.log('Grand total minutes:', grandTotalMinutes);
-    console.log('Adjusted Services:', adjustedServices);
-    setAdjustedUserServices(adjustedServices);
-  };
-
-  const getUniqueOperatingTimes = (operatingTimes: OperatingTime[]) => {
-    const seen = new Set();
-    return operatingTimes.filter(op => {
-      const key = `${op.OTDate}-${op.OTStartTime}-${op.OTEndTime}-${op.OTMachineOp}`;
-      if (seen.has(key)) {
-        console.warn("Removing duplicate operating time:", key);
-        return false;
-      }
-      seen.add(key);
-      return true;
-    });
-  };
-
-  // Helper function for cost calculation
-  const calculateCostFromMinutes = (minutes: number, baseCost: number, unit?: string) => {
-    const pricingUnit = unit?.toLowerCase() || 'hour';
-    switch(pricingUnit) {
-      case 'min': return baseCost * minutes;
-      case 'day': return baseCost * (minutes / 1440);
-      default: return baseCost * (minutes / 60); // hour
-    }
-  };
-
   // Updated recalculateOperationTimes to include alert feedback
   const recalculateOperationTimes = () => {
     console.log('Manual recalculation triggered');
@@ -518,6 +495,84 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
     } else if (reservationStatus === 'Pending Admin Approval' || reservationStatus === 'Approved') {
       calculateBookedCosts();
       alert('Booked times have been recalculated.');
+    }
+  };
+  
+  // Function to fix the total in the database
+  const handleFixTotal = async () => {
+    if (!reservationId) return;
+    
+    try {
+      setIsFixing(true);
+      setFixError(null);
+      setFixSuccess(false);
+      
+      console.log(`Sending update request for reservation ${reservationId} with total: ${calculatedTotal}`);
+      
+      // Simple payload with just essential data
+      const payload = {
+        totalAmount: calculatedTotal,
+        // Keep the service information minimal
+        services: adjustedUserServices.map(service => ({
+          id: service.id,
+          minutes: reservationStatus === 'Ongoing' 
+            ? service.operationMinutes 
+            : service.bookedMinutes
+        }))
+      };
+      
+      console.log("Sending payload:", payload);
+      
+      // Call the API to update the total in the database
+      const response = await fetch(`/api/admin/update-total/${reservationId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+      
+      // Safely handle the response
+      let result;
+      try {
+        const text = await response.text();
+        console.log("Raw response:", text);
+        
+        // Try to parse the response as JSON if possible
+        try {
+          result = JSON.parse(text);
+        } catch {
+          // If it's not valid JSON, use the text as is
+          result = { message: text };
+        }
+      } catch (readError) {
+        console.error("Error reading response:", readError);
+        // If reading fails, use a generic error message
+        throw new Error(`Failed to read response: ${response.statusText}`);
+      }
+      
+      if (!response.ok) {
+        // Use result.error or result.message if available
+        const errorMessage = result?.error || result?.message || response.statusText || 'Failed to update total amount';
+        throw new Error(errorMessage);
+      }
+      
+      console.log('Update successful:', result);
+      setFixSuccess(true);
+      toast.success('Total amount updated successfully');
+      
+      // Wait 1 second before reloading to show success message
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+      
+    } catch (error) {
+      console.error('Error fixing total:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      setFixError(errorMsg);
+      toast.error(`Failed to update: ${errorMsg}`);
+    } finally {
+      setIsFixing(false);
     }
   };
 
@@ -538,7 +593,7 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
           {/* Group services by name */}
           {Array.from(new Set(adjustedUserServices.map(s => s.ServiceAvail))).map((serviceName, index) => {
             const services = adjustedUserServices.filter(s => s.ServiceAvail === serviceName);
-            const totalMinutes = services.reduce((sum, s) => sum + (s.operationMinutes || 0), 0);
+            const totalMinutes = services.reduce((sum, s) => sum + (s.operationMinutes || s.bookedMinutes || 0), 0);
             const totalCost = services.reduce((sum, s) => sum + (s.adjustedCost || 0), 0);
             const firstService = services[0];
 
@@ -553,46 +608,31 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
                       <div key={i} className="text-sm text-gray-600">
                         <div className="flex items-center">
                           <span>Equipment: {service.EquipmentAvail}</span>
-                          {reservationStatus === 'Ongoing' && (
+                          {reservationStatus === 'Ongoing' && service.operationMinutes && (
                             <Badge variant="outline" className="ml-2 text-xs">
                               {service.operationMinutes} mins
                             </Badge>
                           )}
+                          {(reservationStatus === 'Pending Admin Approval' || reservationStatus === 'Approved') && service.bookedMinutes && (
+                            <Badge variant="outline" className="ml-2 text-xs">
+                              {service.bookedMinutes} mins
+                            </Badge>
+                          )}
                         </div>
-                        {reservationStatus === 'Ongoing' && (
-                        <div className="text-xs text-gray-500">
-                          Rate: {formatPrice(service.ratePerMinute)}/min
-                        </div>
-                      )}
                       </div>
                     ))}
                   </div>
-
-                  {/* Show rate information */}
-                  {reservationStatus === 'Ongoing' && (
-                    <div className="text-xs text-gray-500 mt-2">
-                      Rate: {formatPrice(firstService.ratePerMinute)}/min
-                    </div>
-                  )}
-                  {(reservationStatus === 'Pending Admin Approval' || reservationStatus === 'Approved') && (
-                    <div className="mt-2 text-sm">
-                      <span className="text-gray-600">
-                        Base rate: {formatPrice(firstService.originalCost)}/{firstService.pricingUnit || 'hour'}
-                      </span>
-                    </div>
-                  )}
                 </div>
                 
                 <div className="text-right">
                   <span className="font-medium">{formatPrice(totalCost)}</span>
-                    {/* Time display only for ongoing reservations */}
                 </div>
               </div>
             );
           })}
 
           <Separator className="my-3" />
-
+          
           {/* Summary section */}
           {reservationStatus === 'Ongoing' ? (
             <div className="bg-blue-50 p-2 rounded-md mb-2">
@@ -604,7 +644,7 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
                   </span>
                   <span>
                     {totalOperationMinutes} mins 
-                    ({Math.round(totalOperationMinutes / 60 * 10) / 10} hrs)
+                    ({Math.round(totalOperationMinutes / minutesPerHour * 10) / 10} hrs)
                   </span>
                 </div>
                 <Button 
@@ -628,7 +668,7 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
                   </span>
                   <span>
                     {totalBookedMinutes} mins 
-                    ({Math.round(totalBookedMinutes / 60 * 10) / 10} hrs)
+                    ({Math.round(totalBookedMinutes / minutesPerHour * 10) / 10} hrs)
                   </span>
                 </div>
               </div>
@@ -690,34 +730,6 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
                 {fixError && (
                   <div className="text-sm text-red-600 bg-red-50 p-2 rounded">
                     Error: {fixError}
-                  </div>
-                )}
-
-                {reservationStatus === 'Ongoing' && (
-                  <div className="mt-4 p-3 bg-gray-100 rounded">
-                    <h4 className="font-bold mb-2">Time Data Debug</h4>
-                    {machineUtilizations.map((util, i) => (
-                      <div key={`debug-${i}`} className="mb-4">
-                        <p><strong>Machine:</strong> {util.Machine}</p>
-                        <p><strong>Service:</strong> {util.ServiceName}</p>
-                        <div className="ml-4">
-                          {util.OperatingTimes.map((op, j) => (
-                            <div key={`debug-op-${j}`} className="text-sm">
-                              <p>
-                                Time {j+1}: {op.OTStartTime} → {op.OTEndTime} 
-                                (Parsed: {parseMachineUtilizationTime(op.OTStartTime)} to {parseMachineUtilizationTime(op.OTEndTime)})
-                              </p>
-                              <p className="ml-4">
-                                Calculated: {calculateDurationMinutes(
-                                  parseMachineUtilizationTime(op.OTStartTime),
-                                  parseMachineUtilizationTime(op.OTEndTime)
-                                )} minutes
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
                   </div>
                 )}
               </div>

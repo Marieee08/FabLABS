@@ -115,6 +115,32 @@ const MachineUtilization: React.FC<MachineUtilizationProps> = ({
     const formatMinute = (minute) => {
       return minute.toString().padStart(2, '0');
     };
+    const initializeFromServices = () => {
+      // Create initial machine utilization records based on user services
+      const initialMachineUtilizations = userServices
+        .filter(service => service.EquipmentAvail) // Only include services with equipment
+        .map(service => ({
+          id: undefined, // No ID for new records
+          Machine: service.EquipmentAvail,
+          ReviewedBy: '', // For UI display
+          ReviwedBy: '', // For backend consistency
+          MachineApproval: null,
+          DateReviewed: new Date().toISOString().split('T')[0],
+          ServiceName: service.ServiceAvail,
+          utilReqId: reservationId,
+          OperatingTimes: [], // Start with empty arrays
+          DownTimes: [],
+          RepairChecks: []
+        }));
+      
+      // Only set if we have services with equipment
+      if (initialMachineUtilizations.length > 0) {
+        setMachineUtilizations(initialMachineUtilizations);
+      } else {
+        // If no services with equipment found, show appropriate message
+        setError('No equipment services found for this reservation.');
+      }
+    };
     const parseTimeString = (timeString) => {
       if (!timeString) return { hour: 8, minute: 0 };
       
@@ -253,6 +279,79 @@ useEffect(() => {
       setError('Failed to initialize machine utilization data. Please try again.');
       setLoading(false);
     }
+  };
+
+  const calculateMinutesBetween = (startTime: string | null, endTime: string | null): number => {
+    if (!startTime || !endTime) return 0;
+    
+    try {
+      const [startHour, startMinute] = startTime.split(':').map(Number);
+      const [endHour, endMinute] = endTime.split(':').map(Number);
+      
+      // Convert hours to minutes and add the minutes
+      const startTotalMinutes = startHour * 60 + startMinute;
+      const endTotalMinutes = endHour * 60 + endMinute;
+      
+      // Calculate the difference
+      const durationMinutes = endTotalMinutes - startTotalMinutes;
+      
+      // Return 0 if negative (invalid time range)
+      return durationMinutes > 0 ? durationMinutes : 0;
+    } catch (e) {
+      console.error('Error calculating minutes between times:', e);
+      return 0;
+    }
+  };
+
+  const calculateTotalOperatingMinutes = (operatingTimes: OperatingTime[]): number => {
+    return operatingTimes.reduce((total, ot) => {
+      return total + calculateMinutesBetween(ot.OTStartTime, ot.OTEndTime);
+    }, 0);
+  };
+  
+  const renderOperatingStatistics = (machineUtil: MachineUtilization): React.ReactNode => {
+    const totalOperatingMinutes = calculateTotalOperatingMinutes(machineUtil.OperatingTimes);
+    const hours = Math.floor(totalOperatingMinutes / 60);
+    const minutes = totalOperatingMinutes % 60;
+    
+    // Calculate total down time
+    const totalDownTimeMinutes = machineUtil.DownTimes.reduce((total, dt) => {
+      return total + (dt.DTTime || 0);
+    }, 0);
+    
+    // Calculate net operating time
+    const netOperatingMinutes = Math.max(0, totalOperatingMinutes - totalDownTimeMinutes);
+    const netHours = Math.floor(netOperatingMinutes / 60);
+    const netMinutes = netOperatingMinutes % 60;
+    
+    // Calculate efficiency if there are operating minutes
+    const efficiency = totalOperatingMinutes > 0 
+      ? ((netOperatingMinutes / totalOperatingMinutes) * 100).toFixed(1) 
+      : '0.0';
+    
+    return (
+      <div className="bg-gray-50 p-3 rounded-lg my-4">
+        <h5 className="font-medium text-sm mb-2">Machine Statistics</h5>
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <p className="text-gray-600">Total Operating Time:</p>
+            <p className="font-medium">{hours}h {minutes}m ({totalOperatingMinutes} minutes)</p>
+          </div>
+          <div>
+            <p className="text-gray-600">Total Down Time:</p>
+            <p className="font-medium">{Math.floor(totalDownTimeMinutes / 60)}h {totalDownTimeMinutes % 60}m ({totalDownTimeMinutes} minutes)</p>
+          </div>
+          <div>
+            <p className="text-gray-600">Net Operating Time:</p>
+            <p className="font-medium">{netHours}h {netMinutes}m ({netOperatingMinutes} minutes)</p>
+          </div>
+          <div>
+            <p className="text-gray-600">Machine Efficiency:</p>
+            <p className="font-medium">{efficiency}%</p>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const formatTimeStringFromISO = (isoString: string): string => {
@@ -400,6 +499,19 @@ useEffect(() => {
           alert('Operating times must be between 8:00 AM and 5:00 PM');
           return; // Exit without updating
         }
+        
+        // Get the current operating time record
+        const currentOperatingTime = machineUtilizations[machineIndex].OperatingTimes[otIndex];
+        
+        // Determine which times to use for validation
+        const startTime = field === 'OTStartTime' ? value : currentOperatingTime.OTStartTime;
+        const endTime = field === 'OTEndTime' ? value : currentOperatingTime.OTEndTime;
+        
+        // Validate that end time is after start time
+        if (startTime && endTime && startTime >= endTime) {
+          alert('End time must be after start time');
+          return; // Exit without updating
+        }
       }
     
       // If we get here, either it's not a time field or the time is valid
@@ -409,6 +521,7 @@ useEffect(() => {
         return updated;
       });
     };
+    
   
     // Update downtime information
     const handleUpdateDownTime = (machineIndex: number, dtIndex: number, field: string, value: any) => {
