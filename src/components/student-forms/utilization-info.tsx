@@ -275,16 +275,15 @@ export default function UtilizationInfo({
           <div className="py-3 text-red-500">{serviceError}</div>
         ) : (
           <ServiceSelector 
-            selectedServices={
-              typeof formData.ProductsManufactured === 'string' 
-                ? [formData.ProductsManufactured] 
-                : formData.ProductsManufactured
-            }
-            onChange={handleServiceChange}
-            hasError={!!errors.service}
-            errorMessage={errors.service}
-            singleSelect={true}
-          />
+                selectedServices={typeof formData.ProductsManufactured === 'string'
+                  ? [formData.ProductsManufactured]
+                  : formData.ProductsManufactured}
+                onChange={handleServiceChange}
+                hasError={!!errors.service}
+                errorMessage={errors.service}
+                singleSelect={true} onBlur={function (): void {
+                  throw new Error('Function not implemented.');
+                } }          />
         )}
       </div>
 
