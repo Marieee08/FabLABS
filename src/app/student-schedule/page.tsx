@@ -297,7 +297,6 @@ export default function Schedule() {
             formData={formData} 
             updateFormData={updateFormData} 
             nextStep={nextStep} 
-            prevStep={prevStep} 
           />
         );
     }
