@@ -69,18 +69,15 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose, is
         const reservationsRes = await fetch('/api/user/calendar-reservations');
         const reservationsData = await reservationsRes.json();
         
-        // Log ALL reservations for debugging
-        console.log('ALL RESERVATIONS:', JSON.stringify(reservationsData, null, 2));
+        // Fetch all blocked dates
+        const blockedDatesRes = await fetch('/api/blocked-dates');
+        const blockedDatesData = await blockedDatesRes.json();
         
-        // Less restrictive filtering
+        // Filter to only include approved and ongoing reservations
         const filteredReservations = reservationsData.filter((res: Reservation) => 
-          res.machines && 
-          res.machines.length > 0 && 
-          res.machines.some(machine => machine !== 'Not specified')
+          ['Approved', 'Ongoing'].includes(res.status) && 
+          res.machines.some(machine => machine !== 'Not specified' && machine)
         );
-        
-        console.log('FILTERED RESERVATIONS:', JSON.stringify(filteredReservations, null, 2));
-        
         
         // Calculate machine availability per date
         const availability: Record<string, Record<string, number>> = {};

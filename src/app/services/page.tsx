@@ -64,8 +64,6 @@ export default function Services() {
   const [isMachinesLoading, setIsMachinesLoading] = useState(true);
   const [isUserInfoLoaded, setIsUserInfoLoaded] = useState(false);
   const pricingRef = useRef<HTMLElement>(null);
-  
-  // Only use one state for calendar modal
   const [isCalendarModalOpen, setIsCalendarModalOpen] = useState(false);
 
   const handleButtonClick = () => {
