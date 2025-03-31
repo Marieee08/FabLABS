@@ -6,7 +6,7 @@ import Navbar from '@/components/custom/navbar';
 import UtilizationInfo from '@/components/student-forms/utilization-info';
 import ReviewSubmit from '@/components/student-forms/review-submit';
 import { toast } from "@/components/ui/use-toast";
-import DateTimeSelection from '@/components/msme-forms/date-time-selection';
+import DateTimeSelection from '@/components/student-forms/date-time-selection';
 import LabReservation from '@/components/student-forms/lab-reservation';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
