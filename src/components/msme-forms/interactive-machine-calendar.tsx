@@ -95,18 +95,19 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
     const fetchCalendarData = async () => {
       setIsLoading(true);
       try {
-        // Fetch all reservations
-        const reservationsRes = await fetch('/api/user/calendar-reservations');
-        const reservationsData = await reservationsRes.json();
+        // Fetch reservations from both UtilReq and EVCReservation
+        const [reservationsRes, blockedDatesRes] = await Promise.all([
+          fetch('/api/user/calendar-reservations'),
+          fetch('/api/blocked-dates')
+        ]);
         
-        // Fetch all blocked dates
-        const blockedDatesRes = await fetch('/api/blocked-dates');
+        const reservationsData = await reservationsRes.json();
         const blockedDatesData = await blockedDatesRes.json();
         
         // Filter to only include approved and ongoing reservations
         const filteredReservations = reservationsData.filter((res: Reservation) => 
           ['Approved', 'Ongoing'].includes(res.status) && 
-          res.type !== 'evc' &&
+          // Ensure the reserved machines are not just placeholders
           res.machines.some(machine => machine !== 'Not specified' && machine)
         );
         
@@ -150,63 +151,59 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
     }
   }, [selectedService, servicesData]);
 
-  // Calculate machine availability for each date based on reservations
-// In the InteractiveMachineCalendar component, update this useEffect
-// that calculates machine availability for each date
 
-useEffect(() => {
-  if (!selectedService || machinesForService.length === 0) {
-    setMachineAvailabilityMap({});
-    return;
-  }
-
-  // Calculate total machines available for this service
-  // UPDATED: Only count machines that are actually available (isAvailable !== false)
-  const totalMachinesForService = machinesForService.reduce((sum, machine) => 
-    machine.isAvailable !== false ? sum + (machine.Number || 1) : sum, 0);
-  
-  // Create a map to track machine usage by date
-  const dateUsageMap: Record<string, number> = {};
-  
-  // Process each reservation to determine machine usage by date
-  reservations.forEach(reservation => {
-    // Check if this reservation involves any machines from our service
-    const reservedMachines = reservation.machines.filter(machineName => 
-      machinesForService.some(m => m.id === machineName || m.Machine === machineName)
-    );
-    
-    if (reservedMachines.length > 0) {
-      // Use reservation date or extract from time slots
-      let dateStr = '';
-      if (reservation.timeSlots && reservation.timeSlots.length > 0 && reservation.timeSlots[0].startTime) {
-        dateStr = new Date(reservation.timeSlots[0].startTime).toDateString();
-      } else if (reservation.date) {
-        dateStr = new Date(reservation.date).toDateString();
-      }
-      
-      if (dateStr) {
-        // Count each machine separately
-        dateUsageMap[dateStr] = (dateUsageMap[dateStr] || 0) + reservedMachines.length;
-      }
+  useEffect(() => {
+    if (!selectedService || machinesForService.length === 0) {
+      setMachineAvailabilityMap({});
+      return;
     }
-  });
-  
-  // Create the availability map (total - used = available)
-  const availabilityMap: Record<string, number> = {};
-  
-  // Pre-populate availability map with a 3-month range
-  const today = new Date();
-  const threeMonthsLater = new Date();
-  threeMonthsLater.setMonth(today.getMonth() + 3);
-  
-  for (let date = new Date(today); date <= threeMonthsLater; date.setDate(date.getDate() + 1)) {
-    const dateStr = new Date(date).toDateString();
-    availabilityMap[dateStr] = totalMachinesForService - (dateUsageMap[dateStr] || 0);
-  }
-  
-  setMachineAvailabilityMap(availabilityMap);
-  
-}, [machinesForService, reservations, selectedService]);
+
+    // Calculate total machines available for this service
+    const totalMachinesForService = machinesForService.reduce((sum, machine) => 
+      machine.isAvailable !== false ? sum + (machine.Number || 1) : sum, 0);
+    
+    // Create a map to track machine usage by date
+    const dateUsageMap: Record<string, number> = {};
+    
+    // Process each reservation to determine machine usage by date
+    reservations.forEach(reservation => {
+      // Check if this reservation involves any machines from our service
+      const reservedMachines = reservation.machines.filter(machineName => 
+        machinesForService.some(m => m.id === machineName || m.Machine === machineName)
+      );
+      
+      if (reservedMachines.length > 0) {
+        // Use reservation date or extract from time slots
+        let dateStr = '';
+        if (reservation.timeSlots && reservation.timeSlots.length > 0 && reservation.timeSlots[0].startTime) {
+          dateStr = new Date(reservation.timeSlots[0].startTime).toDateString();
+        } else if (reservation.date) {
+          dateStr = new Date(reservation.date).toDateString();
+        }
+        
+        if (dateStr) {
+          // Count each machine separately
+          dateUsageMap[dateStr] = (dateUsageMap[dateStr] || 0) + reservedMachines.length;
+        }
+      }
+    });
+    
+    // Create the availability map (total - used = available)
+    const availabilityMap: Record<string, number> = {};
+    
+    // Pre-populate availability map with a 3-month range
+    const today = new Date();
+    const threeMonthsLater = new Date();
+    threeMonthsLater.setMonth(today.getMonth() + 3);
+    
+    for (let date = new Date(today); date <= threeMonthsLater; date.setDate(date.getDate() + 1)) {
+      const dateStr = new Date(date).toDateString();
+      availabilityMap[dateStr] = Math.max(0, totalMachinesForService - (dateUsageMap[dateStr] || 0));
+    }
+    
+    setMachineAvailabilityMap(availabilityMap);
+    
+  }, [machinesForService, reservations, selectedService]);
 
   // Process reservations and blocked dates into calendar events
   useEffect(() => {
@@ -999,7 +996,7 @@ export const InteractiveMachineCalendarWrapper = ({
         const data = await response.json();
         setServicesData(data);
       } catch (error) {
-        console.error('Error fetching services:', error);
+        console.error('Services fetch error:', error);
         toast({
           title: "Error",
           description: "Failed to load services data",
@@ -1054,7 +1051,6 @@ export const InteractiveMachineCalendarWrapper = ({
                 <p className="text-gray-600 mb-4">Please select a service first</p>
               </div>
             ) : (
-              // Show calendar for all services, regardless of machine quantity
               <InteractiveMachineCalendar
                 selectedService={selectedService}
                 machineQuantityNeeded={machineQuantityNeeded}
@@ -1070,5 +1066,7 @@ export const InteractiveMachineCalendarWrapper = ({
     </Card>
   );
 };
+
+
 
 export default InteractiveMachineCalendar;
