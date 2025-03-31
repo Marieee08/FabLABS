@@ -352,14 +352,19 @@ export default function LabReservation({ formData, updateFormData, nextStep, pre
       newErrors.service = "Please select a service";
     }
     
-    // Validate machine selection
-    if (selectedMachines.length === 0) {
+    // Validate machine selection only if the service has machines available
+    const currentService = selectedService;
+    const hasMachinesForService = currentService && 
+      availableMachines[currentService] && 
+      availableMachines[currentService].length > 0;
+      
+    if (hasMachinesForService && selectedMachines.length === 0) {
       newErrors.machines = "Please select at least one machine";
     }
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [formData, students, currentYear, selectedService, selectedMachines]);
+  }, [formData, students, currentYear, selectedService, selectedMachines, availableMachines]);
 
   // Handle form submission
   const handleSubmit = (e: React.FormEvent) => {
@@ -392,305 +397,297 @@ export default function LabReservation({ formData, updateFormData, nextStep, pre
 
   return (
     <div className="max-w-4xl mx-auto my-8 px-4">
-      <style>{inputStyles}</style>
-      <div className="bg-white p-8 rounded-lg shadow-md border border-gray-200">
-        <h2 className="text-2xl font-bold mb-6 text-blue-700 pb-3 border-b border-gray-200">Laboratory Reservation</h2>
-        
-        <form onSubmit={handleSubmit} noValidate>
-          {/* Service & Equipment Section - NEW */}
-          <section className="mb-10">
-            <div className="flex items-center mb-5">
-              <div className="bg-blue-100 p-2 rounded-full mr-3">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-800">Equipment & Materials</h3>
+    <style>{inputStyles}</style>
+    <div className="bg-white p-8 rounded-lg shadow-md border border-gray-200">
+      <h2 className="text-2xl font-bold mb-6 text-blue-700 pb-3 border-b border-gray-200">Laboratory Reservation</h2>
+      
+      <form onSubmit={handleSubmit} noValidate>
+        {/* Service & Equipment Section - NEW */}
+        <section className="mb-10">
+          <div className="flex items-center mb-5">
+            <div className="bg-blue-100 p-2 rounded-full mr-3">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+              </svg>
             </div>
+            <h3 className="text-lg font-semibold text-gray-800">Equipment & Materials</h3>
+          </div>
 
-            <div className="bg-gray-50 p-6 rounded-lg border border-gray-100">
-              {/* Service Selection */}
-              <div className="mb-6">
-                <label htmlFor="service" className="block text-sm font-medium mb-1 text-gray-700">
-                  Select Service <span className="text-red-500">*</span>
-                </label>
-                {isLoadingServices ? (
-                  <div className="h-12 bg-gray-100 animate-pulse rounded-lg"></div>
-                ) : (
-                  <select
-                    id="service"
-                    value={selectedService}
-                    onChange={handleServiceChange}
-                    className={`w-full border ${errors.service ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition`}
-                    aria-invalid={!!errors.service}
-                  >
-                    <option value="">-- Select a service --</option>
-                    {services.map(service => (
-                      <option key={service.id} value={service.Service}>
-                        {service.Service}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                {errors.service && <p className="mt-1 text-sm text-red-500">{errors.service}</p>}
-                {serviceError && <p className="mt-1 text-sm text-red-500">{serviceError}</p>}
-              </div>
-
-              {/* Machine Selection - Using the optimized component */}
-              <div>
-                <label className="block text-sm font-medium mb-3 text-gray-700">
-                  Available Equipment <span className="text-red-500">*</span>
-                </label>
-                
-                <OptimizedMachineSelector 
-                  selectedService={selectedService}
-                  availableMachines={availableMachines}
-                  initialSelectedMachines={selectedMachines}
-                  onMachineSelectionChange={handleMachineSelectionChange}
-                />
-                
-                {errors.machines && (
-                  <p className="mt-2 text-sm text-red-500">{errors.machines}</p>
-                )}
-              </div>
-            </div>
-          </section>
-
-          {/* Class Details */}
-          <section className="mb-10">
-            <div className="flex items-center mb-5">
-              <div className="bg-blue-100 p-2 rounded-full mr-3">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-800">Class Information</h3>
-            </div>
-            
-            <div className="bg-gray-50 p-6 rounded-lg border border-gray-100">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Level/Section */}
-                <div>
-                  <label htmlFor="lvlSec" className="block text-sm font-medium mb-1 text-gray-700">
-                    Level/Section <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    id="lvlSec"
-                    type="text"
-                    className={`w-full border ${errors.LvlSec ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition`}
-                    value={formData.LvlSec}
-                    onChange={(e) => handleFieldChange('LvlSec', e.target.value)}
-                    aria-invalid={!!errors.LvlSec}
-                    placeholder="e.g. Grade 10-A"
-                  />
-                  {errors.LvlSec && <p className="mt-1 text-sm text-red-500">{errors.LvlSec}</p>}
-                </div>
-                
-                {/* Subject */}
-                <div>
-                  <label htmlFor="subject" className="block text-sm font-medium mb-1 text-gray-700">
-                    Subject <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    id="subject"
-                    type="text"
-                    className={`w-full border ${errors.Subject ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition`}
-                    value={formData.Subject}
-                    onChange={(e) => handleFieldChange('Subject', e.target.value)}
-                    aria-invalid={!!errors.Subject}
-                    placeholder="e.g. Chemistry"
-                  />
-                  {errors.Subject && <p className="mt-1 text-sm text-red-500">{errors.Subject}</p>}
-                </div>
-                
-                {/* Teacher */}
-                <div>
-                  <label htmlFor="teacher" className="block text-sm font-medium mb-1 text-gray-700">
-                    Teacher <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    id="teacher"
-                    type="text"
-                    className={`w-full border ${errors.Teacher ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition`}
-                    value={formData.Teacher}
-                    onChange={(e) => handleFieldChange('Teacher', e.target.value)}
-                    aria-invalid={!!errors.Teacher}
-                    placeholder="e.g. Dr. Jane Smith"
-                  />
-                  {errors.Teacher && <p className="mt-1 text-sm text-red-500">{errors.Teacher}</p>}
-                </div>
-                
-                {/* Teacher Email */}
-                <div>
-                  <label htmlFor="teacherEmail" className="block text-sm font-medium mb-1 text-gray-700">
-                    Teacher Email <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    id="teacherEmail"
-                    type="email"
-                    className={`w-full border ${errors.TeacherEmail ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition`}
-                    value={formData.TeacherEmail}
-                    onChange={(e) => handleFieldChange('TeacherEmail', e.target.value)}
-                    aria-invalid={!!errors.TeacherEmail}
-                    placeholder="e.g. teacher@school.edu"
-                  />
-                  {errors.TeacherEmail && <p className="mt-1 text-sm text-red-500">{errors.TeacherEmail}</p>}
-                </div>
-                
-                {/* Topic */}
-                <div>
-                  <label htmlFor="topic" className="block text-sm font-medium mb-1 text-gray-700">
-                    Topic <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    id="topic"
-                    type="text"
-                    className={`w-full border ${errors.Topic ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition`}
-                    value={formData.Topic}
-                    onChange={(e) => handleFieldChange('Topic', e.target.value)}
-                    aria-invalid={!!errors.Topic}
-                    placeholder="e.g. Acid-Base Reactions"
-                  />
-                  {errors.Topic && <p className="mt-1 text-sm text-red-500">{errors.Topic}</p>}
-                </div>
-                
-                {/* School Year */}
-                <div>
-                  <label htmlFor="schoolYear" className="block text-sm font-medium mb-1 text-gray-700">
-                    School Year <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <input
-                      id="schoolYear"
-                      type="number"
-                      className={`w-full border ${errors.SchoolYear ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition no-spin-buttons`}
-                      value={formData.SchoolYear || ''}
-                      onChange={(e) => handleFieldChange('SchoolYear', parseInt(e.target.value) || 0)}
-                      min={currentYear - 5}
-                      max={currentYear + 5}
-                      aria-invalid={!!errors.SchoolYear}
-                      placeholder={`${currentYear}`}
-                    />
-                    {formData.SchoolYear > 0 && (
-                      <div className="absolute right-0 top-0 h-full flex items-center mr-4 pointer-events-none">
-                        <span className="text-gray-600 bg-gray-100 px-2 py-1 rounded font-medium">to {getEndYear(formData.SchoolYear)}</span>
-                      </div>
-                    )}
-                  </div>
-                  {errors.SchoolYear && <p className="mt-1 text-sm text-red-500">{errors.SchoolYear}</p>}
-                </div>
-              </div>
-            </div>
-          </section>
-          
-          {/* Students List */}
-          <section className="mb-10">
-            <div className="flex items-center mb-5">
-              <div className="bg-blue-100 p-2 rounded-full mr-3">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-800">Student Names <span className="text-red-500">*</span></h3>
-              <button
-                type="button"
-                onClick={addStudent}
-                className="ml-auto bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 text-sm font-medium flex items-center transition"
-                aria-label="Add new student"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
-                Add Student
-              </button>
-            </div>
-            
-            <div className="bg-gray-50 p-6 rounded-lg border border-gray-100">
-              {students.length > 0 ? (
-                <div className="space-y-3 max-h-64 overflow-y-auto rounded-md">
-                  {students.map((student, index) => (
-                    <div key={index} className="flex items-center bg-white p-3 rounded-lg shadow-sm">
-                      <span className="text-sm font-bold w-8 h-8 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center">{index + 1}</span>
-                      <div className="flex-1 mx-3">
-                      <input
-                          type="text"
-                          placeholder={`Student ${index + 1} name`}
-                          className={`w-full border ${errors.Students && errors.Students[index] ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition`}
-                          value={student.name}
-                          onChange={(e) => updateStudentName(index, e.target.value)}
-                          aria-invalid={!!(errors.Students && errors.Students[index])}
-                          disabled={index === 0 && user && student.name === `${user.firstName || ''} ${user.lastName || ''}`.trim()}
-                          ref={index === students.length - 1 && newStudentAdded ? newStudentInputRef : null}
-                        />
-                        {errors.Students && errors.Students[index] && (
-                          <p className="mt-1 text-sm text-red-500">{errors.Students[index]}</p>
-                        )}
-                      </div>
-                      {students.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeStudent(index)}
-                          className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 transition"
-                          aria-label={`Remove student ${index + 1}`}
-                          disabled={index === 0 && user && student.name === `${user.firstName || ''} ${user.lastName || ''}`.trim()}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
+          <div className="bg-gray-50 p-6 rounded-lg border border-gray-100">
+            {/* Service Selection */}
+            <div className="mb-6">
+              <label htmlFor="service" className="block text-sm font-medium mb-1 text-gray-700">
+                Select Service <span className="text-red-500">*</span>
+              </label>
+              {isLoadingServices ? (
+                <div className="h-12 bg-gray-100 animate-pulse rounded-lg"></div>
               ) : (
-                <div className="text-center py-8 bg-white rounded-lg border border-dashed border-gray-300">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                  </svg>
-                  <p className="mt-2 text-gray-500">No students added yet. Click "Add Student" to begin.</p>
-                </div>
+                <select
+                  id="service"
+                  value={selectedService}
+                  onChange={handleServiceChange}
+                  className={`w-full border ${errors.service ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition`}
+                  aria-invalid={!!errors.service}
+                >
+                  <option value="">-- Select a service --</option>
+                  {services.map(service => (
+                    <option key={service.id} value={service.Service}>
+                      {service.Service}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {errors.service && <p className="mt-1 text-sm text-red-500">{errors.service}</p>}
+              {serviceError && <p className="mt-1 text-sm text-red-500">{serviceError}</p>}
+            </div>
+
+            {/* Machine Selection - Using the optimized component */}
+            <div>
+              <label className="block text-sm font-medium mb-3 text-gray-700">
+                Available Equipment <span className="text-red-500">*</span>
+              </label>
+              
+              <OptimizedMachineSelector 
+                selectedService={selectedService}
+                availableMachines={availableMachines}
+                initialSelectedMachines={selectedMachines}
+                onMachineSelectionChange={handleMachineSelectionChange}
+              />
+              
+              {errors.machines && (
+                <p className="mt-2 text-sm text-red-500">{errors.machines}</p>
               )}
             </div>
-          </section>
+          </div>
+        </section>
 
-          {/* Navigation Buttons */}
-          <div className="mt-10 flex justify-between">
+        {/* Class Details */}
+        <section className="mb-10">
+          <div className="flex items-center mb-5">
+            <div className="bg-blue-100 p-2 rounded-full mr-3">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800">Class Information</h3>
+          </div>
+          
+          <div className="bg-gray-50 p-6 rounded-lg border border-gray-100">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Level/Section */}
+              <div>
+                <label htmlFor="lvlSec" className="block text-sm font-medium mb-1 text-gray-700">
+                  Level/Section <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="lvlSec"
+                  type="text"
+                  className={`w-full border ${errors.LvlSec ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition`}
+                  value={formData.LvlSec}
+                  onChange={(e) => handleFieldChange('LvlSec', e.target.value)}
+                  aria-invalid={!!errors.LvlSec}
+                  placeholder="e.g. Grade 10-A"
+                />
+                {errors.LvlSec && <p className="mt-1 text-sm text-red-500">{errors.LvlSec}</p>}
+              </div>
+              
+              {/* Subject */}
+              <div>
+                <label htmlFor="subject" className="block text-sm font-medium mb-1 text-gray-700">
+                  Subject <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="subject"
+                  type="text"
+                  className={`w-full border ${errors.Subject ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition`}
+                  value={formData.Subject}
+                  onChange={(e) => handleFieldChange('Subject', e.target.value)}
+                  aria-invalid={!!errors.Subject}
+                  placeholder="e.g. Chemistry"
+                />
+                {errors.Subject && <p className="mt-1 text-sm text-red-500">{errors.Subject}</p>}
+              </div>
+              
+              {/* Teacher */}
+              <div>
+                <label htmlFor="teacher" className="block text-sm font-medium mb-1 text-gray-700">
+                  Teacher <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="teacher"
+                  type="text"
+                  className={`w-full border ${errors.Teacher ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition`}
+                  value={formData.Teacher}
+                  onChange={(e) => handleFieldChange('Teacher', e.target.value)}
+                  aria-invalid={!!errors.Teacher}
+                  placeholder="e.g. Dr. Jane Smith"
+                />
+                {errors.Teacher && <p className="mt-1 text-sm text-red-500">{errors.Teacher}</p>}
+              </div>
+              
+              {/* Teacher Email */}
+              <div>
+                <label htmlFor="teacherEmail" className="block text-sm font-medium mb-1 text-gray-700">
+                  Teacher Email <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="teacherEmail"
+                  type="email"
+                  className={`w-full border ${errors.TeacherEmail ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition`}
+                  value={formData.TeacherEmail}
+                  onChange={(e) => handleFieldChange('TeacherEmail', e.target.value)}
+                  aria-invalid={!!errors.TeacherEmail}
+                  placeholder="e.g. teacher@school.edu"
+                />
+                {errors.TeacherEmail && <p className="mt-1 text-sm text-red-500">{errors.TeacherEmail}</p>}
+              </div>
+              
+              {/* Topic */}
+              <div>
+                <label htmlFor="topic" className="block text-sm font-medium mb-1 text-gray-700">
+                  Topic <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="topic"
+                  type="text"
+                  className={`w-full border ${errors.Topic ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition`}
+                  value={formData.Topic}
+                  onChange={(e) => handleFieldChange('Topic', e.target.value)}
+                  aria-invalid={!!errors.Topic}
+                  placeholder="e.g. Acid-Base Reactions"
+                />
+                {errors.Topic && <p className="mt-1 text-sm text-red-500">{errors.Topic}</p>}
+              </div>
+              
+              {/* School Year */}
+              <div>
+                <label htmlFor="schoolYear" className="block text-sm font-medium mb-1 text-gray-700">
+                  School Year <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    id="schoolYear"
+                    type="number"
+                    className={`w-full border ${errors.SchoolYear ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition no-spin-buttons`}
+                    value={formData.SchoolYear || ''}
+                    onChange={(e) => handleFieldChange('SchoolYear', parseInt(e.target.value) || 0)}
+                    min={currentYear - 5}
+                    max={currentYear + 5}
+                    aria-invalid={!!errors.SchoolYear}
+                    placeholder={`${currentYear}`}
+                  />
+                  {formData.SchoolYear > 0 && (
+                    <div className="absolute right-0 top-0 h-full flex items-center mr-4 pointer-events-none">
+                      <span className="text-gray-600 bg-gray-100 px-2 py-1 rounded font-medium">to {getEndYear(formData.SchoolYear)}</span>
+                    </div>
+                  )}
+                </div>
+                {errors.SchoolYear && <p className="mt-1 text-sm text-red-500">{errors.SchoolYear}</p>}
+              </div>
+            </div>
+          </div>
+        </section>
+        
+        {/* Students List */}
+        <section className="mb-10">
+          <div className="flex items-center mb-5">
+            <div className="bg-blue-100 p-2 rounded-full mr-3">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-800">Student Names <span className="text-red-500">*</span></h3>
             <button
               type="button"
-              onClick={prevStep}
-              className="bg-gray-600 text-white px-6 py-3 rounded-lg hover:bg-gray-700 font-medium transition flex items-center"
-              disabled={isSubmitting}
+              onClick={addStudent}
+              className="ml-auto bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 text-sm font-medium flex items-center transition"
+              aria-label="Add new student"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
               </svg>
-              Previous
-            </button>
-            <button
-              type="submit"
-              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-medium transition flex items-center"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Processing...
-                </>
-              ) : (
-                <>
-                  Next
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </>
-              )}
+              Add Student
             </button>
           </div>
-        </form>
-      </div>
+          
+          <div className="bg-gray-50 p-6 rounded-lg border border-gray-100">
+            {students.length > 0 ? (
+              <div className="space-y-3 max-h-64 overflow-y-auto rounded-md">
+                {students.map((student, index) => (
+                  <div key={index} className="flex items-center bg-white p-3 rounded-lg shadow-sm">
+                    <span className="text-sm font-bold w-8 h-8 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center">{index + 1}</span>
+                    <div className="flex-1 mx-3">
+                    <input
+                        type="text"
+                        placeholder={`Student ${index + 1} name`}
+                        className={`w-full border ${errors.Students && errors.Students[index] ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition`}
+                        value={student.name}
+                        onChange={(e) => updateStudentName(index, e.target.value)}
+                        aria-invalid={!!(errors.Students && errors.Students[index])}
+                        disabled={index === 0 && user && student.name === `${user.firstName || ''} ${user.lastName || ''}`.trim()}
+                        ref={index === students.length - 1 && newStudentAdded ? newStudentInputRef : null}
+                      />
+                      {errors.Students && errors.Students[index] && (
+                        <p className="mt-1 text-sm text-red-500">{errors.Students[index]}</p>
+                      )}
+                    </div>
+                    {students.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeStudent(index)}
+                        className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 transition"
+                        aria-label={`Remove student ${index + 1}`}
+                        disabled={index === 0 && user && student.name === `${user.firstName || ''} ${user.lastName || ''}`.trim()}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 bg-white rounded-lg border border-dashed border-gray-300">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+                <p className="mt-2 text-gray-500">No students added yet. Click "Add Student" to begin.</p>
+              </div>
+            )}
+          </div>
+        </section>
+
+
+        {/* Navigation Buttons */}
+        <div className="mt-10 flex justify-between">
+          {/* Previous button removed intentionally */}
+          <div></div> {/* Empty div to maintain spacing */}
+          <button
+            type="submit"
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-medium transition flex items-center"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Processing...
+              </>
+            ) : (
+              <>
+                Next
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </>
+            )}
+          </button>
+        </div>
+      </form>
     </div>
-  );
+  </div>
+);
 }

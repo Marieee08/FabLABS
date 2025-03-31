@@ -979,6 +979,7 @@ useEffect(() => {
 };
 
 // Wrapper component that can be used in the MSME scheduling flow
+
 export const InteractiveMachineCalendarWrapper = ({ 
   formData, 
   updateFormData 
@@ -1028,7 +1029,7 @@ export const InteractiveMachineCalendarWrapper = ({
       ? formData.ProductsManufactured[0]
       : '';
 
-  // Determine machine quantity needed
+  // Determine machine quantity needed - defaults to 0 if no machines are tied to the service
   const machineQuantityNeeded = selectedService && formData.serviceMachineNumbers 
     ? formData.serviceMachineNumbers[selectedService] || 0
     : 0;
@@ -1050,15 +1051,10 @@ export const InteractiveMachineCalendarWrapper = ({
               <div className="p-6 text-center">
                 <AlertCircle className="h-10 w-10 text-amber-500 mx-auto mb-3" />
                 <h3 className="text-lg font-medium text-gray-900 mb-1">Service Selection Required</h3>
-                <p className="text-gray-600 mb-4">Please select a service and specify machine quantity first</p>
-              </div>
-            ) : machineQuantityNeeded <= 0 ? (
-              <div className="p-6 text-center">
-                <AlertCircle className="h-10 w-10 text-amber-500 mx-auto mb-3" />
-                <h3 className="text-lg font-medium text-gray-900 mb-1">Machine Quantity Required</h3>
-                <p className="text-gray-600 mb-4">Please specify how many machines you need for this service</p>
+                <p className="text-gray-600 mb-4">Please select a service first</p>
               </div>
             ) : (
+              // Show calendar for all services, regardless of machine quantity
               <InteractiveMachineCalendar
                 selectedService={selectedService}
                 machineQuantityNeeded={machineQuantityNeeded}
