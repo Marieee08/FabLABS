@@ -7,13 +7,14 @@ import UtilizationInfo from '@/components/student-forms/utilization-info';
 import ReviewSubmit from '@/components/student-forms/review-submit';
 import { toast } from "@/components/ui/use-toast";
 import DateTimeSelection from '@/components/msme-forms/date-time-selection';
-import { LabReservation } from '@/components/student-forms/lab-reservation';
+import LabReservation from '@/components/student-forms/lab-reservation';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const MAX_DATES = 5;
 
 // Material interface definition
 interface Material {
+  id: string;
   Item: string;
   ItemQty: number;
   Description: string;
@@ -73,7 +74,7 @@ export default function Schedule() {
     unifiedEndTime: null,
 
     // Initialize UtilizationInfo fields
-    ProductsManufactured: [],
+    ProductsManufactured: "",  // Changed to string instead of array for simplicity
     BulkofCommodity: '',
     Equipment: [],
     Tools: '',
@@ -179,8 +180,8 @@ export default function Schedule() {
   // Memoize the step title to avoid recalculation
   const getStepTitle = useCallback(() => {
     switch(step) {
-      case 1: return "Service Information & Date Selection";
-      case 2: return "Lab Reservation";
+      case 1: return "Lab Reservation";
+      case 2: return "Date & Time Selection";
       case 3: return "Review & Submit";
       default: return "Schedule a Service";
     }
@@ -196,37 +197,9 @@ export default function Schedule() {
         </div>
       );
     }
-
+  
     switch(step) {
       case 1:
-        return (
-          <div className="space-y-12">
-            {/* Utilization Info comes first */}
-            <div className="border rounded-lg bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold text-blue-700 mb-6">Utilization Information</h2>
-              <UtilizationInfo 
-                formData={formData} 
-                updateFormData={updateFormData} 
-                nextStep={() => {}} // No-op since we're on the same page
-                prevStep={() => {}} // No-op since we're on the same page
-                standalonePage={false} // Hide navigation buttons
-              />
-            </div>
-            
-            {/* Calendar Selection comes after */}
-            <div className="border rounded-lg bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold text-blue-700 mb-6">Select Date & Time</h2>
-              <DateTimeSelection
-                formData={formData}
-                setFormData={setFormData}
-                nextStep={nextStep}
-                isDateBlocked={isDateBlocked}
-                maxDates={MAX_DATES}
-              />
-            </div>
-          </div>
-        );
-      case 2:
         return (
           <LabReservation 
             formData={formData} 
@@ -234,6 +207,19 @@ export default function Schedule() {
             nextStep={nextStep} 
             prevStep={prevStep} 
           />
+        );
+      case 2:
+        return (
+          <div className="border rounded-lg bg-white p-6 shadow-sm">
+            <h2 className="text-xl font-semibold text-blue-700 mb-6">Select Date & Time</h2>
+            <DateTimeSelection
+              formData={formData}
+              setFormData={setFormData}
+              nextStep={nextStep}
+              isDateBlocked={isDateBlocked}
+              maxDates={MAX_DATES}
+            />
+          </div>
         );
       case 3:
         return (
@@ -246,31 +232,12 @@ export default function Schedule() {
         );
       default:
         return (
-          <div className="space-y-12">
-            {/* Utilization Info comes first */}
-            <div className="border rounded-lg bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold text-blue-700 mb-6">Utilization Information</h2>
-              <UtilizationInfo 
-                formData={formData} 
-                updateFormData={updateFormData} 
-                nextStep={() => {}} // No-op since we're on the same page
-                prevStep={() => {}} // No-op since we're on the same page
-                standalonePage={false} // Hide navigation buttons
-              />
-            </div>
-            
-            {/* Calendar Selection comes after */}
-            <div className="border rounded-lg bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold text-blue-700 mb-6">Select Date & Time</h2>
-              <DateTimeSelection
-                formData={formData}
-                setFormData={setFormData}
-                nextStep={nextStep}
-                isDateBlocked={isDateBlocked}
-                maxDates={MAX_DATES}
-              />
-            </div>
-          </div>
+          <LabReservation 
+            formData={formData} 
+            updateFormData={updateFormData} 
+            nextStep={nextStep} 
+            prevStep={prevStep} 
+          />
         );
     }
   }, [step, isLoading, formData, nextStep, prevStep, updateFormData, isDateBlocked]);
