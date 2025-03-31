@@ -5,7 +5,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Clock, School, Book, User, CreditCard, FileText, Settings, Tools } from 'lucide-react';
+import { CheckCircle, Clock, School, Book, User, CreditCard, FileText } from 'lucide-react';
 import Link from 'next/link';
 
 interface ClientInfo {
@@ -456,95 +456,6 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
       <Card className="bg-white shadow-sm border border-gray-200 mt-6">
         
         <CardContent className="pt-0">
-          {/* Utilization Information - Added Section */}
-          <div className="mb-6">
-            <h3 className="text-lg font-medium mb-3 flex items-center">
-              <Settings className="h-5 w-5 text-blue-600 mr-2" /> Service Information
-            </h3>
-            <Card className="border-gray-200 shadow-none">
-              <CardContent className="p-4">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Services to be Availed</p>
-                    <div className="mt-1">
-                      {Array.isArray(formData.ProductsManufactured) && formData.ProductsManufactured.length > 0 ? (
-                        <div className="flex flex-wrap gap-2">
-                          {formData.ProductsManufactured.map((service, idx) => (
-                            <span key={idx} className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-sm">
-                              {service}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="text-gray-500">No services selected</p>
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Equipment</p>
-                    {Array.isArray(formData.Equipment) && formData.Equipment.length > 0 ? (
-                      <div className="mt-1 flex flex-wrap gap-2">
-                        {formData.Equipment.map((equipment, idx) => (
-                          <span key={idx} className="bg-green-50 text-green-700 px-3 py-1 rounded-full text-sm">
-                            {equipment}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="mt-1 text-gray-800">Not selected</p>
-                    )}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Tools</p>
-                    {formData.Tools ? (
-                      <div className="mt-1 flex flex-wrap gap-2">
-                        {(() => {
-                          // Try to parse the tools if it's a JSON string
-                          let toolsArray = [];
-                          try {
-                            if (typeof formData.Tools === 'string' && 
-                                (formData.Tools.startsWith('[') && formData.Tools.includes('Tool'))) {
-                              toolsArray = JSON.parse(formData.Tools);
-                            } else if (Array.isArray(formData.Tools)) {
-                              toolsArray = formData.Tools;
-                            } else {
-                              toolsArray = [formData.Tools];
-                            }
-                          } catch (e) {
-                            // If parsing fails, treat as a single string
-                            toolsArray = [String(formData.Tools)];
-                          }
-
-                          // Display the tools
-                          return toolsArray.map((tool, idx) => {
-                            let toolName = '';
-                            let quantity = 1;
-                            
-                            // Check if the tool is an object with a Tool property
-                            if (typeof tool === 'object' && tool !== null && 'Tool' in tool) {
-                              toolName = tool.Tool;
-                              quantity = tool.Quantity || 1;
-                            } else {
-                              toolName = String(tool);
-                            }
-                            
-                            return (
-                              <span key={idx} className="bg-amber-50 text-amber-700 px-3 py-1 rounded-full text-sm">
-                                {toolName} {quantity > 1 ? `(${quantity})` : ''}
-                              </span>
-                            );
-                          });
-                        })()}
-                      </div>
-                    ) : (
-                      <p className="mt-1 text-gray-800">No tools selected</p>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
           {/* Dates and Times */}
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-3 flex items-center">
