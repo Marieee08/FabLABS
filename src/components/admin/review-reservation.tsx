@@ -327,13 +327,51 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
       return;
     }
   
+    // Find corresponding services for each machine utilization to get quantities
+    const machineToServiceMap = new Map();
+    
+    // First, map machines from services to their quantities
+    if (localReservation.UserServices && Array.isArray(localReservation.UserServices)) {
+      localReservation.UserServices.forEach(service => {
+        // Get machine information from the service
+        const machines = typeof service.EquipmentAvail === 'string' ? 
+          service.EquipmentAvail.split(',').map(m => m.trim()) : [];
+        
+        // For each machine, store the service that uses it
+        machines.forEach(machineName => {
+          if (machineName && machineName.toLowerCase() !== 'not specified') {
+            // Store reference to the service for this machine
+            machineToServiceMap.set(machineName, {
+              serviceName: service.ServiceAvail,
+              quantity: service.MinsAvail || 1, // Use MinsAvail as quantity or default to 1
+              cost: service.CostsAvail || 0
+            });
+          }
+        });
+      });
+    }
+  
+    console.log("Machine to service map:", Object.fromEntries(machineToServiceMap));
+  
     // Transform each machine utilization to the PDF format
     localReservation.MachineUtilizations.forEach((machineUtil) => {
+      // Get machine name, defaulting to Unknown if not present
+      const machineName = machineUtil.Machine || 'Unknown Machine';
+      
+      // Get service info from the map we created above
+      const serviceInfo = machineToServiceMap.get(machineName) || {
+        quantity: 1,
+        serviceName: machineUtil.ServiceName || 'Unspecified',
+        cost: 0
+      };
+  
       const pdfData = {
         id: machineUtil.id || localReservation.id,
-        Machine: machineUtil.Machine || 'Unknown Machine',
-        ReviewedBy: machineUtil.ReviwedBy || 'Unknown', // Note the spelling 'ReviwedBy' to match your interface
-        ServiceName: machineUtil.ServiceName || 'Unspecified',
+        Machine: machineName,
+        MachineQuantity: serviceInfo.quantity.toString(), // Add machine quantity
+        ReviewedBy: machineUtil.ReviwedBy || 'Unknown',
+        ServiceName: machineUtil.ServiceName || serviceInfo.serviceName || 'Unspecified',
+        ServiceCost: serviceInfo.cost,
         OperatingTimes: (machineUtil.OperatingTimes || []).map(ot => ({
           OTDate: ot.OTDate,
           OTTypeofProducts: ot.OTTypeofProducts || '',
@@ -357,6 +395,8 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
           RPPersonnel: rc.RPPersonnel || ''
         }))
       };
+  
+      console.log("Generating PDF with data:", pdfData);
   
       // Generate PDF for each machine
       downloadMachineUtilPDF(pdfData);
