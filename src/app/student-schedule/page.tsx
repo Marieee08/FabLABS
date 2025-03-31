@@ -6,7 +6,7 @@ import Navbar from '@/components/custom/navbar';
 import UtilizationInfo from '@/components/student-forms/utilization-info';
 import ReviewSubmit from '@/components/student-forms/review-submit';
 import { toast } from "@/components/ui/use-toast";
-import  DateTimeSelection from '@/components/msme-forms/date-time-selection';
+import DateTimeSelection from '@/components/msme-forms/date-time-selection';
 import LabReservation from '@/components/student-forms/lab-reservation';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -14,6 +14,7 @@ const MAX_DATES = 5;
 
 // Material interface definition
 interface Material {
+  id: string;
   Item: string;
   ItemQty: number;
   Description: string;
@@ -73,7 +74,7 @@ export default function Schedule() {
     unifiedEndTime: null,
 
     // Initialize UtilizationInfo fields
-    ProductsManufactured: [],
+    ProductsManufactured: "",  // Changed to string instead of array for simplicity
     BulkofCommodity: '',
     Equipment: [],
     Tools: '',
@@ -177,18 +178,16 @@ export default function Schedule() {
   }, []);
 
   // Memoize the step title to avoid recalculation
-
-const getStepTitle = useCallback(() => {
-  switch(step) {
-    case 1: return "Lab Reservation";
-    case 2: return "Date & Time Selection";
-    case 3: return "Review & Submit";
-    default: return "Schedule a Service";
-  }
-}, [step]);
+  const getStepTitle = useCallback(() => {
+    switch(step) {
+      case 1: return "Lab Reservation";
+      case 2: return "Date & Time Selection";
+      case 3: return "Review & Submit";
+      default: return "Schedule a Service";
+    }
+  }, [step]);
 
   // Memoize the step component to prevent unnecessary re-renders
-
   const currentStep = useMemo(() => {
     if (isLoading) {
       return (

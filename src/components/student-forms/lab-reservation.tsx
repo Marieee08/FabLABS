@@ -1,7 +1,8 @@
-// src/components/student-forms/enhanced-lab-reservation.tsx
+// src/components/student-forms/lab-reservation.tsx
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useUser } from "@clerk/nextjs";
 import { CheckCircle, AlertCircle } from 'lucide-react';
+import OptimizedMachineSelector from './machine-select';
 
 // Service and machine interfaces
 interface Service {
@@ -90,7 +91,7 @@ interface LabReservationProps {
 // Helper function
 const generateId = (): string => Math.random().toString(36).substring(2, 15);
 
-export function EnhancedLabReservation({ formData, updateFormData, nextStep, prevStep }: LabReservationProps) {
+export default function LabReservation({ formData, updateFormData, nextStep, prevStep }: LabReservationProps) {
   const { user, isLoaded } = useUser();
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -102,7 +103,7 @@ export function EnhancedLabReservation({ formData, updateFormData, nextStep, pre
   const [services, setServices] = useState<Service[]>([]);
   const [isLoadingServices, setIsLoadingServices] = useState(true);
   const [serviceError, setServiceError] = useState<string | null>(null);
-  const [availableMachines, setAvailableMachines] = useState<{[service: string]: any[]}>({});
+  const [availableMachines, setAvailableMachines] = useState<Record<string, any[]>>({});
   const [selectedService, setSelectedService] = useState<string>('');
   const [selectedMachines, setSelectedMachines] = useState<SelectedMachine[]>([]);
   
@@ -113,7 +114,7 @@ export function EnhancedLabReservation({ formData, updateFormData, nextStep, pre
   // Display end year based on start year
   const getEndYear = (startYear: number) => startYear + 1;
   
-  // Fetch services and process machine data
+  // Fetch services and process machine data - This is done once, on component mount
   useEffect(() => {
     const fetchServices = async () => {
       setIsLoadingServices(true);
@@ -135,7 +136,7 @@ export function EnhancedLabReservation({ formData, updateFormData, nextStep, pre
         const data = await response.json();
         
         // Process machine data
-        const machinesByService: {[service: string]: any[]} = {};
+        const machinesByService: Record<string, any[]> = {};
         
         data.forEach((service: Service) => {
           if (service.Machines && service.Machines.length > 0) {
@@ -168,7 +169,7 @@ export function EnhancedLabReservation({ formData, updateFormData, nextStep, pre
     fetchServices();
   }, []);
 
-  // Initialize data from formData if available
+  // Initialize data from formData on mount only
   useEffect(() => {
     // Initialize selected service from formData
     if (formData.ProductsManufactured) {
@@ -190,7 +191,7 @@ export function EnhancedLabReservation({ formData, updateFormData, nextStep, pre
       
       setSelectedMachines(machines);
     }
-  }, [formData]);
+  }, []); // Empty dependency array - run only once on mount
 
   // Auto-fill user's name as first student when component loads
   useEffect(() => {
@@ -260,55 +261,9 @@ export function EnhancedLabReservation({ formData, updateFormData, nextStep, pre
     }
   };
 
-  // Handle machine selection
-  const handleMachineSelection = (machineId: string, quantity: number) => {
-    if (!selectedService) {
-      setErrors(prev => ({...prev, service: "Please select a service first"}));
-      return;
-    }
-    
-    const serviceMachines = availableMachines[selectedService] || [];
-    const machineDetails = serviceMachines.find(m => m.id === machineId);
-    
-    if (!machineDetails) return;
-    
-    // Find if machine already exists in selection
-    const existingIndex = selectedMachines.findIndex(m => m.id === machineId);
-    
-    if (existingIndex !== -1) {
-      // Update existing machine
-      if (quantity <= 0) {
-        // Remove if quantity is zero
-        const updatedMachines = selectedMachines.filter(m => m.id !== machineId);
-        setSelectedMachines(updatedMachines);
-      } else {
-        // Update quantity
-        const updatedMachines = [...selectedMachines];
-        updatedMachines[existingIndex].quantity = quantity;
-        setSelectedMachines(updatedMachines);
-      }
-    } else if (quantity > 0) {
-      // Add new machine
-      setSelectedMachines(prev => [
-        ...prev,
-        {
-          id: machineId,
-          name: machineDetails.name,
-          quantity,
-          description: machineDetails.description
-        }
-      ]);
-    }
-    
-    // Clear any machine selection error
-    if (selectedMachines.length > 0 || quantity > 0) {
-      setErrors(prev => ({...prev, machines: undefined}));
-    }
-  };
-
   // Convert selected machines to NeededMaterials format for the database
-  const updateNeededMaterials = useCallback(() => {
-    const materials = selectedMachines.map(machine => ({
+  const updateNeededMaterials = useCallback((updatedSelectedMachines: SelectedMachine[]) => {
+    const materials = updatedSelectedMachines.map(machine => ({
       id: generateId(),
       Item: machine.name, // Machine name becomes item name
       ItemQty: machine.quantity,
@@ -316,12 +271,18 @@ export function EnhancedLabReservation({ formData, updateFormData, nextStep, pre
     }));
     
     updateFormData('NeededMaterials', materials);
-  }, [selectedMachines, updateFormData]);
+  }, [updateFormData]);
 
-  // Update NeededMaterials whenever selectedMachines changes
-  useEffect(() => {
-    updateNeededMaterials();
-  }, [selectedMachines, updateNeededMaterials]);
+  // Handle machine selection changes from OptimizedMachineSelector
+  const handleMachineSelectionChange = useCallback((machines: SelectedMachine[]) => {
+    setSelectedMachines(machines);
+    updateNeededMaterials(machines);
+    
+    // Clear any machine selection error if at least one machine is selected
+    if (machines.length > 0) {
+      setErrors(prev => ({...prev, machines: undefined}));
+    }
+  }, [updateNeededMaterials]);
 
   // Student handlers
   const addStudent = () => {
@@ -475,128 +436,23 @@ export function EnhancedLabReservation({ formData, updateFormData, nextStep, pre
                 {serviceError && <p className="mt-1 text-sm text-red-500">{serviceError}</p>}
               </div>
 
-              {/* Machine Selection */}
+              {/* Machine Selection - Using the optimized component */}
               <div>
                 <label className="block text-sm font-medium mb-3 text-gray-700">
                   Available Equipment <span className="text-red-500">*</span>
                 </label>
                 
-                {!selectedService ? (
-                  <div className="p-4 bg-gray-100 rounded-lg text-center text-gray-600">
-                    Please select a service first to see available equipment
-                  </div>
-                ) : isLoadingServices ? (
-                  <div className="h-40 bg-gray-100 animate-pulse rounded-lg"></div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {(availableMachines[selectedService] || []).length === 0 ? (
-                      <div className="p-4 bg-yellow-50 rounded-lg text-center text-yellow-700 col-span-full">
-                        <AlertCircle className="h-6 w-6 mx-auto mb-2" />
-                        No equipment currently available for the selected service
-                      </div>
-                    ) : (
-                      availableMachines[selectedService].map((machine) => {
-                        const selectedMachine = selectedMachines.find(m => m.id === machine.id);
-                        const currentQuantity = selectedMachine ? selectedMachine.quantity : 0;
-                        const maxQuantity = machine.quantity;
-
-                        return (
-                          <div 
-                            key={machine.id}
-                            className={`
-                              border rounded-lg p-4 transition-all duration-200
-                              ${currentQuantity > 0 
-                                ? 'bg-blue-50 border-blue-300' 
-                                : 'bg-white border-gray-300 hover:border-blue-300'}
-                            `}
-                          >
-                            <div className="flex justify-between items-center mb-2">
-                              <h4 className="font-semibold text-gray-800">{machine.name}</h4>
-                              <div className="text-sm text-gray-600 bg-gray-100 px-2 py-1 rounded-full">
-                                {machine.quantity} available
-                              </div>
-                            </div>
-                            
-                            {machine.description && (
-                              <p className="text-xs text-gray-600 mb-3">{machine.description}</p>
-                            )}
-                            
-                            <div className="flex items-center space-x-3">
-                              <button
-                                type="button"
-                                onClick={() => handleMachineSelection(machine.id, Math.max(0, currentQuantity - 1))}
-                                disabled={currentQuantity <= 0}
-                                className={`
-                                  p-1.5 rounded border 
-                                  ${currentQuantity > 0 
-                                    ? 'bg-gray-200 hover:bg-gray-300' 
-                                    : 'bg-gray-100 cursor-not-allowed'}
-                                `}
-                              >
-                                -
-                              </button>
-                              
-                              <span className="font-medium text-gray-800 w-8 text-center">
-                                {currentQuantity}
-                              </span>
-                              
-                              <button
-                                type="button"
-                                onClick={() => handleMachineSelection(machine.id, Math.min(maxQuantity, currentQuantity + 1))}
-                                disabled={currentQuantity >= maxQuantity}
-                                className={`
-                                  p-1.5 rounded border 
-                                  ${currentQuantity < maxQuantity 
-                                    ? 'bg-blue-200 hover:bg-blue-300' 
-                                    : 'bg-gray-100 cursor-not-allowed'}
-                                `}
-                              >
-                                +
-                              </button>
-                            </div>
-                            
-                            {currentQuantity > 0 && (
-                              <div className="mt-2 text-green-600 flex items-center">
-                                <CheckCircle className="h-4 w-4 mr-2" />
-                                <span className="text-sm">Selected: {currentQuantity}</span>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
+                <OptimizedMachineSelector 
+                  selectedService={selectedService}
+                  availableMachines={availableMachines}
+                  initialSelectedMachines={selectedMachines}
+                  onMachineSelectionChange={handleMachineSelectionChange}
+                />
+                
                 {errors.machines && (
                   <p className="mt-2 text-sm text-red-500">{errors.machines}</p>
                 )}
               </div>
-
-              {/* Selected Equipment Summary */}
-              {selectedMachines.length > 0 && (
-                <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <h4 className="font-semibold text-blue-800 mb-2">Selected Equipment</h4>
-                  <ul className="space-y-2">
-                    {selectedMachines.map(machine => (
-                      <li key={machine.id} className="flex items-center justify-between">
-                        <span className="text-gray-800">
-                          {machine.name} <span className="text-gray-500">×{machine.quantity}</span>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleMachineSelection(machine.id, 0)}
-                          className="text-red-500 hover:text-red-700"
-                          aria-label={`Remove ${machine.name}`}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
             </div>
           </section>
 
@@ -838,5 +694,3 @@ export function EnhancedLabReservation({ formData, updateFormData, nextStep, pre
     </div>
   );
 }
-
-export default EnhancedLabReservation;
