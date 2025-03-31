@@ -434,11 +434,11 @@ export const downloadLabRequestFormPDF = (formData: LabRequestFormData): void =>
       let currentX = margin;
      
       // Add header cells
-      addCell('Quantity)', currentX, colQuantity, headerHeight);
+      addCell('Quantity', currentX, colQuantity, headerHeight);
       currentX += colQuantity;
       
-      // For the Item header cell:
-      addCell('Item)', currentX, colItem, headerHeight);
+      // Update Item header to Machine
+      addCell('Machine', currentX, colItem, headerHeight);
       currentX += colItem;
      
       addCell('Description', currentX, colDesc, headerHeight);
@@ -470,13 +470,14 @@ export const downloadLabRequestFormPDF = (formData: LabRequestFormData): void =>
           machineQuantity: ''
         };
        
-        // Add cells for this row
-        const quantityText = rowData.quantity + (rowData.machineQuantity ? `\n${rowData.machineQuantity}` : '');
-        addCell(quantityText, currentX, colQuantity, rowHeight, 'center', 9, false);
+        // Display machine quantity in quantity column - prioritize machineQuantity if available
+        const quantityValue = rowData.machineQuantity || rowData.quantity || '';
+        addCell(quantityValue, currentX, colQuantity, rowHeight, 'center', 9, false);
         currentX += colQuantity;
        
-        const itemText = rowData.item + (rowData.machineName ? `\n${rowData.machineName}` : '');
-        addCell(itemText, currentX, colItem, rowHeight, 'left', 9, false);
+        // Display machine name in item column - prioritize machineName if available
+        const itemValue = rowData.machineName || rowData.item || '';
+        addCell(itemValue, currentX, colItem, rowHeight, 'left', 9, false);
         currentX += colItem;
        
         addCell(rowData.description, currentX, colDesc, rowHeight, 'left', 9, false);
