@@ -273,19 +273,6 @@ const ServiceSelector: React.FC<ServiceSelectorProps> = ({
         </div>
       )}
 
-      {/* Enhanced Google Drive Link Note */}
-      <div className="mt-6 p-4 border-2 border-yellow-400 bg-yellow-50 rounded-lg shadow-sm">
-        <div className="flex items-start">
-          <AlertTriangle className="text-yellow-600 mr-3 flex-shrink-0 mt-0.5" size={20} />
-          <div>
-            <h4 className="font-semibold text-yellow-800 text-base">Google Drive Link Required</h4>
-            <p className="text-yellow-700 mt-1">
-              For evaluation purposes, you <strong>must</strong> provide a Google Drive link containing your project files 
-              (3D printing models, laser cutter files, etc.). Files are necessary for assessment and fabrication.
-            </p>
-          </div>
-        </div>
-      </div>
     </div>
   );
 };
