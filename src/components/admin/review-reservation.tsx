@@ -186,6 +186,7 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
     const nonEditableStatuses = ['Pending Payment', 'Paid', 'Completed'];
     return nonEditableStatuses.includes(status);
   };
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [services, setServices] = useState<ServicePricing[]>([]);
 
   const isPendingStatus = (status: string): boolean => {
@@ -857,6 +858,67 @@ const handleApproveReservation = async () => {
   }
 };
 
+const refreshData = async () => {
+  if (!localReservation) return;
+  
+  try {
+    setIsLoading(true);
+    console.log("Refreshing reservation data for ID:", localReservation.id);
+    
+    // Fetch the updated reservation data
+    const response = await fetch(`/api/admin/reservation-review/${localReservation.id}`);
+    
+    if (!response.ok) {
+      throw new Error('Failed to refresh reservation data');
+    }
+    
+    const updatedData = await response.json();
+    console.log("Updated reservation data received:", updatedData);
+    
+    // Log specifically to check the minutes values in UserServices
+    if (updatedData.UserServices && Array.isArray(updatedData.UserServices)) {
+      console.log("Updated UserServices minutes values:", 
+        updatedData.UserServices.map(s => ({
+          id: s.id, 
+          service: s.ServiceAvail,
+          minutes: s.MinsAvail
+        }))
+      );
+    }
+    
+    // Update the local state with the new data
+    setLocalReservation(updatedData);
+    
+    // Update the edited services with the latest data
+    if (updatedData.UserServices && Array.isArray(updatedData.UserServices)) {
+      const updatedServices = updatedData.UserServices.map((service) => ({
+        ...service,
+        selectedMachines: parseMachines(service.EquipmentAvail || '')
+      }));
+      
+      setEditedServices(updatedServices);
+    }
+    
+    // Update the times data
+    if (updatedData.UtilTimes && Array.isArray(updatedData.UtilTimes)) {
+      setEditedTimes(updatedData.UtilTimes.map(time => ({
+        ...time,
+        DateStatus: time.DateStatus || "Ongoing"
+      })));
+    }
+    
+    // Force a re-render by incrementing the refresh trigger
+    setRefreshTrigger(prev => prev + 1);
+    
+    console.log("Reservation data refresh complete");
+  } catch (error) {
+    console.error('Error refreshing reservation data:', error);
+    toast.error(`Failed to refresh data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 const validateAllUtilTimesComplete = (utilTimes: UtilTime[]) => {
   if (!utilTimes || !Array.isArray(utilTimes) || utilTimes.length === 0) {
     return {
@@ -1069,10 +1131,11 @@ return (
                   reservationId={localReservation.id}
                   allowFix={true}
                   reservationStatus={localReservation.Status}
-                  servicePricing={services} // Pass the services pricing data
+                  servicePricing={services}
+                  onRefresh={refreshData}
                 />
                 )}
-              </TabsContent>
+              </TabsContent> 
             </Tabs>
 
             <DialogFooter className="mt-6">
