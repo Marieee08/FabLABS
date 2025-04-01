@@ -1,4 +1,3 @@
-// src/components/admin/cost-breakdown.tsx
 import React, { useState, useEffect } from 'react';
 import {
   Card,
@@ -127,79 +126,59 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
     return `₱${numericPrice.toFixed(2)}`;
   };
 
-  // Add this with your other utility functions
-  const parseMachineUtilizationTime = (timeString: string | null): string => {
-    if (!timeString) return "00:00"; // Default fallback
+  function parseMachineUtilizationTime(timeString: string | null): string {
+    if (!timeString) return "00:00";
     
-    // Case 1: Already in HH:MM format (e.g., "09:30")
-    if (typeof timeString === 'string' && /^\d{2}:\d{2}$/.test(timeString)) {
-      return timeString;
-    }
-    
-    // Case 2: ISO format (e.g., "2023-05-15T09:30:00.000Z")
-    if (typeof timeString === 'string' && timeString.includes('T')) {
+    // Handle ISO format (2025-04-19T00:00:00.000Z)
+    if (timeString.includes('T')) {
       try {
         const date = new Date(timeString);
-        // Ensure valid date
-        if (isNaN(date.getTime())) return "00:00"; 
-        return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+        return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
       } catch (e) {
-        console.error("Error parsing ISO time:", e);
+        console.error("Failed to parse ISO time:", e);
         return "00:00";
       }
     }
     
-    // Case 3: Unknown format - try to extract time
-    if (typeof timeString === 'string' && timeString.includes(':')) {
-      const [hours, minutes] = timeString.split(':');
-      if (hours && minutes) {
-        return `${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}`;
-      }
-    }
+    // Return raw time if already in HH:MM format
+    if (/^\d{2}:\d{2}$/.test(timeString)) return timeString;
     
-    return "00:00"; // Final fallback
-  };
+    return "00:00";
+  }
 
-  const calculateDurationMinutes = (startTimeStr: string, endTimeStr: string): number => {
+  const calculateDurationMinutes = (start: string, end: string, date?: string): number => {
     try {
-      console.log(`Calculating duration from ${startTimeStr} to ${endTimeStr}`);
+      // Parse start and end times
+      const [startH, startM] = start.split(':').map(Number);
+      const [endH, endM] = end.split(':').map(Number);
       
-      // Parse the time strings (expected format is "HH:MM")
-      const startParts = startTimeStr.split(':');
-      const endParts = endTimeStr.split(':');
-      
-      if (startParts.length < 2 || endParts.length < 2) {
-        console.warn(`Invalid time format: start=${startTimeStr}, end=${endTimeStr}`);
-        return 0;
+      // If we have date information, handle potential overnight durations
+      if (date) {
+        const startDate = new Date(date);
+        const endDate = new Date(date);
+        
+        startDate.setHours(startH, startM, 0, 0);
+        endDate.setHours(endH, endM, 0, 0);
+        
+        // If end time is before start time, assume it's the next day
+        if (endDate < startDate) {
+          endDate.setDate(endDate.getDate() + 1);
+        }
+        
+        return (endDate.getTime() - startDate.getTime()) / (1000 * 60);
       }
       
-      const startHour = parseInt(startParts[0], 10);
-      const startMinute = parseInt(startParts[1], 10);
-      const endHour = parseInt(endParts[0], 10);
-      const endMinute = parseInt(endParts[1], 10);
+      // Fallback to simple calculation if no date
+      let duration = (endH * 60 + endM) - (startH * 60 + startM);
       
-      // Validate the parsed values
-      if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute)) {
-        console.warn(`Invalid time values after parsing: start=${startHour}:${startMinute}, end=${endHour}:${endMinute}`);
-        return 0;
+      // Handle overnight scenarios
+      if (duration < 0) {
+        duration += 24 * 60; // Add 24 hours in minutes
       }
       
-      // Calculate total minutes for start and end times
-      const startTotalMinutes = (startHour * 60) + startMinute;
-      const endTotalMinutes = (endHour * 60) + endMinute;
-      
-      // Calculate duration in minutes
-      let durationMinutes = endTotalMinutes - startTotalMinutes;
-      
-      // Handle overnight operations (end time is earlier than start time)
-      if (durationMinutes < 0) {
-        durationMinutes += minutesPerDay; // Add 24 hours
-      }
-      
-      console.log(`Calculated duration: ${durationMinutes} minutes (${durationMinutes/minutesPerHour} hours)`);
-      return durationMinutes;
+      return duration;
     } catch (e) {
-      console.error("Error calculating time duration:", e);
+      console.error("Error calculating duration:", e);
       return 0;
     }
   };
@@ -303,10 +282,11 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
     }
   };
 
+  // This is the key function we're fixing for the issue of machine times syncing
   const calculateOperationTimeCosts = () => {
     console.log("DEBUGGING: Calculating operation time costs");
     
-    // For debugging: log all machine utilizations first
+    // Debug: log all machine utilizations
     console.log("All machine utilizations:");
     machineUtilizations.forEach(util => {
       console.log(`Machine: ${util.Machine}, Service: ${util.ServiceName}, ID: ${util.id}`);
@@ -318,19 +298,109 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
       });
     });
     
-    // Process each user service
-    const adjustedServices = userServices.map(service => {
-      console.log(`\nProcessing service: ${service.ServiceAvail}, Equipment: ${service.EquipmentAvail}`);
+    // Complete redesign of the matching algorithm to properly handle duplicate machine names
+  // Pre-processing: Build a map of already used machine utilization IDs to prevent duplicates
+  const usedMachineUtilIds = new Set();
+  
+  const adjustedServices = userServices.map((service, serviceIndex) => {
+    console.log(`\nProcessing service ${serviceIndex+1}: ${service.ServiceAvail}, Equipment: ${service.EquipmentAvail}, ID: ${service.id}`);
+    
+    // CRITICAL FIX: Use a completely different approach to match machines
+    let matchingUtilization = null;
+    
+    // First, try to find exact match by service ID embedded in utilization
+    // (This is the most reliable way if such relationship exists)
+    if (!matchingUtilization) {
+      const exactMatch = machineUtilizations.find(util => {
+        // Check if any fields contain the service ID as a substring
+        const serviceIdString = service.id;
+        const machineContainsId = util.Machine?.includes(serviceIdString);
+        const serviceNameContainsId = util.ServiceName?.includes(serviceIdString);
+        return (machineContainsId || serviceNameContainsId) && !usedMachineUtilIds.has(util.id);
+      });
       
-      // Find matching machine utilization for this service
-      const matchingUtilization = machineUtilizations.find(util => 
-        (util.Machine && service.EquipmentAvail && 
-         util.Machine.toLowerCase().includes(service.EquipmentAvail.toLowerCase())) || 
-        (util.ServiceName && service.ServiceAvail && 
-         util.ServiceName.toLowerCase().includes(service.ServiceAvail.toLowerCase()))
+      if (exactMatch) {
+        console.log(`Found exact match by ID embedding: ${exactMatch.id}`);
+        matchingUtilization = exactMatch;
+      }
+    }
+    
+    // Second, try to find an exact match by both machine and service name
+    if (!matchingUtilization) {
+      const exactNameMatch = machineUtilizations.find(util => 
+        util.Machine === service.EquipmentAvail && 
+        util.ServiceName === service.ServiceAvail &&
+        !usedMachineUtilIds.has(util.id)
       );
       
-      console.log(`Found matching utilization: ${matchingUtilization ? 'Yes' : 'No'}`);
+      if (exactNameMatch) {
+        console.log(`Found exact match by both names: ${exactNameMatch.id}`);
+        matchingUtilization = exactNameMatch;
+      }
+    }
+    
+    // Third approach: Handle duplicate machine names with index-based assignment
+    if (!matchingUtilization) {
+      // Get all machines with the same name that haven't been used yet
+      const matchingMachines = machineUtilizations
+        .filter(util => util.Machine === service.EquipmentAvail && !usedMachineUtilIds.has(util.id));
+      
+      if (matchingMachines.length > 0) {
+        // Find machines with same SERVICE name too (better match)
+        const serviceMatches = matchingMachines.filter(m => 
+          m.ServiceName === service.ServiceAvail);
+        
+        if (serviceMatches.length > 0) {
+          matchingUtilization = serviceMatches[0]; // Take first available match
+          console.log(`Found match with same machine and service name: ${matchingUtilization.id}`);
+        } else {
+          // Just take the first unused machine with matching name
+          matchingUtilization = matchingMachines[0];
+          console.log(`Found match with same machine name: ${matchingUtilization.id}`);
+        }
+      }
+    }
+    
+    // Fourth approach: Try partial name matching as last resort
+    if (!matchingUtilization) {
+      const partialMatches = machineUtilizations
+        .filter(util => !usedMachineUtilIds.has(util.id))
+        .filter(util => {
+          // Partial machine name match
+          const machineMatch = util.Machine && service.EquipmentAvail && 
+            (service.EquipmentAvail.toLowerCase().includes(util.Machine.toLowerCase()) || 
+             util.Machine.toLowerCase().includes(service.EquipmentAvail.toLowerCase()));
+          
+          // Partial service name match
+          const serviceMatch = util.ServiceName && service.ServiceAvail && 
+            (service.ServiceAvail.toLowerCase().includes(util.ServiceName.toLowerCase()) || 
+             util.ServiceName.toLowerCase().includes(service.ServiceAvail.toLowerCase()));
+          
+          return machineMatch || serviceMatch;
+        });
+        
+      if (partialMatches.length > 0) {
+        // Prioritize matches with both machine and service name similarities
+        const bestMatches = partialMatches.filter(m => 
+          (m.Machine && service.EquipmentAvail && 
+            m.Machine.toLowerCase().includes(service.EquipmentAvail.toLowerCase())) &&
+          (m.ServiceName && service.ServiceAvail && 
+            m.ServiceName.toLowerCase().includes(service.ServiceAvail.toLowerCase()))
+        );
+        
+        matchingUtilization = bestMatches.length > 0 ? bestMatches[0] : partialMatches[0];
+        console.log(`Found partial match: ${matchingUtilization.id}`);
+      }
+    }
+    
+    // If we found a match, mark its ID as used to prevent duplicate assignments
+    if (matchingUtilization?.id) {
+      usedMachineUtilIds.add(matchingUtilization.id);
+      console.log(`Marked machine util ID ${matchingUtilization.id} as used`);
+    }
+    
+    console.log(`Final match result: ${matchingUtilization ? `ID=${matchingUtilization.id}, Machine=${matchingUtilization.Machine}` : 'No match found'}`);
+    
       
       // Calculate operation minutes from operating times
       let operationMinutes = 0;
@@ -338,24 +408,15 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
       if (matchingUtilization && matchingUtilization.OperatingTimes && 
           matchingUtilization.OperatingTimes.length > 0) {
         
-        // Get unique operating times to avoid duplicates
+        // Get unique operating times to avoid duplicates - keep this feature
         const uniqueOpTimes = getUniqueOperatingTimes(matchingUtilization.OperatingTimes);
         console.log(`Found ${uniqueOpTimes.length} unique operating times`);
         
-        // Sum up the duration of all operating times
         operationMinutes = uniqueOpTimes.reduce((total, opTime) => {
-          if (!opTime.OTStartTime || !opTime.OTEndTime) {
-            console.warn("Missing start or end time for operation time:", opTime);
-            return total;
-          }
-          
-          // Parse the start and end times
           const startTime = parseMachineUtilizationTime(opTime.OTStartTime);
           const endTime = parseMachineUtilizationTime(opTime.OTEndTime);
-          console.log(`Parsed times: ${startTime} to ${endTime}`);
-          
-          // Calculate the duration in minutes
-          const duration = calculateDurationMinutes(startTime, endTime);
+          const duration = calculateDurationMinutes(startTime, endTime, opTime.OTDate?.split('T')[0] || '');
+          console.log(`Duration calculated: ${duration} minutes for ${startTime} to ${endTime}`);
           return total + duration;
         }, 0);
         
@@ -424,6 +485,7 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
     setAdjustedUserServices(adjustedServices);
   };
 
+  // This function reduces duplicate records but is still useful
   const getUniqueOperatingTimes = (operatingTimes: OperatingTime[]) => {
     const seen = new Set();
     return operatingTimes.filter(op => {
@@ -491,10 +553,10 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
     if (reservationStatus === 'Ongoing') {
       calculateOperationTimeCosts();
       // Show feedback to user that recalculation is complete
-      alert('Operation times have been recalculated. If values didn\'t change, check console for details.');
+      toast.success('Operation times have been recalculated successfully.');
     } else if (reservationStatus === 'Pending Admin Approval' || reservationStatus === 'Approved') {
       calculateBookedCosts();
-      alert('Booked times have been recalculated.');
+      toast.success('Booked times have been recalculated.');
     }
   };
   
@@ -608,12 +670,12 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
                       <div key={i} className="text-sm text-gray-600">
                         <div className="flex items-center">
                           <span>Equipment: {service.EquipmentAvail}</span>
-                          {reservationStatus === 'Ongoing' && service.operationMinutes && (
+                          {reservationStatus === 'Ongoing' && service.operationMinutes !== null && (
                             <Badge variant="outline" className="ml-2 text-xs">
                               {service.operationMinutes} mins
                             </Badge>
                           )}
-                          {(reservationStatus === 'Pending Admin Approval' || reservationStatus === 'Approved') && service.bookedMinutes && (
+                          {(reservationStatus === 'Pending Admin Approval' || reservationStatus === 'Approved') && service.bookedMinutes !== null && (
                             <Badge variant="outline" className="ml-2 text-xs">
                               {service.bookedMinutes} mins
                             </Badge>
