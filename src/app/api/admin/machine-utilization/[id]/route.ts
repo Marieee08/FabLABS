@@ -1,11 +1,10 @@
-// src\app\api\admin\machine-utilization\[id]\route.ts
 import { PrismaClient } from '@prisma/client'
 import { NextResponse } from 'next/server';
 
 // Initialize Prisma client
 const prisma = new PrismaClient()
 
-// Interfaces remain the same as in the original file
+// Interfaces for machine utilization data
 interface OperatingTime {
   id?: number;
   OTDate: string | null;
@@ -43,7 +42,7 @@ interface RepairCheck {
 interface MachineUtilization {
   id?: number;
   Machine: string | null;
-  ReviewedBy: string | null;
+  ReviwedBy: string | null; // Note the spelling - this is correct according to schema
   MachineApproval: boolean | null;
   DateReviewed: string | null;
   ServiceName: string | null;
@@ -110,8 +109,29 @@ export async function GET(
         RepairChecks: true
       }
     });
+
+    // Format the dates consistently before returning
+    const formattedData = storedData.map(util => ({
+      ...util,
+      DateReviewed: util.DateReviewed ? util.DateReviewed.toISOString() : null,
+      OperatingTimes: util.OperatingTimes.map(ot => ({
+        ...ot,
+        // Format all dates consistently to ISO strings
+        OTDate: ot.OTDate ? ot.OTDate.toISOString() : null,
+        OTStartTime: ot.OTStartTime ? ot.OTStartTime.toISOString() : null,
+        OTEndTime: ot.OTEndTime ? ot.OTEndTime.toISOString() : null
+      })),
+      DownTimes: util.DownTimes.map(dt => ({
+        ...dt,
+        DTDate: dt.DTDate ? dt.DTDate.toISOString() : null
+      })),
+      RepairChecks: util.RepairChecks.map(rc => ({
+        ...rc,
+        RepairDate: rc.RepairDate ? rc.RepairDate.toISOString() : null
+      }))
+    }));
     
-    return NextResponse.json(storedData, { status: 200 });
+    return NextResponse.json(formattedData, { status: 200 });
   } catch (error) {
     console.error('Error fetching machine utilization:', error);
     return NextResponse.json(
@@ -169,183 +189,188 @@ export async function POST(
         return NextResponse.json([], { status: 200 });
       }
       
-      // Modified processedData in the POST method to better handle date formatting
-// For src\app\api\admin\machine-utilization\[id]\route.ts
-
-// Process and store machine utilization data with better date handling
-const processedData = await Promise.all(data.map(async (incomingMachineUtil) => {
-  // Start a transaction to ensure data consistency
-  return prisma.$transaction(async (tx) => {
-    let machineUtilResult;
-    
-    // Check if we have a valid ID for update
-    if (incomingMachineUtil.id) {
-      // Update existing record
-      machineUtilResult = await tx.machineUtilization.update({
-        where: { 
-          id: incomingMachineUtil.id
-        },
-        data: {
-          Machine: incomingMachineUtil.Machine,
-          ReviwedBy: incomingMachineUtil.ReviwedBy || incomingMachineUtil.ReviewedBy,
-          MachineApproval: null,
-          DateReviewed: incomingMachineUtil.DateReviewed,
-          ServiceName: incomingMachineUtil.ServiceName,
-          utilReqId: utilReqId
-        }
-      });
-    } else {
-      // Create new record
-      machineUtilResult = await tx.machineUtilization.create({
-        data: {
-          Machine: incomingMachineUtil.Machine,
-          ReviwedBy: incomingMachineUtil.ReviwedBy || incomingMachineUtil.ReviewedBy,
-          MachineApproval: null,
-          DateReviewed: incomingMachineUtil.DateReviewed,
-          ServiceName: incomingMachineUtil.ServiceName,
-          utilReqId: utilReqId
-        }
-      });
-    }
-
-    // Delete existing related records
-    await Promise.all([
-      tx.operatingTime.deleteMany({
-        where: { machineUtilId: machineUtilResult.id }
-      }),
-      tx.downTime.deleteMany({
-        where: { machineUtilId: machineUtilResult.id }
-      }),
-      tx.repairCheck.deleteMany({
-        where: { machineUtilId: machineUtilResult.id }
-      })
-    ]);
-
-    // Process the operating times with better date handling
-    const processedOperatingTimes = incomingMachineUtil.OperatingTimes.map(ot => {
-      const cleanData = cleanObject(ot);
-      
-      // Format dates correctly for the database
-      let processedData = { ...cleanData };
-      
-      // Handle OTDate - make sure it's in correct format
-      if (processedData.OTDate) {
-        // If it's already a Date object or ISO string, use it
-        // Otherwise, create a new Date
-        try {
-          processedData.OTDate = new Date(processedData.OTDate);
-        } catch (e) {
-          console.error("Error formatting OTDate:", e);
-          // If conversion fails, set to null
-          processedData.OTDate = null;
-        }
-      }
-      
-      // Handle OTStartTime - make sure it's in correct format
-      if (processedData.OTStartTime) {
-        try {
-          processedData.OTStartTime = new Date(processedData.OTStartTime);
-        } catch (e) {
-          console.error("Error formatting OTStartTime:", e);
-          processedData.OTStartTime = null;
-        }
-      }
-      
-      // Handle OTEndTime - make sure it's in correct format
-      if (processedData.OTEndTime) {
-        try {
-          processedData.OTEndTime = new Date(processedData.OTEndTime);
-        } catch (e) {
-          console.error("Error formatting OTEndTime:", e);
-          processedData.OTEndTime = null;
-        }
-      }
-      
-      return processedData;
-    });
-
-    // Process the down times
-    const processedDownTimes = incomingMachineUtil.DownTimes.map(dt => {
-      const cleanData = cleanObject(dt);
-      
-      // Format dates correctly for the database
-      let processedData = { ...cleanData };
-      
-      // Handle DTDate - make sure it's in correct format
-      if (processedData.DTDate) {
-        try {
-          processedData.DTDate = new Date(processedData.DTDate);
-        } catch (e) {
-          console.error("Error formatting DTDate:", e);
-          processedData.DTDate = null;
-        }
-      }
-      
-      return processedData;
-    });
-
-    // Process the repair checks
-    const processedRepairChecks = incomingMachineUtil.RepairChecks.map(rc => {
-      const cleanData = cleanObject(rc);
-      
-      // Format dates correctly for the database
-      let processedData = { ...cleanData };
-      
-      // Handle RepairDate - make sure it's in correct format
-      if (processedData.RepairDate) {
-        try {
-          processedData.RepairDate = new Date(processedData.RepairDate);
-        } catch (e) {
-          console.error("Error formatting RepairDate:", e);
-          processedData.RepairDate = null;
-        }
-      }
-      
-      return processedData;
-    });
-
-    // Create new related records
-    await Promise.all([
-      // Operating Times 
-      ...processedOperatingTimes.map(ot => 
-        tx.operatingTime.create({
-          data: {
-            ...ot,
-            machineUtilId: machineUtilResult.id
+      // Process and store machine utilization data
+      const processedData = await Promise.all(data.map(async (incomingMachineUtil: { id: any; Machine: any; ReviwedBy: any; ReviewedBy: any; DateReviewed: any; ServiceName: any; OperatingTimes: any[]; DownTimes: any[]; RepairChecks: any[]; }) => {
+        // Start a transaction to ensure data consistency
+        return prisma.$transaction(async (tx) => {
+          let machineUtilResult;
+          
+          // Check if we have a valid ID for update
+          if (incomingMachineUtil.id) {
+            // Update existing record
+            machineUtilResult = await tx.machineUtilization.update({
+              where: { 
+                id: incomingMachineUtil.id
+              },
+              data: {
+                Machine: incomingMachineUtil.Machine,
+                ReviwedBy: incomingMachineUtil.ReviwedBy || incomingMachineUtil.ReviewedBy,
+                MachineApproval: null,
+                DateReviewed: incomingMachineUtil.DateReviewed,
+                ServiceName: incomingMachineUtil.ServiceName,
+                utilReqId: utilReqId
+              }
+            });
+          } else {
+            // Create new record
+            machineUtilResult = await tx.machineUtilization.create({
+              data: {
+                Machine: incomingMachineUtil.Machine,
+                ReviwedBy: incomingMachineUtil.ReviwedBy || incomingMachineUtil.ReviewedBy,
+                MachineApproval: null,
+                DateReviewed: incomingMachineUtil.DateReviewed,
+                ServiceName: incomingMachineUtil.ServiceName,
+                utilReqId: utilReqId
+              }
+            });
           }
-        })
-      ),
-      // Down Times
-      ...processedDownTimes.map(dt => 
-        tx.downTime.create({
-          data: {
-            ...dt,
-            machineUtilId: machineUtilResult.id
+  
+          // Delete existing related records
+          await Promise.all([
+            tx.operatingTime.deleteMany({
+              where: { machineUtilId: machineUtilResult.id }
+            }),
+            tx.downTime.deleteMany({
+              where: { machineUtilId: machineUtilResult.id }
+            }),
+            tx.repairCheck.deleteMany({
+              where: { machineUtilId: machineUtilResult.id }
+            })
+          ]);
+  
+          // Deduplication function
+          const deduplicate = (items: any[], getSignature: (item: any) => string) => {
+            const uniqueItems = [];
+            const signatures = new Set();
+  
+            for (const item of items) {
+              const signature = getSignature(item);
+              
+              if (!signatures.has(signature)) {
+                signatures.add(signature);
+                uniqueItems.push(item);
+              }
+            }
+  
+            return uniqueItems;
+          };
+  
+          // Deduplicate and create Operating Times
+          const uniqueOperatingTimes = deduplicate(
+            incomingMachineUtil.OperatingTimes, 
+            (ot) => JSON.stringify({
+              OTDate: ot.OTDate,
+              OTTypeofProducts: ot.OTTypeofProducts,
+              OTStartTime: ot.OTStartTime,
+              OTEndTime: ot.OTEndTime,
+              OTMachineOp: ot.OTMachineOp
+            })
+          );
+  
+          // Deduplicate and create Down Times
+          const uniqueDownTimes = deduplicate(
+            incomingMachineUtil.DownTimes,
+            (dt) => JSON.stringify({
+              DTDate: dt.DTDate,
+              DTTypeofProducts: dt.DTTypeofProducts,
+              DTTime: dt.DTTime,
+              Cause: dt.Cause,
+              DTMachineOp: dt.DTMachineOp
+            })
+          );
+  
+          // Deduplicate and create Repair Checks
+          const uniqueRepairChecks = deduplicate(
+            incomingMachineUtil.RepairChecks,
+            (rc) => JSON.stringify({
+              RepairDate: rc.RepairDate,
+              Service: rc.Service,
+              Duration: rc.Duration,
+              RepairReason: rc.RepairReason,
+              PartsReplaced: rc.PartsReplaced,
+              RPPersonnel: rc.RPPersonnel
+            })
+          );
+  
+          // Get any auto-generated times from utilTime table
+          const utilTimes = await tx.utilTime.findMany({
+            where: { utilReqId: utilReqId }
+          });
+          
+          // Convert utilTimes to operatingTimes format
+          const autoGeneratedTimes = utilTimes.map(utilTime => ({
+            OTDate: utilTime.StartTime,
+            OTStartTime: utilTime.StartTime,
+            OTEndTime: utilTime.EndTime,
+            OTTypeofProducts: null, 
+            OTMachineOp: null
+          }));
+          
+          // Determine which operating times to use based on the situation
+          let finalOperatingTimes;
+          
+          if (incomingMachineUtil.id) {
+            // CASE 1: This is an UPDATE to an existing record
+            // Use only the times provided by the user - no auto-merging
+            finalOperatingTimes = uniqueOperatingTimes;
+          } else {
+            // CASE 2: This is a NEW machine utilization record
+            if (uniqueOperatingTimes.length > 0) {
+              // User has already specified operating times, use those
+              finalOperatingTimes = uniqueOperatingTimes;
+            } else {
+              // No user-defined times, use the auto-generated ones
+              finalOperatingTimes = autoGeneratedTimes;
+            }
           }
-        })
-      ),
-      // Repair Checks
-      ...processedRepairChecks.map(rc => 
-        tx.repairCheck.create({
-          data: {
-            ...rc,
-            machineUtilId: machineUtilResult.id
-          }
-        })
-      )
-    ]);
-
-    // Return the full record
-    return tx.machineUtilization.findUnique({
-      where: { id: machineUtilResult.id },
-      include: {
-        OperatingTimes: true,
-        DownTimes: true,
-        RepairChecks: true
-      }
-    });
-  });
-}));
+          
+          // Create all the related records
+          await Promise.all([
+            // Operating Times - Use finalOperatingTimes instead of mergedOperatingTimes
+            ...finalOperatingTimes.map(ot => {
+              const cleanData = cleanObject(ot);
+              return tx.operatingTime.create({
+                data: {
+                  ...cleanData,
+                  machineUtilId: machineUtilResult.id
+                }
+              });
+            }),
+            
+            // Down Times - Remove isNew flag before saving
+            ...uniqueDownTimes.map(dt => {
+              const cleanData = cleanObject(dt);
+              return tx.downTime.create({
+                data: {
+                  ...cleanData,
+                  machineUtilId: machineUtilResult.id
+                }
+              });
+            }),
+            
+            // Repair Checks - Remove isNew flag before saving
+            ...uniqueRepairChecks.map(rc => {
+              const cleanData = cleanObject(rc);
+              return tx.repairCheck.create({
+                data: {
+                  ...cleanData,
+                  machineUtilId: machineUtilResult.id
+                }
+              });
+            })
+          ]);
+  
+          // Return the full record
+          return tx.machineUtilization.findUnique({
+            where: { id: machineUtilResult.id },
+            include: {
+              OperatingTimes: true,
+              DownTimes: true,
+              RepairChecks: true
+            }
+          });
+        });
+      }));
   
       // Return the processed data
       return NextResponse.json(processedData, { status: 200 });
@@ -367,7 +392,6 @@ export async function DELETE(
   try {
     const id = params.id;
     
-    // Validate ID
     if (!id) {
       return NextResponse.json(
         { error: 'Invalid or missing reservation ID' }, 
@@ -375,10 +399,8 @@ export async function DELETE(
       );
     }
     
-    // Convert id to number
     const utilReqId = parseInt(id);
     
-    // Remove data for this ID
     await prisma.machineUtilization.deleteMany({
       where: { utilReqId }
     });

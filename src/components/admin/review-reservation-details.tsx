@@ -71,9 +71,16 @@ interface ReservationDetailsTabProps {
   machineUsageCounts?: {[machineName: string]: number};
 }
 
-// Simple time status badge component that only shows when reservation is Ongoing
+// Simple time status badge component that hides status for specific reservation statuses
 const TimeStatusBadge = ({ status, reservationStatus }: { status: string | null | undefined, reservationStatus: string }) => {
-  if (reservationStatus !== 'Ongoing') return null;
+  // Return null (hide the badge) when reservation is in these statuses
+  if (
+    reservationStatus === 'Pending Admin Approval' ||
+    reservationStatus === 'Approved' ||
+    reservationStatus === 'Rejected'
+  ) {
+    return null;
+  }
   
   const getStatusBadgeStyle = (): string => {
     switch (status) {
@@ -115,13 +122,16 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
   validationError,
   onUpdateService,
   hideRequiresEquipment = false,
-  onUpdateTimeStatus
+  onUpdateTimeStatus,
+  machineUsageCounts: externalMachineUsageCounts
 }) => {
   const [servicesWithMachines, setServicesWithMachines] = useState<UserServiceWithMachines[]>([]);
   const [equipmentTexts, setEquipmentTexts] = useState<{[serviceId: string]: string}>({});
-  const [machineUsageCounts, setMachineUsageCounts] = useState<{[machineName: string]: number}>({});
+  const [internalMachineUsageCounts, setInternalMachineUsageCounts] = useState<{[machineName: string]: number}>({});
   const [editedTimes, setEditedTimes] = useState<UtilTime[]>([]);
-  const effectiveMachineUsageCounts = machineUsageCounts || {};
+  
+  // Use external counts if provided, otherwise use internal counts
+  const effectiveMachineUsageCounts = externalMachineUsageCounts || internalMachineUsageCounts;
   
   // Time status options
   const statusOptions = [
@@ -129,6 +139,12 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
     { value: "Completed", label: "Completed" },
     { value: "Cancelled", label: "Cancelled" }
   ];
+
+  // Check if status should be hidden based on reservation status
+  const shouldHideStatus = 
+    reservation.Status === 'Pending Admin Approval' ||
+    reservation.Status === 'Approved' ||
+    reservation.Status === 'Rejected';
 
   // Parse machines without quantity
   const parseMachines = (equipmentStr: string): SelectedMachine[] => {
@@ -169,14 +185,16 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
       });
       setEquipmentTexts(initialTexts);
 
-      // Calculate initial machine usage counts
-      const initialUsage: {[machineName: string]: number} = {};
-      servicesWithMachines.forEach(service => {
-        service.selectedMachines.forEach(machine => {
-          initialUsage[machine.name] = (initialUsage[machine.name] || 0) + 1;
+      // Calculate initial machine usage counts only if external counts aren't provided
+      if (!externalMachineUsageCounts) {
+        const initialUsage: {[machineName: string]: number} = {};
+        servicesWithMachines.forEach(service => {
+          service.selectedMachines.forEach(machine => {
+            initialUsage[machine.name] = (initialUsage[machine.name] || 0) + 1;
+          });
         });
-      });
-      setMachineUsageCounts(initialUsage);
+        setInternalMachineUsageCounts(initialUsage);
+      }
       
       // Initialize time status
       setEditedTimes(reservation.UtilTimes.map(time => ({
@@ -185,25 +203,17 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
         DateStatus: time.DateStatus || "Ongoing"
       })));
     }
-  }, [reservation]);
+  }, [reservation, externalMachineUsageCounts]);
 
-  // Find machines that can perform a specific service and check their availability
+  // Find machines that can perform a specific service
   const getMachinesForService = (serviceName: string) => {
     return machines.filter(machine => {
       if (!machine.isAvailable) return false;
       
       // Check if machine provides this service
-      const providesService = machine.Services.some(service => 
+      return machine.Services.some(service => 
         service.Service.toLowerCase() === serviceName.toLowerCase()
       );
-      
-      if (!providesService) return false;
-      
-      // Check if machine has available units
-      const currentUsage = machineUsageCounts[machine.Machine] || 0;
-      const machineCount = machine.Number || 1; // Default to 1 if Number is not specified
-      
-      return currentUsage < machineCount;
     });
   };
 
@@ -235,54 +245,57 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
       [service.id]: equipmentStr
     }));
     
-    // Update machine usage counts
-    setMachineUsageCounts(prev => {
-      const newCounts = {...prev};
-      
-      // Decrement count for previously selected machine if any
-      if (service.selectedMachines.length > 0) {
-        const prevMachine = service.selectedMachines[0].name;
-        newCounts[prevMachine] = Math.max((newCounts[prevMachine] || 0) - 1, 0);
-      }
-      
-      // Increment count for newly selected machine
-      newCounts[machineName] = (newCounts[machineName] || 0) + 1;
-      
-      return newCounts;
-    });
+    // Update machine usage counts if managing internally
+    if (!externalMachineUsageCounts) {
+      setInternalMachineUsageCounts(prev => {
+        const newCounts = {...prev};
+        
+        // Decrement count for previously selected machine if any
+        if (service.selectedMachines.length > 0) {
+          const prevMachine = service.selectedMachines[0].name;
+          newCounts[prevMachine] = Math.max((newCounts[prevMachine] || 0) - 1, 0);
+        }
+        
+        // Increment count for newly selected machine
+        newCounts[machineName] = (newCounts[machineName] || 0) + 1;
+        
+        return newCounts;
+      });
+    }
     
     // Propagate changes to parent component
     onUpdateService(updatedService);
   };
 
   // Remove a machine from a service's selected machines
-  const handleRemoveMachine = (service: UserServiceWithMachines, machineName: string) => {
-    const equipmentStr = "Not Specified";
+  const handleRemoveMachine = (service: UserServiceWithMachines) => {
+    // Update machine usage count if managing internally
+    if (!externalMachineUsageCounts && service.selectedMachines.length > 0) {
+      const oldMachineName = service.selectedMachines[0].name;
+      setInternalMachineUsageCounts(prev => ({
+        ...prev,
+        [oldMachineName]: Math.max(0, (prev[oldMachineName] || 0) - 1)
+      }));
+    }
+    
     const updatedService = {
       ...service,
       selectedMachines: [],
-      EquipmentAvail: equipmentStr
+      EquipmentAvail: "Not Specified"
     };
-    
+  
     // Update local state
     setServicesWithMachines(prev => 
       prev.map(s => s.id === service.id ? updatedService : s)
     );
     
-    // Update equipment text state
+    // Update equipment texts
     setEquipmentTexts(prev => ({
       ...prev,
-      [service.id]: equipmentStr
+      [service.id]: "Not Specified"
     }));
-    
-    // Update machine usage counts
-    setMachineUsageCounts(prev => {
-      const newCounts = {...prev};
-      newCounts[machineName] = Math.max((newCounts[machineName] || 0) - 1, 0);
-      return newCounts;
-    });
-    
-    // Propagate changes to parent component
+  
+    // Update parent component
     onUpdateService(updatedService);
   };
 
@@ -293,6 +306,26 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
       ...prev,
       [service.id]: finalText
     }));
+    
+    // Update machine usage count if managing internally
+    if (!externalMachineUsageCounts) {
+      // Decrease count for old machines
+      service.selectedMachines.forEach(machine => {
+        setInternalMachineUsageCounts(prev => ({
+          ...prev,
+          [machine.name]: Math.max(0, (prev[machine.name] || 0) - 1)
+        }));
+      });
+      
+      // Increase count for new machines
+      const newMachines = parseMachines(finalText);
+      newMachines.forEach(machine => {
+        setInternalMachineUsageCounts(prev => ({
+          ...prev,
+          [machine.name]: (prev[machine.name] || 0) + 1
+        }));
+      });
+    }
     
     const machines = parseMachines(finalText);
     const updatedService = {
@@ -386,105 +419,52 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
     }
 
     // For second version of the component (using shadcn/ui Select)
-    if (typeof Select !== 'undefined') {
-      return (
-        <div>
-          <Select 
-            value={service.selectedMachines.length > 0 ? service.selectedMachines[0].name : "none"}
-            onValueChange={(value) => {
-              if (value && value !== "none") {
-                handleAddMachine(service, value);
-              } else {
-                handleRemoveMachine(service, "");
-              }
-            }}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select equipment" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="none">None</SelectItem>
-              {getMachinesForService(service.ServiceAvail)
-                .map(machine => {
-                  const currentUsage = machineUsageCounts[machine.Machine] || 0;
-                  const machineCount = machine.Number || 1;
-                  const remaining = machineCount - currentUsage;
-                  
-                  return (
-                    <SelectItem 
-                      key={machine.id} 
-                      value={machine.Machine}
-                      disabled={remaining <= 0}
-                    >
-                      {machine.Machine} {remaining > 0 ? `(${remaining} available)` : '(unavailable)'}
-                    </SelectItem>
-                  );
-                })
-              }
-            </SelectContent>
-          </Select>
-        </div>
-      );
-    }
-
-    // For first/third version of the component (using native select with badges)
     return (
-      <div className="space-y-2">
-        {service.selectedMachines.length > 0 ? (
-          <div className="flex flex-wrap gap-2 mb-2">
-            <div className="bg-blue-100 px-2 py-1 rounded-lg flex items-center text-sm">
-              <span className="mr-2">{service.selectedMachines[0].name}</span>
-              <button 
-                type="button" 
-                onClick={() => handleRemoveMachine(service, service.selectedMachines[0].name)}
-                className="text-blue-700 hover:text-blue-900"
-              >
-                <X size={14} />
-              </button>
-            </div>
-          </div>
-        ) : (
-          <p className="italic text-sm mb-2 text-gray-500">
-            No equipment assigned
-          </p>
-        )}
-        
-        <div className="flex gap-2">
-          <select 
-            className="w-full border rounded px-2 py-1 text-sm"
-            onChange={(e) => {
-              if (e.target.value) {
-                handleAddMachine(service, e.target.value);
-                e.target.value = ''; // Reset the dropdown
-              }
-            }}
-            value=""
-          >
-            <option value="">Select equipment...</option>
+      <div>
+        <Select 
+          value={service.selectedMachines.length > 0 ? service.selectedMachines[0].name : "none"}
+          onValueChange={(value) => {
+            if (value && value !== "none") {
+              handleAddMachine(service, value);
+            } else {
+              handleRemoveMachine(service);
+            }
+          }}
+        >
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Select equipment" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">None</SelectItem>
             {getMachinesForService(service.ServiceAvail)
               .map(machine => {
-                const currentUsage = machineUsageCounts[machine.Machine] || 0;
+                const currentUsage = effectiveMachineUsageCounts[machine.Machine] || 0;
                 const machineCount = machine.Number || 1;
                 const remaining = machineCount - currentUsage;
                 
+                // If this machine is already selected for this service, 
+                // it should be selectable regardless of remaining count
+                const isCurrentlySelected = service.selectedMachines.some(m => m.name === machine.Machine);
+                const adjustedRemaining = isCurrentlySelected ? remaining + 1 : remaining;
+                
                 return (
-                  <option 
+                  <SelectItem 
                     key={machine.id} 
                     value={machine.Machine}
-                    disabled={remaining <= 0}
+                    disabled={!isCurrentlySelected && adjustedRemaining <= 0}
                   >
-                    {machine.Machine} {remaining > 0 ? `(${remaining} available)` : '(unavailable)'}
-                  </option>
+                    {machine.Machine} {adjustedRemaining > 0 ? `(${adjustedRemaining} available)` : '(unavailable)'}
+                  </SelectItem>
                 );
               })
             }
-          </select>
-        </div>
+          </SelectContent>
+        </Select>
       </div>
     );
   };
 
-  // Render schedule items with combined functionality from all versions
+  // Render schedule items with status conditional visibility
   const renderScheduleItems = () => {
     const timesToRender = editedTimes.length > 0 ? editedTimes : reservation.UtilTimes;
     
@@ -504,7 +484,7 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
             return (
               <div 
                 key={index} 
-                className={`p-3 rounded-lg border ${getTimeSlotBgColor(time.DateStatus)}`}
+                className={`p-3 rounded-lg border ${shouldHideStatus ? 'bg-gray-50 border-gray-200' : getTimeSlotBgColor(time.DateStatus)}`}
               >
                 <div className="flex justify-between items-center">
                   <div>
@@ -514,7 +494,8 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
                     </p>
                   </div>
                   <div>
-                    {editMode && reservation.Status !== 'Approved' && reservation.Status === 'Ongoing' ? (
+                    {/* Only show status controls when not in the restricted statuses */}
+                    {!shouldHideStatus && editMode && reservation.Status === 'Ongoing' ? (
                       <Select
                         value={time.DateStatus || "Ongoing"}
                         onValueChange={(value) => handleStatusChange(index, value)}
@@ -530,7 +511,7 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
                           ))}
                         </SelectContent>
                       </Select>
-                    ) : reservation.Status !== 'Approved' ? (
+                    ) : !shouldHideStatus ? (
                       <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                         time.DateStatus === "Completed" ? "bg-green-100 text-green-800 border border-green-200" :
                         time.DateStatus === "Cancelled" ? "bg-red-100 text-red-800 border border-red-200" :
@@ -559,7 +540,10 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
               <p className="ml-4">End: {formatDateTime(time.EndTime)}</p>
             </div>
             <div className="pt-1">
-              <TimeStatusBadge status={time.DateStatus} reservationStatus={reservation.Status} />
+              {/* Only show status badge when not in the restricted statuses */}
+              {!shouldHideStatus && (
+                <TimeStatusBadge status={time.DateStatus} reservationStatus={reservation.Status} />
+              )}
             </div>
           </div>
         ))}

@@ -1,10 +1,13 @@
 // src/components/admin/time-editor.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, ChevronUp, ChevronDown, CheckCircle } from 'lucide-react';
+import { AlertCircle, ChevronUp, ChevronDown, CheckCircle, Clock } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, addMinutes, parse, parseISO } from 'date-fns';
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Separator } from "@/components/ui/separator";
 
 interface UtilTime {
   id: number;
@@ -14,9 +17,27 @@ interface UtilTime {
   DateStatus?: string | null;
 }
 
+interface DownTime {
+  id?: number;
+  DTDate: string | null;
+  DTTypeofProducts: string | null;
+  DTTime: number | null; // Time in minutes
+  Cause: string | null;
+  DTMachineOp: string | null;
+  machineUtilId?: number | null;
+}
+
+interface MachineUtilization {
+  id?: number;
+  Machine: string | null;
+  ServiceName: string | null;
+  DownTimes: DownTime[];
+}
+
 interface TimeEditorProps {
   utilTimes: UtilTime[];
   serviceRates: Map<string, number>;
+  machineUtilizations?: MachineUtilization[]; // Add machine utilizations
   onSave: (updatedTimes: UtilTime[], updatedCost: number, totalDuration: number) => void;
   onCancel: () => void;
 }
@@ -46,6 +67,7 @@ const StatusBadge = ({ status }: { status: string | null | undefined }) => {
 const TimeEditor: React.FC<TimeEditorProps> = ({
   utilTimes,
   serviceRates,
+  machineUtilizations = [],
   onSave,
   onCancel
 }) => {
@@ -61,6 +83,8 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [totalDowntimeMinutes, setTotalDowntimeMinutes] = useState<number>(0);
+  const [downtimeDeduction, setDowntimeDeduction] = useState<number>(0);
 
   // Time status options
   const statusOptions = [
@@ -68,6 +92,27 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
     { value: "Completed", label: "Completed" },
     { value: "Cancelled", label: "Cancelled" }
   ];
+
+  // Calculate total downtime on component mount
+  useEffect(() => {
+    calculateTotalDowntime();
+  }, [machineUtilizations]);
+
+  // Calculate total downtime minutes from machine utilizations
+  const calculateTotalDowntime = () => {
+    let totalMinutes = 0;
+    
+    // Sum up all downtime minutes across all machines
+    machineUtilizations.forEach(machine => {
+      if (machine.DownTimes && Array.isArray(machine.DownTimes)) {
+        machine.DownTimes.forEach(downtime => {
+          totalMinutes += (downtime.DTTime || 0);
+        });
+      }
+    });
+    
+    setTotalDowntimeMinutes(totalMinutes);
+  };
 
   const validateAllUtilTimesComplete = (utilTimes) => {
     if (!utilTimes || !Array.isArray(utilTimes) || utilTimes.length === 0) {
@@ -92,22 +137,6 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
       valid: true,
       message: "All time slots are properly marked."
     };
-  };
-
-  const handleTransitionToPendingPayment = () => {
-    // Validate that all time slots are completed
-    const validation = validateAllUtilTimesComplete(editedTimes);
-    
-    if (!validation.valid) {
-      // Display an error message indicating why pending payment cannot proceed
-      setError(validation.message);
-      return;
-    }
-    
-    // If all times are valid, proceed with status update
-    // You'll need to pass the actual reservation ID and implementation
-    // of handleStatusUpdate from the parent component
-    handleStatusUpdate(reservationId, 'Pending Payment');
   };
 
   // Generate time options in 15-minute increments for a 24-hour period
@@ -187,16 +216,35 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
     }, 0);
   };
 
-  // Calculate the cost based on updated times and service rates
-  const calculateUpdatedCost = (): number => {
+  // Calculate the effective minutes after deducting downtime
+  const calculateEffectiveMinutes = (times: UtilTime[]): number => {
+    const totalMins = calculateTotalMinutes(times);
+    // Ensure we don't go below zero
+    return Math.max(0, totalMins - totalDowntimeMinutes);
+  };
+
+  // Format price to have 2 decimal places and currency symbol
+  const formatPrice = (price: number): string => {
+    return `₱${price.toFixed(2)}`;
+  };
+
+  // Calculate the cost based on updated times, service rates, and downtime
+  const calculateUpdatedCost = (): { originalCost: number, adjustedCost: number } => {
     const totalMinutes = calculateTotalMinutes(editedTimes);
+    const effectiveMinutes = calculateEffectiveMinutes(editedTimes);
     
     // If we have explicit service rates, use them
     // For simplicity, here we're using a flat rate for all services
     // In a real implementation, you'd calculate based on specific services
     const defaultRatePerMinute = Array.from(serviceRates.values())[0] || 1;
     
-    return totalMinutes * defaultRatePerMinute;
+    const originalCost = totalMinutes * defaultRatePerMinute;
+    const adjustedCost = effectiveMinutes * defaultRatePerMinute;
+    
+    // Update downtime deduction state
+    setDowntimeDeduction(originalCost - adjustedCost);
+    
+    return { originalCost, adjustedCost };
   };
 
   // Format a duration in minutes to hours and minutes
@@ -278,10 +326,11 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
     
     try {
       // Calculate the updated cost
-      const updatedCost = calculateUpdatedCost();
+      const { adjustedCost } = calculateUpdatedCost();
+      const totalDuration = calculateTotalMinutes(editedTimes);
       
-      // Call the parent's save handler
-      await onSave(editedTimes, updatedCost);
+      // Call the parent's save handler with the downtime-adjusted cost
+      await onSave(editedTimes, adjustedCost, totalDuration);
     } catch (err) {
       setError("Failed to save time changes");
       console.error(err);
@@ -306,7 +355,9 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
   };
 
   // Calculate and display the estimated updated cost
-  const updatedCost = calculateUpdatedCost();
+  const { originalCost, adjustedCost } = calculateUpdatedCost();
+  const totalDuration = calculateTotalMinutes(editedTimes);
+  const effectiveDuration = calculateEffectiveMinutes(editedTimes);
 
   const renderTimeSlotSummary = () => {
     const ongoingCount = editedTimes.filter(time => 
@@ -344,6 +395,79 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
     );
   };
 
+  const renderCostSummary = () => {
+    return (
+      <div className="my-4 p-3 rounded-lg border">
+        <h4 className="font-medium mb-3">Cost Calculation</h4>
+        
+        <div className="space-y-2">
+          <div className="flex justify-between items-center">
+            <span>Total Duration:</span>
+            <span className="font-medium">{formatDuration(totalDuration)}</span>
+          </div>
+          
+          {totalDowntimeMinutes > 0 && (
+            <>
+              <div className="flex justify-between items-center text-red-600">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="flex items-center cursor-help">
+                        <Clock className="h-4 w-4 mr-1" />
+                        Downtime Deduction:
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="p-2 max-w-xs bg-white shadow-lg rounded-md">
+                      <div className="text-xs text-gray-800">
+                        <p>Downtime is recorded for machines in Machine Utilization records. This time is deducted from the billable duration.</p>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <span className="font-medium">-{formatDuration(totalDowntimeMinutes)}</span>
+              </div>
+              
+              <div className="flex justify-between items-center text-green-600">
+                <span>Effective Duration:</span>
+                <span className="font-medium">{formatDuration(effectiveDuration)}</span>
+              </div>
+              
+              <Separator className="my-2" />
+              
+              <div className="flex justify-between items-center">
+                <span>Original Cost:</span>
+                <span className={totalDowntimeMinutes > 0 ? "line-through text-gray-500" : "font-medium"}>
+                  {formatPrice(originalCost)}
+                </span>
+              </div>
+              
+              {totalDowntimeMinutes > 0 && (
+                <>
+                  <div className="flex justify-between items-center text-red-600">
+                    <span>Downtime Deduction:</span>
+                    <span className="font-medium">-{formatPrice(downtimeDeduction)}</span>
+                  </div>
+                
+                  <div className="flex justify-between items-center mt-2">
+                    <span className="font-bold">Adjusted Total:</span>
+                    <span className="font-bold text-green-600">{formatPrice(adjustedCost)}</span>
+                  </div>
+                </>
+              )}
+            </>
+          )}
+          
+          {totalDowntimeMinutes === 0 && (
+            <div className="flex justify-between items-center mt-2">
+              <span className="font-bold">Total Cost:</span>
+              <span className="font-bold">{formatPrice(originalCost)}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const markAllSlotsCompleted = () => {
     setEditedTimes(prev => prev.map(time => ({
       ...time,
@@ -360,6 +484,16 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      
+      {totalDowntimeMinutes > 0 && (
+        <Alert variant="default" className="bg-amber-50 border-amber-200">
+          <Clock className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-700">
+            <span className="font-medium">{totalDowntimeMinutes} minutes</span> of machine downtime detected. 
+            This will be deducted from the billable duration and total cost.
+          </AlertDescription>
         </Alert>
       )}
       
@@ -451,6 +585,8 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
         })}
       </div>
       
+      {renderCostSummary()}
+      
       <div className="flex flex-col gap-4">
         {/* Add a warning if there are ongoing time slots */}
         {editedTimes.some(time => time.DateStatus === "Ongoing" || time.DateStatus === null || time.DateStatus === undefined) && (
@@ -484,7 +620,7 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
             onClick={handleSubmit}
             disabled={isSubmitting}
           >
-            {isSubmitting ? 'Saving...' : 'Save & Update Cost'}
+            {isSubmitting ? 'Saving...' : `Save & Update Cost${totalDowntimeMinutes > 0 ? ' with Downtime' : ''}`}
           </Button>
         </div>
       </div>
