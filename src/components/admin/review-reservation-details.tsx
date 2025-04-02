@@ -1,3 +1,4 @@
+// src\components\admin\review-reservation-details.tsx
 import React, { useState, useEffect } from 'react';
 import { Separator } from "@/components/ui/separator";
 import { X } from 'lucide-react';
@@ -55,9 +56,9 @@ interface SelectedMachine {
   name: string;
 }
 
-// Extended service that includes selected machines
 interface UserServiceWithMachines extends UserService {
   selectedMachines: SelectedMachine[];
+  localSelection?: string; // Add this line
 }
 
 interface ReservationDetailsTabProps {
@@ -90,6 +91,7 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
   editMode,
   validationError,
   onUpdateService,
+<<<<<<< Updated upstream
   hideRequiresEquipment = false, // Default to false for backward compatibility
   onUpdateTimeStatus
 }) => {
@@ -98,6 +100,18 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
   const [equipmentTexts, setEquipmentTexts] = useState<{[serviceId: string]: string}>({});
   // State for managing time slots
   const [editedTimes, setEditedTimes] = useState<UtilTime[]>([]);
+=======
+  hideRequiresEquipment = false,
+  onUpdateTimeStatus,
+  machineUsageCounts: externalMachineUsageCounts
+}) => {
+  const [servicesWithMachines, setServicesWithMachines] = useState<UserServiceWithMachines[]>([]);
+  const [internalMachineUsageCounts, setInternalMachineUsageCounts] = useState<{[machineName: string]: number}>({});
+  const [editedTimes, setEditedTimes] = useState<UtilTime[]>([]);
+  
+  // Use external counts if provided, otherwise use internal counts
+  const effectiveMachineUsageCounts = externalMachineUsageCounts || internalMachineUsageCounts;
+>>>>>>> Stashed changes
   
   // Time status options
   const statusOptions = [
@@ -128,7 +142,20 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
     return machines.map(m => m.name).join(', ');
   };
 
+<<<<<<< Updated upstream
   // Initialize the services with machines data and time status
+=======
+  // Calculate machine availability based on current usage and machine capacity
+  const getMachineAvailability = (machine: Machine): number => {
+    const machineCount = machine.Number || 1; // Default to 1 if Number is not specified
+    const currentUsage = effectiveMachineUsageCounts[machine.Machine] || 0;
+    
+    // If this service already has this machine selected, it doesn't count against availability
+    return Math.max(0, machineCount - currentUsage);
+  };
+
+  // Initialize the services with machines data and calculate machine usage
+>>>>>>> Stashed changes
   useEffect(() => {
     if (reservation) {
       const servicesWithMachines = reservation.UserServices.map(service => {
@@ -137,11 +164,13 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
         return {
           ...service,
           EquipmentAvail: equipmentAvail,
-          selectedMachines: parseMachines(equipmentAvail)
+          selectedMachines: parseMachines(equipmentAvail),
+          localSelection: equipmentAvail === "Not Specified" ? "not-specified" : equipmentAvail // Add this
         };
       });
       
       setServicesWithMachines(servicesWithMachines);
+<<<<<<< Updated upstream
       
       // Initialize the equipment text inputs
       const initialTexts: {[serviceId: string]: string} = {};
@@ -149,6 +178,19 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
         initialTexts[service.id] = service.EquipmentAvail || "Not Specified";
       });
       setEquipmentTexts(initialTexts);
+=======
+
+      // Calculate initial machine usage counts only if external counts aren't provided
+      if (!externalMachineUsageCounts) {
+        const initialUsage: {[machineName: string]: number} = {};
+        servicesWithMachines.forEach(service => {
+          service.selectedMachines.forEach(machine => {
+            initialUsage[machine.name] = (initialUsage[machine.name] || 0) + 1;
+          });
+        });
+        setInternalMachineUsageCounts(initialUsage);
+      }
+>>>>>>> Stashed changes
       
       // Initialize time status
       setEditedTimes(reservation.UtilTimes.map(time => ({
@@ -157,15 +199,26 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
         DateStatus: time.DateStatus || "Ongoing"
       })));
     }
-  }, [reservation]);
+  }, [reservation, externalMachineUsageCounts]);
 
   // Find machines that can perform a specific service
   const getMachinesForService = (serviceName: string) => {
+<<<<<<< Updated upstream
     return machines.filter(machine => 
       machine.isAvailable && machine.Services.some(service => 
         service.Service.toLowerCase() === serviceName.toLowerCase()
       )
     );
+=======
+    return machines.filter(machine => {
+      if (!machine.isAvailable) return false;
+      
+      // Check if machine provides this service
+      return machine.Services.some(service => 
+        service.Service.toLowerCase() === serviceName.toLowerCase()
+      );
+    });
+>>>>>>> Stashed changes
   };
 
   // Check if a service requires machines
@@ -174,24 +227,39 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
     return getMachinesForService(serviceName).length > 0;
   };
 
+<<<<<<< Updated upstream
   // Add a machine to a service's selected machines - replacing any existing ones
   const handleAddMachine = (service: UserServiceWithMachines, machineName: string) => {
     // Only allow one machine - replace any existing ones
     const updatedMachines = [{ name: machineName }];
     
     const equipmentStr = stringifyMachines(updatedMachines);
+=======
+  // Updated handleAddMachine for immediate UI update
+  const handleAddMachine = (service: UserServiceWithMachines, machineName: string) => {
+    // Remove existing machine from usage count if any
+    if (service.selectedMachines.length > 0 && !externalMachineUsageCounts) {
+      const oldMachineName = service.selectedMachines[0].name;
+      setInternalMachineUsageCounts(prev => ({
+        ...prev,
+        [oldMachineName]: Math.max(0, (prev[oldMachineName] || 0) - 1)
+      }));
+    }
+>>>>>>> Stashed changes
     
+    // Create updated service with new machine
     const updatedService = {
       ...service,
-      selectedMachines: updatedMachines,
-      EquipmentAvail: equipmentStr
+      selectedMachines: [{ name: machineName }],
+      EquipmentAvail: machineName
     };
-    
-    // Update local state
+  
+    // Update local state immediately
     setServicesWithMachines(prev => 
       prev.map(s => s.id === service.id ? updatedService : s)
     );
     
+<<<<<<< Updated upstream
     // Update equipment text state
     setEquipmentTexts(prev => ({
       ...prev,
@@ -206,17 +274,42 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
   const handleRemoveMachine = (service: UserServiceWithMachines, machineName: string) => {
     // Set to "Not Specified" instead of empty string when removing the last machine
     const equipmentStr = "Not Specified";
+=======
+    // Update machine usage count if managing internally
+    if (!externalMachineUsageCounts) {
+      setInternalMachineUsageCounts(prev => ({
+        ...prev,
+        [machineName]: (prev[machineName] || 0) + 1
+      }));
+    }
+  
+    // Update parent component
+    onUpdateService(updatedService);
+  };
+  
+  // Updated handleRemoveMachine for immediate UI update
+  const handleRemoveMachine = (service: UserServiceWithMachines) => {
+    // Update machine usage count if managing internally
+    if (!externalMachineUsageCounts && service.selectedMachines.length > 0) {
+      const oldMachineName = service.selectedMachines[0].name;
+      setInternalMachineUsageCounts(prev => ({
+        ...prev,
+        [oldMachineName]: Math.max(0, (prev[oldMachineName] || 0) - 1)
+      }));
+    }
+>>>>>>> Stashed changes
     
     const updatedService = {
       ...service,
       selectedMachines: [],
-      EquipmentAvail: equipmentStr
+      EquipmentAvail: "Not Specified"
     };
-    
-    // Update local state
+  
+    // Update local state immediately
     setServicesWithMachines(prev => 
       prev.map(s => s.id === service.id ? updatedService : s)
     );
+<<<<<<< Updated upstream
     
     // Update equipment text state
     setEquipmentTexts(prev => ({
@@ -225,6 +318,10 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
     }));
     
     // Propagate changes to parent component
+=======
+  
+    // Update parent component
+>>>>>>> Stashed changes
     onUpdateService(updatedService);
   };
 
@@ -284,6 +381,165 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
     }
   };
 
+<<<<<<< Updated upstream
+=======
+  const renderEquipmentSelection = (service: UserServiceWithMachines) => {
+    if (!editMode) {
+      return (
+        <div>
+          {service.selectedMachines.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              <span className="bg-blue-50 px-2 py-1 rounded-lg text-sm">
+                {service.selectedMachines[0].name}
+              </span>
+            </div>
+          ) : (
+            <p className="italic text-gray-500">
+              Not assigned
+            </p>
+          )}
+        </div>
+      );
+    }
+  
+    const availableMachines = getMachinesForService(service.ServiceAvail);
+    
+    return (
+      <Select
+        value={service.localSelection || "not-specified"}
+        onValueChange={(selectedValue) => {
+          // Create updated service with new local selection
+          const updatedService = {
+            ...service,
+            localSelection: selectedValue
+          };
+          
+          // Update local state immediately for visual feedback
+          setServicesWithMachines(prevServices =>
+            prevServices.map(s =>
+              s.id === service.id ? updatedService : s
+            )
+          );
+          
+          // Then update the actual state
+          if (selectedValue === "not-specified") {
+            handleRemoveMachine(updatedService);
+          } else {
+            handleAddMachine(updatedService, selectedValue);
+          }
+        }}
+      >
+        <SelectTrigger className="w-full">
+          <SelectValue placeholder="Select machine" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="not-specified">Not Specified</SelectItem>
+          {availableMachines.map(machine => {
+            const availability = getMachineAvailability(machine);
+            const isCurrentlySelected = service.selectedMachines.some(m => 
+              m.name === machine.Machine
+            );
+            const adjustedAvailability = isCurrentlySelected ? availability + 1 : availability;
+            
+            return (
+              <SelectItem 
+                key={machine.id} 
+                value={machine.Machine}
+                disabled={!isCurrentlySelected && adjustedAvailability <= 0}
+              >
+                {machine.Machine} ({adjustedAvailability} available)
+              </SelectItem>
+            );
+          })}
+        </SelectContent>
+      </Select>
+    );
+  };
+
+  // Render schedule items with combined functionality from all versions
+  const renderScheduleItems = () => {
+    const timesToRender = editedTimes.length > 0 ? editedTimes : reservation.UtilTimes;
+    
+    if (timesToRender.length === 0) {
+      return <p className="text-gray-500 italic">No schedules available</p>;
+    }
+
+    // Enhanced time slots version with status control
+    if (onUpdateTimeStatus) {
+      return (
+        <div className="space-y-4">
+          {timesToRender.map((time, index) => {
+            const formattedDate = time.StartTime 
+              ? format(new Date(time.StartTime), 'MMMM d, yyyy')
+              : 'Date not set';
+            
+            return (
+              <div 
+                key={index} 
+                className={`p-3 rounded-lg border ${getTimeSlotBgColor(time.DateStatus)}`}
+              >
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h4 className="font-medium">Time Slot {index + 1}</h4>
+                    <p className="text-sm text-gray-600">
+                      {formatDateTime(time.StartTime)} - {formatDateTime(time.EndTime)}
+                    </p>
+                  </div>
+                  <div>
+                    {editMode && reservation.Status !== 'Approved' && reservation.Status === 'Ongoing' ? (
+                      <Select
+                        value={time.DateStatus || "Ongoing"}
+                        onValueChange={(value) => handleStatusChange(index, value)}
+                      >
+                        <SelectTrigger className="w-32">
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {statusOptions.map(option => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : reservation.Status !== 'Approved' ? (
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                        time.DateStatus === "Completed" ? "bg-green-100 text-green-800 border border-green-200" :
+                        time.DateStatus === "Cancelled" ? "bg-red-100 text-red-800 border border-red-200" :
+                        "bg-blue-100 text-blue-800 border border-blue-200"
+                      }`}>
+                        {time.DateStatus || "Ongoing"}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+    
+    // Simple time slot display with badge
+    return (
+      <div className="space-y-2">
+        {timesToRender.map((time, index) => (
+          <div key={index} className="bg-gray-50 p-3 rounded-lg flex justify-between items-start">
+            <div>
+              <p><span className="text-gray-600">Day {time.DayNum || index + 1}:</span></p>
+              <p className="ml-4">Start: {formatDateTime(time.StartTime)}</p>
+              <p className="ml-4">End: {formatDateTime(time.EndTime)}</p>
+            </div>
+            <div className="pt-1">
+              <TimeStatusBadge status={time.DateStatus} reservationStatus={reservation.Status} />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+>>>>>>> Stashed changes
   return (
     <div className="space-y-6">
       {validationError && (
