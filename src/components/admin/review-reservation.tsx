@@ -6,6 +6,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -18,7 +19,7 @@ import TimeEditor from './time-editor';
 import { downloadMachineUtilPDF } from "@/components/admin-functions/pdf/machine-utilization-pdf";
 import CostBreakdown from './cost-breakdown'; // Import the new CostBreakdown component
 import { toast } from 'sonner';
-import MachineUtilization from './machine-utilization';
+import  MachineUtilization from './machine-utilization';
 
 // Updated interface definitions
 interface UserService {
@@ -34,15 +35,6 @@ interface UserTool {
   id: string;
   ToolUser: string;
   ToolQuantity: number;
-}
-
-interface Service {
-  id: string;
-  Service: string;
-  Costs: number | string | null;
-  Icon?: string | null;
-  Info?: string | null;
-  Per?: string | null;
 }
 
 interface UtilTime {
@@ -181,12 +173,10 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
   const [comments, setComments] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-<<<<<<< Updated upstream
-  const [editedTimes, setEditedTimes] = useState<UtilTime[]>([]);
-=======
   const [machineUsageCounts, setMachineUsageCounts] = useState<{[machineName: string]: number}>({});
   const [isLoading, setIsLoading] = useState(false);
   const [servicePricing, setServicePricing] = useState<ServicePricing[]>([]);
+  const [timeSlotError, setTimeSlotError] = useState<string | null>(null);
 
   const [confirmationDialog, setConfirmationDialog] = useState({
     isOpen: false,
@@ -237,20 +227,27 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
 
   const handleMarkAsPendingPayment = () => {
     if (!localReservation) return;
+    
+    // Clear previous errors
+    setTimeSlotError(null);
+    
     // Check if all UtilTimes are marked as Completed or Cancelled
     const incompleteTimes = localReservation.UtilTimes.filter(
       time => time.DateStatus !== "Completed" && time.DateStatus !== "Cancelled"
     );
     
     if (incompleteTimes.length > 0) {
+      setTimeSlotError(`${incompleteTimes.length} time slot(s) are not yet marked as Completed or Cancelled. 
+        Please review and update all time slots before proceeding.`);
+      
       toast.error("Cannot proceed to payment", {
-        description: `${incompleteTimes.length} time slot(s) are not yet marked as Completed or Cancelled. 
-        Please review and update all time slots before proceeding.`,
+        description: `${incompleteTimes.length} time slot(s) are not yet marked as Completed or Cancelled.`,
         duration: 5000
       });
       return;
     }
     
+    // If validation passes, show confirmation dialog
     showConfirmation(
       'Mark as Pending Payment',
       'Are you sure you want to mark this reservation as Pending Payment? This will notify the client to proceed with payment.',
@@ -294,13 +291,10 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
     );
   };
   
->>>>>>> Stashed changes
   const isEditingDisabled = (status: string): boolean => {
     const nonEditableStatuses = ['Pending Payment', 'Paid', 'Completed'];
     return nonEditableStatuses.includes(status);
   };
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
-  const [services, setServices] = useState<ServicePricing[]>([]);
 
   const isPendingStatus = (status: string): boolean => {
     return status === 'Pending' || status === 'Pending Admin Approval';
@@ -612,8 +606,6 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
     }
   };
 
-=======
->>>>>>> Stashed changes
   // Handle completion of machine utilization editing
   const handleMachineUtilizationComplete = () => {
     setEditingMachineUtilization(false);
@@ -674,18 +666,35 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
     }
   };
 
-  // Handle update of a service from the child component
   const handleUpdateService = (updatedService: UserServiceWithMachines) => {
+    // Find the service being updated
+    const oldService = editedServices.find(s => s.id === updatedService.id);
+    
+    // Update machine usage counts
+    setMachineUsageCounts(prev => {
+      const newCounts = {...prev};
+      
+      // Remove counts for previously selected machines
+      if (oldService) {
+        oldService.selectedMachines.forEach(machine => {
+          newCounts[machine.name] = Math.max((newCounts[machine.name] || 0) - 1, 0);
+        });
+      }
+      
+      // Add counts for newly selected machines
+      updatedService.selectedMachines.forEach(machine => {
+        newCounts[machine.name] = (newCounts[machine.name] || 0) + 1;
+      });
+      
+      return newCounts;
+    });
+    
+    // Update the services array
     setEditedServices(prev => 
       prev.map(service => 
         service.id === updatedService.id ? updatedService : service
       )
     );
-    setHasUnsavedChanges(true);
-  };
-
-  const handleUpdateTimeStatus = (updatedTimes: UtilTime[]) => {
-    setEditedTimes(updatedTimes);
     setHasUnsavedChanges(true);
   };
 
@@ -1041,6 +1050,12 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
   
                 <DialogFooter className="mt-6">
                 <div className="w-full flex flex-col">
+                {timeSlotError && (
+      <Alert variant="destructive" className="mb-4 w-full">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>{timeSlotError}</AlertDescription>
+      </Alert>
+    )}
                   {validationError && (
                     <Alert variant="destructive" className="mb-4 w-full">
                       <AlertCircle className="h-4 w-4" />

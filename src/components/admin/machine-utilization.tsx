@@ -896,162 +896,150 @@ useEffect(() => {
                         />
                       </div>
                     </div>
-
+    
                     <Separator />
-
+    
                     {/* Operating Times Section - Fixed Layout */}
                     <div>
-  <div className="flex justify-between items-center mb-2">
-    <h4 className="font-medium flex items-center">
-      <Clock className="h-4 w-4 mr-2" />
-      Operating Times
-    </h4>
-    <Button 
-      variant="outline" 
-      size="sm" 
-      onClick={() => handleAddOperatingTime(machineIndex)}
-    >
-      <Plus className="h-4 w-4 mr-1" />
-      Add Time
-    </Button>
-  </div>
-  
-  {machineUtil.OperatingTimes.length === 0 ? (
-    <p className="text-gray-500 italic text-sm">No operating times recorded</p>
-  ) : (
-    <div className="space-y-4">
-      {machineUtil.OperatingTimes.map((operatingTime, otIndex) => (
-        <div key={`op-time-${machineIndex}-${otIndex}-${operatingTime.id || 'new'}`} className="bg-blue-50 p-3 rounded-lg relative">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="absolute top-2 right-2 h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-100"
-            onClick={() => handleRemoveOperatingTime(machineIndex, otIndex)}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-          
-          <div className="grid grid-cols-2 gap-4 mb-3">
-            <div>
-              <label className="block text-xs font-medium mb-1">Date</label>
-              <Input 
-                type="date"
-                value={operatingTime.OTDate || ''}
-                onChange={(e) => handleUpdateOperatingTime(machineIndex, otIndex, 'OTDate', e.target.value)}
-                className="w-full"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium mb-1">Type of Products</label>
-              <Input 
-                value={operatingTime.OTTypeofProducts || ''}
-                onChange={(e) => handleUpdateOperatingTime(machineIndex, otIndex, 'OTTypeofProducts', e.target.value)}
-                className="w-full"
-              />
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-3 gap-4 mb-3">
-  <div>
-    <label className="block text-xs font-medium mb-1">Start Time</label>
-    <div className="flex space-x-2">
-      <Select 
-        value={parseTimeString(operatingTime.OTStartTime).hour.toString()}
-        onValueChange={(value) => handleHourChange(machineIndex, otIndex, 'OTStartTime', parseInt(value))}
-      >
-        <SelectTrigger className="w-[110px]">
-          <SelectValue placeholder="Hour" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>
-            {validHours.map(hour => (
-              <SelectItem key={`start-hour-${hour}`} value={hour.toString()}>
-                {formatHour(hour)}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
-      
-      <Select 
-        value={parseTimeString(operatingTime.OTStartTime).minute.toString()}
-        onValueChange={(value) => handleMinuteChange(machineIndex, otIndex, 'OTStartTime', parseInt(value))}
-      >
-        <SelectTrigger className="w-[100px]">
-          <SelectValue placeholder="Minute" />
-        </SelectTrigger>
-        <SelectContent className="h-[200px] overflow-y-auto">
-          <SelectGroup>
-            {allMinutes.map(minute => (
-              <SelectItem key={`start-min-${minute}`} value={minute.toString()}>
-                {formatMinute(minute)}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
-    </div>
-  </div>
-  
-  <div>
-    <label className="block text-xs font-medium mb-1">End Time</label>
-    <div className="flex space-x-2">
-      <Select 
-        value={parseTimeString(operatingTime.OTEndTime).hour.toString()}
-        onValueChange={(value) => handleHourChange(machineIndex, otIndex, 'OTEndTime', parseInt(value))}
-      >
-        <SelectTrigger className="w-[110px]">
-          <SelectValue placeholder="Hour" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>
-            {validHours.map(hour => (
-              <SelectItem key={`end-hour-${hour}`} value={hour.toString()}>
-                {formatHour(hour)}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
-      
-      <Select 
-        value={parseTimeString(operatingTime.OTEndTime).minute.toString()}
-        onValueChange={(value) => handleMinuteChange(machineIndex, otIndex, 'OTEndTime', parseInt(value))}
-      >
-        <SelectTrigger className="w-[100px]">
-          <SelectValue placeholder="Minute" />
-        </SelectTrigger>
-        <SelectContent className="h-[200px] overflow-y-auto">
-          <SelectGroup>
-            {allMinutes.map(minute => (
-              <SelectItem key={`end-min-${minute}`} value={minute.toString()}>
-                {formatMinute(minute)}
-              </SelectItem>
-            ))}
-          </SelectGroup>
-        </SelectContent>
-      </Select>
-    </div>
-  </div>
-  
-  <div>
-    <label className="block text-xs font-medium mb-1">Machine Operator</label>
-    <Input 
-      value={operatingTime.OTMachineOp || ''}
-      onChange={(e) => handleUpdateOperatingTime(machineIndex, otIndex, 'OTMachineOp', e.target.value)}
-      placeholder="Enter operator name"
-      className="w-full"
-    />
-  </div>
-</div>
-        </div>
-      ))}
-    </div>
-  )}
-</div>
-
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="font-medium flex items-center">
+                          <Clock className="h-4 w-4 mr-2" />
+                          Operating Times
+                        </h4>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleAddOperatingTime(machineIndex)}
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add Time
+                        </Button>
+                      </div>
+                      
+                      {machineUtil.OperatingTimes.length === 0 ? (
+                        <p className="text-gray-500 italic text-sm">No operating times recorded</p>
+                      ) : (
+                        <div className="space-y-4">
+                          {machineUtil.OperatingTimes.map((operatingTime, otIndex) => (
+                            <div key={`op-time-${machineIndex}-${otIndex}-${operatingTime.id || 'new'}`} className="bg-blue-50 p-3 rounded-lg relative">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="absolute top-2 right-2 h-6 w-6 text-red-500 hover:text-red-700 hover:bg-red-100"
+                                onClick={() => handleRemoveOperatingTime(machineIndex, otIndex)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                              
+                              <div className="grid grid-cols-2 gap-4 mb-3">
+                                <div>
+                                  <label className="block text-xs font-medium mb-1">Date</label>
+                                  <Input 
+                                    type="date"
+                                    value={operatingTime.OTDate || ''}
+                                    onChange={(e) => handleUpdateOperatingTime(machineIndex, otIndex, 'OTDate', e.target.value)}
+                                    className="w-full"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium mb-1">Type of Products</label>
+                                  <Input 
+                                    value={operatingTime.OTTypeofProducts || ''}
+                                    onChange={(e) => handleUpdateOperatingTime(machineIndex, otIndex, 'OTTypeofProducts', e.target.value)}
+                                    className="w-full"
+                                  />
+                                </div>
+                              </div>
+                              
+                              <div className="grid grid-cols-3 gap-4 mb-3">
+                                <div>
+                                  <label className="block text-xs font-medium mb-1">Start Time</label>
+                                  <div className="flex space-x-2">
+                                    {/* Hours - Native Select */}
+                                    <div className="relative w-[110px]">
+                                      <select
+                                        value={parseTimeString(operatingTime.OTStartTime).hour}
+                                        onChange={(e) => handleHourChange(machineIndex, otIndex, 'OTStartTime', parseInt(e.target.value))}
+                                        className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                      >
+                                        {validHours.map(hour => (
+                                          <option key={`start-hour-${hour}`} value={hour}>
+                                            {formatHour(hour)}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    
+                                    {/* Minutes - Native Select */}
+                                    <div className="relative w-[100px]">
+                                      <select
+                                        value={parseTimeString(operatingTime.OTStartTime).minute}
+                                        onChange={(e) => handleMinuteChange(machineIndex, otIndex, 'OTStartTime', parseInt(e.target.value))}
+                                        className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                      >
+                                        {allMinutes.map(minute => (
+                                          <option key={`start-min-${minute}`} value={minute}>
+                                            {formatMinute(minute)}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                <div>
+                                  <label className="block text-xs font-medium mb-1">End Time</label>
+                                  <div className="flex space-x-2">
+                                    {/* Hours - Native Select */}
+                                    <div className="relative w-[110px]">
+                                      <select
+                                        value={parseTimeString(operatingTime.OTEndTime).hour}
+                                        onChange={(e) => handleHourChange(machineIndex, otIndex, 'OTEndTime', parseInt(e.target.value))}
+                                        className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                      >
+                                        {validHours.map(hour => (
+                                          <option key={`end-hour-${hour}`} value={hour}>
+                                            {formatHour(hour)}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    
+                                    {/* Minutes - Native Select */}
+                                    <div className="relative w-[100px]">
+                                      <select
+                                        value={parseTimeString(operatingTime.OTEndTime).minute}
+                                        onChange={(e) => handleMinuteChange(machineIndex, otIndex, 'OTEndTime', parseInt(e.target.value))}
+                                        className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                      >
+                                        {allMinutes.map(minute => (
+                                          <option key={`end-min-${minute}`} value={minute}>
+                                            {formatMinute(minute)}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                <div>
+                                  <label className="block text-xs font-medium mb-1">Machine Operator</label>
+                                  <Input 
+                                    value={operatingTime.OTMachineOp || ''}
+                                    onChange={(e) => handleUpdateOperatingTime(machineIndex, otIndex, 'OTMachineOp', e.target.value)}
+                                    placeholder="Enter operator name"
+                                    className="w-full"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+    
                     <Separator />
-
+    
                     {/* Down Times */}
                     <div>
                       <div className="flex justify-between items-center mb-2">
@@ -1141,9 +1129,9 @@ useEffect(() => {
                         </div>
                       )}
                     </div>
-
+    
                     <Separator />
-
+    
                     {/* Repair Checks */}
                     <div>
                       <div className="flex justify-between items-center mb-2">

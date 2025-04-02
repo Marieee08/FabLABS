@@ -76,6 +76,16 @@
   transform: rotate(0deg, 360deg); /* Adjust initial transform if needed */
 }
 
+.select-below {
+  position: relative;
+}
+
+.select-below select {
+  position: relative;
+  z-index: 1;
+}
+
+
 @layer utilities {
   .animate-slide {
     display: flex;

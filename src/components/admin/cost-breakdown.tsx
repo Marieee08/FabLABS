@@ -119,7 +119,7 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
 
   // Effect to recalculate based on reservation status whenever needed
   useEffect(() => {
-    if (reservationStatus === 'Ongoing') {
+    if (reservationStatus === 'Ongoing' || reservationStatus === 'Pending Payment' || reservationStatus === 'Completed') {
       calculateOperationTimeCosts();
     } else if (reservationStatus === 'Pending Admin Approval' || reservationStatus === 'Approved') {
       calculateBookedCosts();
@@ -650,11 +650,11 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
       <CardHeader className="pb-2">
         <CardTitle className="text-lg font-medium">
           Cost Breakdown
-          {reservationStatus === 'Ongoing' && (
-            <Badge variant="outline" className="ml-2 text-blue-600 border-blue-300 bg-blue-50">
-              Based on actual operation times
-            </Badge>
-          )}
+          {(reservationStatus === 'Ongoing' || reservationStatus === 'Pending Payment' || reservationStatus === 'Completed') && (
+  <Badge variant="outline" className="ml-2 text-blue-600 border-blue-300 bg-blue-50">
+    Based on actual operation times
+  </Badge>
+)}
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -674,7 +674,7 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
                         <div className="flex flex-col">
                           <span>Equipment: {service.EquipmentAvail}</span>
                           
-                          {reservationStatus === 'Ongoing' && (
+                          {(reservationStatus === 'Ongoing' || reservationStatus === 'Pending Payment' || reservationStatus === 'Completed') && (
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
@@ -728,29 +728,31 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
             );
           })}
   
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="w-full mt-2 text-blue-600 border-blue-300 hover:bg-blue-100"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-          >
-            {isRefreshing ? (
-              <>
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                Refreshing...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh Calculations
-              </>
-            )}
-          </Button>
+  {reservationStatus !== 'Pending Payment' && reservationStatus !== 'Completed' && (
+  <Button 
+    variant="outline" 
+    size="sm" 
+    className="w-full mt-2 text-blue-600 border-blue-300 hover:bg-blue-100"
+    onClick={handleRefresh}
+    disabled={isRefreshing}
+  >
+    {isRefreshing ? (
+      <>
+        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+        Refreshing...
+      </>
+    ) : (
+      <>
+        <RefreshCw className="h-4 w-4 mr-2" />
+        Refresh Calculations
+      </>
+    )}
+  </Button>
+)}
   
           <Separator className="my-3" />
           
-          {reservationStatus === 'Ongoing' ? (
+          {(reservationStatus === 'Ongoing' || reservationStatus === 'Pending Payment' || reservationStatus === 'Completed') ? (
             <div className="bg-blue-50 p-2 rounded-md mb-2">
               <div className="text-sm text-blue-700">
                 <div className="flex justify-between mb-1">
@@ -818,7 +820,7 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
             <div className="mt-3 p-2 rounded bg-amber-50">
               <div className="text-sm text-amber-600">
                 <AlertCircle className="h-4 w-4 inline mr-1" />
-                {reservationStatus === 'Ongoing' ?
+                {(reservationStatus === 'Ongoing' || reservationStatus === 'Pending Payment' || reservationStatus === 'Completed') ?
                   "The total has been recalculated based on rounded operation times and differs from the stored value." :
                   reservationStatus === 'Pending Admin Approval' || reservationStatus === 'Approved' ?
                   "The total has been recalculated based on rounded booked hours and differs from the stored value." :
