@@ -1,4 +1,4 @@
-// Updated CostBreakdown.tsx with downtime deduction
+// Updated CostBreakdown.tsx with individual machine downtime tracking
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -56,7 +56,8 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
   const [adjustedUserServices, setAdjustedUserServices] = useState<Array<UserService & { 
     downtimeMinutes?: number, 
     adjustedCost?: number,
-    originalCost?: number 
+    originalCost?: number,
+    machineUtilization?: MachineUtilization | null 
   }>>([]);
 
   // Calculate downtime adjustments when component mounts or dependencies change
@@ -74,18 +75,35 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
 
   // Calculate downtime adjustments for each service
   const calculateDowntimeAdjustments = () => {
-    const adjustedServices = userServices.map(service => {
-      // Find machine utilization for this service and equipment
-      const matchingMachineUtils = machineUtilizations.filter(util => 
+    // Create a mapping of service ID to machine utilization
+    // This ensures each service is linked to a specific machine utilization record
+    const serviceToMachineUtil = new Map<string, MachineUtilization | null>();
+    
+    // Map each service to its corresponding machine utilization if available
+    userServices.forEach(service => {
+      // Get equipment name for this service
+      const equipmentName = service.EquipmentAvail.trim();
+      
+      // Try to find a matching machine utilization that hasn't been assigned yet
+      const matchingMachineUtil = machineUtilizations.find(util => 
         util.ServiceName === service.ServiceAvail && 
-        service.EquipmentAvail.includes(util.Machine || '')
+        util.Machine === equipmentName && 
+        !Array.from(serviceToMachineUtil.values()).includes(util)
       );
-
-      // Sum all downtime minutes for this service
-      const totalDowntimeMinutes = matchingMachineUtils.reduce((total, util) => {
-        return total + util.DownTimes.reduce((minutes, downtime) => 
-          minutes + (downtime.DTTime || 0), 0);
-      }, 0);
+      
+      // Store the mapping
+      serviceToMachineUtil.set(service.id, matchingMachineUtil || null);
+    });
+    
+    // Now process each service with its specific machine utilization
+    const adjustedServices = userServices.map(service => {
+      // Get the specific machine utilization for this service
+      const machineUtil = serviceToMachineUtil.get(service.id);
+      
+      // Sum downtime minutes only for this specific machine utilization
+      const totalDowntimeMinutes = machineUtil
+        ? machineUtil.DownTimes.reduce((minutes, downtime) => minutes + (downtime.DTTime || 0), 0)
+        : 0;
 
       // Get original cost
       const originalCost = service.CostsAvail 
@@ -110,7 +128,8 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
         ...service,
         downtimeMinutes: totalDowntimeMinutes,
         originalCost,
-        adjustedCost
+        adjustedCost,
+        machineUtilization: machineUtil
       };
     });
 
@@ -195,6 +214,11 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
                 {service.EquipmentAvail && (
                   <div className="text-sm text-gray-600 mt-1">
                     Equipment: {service.EquipmentAvail}
+                    {service.machineUtilization && (
+                      <span className="ml-1 text-xs text-gray-500">
+                        (ID: {service.machineUtilization.id})
+                      </span>
+                    )}
                   </div>
                 )}
                 {service.MinsAvail && (
@@ -218,6 +242,16 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
                           <p className="font-medium">Downtime Adjustment</p>
                           <p>Original Cost: {formatPrice(service.originalCost)}</p>
                           <p>Deduction: {formatPrice((service.originalCost || 0) - (service.adjustedCost || 0))}</p>
+                          {service.machineUtilization?.DownTimes && service.machineUtilization.DownTimes.length > 0 && (
+                            <div className="mt-1 pt-1 border-t border-gray-200">
+                              <p className="font-medium">Downtime Details:</p>
+                              {service.machineUtilization.DownTimes.map((downtime, idx) => (
+                                <div key={idx} className="mt-1">
+                                  <p>{downtime.DTTime} mins - {downtime.Cause || 'No cause specified'}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </TooltipContent>
                     </Tooltip>
@@ -256,18 +290,18 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
           )}
           
           <div className="flex justify-between items-center pt-2">
-          <span className="font-bold text-lg">Total</span>
-          <div className="text-right">
-            <span className="font-bold text-lg">
-              {formatPrice(calculatedTotal)}
-            </span>
-            {hasDiscrepancy && (
-              <div className="text-xs text-amber-600 mt-1">
-                {totalDowntimeMinutes > 0 ? "Adjusted for downtime" : "Recalculated from services"}
-              </div>
-            )}
+            <span className="font-bold text-lg">Total</span>
+            <div className="text-right">
+              <span className="font-bold text-lg">
+                {formatPrice(calculatedTotal)}
+              </span>
+              {hasDiscrepancy && (
+                <div className="text-xs text-amber-600 mt-1">
+                  {totalDowntimeMinutes > 0 ? "Adjusted for downtime" : "Recalculated from services"}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
 
           {hasDiscrepancy && allowFix && reservationId && (
             <div className="mt-3 p-2 rounded bg-amber-50 space-y-2">

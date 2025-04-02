@@ -11,12 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
 
-
-
-
 // Set up the localizer for the calendar
 const localizer = momentLocalizer(moment);
-
 
 interface TimeSlot {
   id: number;
@@ -1121,10 +1117,6 @@ export const InteractiveMachineCalendarWrapper = ({
     </Card>
   );
 };
-
-
-
-
 
 
 export default InteractiveMachineCalendar;
