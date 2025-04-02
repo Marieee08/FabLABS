@@ -41,7 +41,7 @@ interface Machine {
   Machine: string;
   Image: string;
   Desc: string;
-  Number?: number | null;
+  Number?: number | null; // Number of available units
   Instructions?: string | null;
   Link?: string | null;
   isAvailable: boolean;
@@ -64,12 +64,11 @@ interface ReservationDetailsTabProps {
   editMode: boolean;
   validationError: string | null;
   onUpdateService: (updatedService: UserServiceWithMachines) => void;
-  hideRequiresEquipment?: boolean; // Added prop to hide "requires equipment" label
+  hideRequiresEquipment?: boolean;
 }
 
 // Simple time status badge component that only shows when reservation is Ongoing
 const TimeStatusBadge = ({ status, reservationStatus }: { status: string | null | undefined, reservationStatus: string }) => {
-  // Only show status badges when reservation is Ongoing
   if (reservationStatus !== 'Ongoing') return null;
   
   const getStatusBadgeStyle = (): string => {
@@ -91,7 +90,6 @@ const TimeStatusBadge = ({ status, reservationStatus }: { status: string | null 
   );
 };
 
-// Custom error alert component to avoid issues with AlertCircle
 const ErrorAlert = ({ message }: { message: string }) => (
   <div className="bg-red-50 border border-red-200 text-red-800 rounded-md p-4 mb-4">
     <div className="flex">
@@ -111,39 +109,34 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
   editMode,
   validationError,
   onUpdateService,
-  hideRequiresEquipment = false // Default to false for backward compatibility
+  hideRequiresEquipment = false
 }) => {
   const [servicesWithMachines, setServicesWithMachines] = useState<UserServiceWithMachines[]>([]);
-  // State for tracking equipment text input for direct editing
   const [equipmentTexts, setEquipmentTexts] = useState<{[serviceId: string]: string}>({});
+  const [machineUsageCounts, setMachineUsageCounts] = useState<{[machineName: string]: number}>({});
 
-  // Modified to parse machines without quantity
+  // Parse machines without quantity
   const parseMachines = (equipmentStr: string): SelectedMachine[] => {
     if (!equipmentStr) return [];
     if (equipmentStr.trim().toLowerCase() === 'not specified') return [];
     
     return equipmentStr.split(',').map(machine => {
-      // Split by colon to handle legacy data that might have quantities
       const parts = machine.trim().split(':');
       const name = parts[0].trim();
-      
-      // Skip "Not Specified" values
       if (name.toLowerCase() === 'not specified') return { name: '' };
-      
       return { name };
     }).filter(m => m.name !== '');
   };
   
-  // Modified to stringify machines without quantity
+  // Stringify machines without quantity
   const stringifyMachines = (machines: SelectedMachine[]): string => {
     return machines.map(m => m.name).join(', ');
   };
 
-  // Initialize the services with machines data
+  // Initialize the services with machines data and calculate machine usage
   useEffect(() => {
     if (reservation) {
       const servicesWithMachines = reservation.UserServices.map(service => {
-        // Default to "Not Specified" if equipment is empty or null
         const equipmentAvail = service.EquipmentAvail || "Not Specified";
         return {
           ...service,
@@ -160,29 +153,47 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
         initialTexts[service.id] = service.EquipmentAvail || "Not Specified";
       });
       setEquipmentTexts(initialTexts);
+
+      // Calculate initial machine usage counts
+      const initialUsage: {[machineName: string]: number} = {};
+      servicesWithMachines.forEach(service => {
+        service.selectedMachines.forEach(machine => {
+          initialUsage[machine.name] = (initialUsage[machine.name] || 0) + 1;
+        });
+      });
+      setMachineUsageCounts(initialUsage);
     }
   }, [reservation]);
 
-  // Find machines that can perform a specific service
+  // Find machines that can perform a specific service and check their availability
   const getMachinesForService = (serviceName: string) => {
-    return machines.filter(machine => 
-      machine.isAvailable && machine.Services.some(service => 
+    return machines.filter(machine => {
+      if (!machine.isAvailable) return false;
+      
+      // Check if machine provides this service
+      const providesService = machine.Services.some(service => 
         service.Service.toLowerCase() === serviceName.toLowerCase()
-      )
-    );
+      );
+      
+      if (!providesService) return false;
+      
+      // Check if machine has available units
+      const currentUsage = machineUsageCounts[machine.Machine] || 0;
+      const machineCount = machine.Number || 1; // Default to 1 if Number is not specified
+      
+      return currentUsage < machineCount;
+    });
   };
 
-  // Check if a service requires machines
   const serviceRequiresMachines = (serviceName: string) => {
     if (hideRequiresEquipment) return false;
     return getMachinesForService(serviceName).length > 0;
   };
 
-  // Add a machine to a service's selected machines - replacing any existing ones
+  // Add a machine to a service's selected machines
   const handleAddMachine = (service: UserServiceWithMachines, machineName: string) => {
     // Only allow one machine - replace any existing ones
     const updatedMachines = [{ name: machineName }];
-    
     const equipmentStr = stringifyMachines(updatedMachines);
     
     const updatedService = {
@@ -202,15 +213,29 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
       [service.id]: equipmentStr
     }));
     
+    // Update machine usage counts
+    setMachineUsageCounts(prev => {
+      const newCounts = {...prev};
+      
+      // Decrement count for previously selected machine if any
+      if (service.selectedMachines.length > 0) {
+        const prevMachine = service.selectedMachines[0].name;
+        newCounts[prevMachine] = Math.max((newCounts[prevMachine] || 0) - 1, 0);
+      }
+      
+      // Increment count for newly selected machine
+      newCounts[machineName] = (newCounts[machineName] || 0) + 1;
+      
+      return newCounts;
+    });
+    
     // Propagate changes to parent component
     onUpdateService(updatedService);
   };
 
   // Remove a machine from a service's selected machines
   const handleRemoveMachine = (service: UserServiceWithMachines, machineName: string) => {
-    // Set to "Not Specified" instead of empty string when removing the last machine
     const equipmentStr = "Not Specified";
-    
     const updatedService = {
       ...service,
       selectedMachines: [],
@@ -228,37 +253,35 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
       [service.id]: equipmentStr
     }));
     
+    // Update machine usage counts
+    setMachineUsageCounts(prev => {
+      const newCounts = {...prev};
+      newCounts[machineName] = Math.max((newCounts[machineName] || 0) - 1, 0);
+      return newCounts;
+    });
+    
     // Propagate changes to parent component
     onUpdateService(updatedService);
   };
 
-  // Handle direct equipment text editing
   const handleEquipmentTextChange = (service: UserServiceWithMachines, text: string) => {
-    // If text is empty or cleared, set to "Not Specified"
     const finalText = text.trim() === '' ? 'Not Specified' : text;
-    
-    // Update the equipment text state
     setEquipmentTexts(prev => ({
       ...prev,
       [service.id]: finalText
     }));
     
-    // Parse the text to get the machines array
     const machines = parseMachines(finalText);
-    
-    // Create the updated service
     const updatedService = {
       ...service,
       selectedMachines: machines,
       EquipmentAvail: finalText
     };
     
-    // Update local state
     setServicesWithMachines(prev => 
       prev.map(s => s.id === service.id ? updatedService : s)
     );
     
-    // Propagate changes to parent component
     onUpdateService(updatedService);
   };
 
@@ -276,7 +299,6 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
     return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
   };
 
-  // Format date for display
   const formatDateTime = (dateTimeStr: string | null): string => {
     if (!dateTimeStr) return 'Not set';
     try {
@@ -328,7 +350,6 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
                   <label className="text-sm text-gray-600">Equipment</label>
                   {editMode ? (
                     <div className="space-y-2">
-                      {/* Display currently selected machine with remove button */}
                       {service.selectedMachines.length > 0 ? (
                         <div className="flex flex-wrap gap-2 mb-2">
                           <div className="bg-blue-100 px-2 py-1 rounded-lg flex items-center text-sm">
@@ -348,7 +369,6 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
                         </p>
                       )}
                       
-                      {/* Dropdown to select a machine */}
                       <div className="flex gap-2">
                         <select 
                           className="w-full border rounded px-2 py-1 text-sm"
@@ -362,11 +382,21 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
                         >
                           <option value="">Select equipment...</option>
                           {getMachinesForService(service.ServiceAvail)
-                            .map(machine => (
-                              <option key={machine.id} value={machine.Machine}>
-                                {machine.Machine}
-                              </option>
-                            ))
+                            .map(machine => {
+                              const currentUsage = machineUsageCounts[machine.Machine] || 0;
+                              const machineCount = machine.Number || 1;
+                              const remaining = machineCount - currentUsage;
+                              
+                              return (
+                                <option 
+                                  key={machine.id} 
+                                  value={machine.Machine}
+                                  disabled={remaining <= 0}
+                                >
+                                  {machine.Machine} {remaining > 0 ? `(${remaining} available)` : '(unavailable)'}
+                                </option>
+                              );
+                            })
                           }
                         </select>
                       </div>
@@ -416,7 +446,6 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
                 <p className="ml-4">End: {formatDateTime(time.EndTime)}</p>
               </div>
               <div className="pt-1">
-                {/* Pass the reservation status to the TimeStatusBadge component */}
                 <TimeStatusBadge status={time.DateStatus} reservationStatus={reservation.Status} />
               </div>
             </div>
