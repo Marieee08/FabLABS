@@ -60,19 +60,13 @@ interface ServicePricing {
 interface AdjustedUserService extends UserService {
   downtimeMinutes: number | null;
   operationMinutes: number | null;
-<<<<<<< Updated upstream
-=======
   roundedMinutes: number | null; // Added for rounded minutes
->>>>>>> Stashed changes
   adjustedCost: number | null;
   originalCost: number | null;
   adjustedMins: number | null;
   originalMins: number | null;
   bookedMinutes: number | null;
-<<<<<<< Updated upstream
-=======
   roundedBookedMinutes: number | null; // Added for rounded booked minutes
->>>>>>> Stashed changes
   ratePerMinute?: number | null;
   pricingUnit?: string | null;
 }
@@ -114,10 +108,6 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
   const [updateCounter, setUpdateCounter] = useState(0);
   // Reference to the latest adjusted services for immediate access
   const latestServicesRef = useRef<AdjustedUserService[]>([]);
-<<<<<<< Updated upstream
-
-  useEffect(() => {
-=======
   // State to trigger recalculation
   const [recalculationTrigger, setRecalculationTrigger] = useState(0);
   // Reference to store the original totalAmountDue
@@ -129,17 +119,12 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
 
   // Effect to recalculate based on reservation status whenever needed
   useEffect(() => {
->>>>>>> Stashed changes
     if (reservationStatus === 'Ongoing') {
       calculateOperationTimeCosts();
     } else if (reservationStatus === 'Pending Admin Approval' || reservationStatus === 'Approved') {
       calculateBookedCosts();
     }
-<<<<<<< Updated upstream
-  }, [userServices, machineUtilizations, reservationStatus, servicePricing, updateCounter]);
-=======
   }, [userServices, machineUtilizations, reservationStatus, servicePricing, updateCounter, recalculationTrigger]);
->>>>>>> Stashed changes
 
   const formatPrice = (price: number | string | null): string => {
     if (price === null || price === undefined) return '₱0.00';
@@ -202,14 +187,11 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
     }
   };
 
-<<<<<<< Updated upstream
-=======
   // New function to round minutes up to the nearest hour
   const roundUpToNearestHour = (minutes: number): number => {
     return Math.ceil(minutes / minutesPerHour) * minutesPerHour;
   };
 
->>>>>>> Stashed changes
   const calculateBookedCosts = () => {
     console.log(`Calculating costs based on booked hours for ${reservationStatus} reservation`);
     
@@ -221,12 +203,8 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
 
     const calculatedServices = userServices.map(service => {
       const bookedMinutes = service.MinsAvail || 0;
-<<<<<<< Updated upstream
-      console.log(`Service: ${service.ServiceAvail}, Using database MinsAvail: ${bookedMinutes}`);
-=======
       const roundedBookedMinutes = roundUpToNearestHour(Number(bookedMinutes));
       console.log(`Service: ${service.ServiceAvail}, Using database MinsAvail: ${bookedMinutes}, Rounded: ${roundedBookedMinutes}`);
->>>>>>> Stashed changes
       
       const pricing = servicePricing.find(p => 
         p.Service === service.ServiceAvail
@@ -240,36 +218,22 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
       
       let adjustedCost;
       if (pricingUnit.toLowerCase() === 'min') {
-<<<<<<< Updated upstream
-        adjustedCost = baseCostPerUnit * Number(bookedMinutes);
-      } else if (pricingUnit.toLowerCase() === 'day') {
-        adjustedCost = baseCostPerUnit * (Number(bookedMinutes) / minutesPerDay);
-      } else {
-        adjustedCost = baseCostPerUnit * (Number(bookedMinutes) / minutesPerHour);
-=======
         adjustedCost = baseCostPerUnit * Number(roundedBookedMinutes);
       } else if (pricingUnit.toLowerCase() === 'day') {
         adjustedCost = baseCostPerUnit * (Number(roundedBookedMinutes) / minutesPerDay);
       } else {
         adjustedCost = baseCostPerUnit * (Number(roundedBookedMinutes) / minutesPerHour);
->>>>>>> Stashed changes
       }
 
       return {
         ...service,
         bookedMinutes: Number(bookedMinutes),
-<<<<<<< Updated upstream
-=======
         roundedBookedMinutes: roundedBookedMinutes,
->>>>>>> Stashed changes
         originalCost: baseCostPerUnit,
         adjustedCost,
         downtimeMinutes: null,
         operationMinutes: null,
-<<<<<<< Updated upstream
-=======
         roundedMinutes: null,
->>>>>>> Stashed changes
         adjustedMins: null,
         originalMins: null,
         pricingUnit
@@ -445,13 +409,10 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
         }
       }
       
-<<<<<<< Updated upstream
-=======
       // Round up minutes to the nearest hour for pricing
       const roundedMinutes = roundUpToNearestHour(operationMinutes);
       console.log(`Rounded operation minutes: ${operationMinutes} → ${roundedMinutes}`);
       
->>>>>>> Stashed changes
       const servicePricingInfo = servicePricing.find(s => 
         s.Service.toLowerCase() === service.ServiceAvail.toLowerCase()
       ) || { Costs: defaultPricePerMin, Per: defaultPricingUnit };
@@ -461,19 +422,11 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
       
       let adjustedCost;
       if (pricingUnit.toLowerCase() === 'min') {
-<<<<<<< Updated upstream
-        adjustedCost = ratePerUnit * operationMinutes;
-      } else if (pricingUnit.toLowerCase() === 'day') {
-        adjustedCost = ratePerUnit * (operationMinutes / minutesPerDay);
-      } else {
-        adjustedCost = ratePerUnit * (operationMinutes / minutesPerHour);
-=======
         adjustedCost = ratePerUnit * roundedMinutes;
       } else if (pricingUnit.toLowerCase() === 'day') {
         adjustedCost = ratePerUnit * (roundedMinutes / minutesPerDay);
       } else {
         adjustedCost = ratePerUnit * (roundedMinutes / minutesPerHour);
->>>>>>> Stashed changes
       }
       
       const ratePerMinute = pricingUnit.toLowerCase() === 'min' 
@@ -485,10 +438,7 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
       return {
         ...service,
         operationMinutes: operationMinutes,
-<<<<<<< Updated upstream
-=======
         roundedMinutes: roundedMinutes,
->>>>>>> Stashed changes
         adjustedCost: adjustedCost,
         ratePerMinute: ratePerMinute,
         originalCost: ratePerUnit,
@@ -496,12 +446,8 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
         downtimeMinutes: null,
         adjustedMins: null,
         originalMins: null,
-<<<<<<< Updated upstream
-        bookedMinutes: null
-=======
         bookedMinutes: null,
         roundedBookedMinutes: null
->>>>>>> Stashed changes
       } as AdjustedUserService;
     });
     
@@ -552,17 +498,6 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
     setRefreshSuccess(false);
     
     try {
-<<<<<<< Updated upstream
-      // Step 1: Recalculate costs based on reservation status
-      console.log('Refresh triggered - recalculating costs');
-      
-      // Force immediate calculation
-      if (reservationStatus === 'Ongoing') {
-        calculateOperationTimeCosts();
-      } else if (reservationStatus === 'Pending Admin Approval' || reservationStatus === 'Approved') {
-        calculateBookedCosts();
-      }
-=======
       // Trigger immediate recalculation by incrementing the trigger
       setRecalculationTrigger(prev => prev + 1);
       
@@ -572,7 +507,6 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
       
       // Update UI first for immediate feedback
       setUpdateCounter(prev => prev + 1);
->>>>>>> Stashed changes
       
       // Step 2: If there's a discrepancy, update the database
       if (hasDiscrepancy && allowFix && reservationId) {
@@ -582,12 +516,7 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
           // Format data properly for SQLite
           const totalAmountString = calculatedTotal.toFixed(2);
           
-<<<<<<< Updated upstream
-          // Immediately update the UI with the new calculations before API call
-          // This gives instant feedback to the user
-=======
           // Get the current services for the API payload
->>>>>>> Stashed changes
           const currentServices = latestServicesRef.current;
           
           const payload = {
@@ -595,24 +524,13 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
             services: currentServices.map(service => ({
               id: service.id,
               minutes: reservationStatus === 'Ongoing' 
-<<<<<<< Updated upstream
-                ? service.operationMinutes?.toString()
-                : service.bookedMinutes?.toString()
-=======
                 ? service.roundedMinutes?.toString()
                 : service.roundedBookedMinutes?.toString()
->>>>>>> Stashed changes
             }))
           };
           
           console.log("Formatted payload:", payload);
           
-<<<<<<< Updated upstream
-          // Trigger a UI update even before the API response comes back
-          setUpdateCounter(prev => prev + 1);
-          
-=======
->>>>>>> Stashed changes
           const response = await fetch(`/api/admin/update-total/${reservationId}`, {
             method: 'PATCH',
             headers: {
@@ -642,12 +560,6 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
             setRefreshSuccess(true);
             toast.success('Calculations updated and database refreshed successfully');
             
-<<<<<<< Updated upstream
-            // Force another update after successful API call
-            setUpdateCounter(prev => prev + 1);
-            
-=======
->>>>>>> Stashed changes
             // Call parent refresh if provided
             if (typeof onRefresh === 'function') {
               onRefresh();
@@ -662,12 +574,6 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
         // No database update needed, just show success for recalculation
         setRefreshSuccess(true);
         toast.success('Calculations refreshed successfully');
-<<<<<<< Updated upstream
-        
-        // Force UI update even without API call
-        setUpdateCounter(prev => prev + 1);
-=======
->>>>>>> Stashed changes
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
@@ -678,18 +584,12 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
     }
   };
 
-<<<<<<< Updated upstream
-=======
   // Calculate totals based on actual and rounded times
->>>>>>> Stashed changes
   const correctTotalBookedMinutes = adjustedUserServices.reduce((sum, service) => {
     const minutes = service.bookedMinutes || 0;
     return sum + (Number.isFinite(minutes) ? minutes : 0);
   }, 0);
 
-<<<<<<< Updated upstream
-  const correctTotalBookedHours = (correctTotalBookedMinutes / minutesPerHour).toFixed(1);
-=======
   const correctTotalRoundedBookedMinutes = adjustedUserServices.reduce((sum, service) => {
     const minutes = service.roundedBookedMinutes || 0;
     return sum + (Number.isFinite(minutes) ? minutes : 0);
@@ -709,28 +609,11 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
   const correctTotalRoundedBookedHours = (correctTotalRoundedBookedMinutes / minutesPerHour).toFixed(1);
   const correctTotalOperationHours = (correctTotalOperationMinutes / minutesPerHour).toFixed(1);
   const correctTotalRoundedOperationHours = (correctTotalRoundedOperationMinutes / minutesPerHour).toFixed(1);
->>>>>>> Stashed changes
   
   const calculatedTotal = adjustedUserServices.reduce((sum, service) => {
     return sum + (service.adjustedCost || 0);
   }, 0);
 
-<<<<<<< Updated upstream
-
-  const storedTotal = totalAmountDue !== null && totalAmountDue !== undefined ? 
-    (typeof totalAmountDue === 'string' ? parseFloat(totalAmountDue) : totalAmountDue) : 
-    0;
-  
-    const calculatedTotalRounded = Math.round(calculatedTotal * 100) / 100;
-    const storedTotalRounded = Math.round(storedTotal * 100) / 100;
-    const hasDiscrepancy = Math.abs(calculatedTotalRounded - storedTotalRounded) > 0.01 && totalAmountDue !== null;
-
-    const totalOperationMinutes = adjustedUserServices.reduce((sum, service) => 
-      sum + (service.operationMinutes || 0), 0);
-    
-    const totalBookedMinutes = adjustedUserServices.reduce((sum, service) => 
-      sum + (service.bookedMinutes || 0), 0);
-=======
   // Use local state for comparison to ensure UI updates
   const storedTotal = localTotalAmountDue !== null && localTotalAmountDue !== undefined ? 
     (typeof localTotalAmountDue === 'string' ? parseFloat(localTotalAmountDue) : localTotalAmountDue) : 
@@ -758,7 +641,6 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
     const hours = (minutes / minutesPerHour).toFixed(1);
     return `${minutes} mins (${hours} hrs)`;
   };
->>>>>>> Stashed changes
 
   // Generate a unique key for forced re-rendering
   const renderKey = `cost-breakdown-${updateCounter}-${recalculationTrigger}`;
@@ -780,34 +662,14 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
           {Array.from(new Set(adjustedUserServices.map(s => s.ServiceAvail))).map((serviceName, index) => {
             const services = adjustedUserServices.filter(s => s.ServiceAvail === serviceName);
             const totalCost = services.reduce((sum, s) => sum + (s.adjustedCost || 0), 0);
-<<<<<<< Updated upstream
-
-            return (
-              <div key={`${serviceName}-${index}-${updateCounter}`} className="flex justify-between items-start py-2">
-=======
   
             return (
               <div key={`${serviceName}-${index}-${updateCounter}-${recalculationTrigger}`} className="flex justify-between items-start py-2">
->>>>>>> Stashed changes
                 <div className="flex-1">
                   <span className="font-medium">{serviceName}</span>
                   
                   <div className="space-y-1 mt-1">
                     {services.map((service, i) => (
-<<<<<<< Updated upstream
-                      <div key={`${service.id}-${i}-${updateCounter}`} className="text-sm text-gray-600">
-                        <div className="flex items-center">
-                          <span>Equipment: {service.EquipmentAvail}</span>
-                          {reservationStatus === 'Ongoing' && service.operationMinutes !== null && (
-                            <Badge variant="outline" className="ml-2 text-xs">
-                              {service.operationMinutes} mins
-                            </Badge>
-                          )}
-                          {(reservationStatus === 'Pending Admin Approval' || reservationStatus === 'Approved') && service.bookedMinutes !== null && (
-                            <Badge variant="outline" className="ml-2 text-xs">
-                              {service.bookedMinutes} mins
-                            </Badge>
-=======
                       <div key={`${service.id}-${i}-${updateCounter}-${recalculationTrigger}`} className="text-sm text-gray-600">
                         <div className="flex flex-col">
                           <span>Equipment: {service.EquipmentAvail}</span>
@@ -852,7 +714,6 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
                                 </TooltipContent>
                               </Tooltip>
                             </TooltipProvider>
->>>>>>> Stashed changes
                           )}
                         </div>
                       </div>
@@ -866,11 +727,7 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
               </div>
             );
           })}
-<<<<<<< Updated upstream
-
-=======
   
->>>>>>> Stashed changes
           <Button 
             variant="outline" 
             size="sm" 
@@ -890,11 +747,7 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
               </>
             )}
           </Button>
-<<<<<<< Updated upstream
-
-=======
   
->>>>>>> Stashed changes
           <Separator className="my-3" />
           
           {reservationStatus === 'Ongoing' ? (
@@ -903,13 +756,6 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
                 <div className="flex justify-between mb-1">
                   <span className="flex items-center">
                     <Clock className="h-4 w-4 mr-1" />
-<<<<<<< Updated upstream
-                    Total Operation Time:
-                  </span>
-                  <span>
-                    {totalOperationMinutes} mins 
-                    ({Math.round(totalOperationMinutes / minutesPerHour * 10) / 10} hrs)
-=======
                     Actual Operation Time:
                   </span>
                   <span>
@@ -925,7 +771,6 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
                   <span>
                     {totalRoundedOperationMinutes} mins 
                     ({(totalRoundedOperationMinutes / minutesPerHour).toFixed(1)} hrs)
->>>>>>> Stashed changes
                   </span>
                 </div>
               </div>
@@ -933,16 +778,6 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
           ) : (
             <div className="bg-green-50 p-2 rounded-md mb-2">
               <div className="text-sm text-green-700">
-<<<<<<< Updated upstream
-                <div className="flex justify-between font-medium">
-                  <span className="flex items-center">
-                    <Clock className="h-4 w-4 mr-1" />
-                    Total Booked:
-                  </span>
-                  <span>
-                    {totalBookedMinutes} mins 
-                    ({Math.round(totalBookedMinutes / minutesPerHour * 10) / 10} hrs)
-=======
                 <div className="flex justify-between mb-1">
                   <span className="flex items-center">
                     <Clock className="h-4 w-4 mr-1" />
@@ -961,17 +796,12 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
                   <span>
                     {totalRoundedBookedMinutes} mins 
                     ({(totalRoundedBookedMinutes / minutesPerHour).toFixed(1)} hrs)
->>>>>>> Stashed changes
                   </span>
                 </div>
               </div>
             </div>
           )}
-<<<<<<< Updated upstream
-
-=======
   
->>>>>>> Stashed changes
           <div className="flex justify-between items-center pt-2">
             <span className="font-bold text-lg">Total</span>
             <div className="text-right">
@@ -983,25 +813,15 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
               )}
             </div>
           </div>
-<<<<<<< Updated upstream
-
-=======
   
->>>>>>> Stashed changes
           {hasDiscrepancy && (
             <div className="mt-3 p-2 rounded bg-amber-50">
               <div className="text-sm text-amber-600">
                 <AlertCircle className="h-4 w-4 inline mr-1" />
                 {reservationStatus === 'Ongoing' ?
-<<<<<<< Updated upstream
-                  "The total has been recalculated based on actual operation times and differs from the stored value." :
-                  reservationStatus === 'Pending Admin Approval' || reservationStatus === 'Approved' ?
-                  "The total has been recalculated based on booked hours and differs from the stored value." :
-=======
                   "The total has been recalculated based on rounded operation times and differs from the stored value." :
                   reservationStatus === 'Pending Admin Approval' || reservationStatus === 'Approved' ?
                   "The total has been recalculated based on rounded booked hours and differs from the stored value." :
->>>>>>> Stashed changes
                   "The displayed total has been recalculated from the services and differs from the database value."
                 }
               </div>

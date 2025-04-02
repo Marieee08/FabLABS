@@ -91,16 +91,6 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
   editMode,
   validationError,
   onUpdateService,
-<<<<<<< Updated upstream
-  hideRequiresEquipment = false, // Default to false for backward compatibility
-  onUpdateTimeStatus
-}) => {
-  const [servicesWithMachines, setServicesWithMachines] = useState<UserServiceWithMachines[]>([]);
-  // State for tracking equipment text input for direct editing
-  const [equipmentTexts, setEquipmentTexts] = useState<{[serviceId: string]: string}>({});
-  // State for managing time slots
-  const [editedTimes, setEditedTimes] = useState<UtilTime[]>([]);
-=======
   hideRequiresEquipment = false,
   onUpdateTimeStatus,
   machineUsageCounts: externalMachineUsageCounts
@@ -111,7 +101,6 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
   
   // Use external counts if provided, otherwise use internal counts
   const effectiveMachineUsageCounts = externalMachineUsageCounts || internalMachineUsageCounts;
->>>>>>> Stashed changes
   
   // Time status options
   const statusOptions = [
@@ -142,9 +131,6 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
     return machines.map(m => m.name).join(', ');
   };
 
-<<<<<<< Updated upstream
-  // Initialize the services with machines data and time status
-=======
   // Calculate machine availability based on current usage and machine capacity
   const getMachineAvailability = (machine: Machine): number => {
     const machineCount = machine.Number || 1; // Default to 1 if Number is not specified
@@ -170,15 +156,6 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
       });
       
       setServicesWithMachines(servicesWithMachines);
-<<<<<<< Updated upstream
-      
-      // Initialize the equipment text inputs
-      const initialTexts: {[serviceId: string]: string} = {};
-      servicesWithMachines.forEach(service => {
-        initialTexts[service.id] = service.EquipmentAvail || "Not Specified";
-      });
-      setEquipmentTexts(initialTexts);
-=======
 
       // Calculate initial machine usage counts only if external counts aren't provided
       if (!externalMachineUsageCounts) {
@@ -190,7 +167,6 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
         });
         setInternalMachineUsageCounts(initialUsage);
       }
->>>>>>> Stashed changes
       
       // Initialize time status
       setEditedTimes(reservation.UtilTimes.map(time => ({
@@ -218,23 +194,13 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
         service.Service.toLowerCase() === serviceName.toLowerCase()
       );
     });
->>>>>>> Stashed changes
   };
 
-  // Check if a service requires machines
   const serviceRequiresMachines = (serviceName: string) => {
     if (hideRequiresEquipment) return false;
     return getMachinesForService(serviceName).length > 0;
   };
 
-<<<<<<< Updated upstream
-  // Add a machine to a service's selected machines - replacing any existing ones
-  const handleAddMachine = (service: UserServiceWithMachines, machineName: string) => {
-    // Only allow one machine - replace any existing ones
-    const updatedMachines = [{ name: machineName }];
-    
-    const equipmentStr = stringifyMachines(updatedMachines);
-=======
   // Updated handleAddMachine for immediate UI update
   const handleAddMachine = (service: UserServiceWithMachines, machineName: string) => {
     // Remove existing machine from usage count if any
@@ -245,7 +211,6 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
         [oldMachineName]: Math.max(0, (prev[oldMachineName] || 0) - 1)
       }));
     }
->>>>>>> Stashed changes
     
     // Create updated service with new machine
     const updatedService = {
@@ -259,22 +224,6 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
       prev.map(s => s.id === service.id ? updatedService : s)
     );
     
-<<<<<<< Updated upstream
-    // Update equipment text state
-    setEquipmentTexts(prev => ({
-      ...prev,
-      [service.id]: equipmentStr
-    }));
-    
-    // Propagate changes to parent component
-    onUpdateService(updatedService);
-  };
-
-  // Remove a machine from a service's selected machines
-  const handleRemoveMachine = (service: UserServiceWithMachines, machineName: string) => {
-    // Set to "Not Specified" instead of empty string when removing the last machine
-    const equipmentStr = "Not Specified";
-=======
     // Update machine usage count if managing internally
     if (!externalMachineUsageCounts) {
       setInternalMachineUsageCounts(prev => ({
@@ -297,7 +246,6 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
         [oldMachineName]: Math.max(0, (prev[oldMachineName] || 0) - 1)
       }));
     }
->>>>>>> Stashed changes
     
     const updatedService = {
       ...service,
@@ -309,19 +257,8 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
     setServicesWithMachines(prev => 
       prev.map(s => s.id === service.id ? updatedService : s)
     );
-<<<<<<< Updated upstream
-    
-    // Update equipment text state
-    setEquipmentTexts(prev => ({
-      ...prev,
-      [service.id]: equipmentStr
-    }));
-    
-    // Propagate changes to parent component
-=======
   
     // Update parent component
->>>>>>> Stashed changes
     onUpdateService(updatedService);
   };
 
@@ -381,8 +318,6 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
     }
   };
 
-<<<<<<< Updated upstream
-=======
   const renderEquipmentSelection = (service: UserServiceWithMachines) => {
     if (!editMode) {
       return (
