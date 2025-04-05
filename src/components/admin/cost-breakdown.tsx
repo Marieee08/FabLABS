@@ -104,6 +104,7 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [refreshSuccess, setRefreshSuccess] = useState(false);
   const [adjustedUserServices, setAdjustedUserServices] = useState<AdjustedUserService[]>([]);
+  const [isFetchingLatestData, setIsFetchingLatestData] = useState(false);
   // This will help us track and force UI updates
   const [updateCounter, setUpdateCounter] = useState(0);
   // Reference to the latest adjusted services for immediate access
@@ -112,10 +113,20 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
   const [recalculationTrigger, setRecalculationTrigger] = useState(0);
   // Reference to store the original totalAmountDue
   const [localTotalAmountDue, setLocalTotalAmountDue] = useState<number | string | null>(totalAmountDue);
+  // State to store the latest data from the database
+  const [latestMachineUtilizations, setLatestMachineUtilizations] = useState<MachineUtilization[]>(machineUtilizations);
+  const [latestUserServices, setLatestUserServices] = useState<UserService[]>(userServices);
 
+  // Effect to handle prop updates from parent refresh
   useEffect(() => {
+    // When props change, update our internal state
+    setLatestMachineUtilizations(machineUtilizations);
+    setLatestUserServices(userServices);
     setLocalTotalAmountDue(totalAmountDue);
-  }, [totalAmountDue]);
+    
+    // Force recalculation with new data
+    setRecalculationTrigger(prev => prev + 1);
+  }, [machineUtilizations, userServices, totalAmountDue]);
 
   // Effect to recalculate based on reservation status whenever needed
   useEffect(() => {
@@ -124,7 +135,7 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
     } else if (reservationStatus === 'Pending Admin Approval' || reservationStatus === 'Approved') {
       calculateBookedCosts();
     }
-  }, [userServices, machineUtilizations, reservationStatus, servicePricing, updateCounter, recalculationTrigger]);
+  }, [latestUserServices, latestMachineUtilizations, reservationStatus, servicePricing, updateCounter, recalculationTrigger]);
 
   const formatPrice = (price: number | string | null): string => {
     if (price === null || price === undefined) return '₱0.00';
@@ -195,13 +206,13 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
   const calculateBookedCosts = () => {
     console.log(`Calculating costs based on booked hours for ${reservationStatus} reservation`);
     
-    if (!userServices || !Array.isArray(userServices) || userServices.length === 0) {
+    if (!latestUserServices || !Array.isArray(latestUserServices) || latestUserServices.length === 0) {
       console.warn("No user services available for cost calculation");
       setAdjustedUserServices([]);
       return;
     }
 
-    const calculatedServices = userServices.map(service => {
+    const calculatedServices = latestUserServices.map(service => {
       const bookedMinutes = service.MinsAvail || 0;
       const roundedBookedMinutes = roundUpToNearestHour(Number(bookedMinutes));
       console.log(`Service: ${service.ServiceAvail}, Using database MinsAvail: ${bookedMinutes}, Rounded: ${roundedBookedMinutes}`);
@@ -281,7 +292,7 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
     console.log("DEBUGGING: Calculating operation time costs");
     
     console.log("All machine utilizations:");
-    machineUtilizations.forEach(util => {
+    latestMachineUtilizations.forEach(util => {
       console.log(`Machine: ${util.Machine}, Service: ${util.ServiceName}, ID: ${util.id}`);
       console.log(`Operating Times: ${util.OperatingTimes.length}`);
       
@@ -292,13 +303,13 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
     
     const usedMachineUtilIds = new Set();
   
-    const adjustedServices = userServices.map((service, serviceIndex) => {
+    const adjustedServices = latestUserServices.map((service, serviceIndex) => {
       console.log(`\nProcessing service ${serviceIndex+1}: ${service.ServiceAvail}, Equipment: ${service.EquipmentAvail}, ID: ${service.id}`);
       
       let matchingUtilization = null;
       
       if (!matchingUtilization) {
-        const exactMatch = machineUtilizations.find(util => {
+        const exactMatch = latestMachineUtilizations.find(util => {
           const serviceIdString = service.id;
           const machineContainsId = util.Machine?.includes(serviceIdString);
           const serviceNameContainsId = util.ServiceName?.includes(serviceIdString);
@@ -312,7 +323,7 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
       }
       
       if (!matchingUtilization) {
-        const exactNameMatch = machineUtilizations.find(util => 
+        const exactNameMatch = latestMachineUtilizations.find(util => 
           util.Machine === service.EquipmentAvail && 
           util.ServiceName === service.ServiceAvail &&
           !usedMachineUtilIds.has(util.id)
@@ -325,7 +336,7 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
       }
       
       if (!matchingUtilization) {
-        const matchingMachines = machineUtilizations
+        const matchingMachines = latestMachineUtilizations
           .filter(util => util.Machine === service.EquipmentAvail && !usedMachineUtilIds.has(util.id));
         
         if (matchingMachines.length > 0) {
@@ -343,7 +354,7 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
       }
       
       if (!matchingUtilization) {
-        const partialMatches = machineUtilizations
+        const partialMatches = latestMachineUtilizations
           .filter(util => !usedMachineUtilIds.has(util.id))
           .filter(util => {
             const machineMatch = util.Machine && service.EquipmentAvail && 
@@ -492,23 +503,80 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
     latestServicesRef.current = adjustedUserServices;
   }, [adjustedUserServices]);
 
+  // New function to fetch the latest data from the database
+  const fetchLatestData = async (): Promise<{ success: boolean, error?: string }> => {
+    if (!reservationId) {
+      return { success: false, error: 'No reservation ID provided' };
+    }
+
+    setIsFetchingLatestData(true);
+    try {
+      // Fetch the latest data from the database
+      // Using the same endpoint structure as the update-total endpoint
+      const response = await fetch(`/api/admin/reservations/${reservationId}`);
+      
+      if (!response.ok) {
+        let errorMessage = 'Failed to fetch latest data';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch (e) {
+          // Ignore parsing errors
+        }
+        console.error(`API Error (${response.status}): ${errorMessage}`);
+        return { success: false, error: errorMessage };
+      }
+      
+      const data = await response.json();
+      console.log("Fetched latest reservation data:", data);
+      
+      // Extract services and machine utilizations from the response
+      // Adapt this based on the actual structure of your API response
+      if (data.userServices || data.services) {
+        const services = data.userServices || data.services || [];
+        console.log("Updated user services:", services);
+        setLatestUserServices(services);
+      }
+      
+      if (data.machineUtilizations) {
+        console.log("Updated machine utilizations:", data.machineUtilizations);
+        setLatestMachineUtilizations(data.machineUtilizations);
+      }
+      
+      if ((data.totalAmountDue !== undefined && data.totalAmountDue !== null) ||
+          (data.total !== undefined && data.total !== null)) {
+        const totalAmount = data.totalAmountDue || data.total;
+        console.log("Updated total amount:", totalAmount);
+        setLocalTotalAmountDue(totalAmount);
+      }
+      
+      return { success: true };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error during fetch';
+      console.error("Error fetching latest data:", errorMsg);
+      return { success: false, error: errorMsg };
+    } finally {
+      setIsFetchingLatestData(false);
+    }
+  };
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
     setRefreshError(null);
     setRefreshSuccess(false);
     
     try {
-      // Trigger immediate recalculation by incrementing the trigger
+      // Trigger immediate recalculation
       setRecalculationTrigger(prev => prev + 1);
       
       // For immediate UI feedback, update the local total amount
       const recalculatedTotal = calculatedTotal;
       setLocalTotalAmountDue(recalculatedTotal.toFixed(2));
       
-      // Update UI first for immediate feedback
+      // Update UI for immediate feedback
       setUpdateCounter(prev => prev + 1);
       
-      // Step 2: If there's a discrepancy, update the database
+      // If there's a discrepancy, update the database
       if (hasDiscrepancy && allowFix && reservationId) {
         try {
           console.log(`Updating database with recalculated total: ${calculatedTotal}`);
@@ -558,7 +626,7 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
             toast.error(`Database update failed: ${errorMessage}`);
           } else {
             setRefreshSuccess(true);
-            toast.success('Calculations updated and database refreshed successfully');
+            toast.success('Calculations updated successfully');
             
             // Call parent refresh if provided
             if (typeof onRefresh === 'function') {
@@ -574,6 +642,11 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
         // No database update needed, just show success for recalculation
         setRefreshSuccess(true);
         toast.success('Calculations refreshed successfully');
+        
+        // Still call parent refresh to ensure UI is in sync
+        if (typeof onRefresh === 'function') {
+          onRefresh();
+        }
       }
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
@@ -729,25 +802,25 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
           })}
   
   {reservationStatus !== 'Pending Payment' && reservationStatus !== 'Completed' && (
-  <Button 
-    variant="outline" 
-    size="sm" 
-    className="w-full mt-2 text-blue-600 border-blue-300 hover:bg-blue-100"
-    onClick={handleRefresh}
-    disabled={isRefreshing}
-  >
-    {isRefreshing ? (
-      <>
-        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-        Refreshing...
-      </>
-    ) : (
-      <>
-        <RefreshCw className="h-4 w-4 mr-2" />
-        Refresh Calculations
-      </>
-    )}
-  </Button>
+      <Button 
+        variant="outline" 
+        size="sm" 
+        className="w-full mt-2 text-blue-600 border-blue-300 hover:bg-blue-100"
+        onClick={handleRefresh}
+        disabled={isRefreshing}
+      >
+        {isRefreshing ? (
+          <>
+            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+            Refreshing...
+          </>
+        ) : (
+          <>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh Calculations
+          </>
+        )}
+      </Button>
 )}
   
           <Separator className="my-3" />
@@ -838,7 +911,7 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
           
           {refreshSuccess && (
             <div className="mt-2 text-sm text-green-600 bg-green-50 p-2 rounded">
-              Database updated successfully!
+              {isFetchingLatestData ? 'Refreshing data from parent component...' : 'Calculations updated successfully!'}
             </div>
           )}
         </div>

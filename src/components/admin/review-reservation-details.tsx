@@ -127,11 +127,11 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
 }) => {
   const [servicesWithMachines, setServicesWithMachines] = useState<UserServiceWithMachines[]>([]);
   const [equipmentTexts, setEquipmentTexts] = useState<{[serviceId: string]: string}>({});
-  const [internalMachineUsageCounts, setInternalMachineUsageCounts] = useState<{[machineName: string]: number}>({});
+  const [machineUsageCounts, setMachineUsageCounts] = useState<{[machineName: string]: number}>({});
   const [editedTimes, setEditedTimes] = useState<UtilTime[]>([]);
   
-  // Use external counts if provided, otherwise use internal counts
-  const effectiveMachineUsageCounts = externalMachineUsageCounts || internalMachineUsageCounts;
+  // If external counts are provided, use them, otherwise use internal state
+  const effectiveMachineUsageCounts = externalMachineUsageCounts || machineUsageCounts;
   
   // Time status options
   const statusOptions = [
@@ -185,7 +185,7 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
       });
       setEquipmentTexts(initialTexts);
 
-      // Calculate initial machine usage counts only if external counts aren't provided
+      // Only calculate initial machine usage counts if external counts aren't provided
       if (!externalMachineUsageCounts) {
         const initialUsage: {[machineName: string]: number} = {};
         servicesWithMachines.forEach(service => {
@@ -193,7 +193,7 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
             initialUsage[machine.name] = (initialUsage[machine.name] || 0) + 1;
           });
         });
-        setInternalMachineUsageCounts(initialUsage);
+        setMachineUsageCounts(initialUsage);
       }
       
       // Initialize time status
@@ -245,9 +245,9 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
       [service.id]: equipmentStr
     }));
     
-    // Update machine usage counts if managing internally
+    // Only update internal machine usage counts if external counts aren't provided
     if (!externalMachineUsageCounts) {
-      setInternalMachineUsageCounts(prev => {
+      setMachineUsageCounts(prev => {
         const newCounts = {...prev};
         
         // Decrement count for previously selected machine if any
@@ -268,34 +268,39 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
   };
 
   // Remove a machine from a service's selected machines
-  const handleRemoveMachine = (service: UserServiceWithMachines) => {
-    // Update machine usage count if managing internally
-    if (!externalMachineUsageCounts && service.selectedMachines.length > 0) {
-      const oldMachineName = service.selectedMachines[0].name;
-      setInternalMachineUsageCounts(prev => ({
-        ...prev,
-        [oldMachineName]: Math.max(0, (prev[oldMachineName] || 0) - 1)
-      }));
-    }
+  const handleRemoveMachine = (service: UserServiceWithMachines, machineName: string = "") => {
+    // If machineName is empty but service has selectedMachines, use the first one
+    const effectiveMachineName = machineName || (service.selectedMachines.length > 0 
+      ? service.selectedMachines[0].name 
+      : "");
     
     const updatedService = {
       ...service,
       selectedMachines: [],
       EquipmentAvail: "Not Specified"
     };
-  
+    
     // Update local state
     setServicesWithMachines(prev => 
       prev.map(s => s.id === service.id ? updatedService : s)
     );
     
-    // Update equipment texts
+    // Update equipment text state
     setEquipmentTexts(prev => ({
       ...prev,
       [service.id]: "Not Specified"
     }));
-  
-    // Update parent component
+    
+    // Only update internal machine usage counts if external counts aren't provided
+    if (!externalMachineUsageCounts && effectiveMachineName) {
+      setMachineUsageCounts(prev => {
+        const newCounts = {...prev};
+        newCounts[effectiveMachineName] = Math.max((newCounts[effectiveMachineName] || 0) - 1, 0);
+        return newCounts;
+      });
+    }
+    
+    // Propagate changes to parent component
     onUpdateService(updatedService);
   };
 
@@ -307,11 +312,11 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
       [service.id]: finalText
     }));
     
-    // Update machine usage count if managing internally
+    // Only update internal machine usage counts if external counts aren't provided
     if (!externalMachineUsageCounts) {
       // Decrease count for old machines
       service.selectedMachines.forEach(machine => {
-        setInternalMachineUsageCounts(prev => ({
+        setMachineUsageCounts(prev => ({
           ...prev,
           [machine.name]: Math.max(0, (prev[machine.name] || 0) - 1)
         }));
@@ -320,7 +325,7 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
       // Increase count for new machines
       const newMachines = parseMachines(finalText);
       newMachines.forEach(machine => {
-        setInternalMachineUsageCounts(prev => ({
+        setMachineUsageCounts(prev => ({
           ...prev,
           [machine.name]: (prev[machine.name] || 0) + 1
         }));
@@ -398,15 +403,17 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
     }
   };
 
-  // Render equipment selection UI based on editMode and component version
   const renderEquipmentSelection = (service: UserServiceWithMachines) => {
+    // Get the currently selected machine name (or empty string if none)
+    const selectedMachine = service.selectedMachines[0]?.name || '';
+  
     if (!editMode) {
       return (
         <div>
-          {service.selectedMachines.length > 0 ? (
+          {selectedMachine ? (
             <div className="flex flex-wrap gap-2">
               <span className="bg-blue-50 px-2 py-1 rounded-lg text-sm">
-                {service.selectedMachines[0].name}
+                {selectedMachine}
               </span>
             </div>
           ) : (
@@ -417,12 +424,12 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
         </div>
       );
     }
-
-    // For second version of the component (using shadcn/ui Select)
+  
+    // Edit mode - show the select dropdown
     return (
       <div>
         <Select 
-          value={service.selectedMachines.length > 0 ? service.selectedMachines[0].name : "none"}
+          value={selectedMachine || "none"}
           onValueChange={(value) => {
             if (value && value !== "none") {
               handleAddMachine(service, value);
@@ -442,9 +449,7 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
                 const machineCount = machine.Number || 1;
                 const remaining = machineCount - currentUsage;
                 
-                // If this machine is already selected for this service, 
-                // it should be selectable regardless of remaining count
-                const isCurrentlySelected = service.selectedMachines.some(m => m.name === machine.Machine);
+                const isCurrentlySelected = machine.Machine === selectedMachine;
                 const adjustedRemaining = isCurrentlySelected ? remaining + 1 : remaining;
                 
                 return (
