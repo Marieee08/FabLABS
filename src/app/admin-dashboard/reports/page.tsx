@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import RoleGuard from '@/components/auth/role-guard';
 import { EnhancedChartCarousel } from '@/components/admin-reports/chart-carousel';
+import CompletedSurveysPage from '@/components/admin/completed-surveys';
 
 const ReportsPage: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -235,6 +236,7 @@ const ReportsPage: React.FC = () => {
                 timeInterval={timeInterval}
                 onTimeIntervalChange={handleTimeIntervalChange}
               />
+              <CompletedSurveysPage/>
               
               {/* Last updated information */}
               <div className="text-right text-sm text-gray-500 mt-4">

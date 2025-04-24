@@ -1,6 +1,7 @@
 // src/components/msme-forms/interactive-machine-calendar.tsx
 "use client";
 
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
@@ -9,7 +10,6 @@ import { Info, Filter, ChevronLeft, ChevronRight, Loader2, Clock, CheckCircle, A
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "@/components/ui/use-toast";
-
 
 // Set up the localizer for the calendar
 const localizer = momentLocalizer(moment);
@@ -22,6 +22,7 @@ interface TimeSlot {
   duration: number | null;
 }
 
+
 interface Reservation {
   id: string;
   date: string;
@@ -31,6 +32,7 @@ interface Reservation {
   type: 'utilization' | 'evc';
 }
 
+
 interface Machine {
   id: string;
   Machine: string;
@@ -38,23 +40,26 @@ interface Machine {
   Number?: number;  // Number of machines available
 }
 
+
 interface BlockedDate {
   id: string;
   date: Date;
 }
 
+
 interface Service {
   id: string;
   Service: string;
-  Machines?: { 
+  Machines?: {
     machine: {
-      isAvailable: boolean; 
+      isAvailable: boolean;
       id: string;
       Machine: string;
       Number?: number;
-    } 
+    }
   }[];
 }
+
 
 interface InteractiveMachineCalendarProps {
   selectedService: string;
@@ -64,6 +69,7 @@ interface InteractiveMachineCalendarProps {
   servicesData: Service[];
   maxDates?: number;
 }
+
 
 const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
   selectedService,
@@ -82,13 +88,18 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
   const [machineAvailabilityMap, setMachineAvailabilityMap] = useState<Record<string, number>>({});
 
 
+
+
   // Time slots definitions
   const MORNING_START = 8; // 8 AM
   const MORNING_END = 12; // 12 PM
   const AFTERNOON_START = 13; // 1 PM
   const AFTERNOON_END = 17; // 5 PM
 
+
   // Fetch reservation and blocked date data
+
+
 
 
   useEffect(() => {
@@ -100,17 +111,17 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
           fetch('/api/user/calendar-reservations'),
           fetch('/api/blocked-dates')
         ]);
-        
+       
         const reservationsData = await reservationsRes.json();
         const blockedDatesData = await blockedDatesRes.json();
-        
+       
         // Filter to only include approved and ongoing reservations
-        const filteredReservations = reservationsData.filter((res: Reservation) => 
-          ['Approved', 'Ongoing'].includes(res.status) && 
+        const filteredReservations = reservationsData.filter((res: Reservation) =>
+          ['Approved', 'Ongoing'].includes(res.status) &&
           // Ensure the reserved machines are not just placeholders
           res.machines.some(machine => machine !== 'Not specified' && machine)
         );
-        
+       
         setReservations(filteredReservations);
         setBlockedDates(blockedDatesData);
       } catch (error) {
@@ -125,14 +136,16 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
       }
     };
 
+
     fetchCalendarData();
   }, []);
+
 
   // Extract machines for the selected service
   useEffect(() => {
     if (selectedService && servicesData.length > 0) {
       const service = servicesData.find(s => s.Service === selectedService);
-      
+     
       if (service && service.Machines) {
         // Preserve the isAvailable property from the service data
         const machines = service.Machines.map(m => ({
@@ -141,7 +154,7 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
           isAvailable: m.machine.isAvailable, // Keep the original availability
           Number: m.machine.Number || 1
         }));
-        
+       
         setMachinesForService(machines);
       } else {
         setMachinesForService([]);
@@ -152,26 +165,29 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
   }, [selectedService, servicesData]);
 
 
+
+
   useEffect(() => {
     if (!selectedService || machinesForService.length === 0) {
       setMachineAvailabilityMap({});
       return;
     }
 
+
     // Calculate total machines available for this service
-    const totalMachinesForService = machinesForService.reduce((sum, machine) => 
+    const totalMachinesForService = machinesForService.reduce((sum, machine) =>
       machine.isAvailable !== false ? sum + (machine.Number || 1) : sum, 0);
-    
+   
     // Create a map to track machine usage by date
     const dateUsageMap: Record<string, number> = {};
-    
+   
     // Process each reservation to determine machine usage by date
     reservations.forEach(reservation => {
       // Check if this reservation involves any machines from our service
-      const reservedMachines = reservation.machines.filter(machineName => 
+      const reservedMachines = reservation.machines.filter(machineName =>
         machinesForService.some(m => m.id === machineName || m.Machine === machineName)
       );
-      
+     
       if (reservedMachines.length > 0) {
         // Use reservation date or extract from time slots
         let dateStr = '';
@@ -180,30 +196,31 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
         } else if (reservation.date) {
           dateStr = new Date(reservation.date).toDateString();
         }
-        
+       
         if (dateStr) {
           // Count each machine separately
           dateUsageMap[dateStr] = (dateUsageMap[dateStr] || 0) + reservedMachines.length;
         }
       }
     });
-    
+   
     // Create the availability map (total - used = available)
     const availabilityMap: Record<string, number> = {};
-    
+   
     // Pre-populate availability map with a 3-month range
     const today = new Date();
     const threeMonthsLater = new Date();
     threeMonthsLater.setMonth(today.getMonth() + 3);
-    
+   
     for (let date = new Date(today); date <= threeMonthsLater; date.setDate(date.getDate() + 1)) {
       const dateStr = new Date(date).toDateString();
       availabilityMap[dateStr] = Math.max(0, totalMachinesForService - (dateUsageMap[dateStr] || 0));
     }
-    
+   
     setMachineAvailabilityMap(availabilityMap);
-    
+   
   }, [machinesForService, reservations, selectedService]);
+
 
   // Process reservations and blocked dates into calendar events
   useEffect(() => {
@@ -211,8 +228,9 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
       setCalendarEvents([]);
       return;
     }
-    
+   
     const events = [];
+
 
     // Update the event component to make it more compact
     const EventComponent = ({ event }: { event: any }) => {
@@ -223,41 +241,42 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
         );
     };
 
+
     // Create events for each machine reservation
     for (const reservation of reservations) {
       // Check if the reservation involves any of our service's machines
-      const reservedMachines = reservation.machines.filter(machineName => 
+      const reservedMachines = reservation.machines.filter(machineName =>
         machinesForService.some(m => m.id === machineName || m.Machine === machineName)
       );
-      
+     
       if (reservedMachines.length === 0) continue;
-      
+     
       // Process each reserved machine
       for (const machineName of reservedMachines) {
         // Find the machine object to get its proper name
         const machineObj = machinesForService.find(m => m.id === machineName || m.Machine === machineName);
         const displayName = machineObj ? machineObj.Machine : machineName;
-        
+       
         if (reservation.timeSlots && reservation.timeSlots.length > 0) {
           // Process each time slot
           for (const slot of reservation.timeSlots) {
             if (slot.startTime && slot.endTime) {
               const startTime = new Date(slot.startTime);
               const endTime = new Date(slot.endTime);
-              
+             
               // Determine if this crosses morning and afternoon
               const isMorning = startTime.getHours() < MORNING_END && startTime.getHours() >= MORNING_START;
               const isAfternoon = endTime.getHours() <= AFTERNOON_END && endTime.getHours() > AFTERNOON_START;
               const spansBoth = startTime.getHours() < MORNING_END && endTime.getHours() > AFTERNOON_START;
-              
+             
               if (spansBoth) {
                 // Create all-day event
                 const allDayStart = new Date(startTime);
                 allDayStart.setHours(0, 0, 0, 0);
-                
+               
                 const allDayEnd = new Date(startTime);
                 allDayEnd.setHours(23, 59, 59, 999);
-                
+               
                 events.push({
                   title: `${displayName} (Reserved)`,
                   start: allDayStart,
@@ -274,10 +293,10 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
                 // Create morning event
                 const morningStart = new Date(startTime);
                 morningStart.setHours(MORNING_START, 0, 0);
-                
+               
                 const morningEnd = new Date(startTime);
                 morningEnd.setHours(MORNING_END, 0, 0);
-                
+               
                 events.push({
                   title: `${displayName} (Morning)`,
                   start: morningStart,
@@ -294,10 +313,10 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
                 // Create afternoon event
                 const afternoonStart = new Date(startTime);
                 afternoonStart.setHours(AFTERNOON_START, 0, 0);
-                
+               
                 const afternoonEnd = new Date(startTime);
                 afternoonEnd.setHours(AFTERNOON_END, 0, 0);
-                
+               
                 events.push({
                   title: `${displayName} (Afternoon)`,
                   start: afternoonStart,
@@ -316,7 +335,7 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
         } else {
           // If no time slots, use the reservation date as an all-day event
           const reservationDate = new Date(reservation.date);
-          
+         
           events.push({
             title: `${displayName} (Reserved)`,
             start: new Date(reservationDate.setHours(0, 0, 0, 0)),
@@ -333,12 +352,13 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
       }
     }
 
+
     // Process blocked dates
     for (const blockedDate of blockedDates) {
       const date = new Date(blockedDate.date);
-      
+     
       events.push({
-        title: 'Unavailable (Blocked)', 
+        title: 'Unavailable (Blocked)',
         start: new Date(date.setHours(0, 0, 0, 0)),
         end: new Date(date.setHours(23, 59, 59, 999)),
         allDay: true,
@@ -349,6 +369,7 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
         }
       });
     }
+
 
     // Add user selections as events
     selectedDates.forEach(date => {
@@ -364,8 +385,10 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
       });
     });
 
+
     setCalendarEvents(events);
   }, [reservations, blockedDates, selectedDates, selectedService, machinesForService]);
+
 
   // Handle date selection
   const handleDateSelect = (date: Date) => {
@@ -374,12 +397,13 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
       return;
     }
 
+
     // Check if date is already selected
     const dateStr = date.toDateString();
     const isAlreadySelected = selectedDates.some(d => d.toDateString() === dateStr);
-    
+   
     let newSelectedDates;
-    
+   
     if (isAlreadySelected) {
       // Remove the date if already selected
       newSelectedDates = selectedDates.filter(d => d.toDateString() !== dateStr);
@@ -395,17 +419,19 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
       }
       newSelectedDates = [...selectedDates, date];
     }
-    
+   
     // Notify parent
     onDateSelect(newSelectedDates);
   };
+
+
 
 
   const eventStyleGetter = (event: any) => {
     let backgroundColor = '#4F46E5'; // Default Indigo
     let borderColor = '#4338CA';
     let textColor = 'white';
-    
+   
     if (event.resource) {
       if (event.resource.isBlocked) {
         backgroundColor = '#EF4444'; // Red for blocked dates
@@ -426,7 +452,7 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
         }
       }
     }
-    
+   
     const style = {
       backgroundColor,
       borderLeft: `3px solid ${borderColor}`,
@@ -443,12 +469,14 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
       transition: 'all 0.2s ease-in-out',
       opacity: event.resource?.isSelected ? 1 : 0.85 // Slightly transparent for reservations
     };
-    
+   
     return {
       style,
       className: 'event-item hover:opacity-100'
     };
   };
+
+
 
 
   // Day cell styling with availability information
@@ -459,105 +487,106 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
     const isPastDate = moment(date).isBefore(moment(), 'day');
     const isBlocked = blockedDates.some(d => new Date(d.date).toDateString() === dateStr);
     const isSelected = selectedDates.some(d => d.toDateString() === dateStr);
-    
+   
     // Get availability for this date
     const availableMachines = machineAvailabilityMap[dateStr] || 0;
     const hasEnoughMachines = availableMachines >= machineQuantityNeeded;
-    
+   
     let className = '';
     let style: React.CSSProperties = {};
-    
+   
     // Apply basic styling
     if (isWeekend) {
       style = { ...style, backgroundColor: '#F9FAFB' };
       className += ' weekend-day';
     }
-    
+   
     if (isToday) {
       className += ' today-cell';
     }
-    
+   
     if (isPastDate) {
       className += ' past-date';
       style = { ...style, backgroundColor: '#F1F1F1', opacity: 0.7 };
     }
-    
+   
     if (isBlocked) {
       className += ' blocked-date';
       style = { ...style, backgroundColor: '#FEE2E2', opacity: 0.85 };
     }
-    
+   
     if (!hasEnoughMachines && !isBlocked && !isPastDate && !isWeekend) {
       className += ' insufficient-machines';
       style = { ...style, backgroundColor: '#FEF3C7', opacity: 0.85 };
     }
-    
+   
     if (isSelected) {
       className += ' selected-date';
       style = { ...style, backgroundColor: '#DCFCE7', borderColor: '#16A34A', borderWidth: '2px' };
     }
-    
+   
     return {
       style,
       className: className.trim()
     };
   };
 
+
   const calculateDailyMachineAvailability = (date: Date) => {
     const dateStr = date.toDateString();
-    
+   
     // Validate service and machine data exist
     if (!selectedService || !machinesForService.length) return true;
-  
+ 
     // Get total available machines for this service
-    const totalMachinesForService = machinesForService.reduce((sum, machine) => 
+    const totalMachinesForService = machinesForService.reduce((sum, machine) =>
       machine.isAvailable !== false ? sum + (machine.Number || 1) : sum, 0);
-  
+ 
     // Get all reservations for this date
-    const dayReservations = reservations.filter(reservation => 
-      reservation.timeSlots.some(slot => 
+    const dayReservations = reservations.filter(reservation =>
+      reservation.timeSlots.some(slot =>
         new Date(slot.startTime).toDateString() === dateStr
       ) &&
       // Ensure the reservation uses machines from this service
-      reservation.machines.some(machineName => 
+      reservation.machines.some(machineName =>
         machinesForService.some(m => m.id === machineName || m.Machine === machineName)
       )
     );
-  
+ 
     // Count total machines used on this day for this service
     const totalMachinesUsed = dayReservations.reduce((total, reservation) => {
-      const serviceMachinesUsed = reservation.machines.filter(machineName => 
+      const serviceMachinesUsed = reservation.machines.filter(machineName =>
         machinesForService.some(m => m.id === machineName || m.Machine === machineName)
       );
       return total + serviceMachinesUsed.length;
     }, 0);
-  
+ 
     // Check if machines needed exceed total available
     return totalMachinesUsed + machineQuantityNeeded <= totalMachinesForService;
   };
-  
-  
+ 
+ 
   // Determine if a date should be disabled
   const isDateDisabled = (date: Date): boolean => {
     const dateStr = date.toDateString();
     const isWeekend = date.getDay() === 0 || date.getDay() === 6;
     const isPastDate = moment(date).isBefore(moment(), 'day');
     const isBlocked = blockedDates.some(d => new Date(d.date).toDateString() === dateStr);
-    
+   
     const oneMonthLater = new Date();
     oneMonthLater.setMonth(oneMonthLater.getMonth() + 1);
     const isTooFarInFuture = date > oneMonthLater;
-  
+ 
     // Check machine availability specifically
     const hasEnoughMachines = calculateDailyMachineAvailability(date);
-    
-    return isWeekend || 
-           isPastDate || 
-           isBlocked || 
-           !hasEnoughMachines || 
+   
+    return isWeekend ||
+           isPastDate ||
+           isBlocked ||
+           !hasEnoughMachines ||
            isTooFarInFuture;
   };
-  
+ 
   // Custom toolbar component
   const CustomToolbar = (toolbar: any) => {
     const goToBack = () => {
@@ -566,7 +595,7 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
       toolbar.onNavigate('prev');
       setCurrentDate(newDate);
     };
-    
+   
     const goToNext = () => {
       const newDate = new Date(toolbar.date);
       newDate.setMonth(newDate.getMonth() + 1);
@@ -574,32 +603,33 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
       setCurrentDate(newDate);
     };
 
+
     return (
       <div className="rbc-toolbar py-2 px-3 flex flex-row items-center justify-between border-b border-gray-200 bg-white relative">
         <div className="flex items-center">
           <div className="flex items-center">
-            <button 
-              onClick={goToBack} 
+            <button
+              onClick={goToBack}
               className="p-1 rounded-l border border-gray-200 hover:bg-gray-50 transition-colors"
               aria-label="Previous month"
             >
               <ChevronLeft className="h-4 w-4 text-gray-600" />
             </button>
           </div>
-          
+         
           <span className="font-semibold mx-3 text-gray-800 text-base">{toolbar.label}</span>
-          <button 
-              onClick={goToNext} 
+          <button
+              onClick={goToNext}
               className="p-1 rounded-r border-t border-r border-b border-gray-200 hover:bg-gray-50 transition-colors"
               aria-label="Next month"
             >
               <ChevronRight className="h-4 w-4 text-gray-600" />
             </button>
         </div>
-        
+       
         {/* Empty middle space */}
         <div className="flex-grow"></div>
-        
+       
         {/* Selection counter */}
         <div className="text-sm font-medium text-gray-600">
           {selectedDates.length} of {maxDates} dates selected
@@ -607,6 +637,7 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
       </div>
     );
   };
+
 
   const EventComponent = ({ event }: { event: any }) => {
     return (
@@ -616,6 +647,7 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
     );
   };
 
+
   // Custom day cell component with availability info
   const DayCellWrapper = ({ children, value }: any) => {
     const dateStr = value.toDateString();
@@ -623,10 +655,10 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
     const isSelectable = !isDateDisabled(value);
     const isSelected = selectedDates.some(d => d.toDateString() === dateStr);
     const isCurrentMonth = value.getMonth() === currentDate.getMonth();
-    
+   
     // Show date availability indicator only for current month dates that are selectable
     return (
-      <div 
+      <div
         className={`relative day-cell-wrapper ${isSelectable ? 'selectable' : 'disabled'} ${isSelected ? 'selected' : ''}`}
         onClick={(e) => {
           // Stop propagation to prevent event bubbling from the events below
@@ -649,36 +681,39 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
     );
   };
 
+
   const additionalStyles = `
   /* Hide "free" indicators for dates outside current month */
   .rbc-off-range .day-cell-wrapper .absolute.bottom-1.right-1 {
     display: none;
   }
-  
+ 
   /* Make selected dates stand out more */
   .selected-date {
     box-shadow: inset 0 0 0 2px #16A34A !important;
   }
-  
+ 
   /* Clean up the calendar bottom area */
   .rbc-row:last-child {
     margin-bottom: 8px;
   }
-  
+ 
   /* Give more space to the calendar cells */
   .rbc-month-row {
     min-height: 100px;
   }
 `;
 
+
   // Tooltips for info about the calendar
   const availabilityInfo = useMemo(() => {
     if (!selectedService || !machineQuantityNeeded) {
       return "Please select a service and specify machine quantity first";
     }
-    
+   
     return `Showing availability for ${selectedService} with ${machineQuantityNeeded} machine(s) needed`;
   }, [selectedService, machineQuantityNeeded]);
+
 
   return (
     <div className="flex flex-col h-full overflow-hidden bg-white rounded-lg border border-gray-200">
@@ -691,6 +726,7 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
           </p>
         </div>
       </div>
+
 
       {/* Legend */}
       <div className="px-3 py-2 border-b border-gray-200 bg-gray-50">
@@ -721,7 +757,7 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
           </div>
         </div>
       </div>
-      
+     
       {/* Calendar Section */}
       {isLoading ? (
         <div className="h-96 flex flex-col items-center justify-center bg-gray-50">
@@ -730,6 +766,7 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
         </div>
       ) : (
         <div className="calendar-container flex-grow" style={{ height: "500px" }}>
+
 
           <Calendar
             localizer={localizer}
@@ -752,20 +789,20 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
             formats={{
               monthHeaderFormat: 'MMMM YYYY',
               dayHeaderFormat: 'dddd, MMMM D',
-              dayRangeHeaderFormat: ({ start, end }) => 
+              dayRangeHeaderFormat: ({ start, end }) =>
                 `${moment(start).format('MMMM D')} - ${moment(end).format('MMMM D, YYYY')}`
             }}
           />
         </div>
       )}
-      
+     
       {/* Selected dates summary */}
       {selectedDates.length > 0 && (
         <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
           <h3 className="text-sm font-medium text-gray-700 mb-2">Selected Dates:</h3>
           <div className="flex flex-wrap gap-2">
             {selectedDates.map((date, index) => (
-              <div 
+              <div
                 key={index}
                 className="bg-green-100 text-green-800 px-2 py-1 rounded-md text-xs flex items-center"
               >
@@ -781,10 +818,10 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
           </div>
         </div>
       )}
-      
+     
       {/* Add custom styling for better calendar appearance */}
       <style jsx global>{`
-        
+       
         /* Reduce event card height to prevent blocking availability indicators */
         .rbc-event {
         padding: 1px 6px !important;
@@ -793,18 +830,20 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
         overflow: hidden;
         }
 
+
         /* Make day cells scrollable when they have many events */
         .rbc-day-bg {
         overflow-y: auto;
         max-height: 100%;
         }
-        
+       
         /* Ensure the "X free" indicator stays visible */
         .day-cell-wrapper .absolute.bottom-1.right-1 {
         z-index: 10;
         background-color: white;
         box-shadow: 0 1px 3px rgba(0,0,0,0.2);
         }
+
 
         /* Make the grid wider on larger screens */
         @media (min-width: 1024px) {
@@ -814,55 +853,58 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
         }
         }
 
+
         /* Ensure events don't block interaction with the day cell */
         .rbc-event {
         pointer-events: auto;
         z-index: 4;
         }
 
+
         .day-cell-wrapper {
         z-index: 5;
         }
+
 
         /* Month row styling */
         .rbc-month-row {
           min-height: 90px
         }
-        
+       
         /* Weekends styling */
         .weekend-day {
           background-color: #F8FAFC !important;
         }
-        
+       
         /* Today's cell */
         .today-cell {
           box-shadow: inset 0 0 0 1px #4F46E5;
           z-index: 1;
           position: relative;
         }
-        
+       
         /* Off-range day styling (days from other months) */
         .rbc-off-range {
           color: #CBD5E1;
         }
-        
+       
         /* Active day styling when clicked */
         .rbc-day-bg.rbc-selected-cell {
           background-color: rgba(224, 231, 255, 0.5);
         }
-        
+       
         /* Past dates styling */
         .past-date .rbc-date-cell {
           color: #94A3B8;
           text-decoration: line-through;
           opacity: 0.85;
         }
-        
+       
         /* Events on past dates */
         .past-date .rbc-event {
           opacity: 0.65 !important;
         }
-        
+       
         /* Diagonal striped background for past dates */
         .past-date:after {
           content: '';
@@ -871,25 +913,25 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
           left: 0;
           width: 100%;
           height: 100%;
-          background-image: linear-gradient(45deg, 
-            rgba(203, 213, 225, 0.1) 25%, 
-            transparent 25%, 
-            transparent 50%, 
-            rgba(203, 213, 225, 0.1) 50%, 
-            rgba(203, 213, 225, 0.1) 75%, 
-            transparent 75%, 
+          background-image: linear-gradient(45deg,
+            rgba(203, 213, 225, 0.1) 25%,
+            transparent 25%,
+            transparent 50%,
+            rgba(203, 213, 225, 0.1) 50%,
+            rgba(203, 213, 225, 0.1) 75%,
+            transparent 75%,
             transparent);
           background-size: 8px 8px;
           pointer-events: none;
           z-index: 2;
         }
-        
+       
         /* Blocked dates styling */
         .blocked-date .rbc-date-cell {
           color: #EF4444;
           font-weight: 500;
         }
-        
+       
         /* Not enough machines styling */
         .insufficient-machines:after {
           content: '';
@@ -898,73 +940,73 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
           left: 0;
           width: 100%;
           height: 100%;
-          background-image: linear-gradient(45deg, 
-            rgba(251, 191, 36, 0.1) 25%, 
-            transparent 25%, 
-            transparent 50%, 
-            rgba(251, 191, 36, 0.1) 50%, 
-            rgba(251, 191, 36, 0.1) 75%, 
-            transparent 75%, 
+          background-image: linear-gradient(45deg,
+            rgba(251, 191, 36, 0.1) 25%,
+            transparent 25%,
+            transparent 50%,
+            rgba(251, 191, 36, 0.1) 50%,
+            rgba(251, 191, 36, 0.1) 75%,
+            transparent 75%,
             transparent);
           background-size: 8px 8px;
           pointer-events: none;
           z-index: 1;
         }
-        
+       
         /* Cell wrapper for interaction */
         .day-cell-wrapper {
           height: 100%;
           min-height: 5rem;
           width: 100%;
         }
-        
+       
         .day-cell-wrapper.selectable {
           cursor: pointer;
         }
-        
+       
         .day-cell-wrapper.selectable:hover {
           background-color: rgba(224, 231, 255, 0.3);
           transition: background-color 0.15s ease;
         }
-        
+       
         .day-cell-wrapper.disabled {
           cursor: not-allowed;
         }
-        
+       
         .day-cell-wrapper.selected .rbc-date-cell {
           font-weight: 700;
           color: #16A34A;
         }
-        
+       
         /* Add position relative for pseudo-element placement */
         .rbc-day-bg {
           position: relative;
         }
-        
+       
         /* Ensure borders connect properly */
         .rbc-month-view, .rbc-month-row, .rbc-week-row, .rbc-day-bg {
           border-collapse: separate;
         }
-        
+       
         /* Make events container scrollable if many events */
         .rbc-row-content {
           max-height: 100%;
         }
-        
+       
         /* Calendar container scroll */
         .rbc-calendar {
           height: 100% !important;
         }
-        
+       
         /* Custom scrollbar for calendar */
         .rbc-month-view::-webkit-scrollbar {
           width: 6px;
         }
-        
+       
         .rbc-month-view::-webkit-scrollbar-track {
           background: #F1F5F9;
         }
-        
+       
         .rbc-month-view::-webkit-scrollbar-thumb {
           background-color: #CBD5E1;
           border-radius: 3px;
@@ -975,17 +1017,20 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
   );
 };
 
+
 // Wrapper component that can be used in the MSME scheduling flow
 
-export const InteractiveMachineCalendarWrapper = ({ 
-  formData, 
-  updateFormData 
-}: { 
+
+export const InteractiveMachineCalendarWrapper = ({
+  formData,
+  updateFormData
+}: {
   formData: any;
   updateFormData: (field: string, value: any) => void;
 }) => {
   const [servicesData, setServicesData] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
 
   // Fetch services data
   useEffect(() => {
@@ -1007,8 +1052,10 @@ export const InteractiveMachineCalendarWrapper = ({
       }
     };
 
+
     fetchServices();
   }, []);
+
 
   const handleDateSelect = (dates: Date[]) => {
     // Update form data with the new dates
@@ -1019,20 +1066,24 @@ export const InteractiveMachineCalendarWrapper = ({
     })));
   };
 
+
   // Determine the selected service
-  const selectedService = typeof formData.ProductsManufactured === 'string' 
-    ? formData.ProductsManufactured 
+  const selectedService = typeof formData.ProductsManufactured === 'string'
+    ? formData.ProductsManufactured
     : Array.isArray(formData.ProductsManufactured) && formData.ProductsManufactured.length > 0
       ? formData.ProductsManufactured[0]
       : '';
 
+
   // Determine machine quantity needed - defaults to 0 if no machines are tied to the service
-  const machineQuantityNeeded = selectedService && formData.serviceMachineNumbers 
+  const machineQuantityNeeded = selectedService && formData.serviceMachineNumbers
     ? formData.serviceMachineNumbers[selectedService] || 0
     : 0;
 
+
   // Extract currently selected dates
   const selectedDates = formData.days?.map((day: any) => new Date(day.date)) || [];
+
 
   return (
     <Card className="mt-6 shadow-sm">
@@ -1066,7 +1117,6 @@ export const InteractiveMachineCalendarWrapper = ({
     </Card>
   );
 };
-
 
 
 export default InteractiveMachineCalendar;

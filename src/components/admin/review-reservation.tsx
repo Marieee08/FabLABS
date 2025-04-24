@@ -1,4 +1,3 @@
-// src/components/admin/review-reservation.tsx
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -6,6 +5,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ import TimeEditor from './time-editor';
 import { downloadMachineUtilPDF } from "@/components/admin-functions/pdf/machine-utilization-pdf";
 import CostBreakdown from './cost-breakdown'; // Import the new CostBreakdown component
 import { toast } from 'sonner';
-import MachineUtilization from './machine-utilization';
+import  MachineUtilization from './machine-utilization';
 
 // Updated interface definitions
 interface UserService {
@@ -172,6 +172,112 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
   const [comments, setComments] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  const [confirmationDialog, setConfirmationDialog] = useState({
+    isOpen: false,
+    action: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
+  // Helper function to show confirmation dialog
+  const showConfirmation = (action: string, message: string, onConfirm: () => void) => {
+    setConfirmationDialog({
+      isOpen: true,
+      action,
+      message,
+      onConfirm,
+    });
+  };
+
+  // Status change handlers with confirmation dialogs
+const handleMarkAsOngoing = () => {
+  if (!localReservation) return;
+
+  // Check if any service requires machines but doesn't have them assigned
+  const hasUnassignedRequiredMachines = editedServices.some(service => {
+    const requiresMachines = serviceRequiresMachines(service.ServiceAvail);
+    const hasMachinesAssigned = service.selectedMachines.length > 0;
+    return requiresMachines && !hasMachinesAssigned;
+  });
+
+  if (hasUnassignedRequiredMachines) {
+    // Show modal instead of confirmation dialog
+    setConfirmationDialog({
+      isOpen: true,
+      action: 'Assign Machines',
+      message: 'Please assign machines to all required services before marking as Ongoing.',
+      onConfirm: () => {} // Empty function since we just want to show a message
+    });
+    return;
+  }
+
+  // Proceed with original confirmation if machines are assigned
+  showConfirmation(
+    'Mark as Ongoing',
+    'Are you sure you want to mark this reservation as Ongoing? This will start the utilization process.',
+    () => handleStatusUpdate(localReservation.id, 'Ongoing')
+  );
+};
+
+  const handleMarkAsPendingPayment = () => {
+    if (!localReservation) return;
+    // Check if all UtilTimes are marked as Completed or Cancelled
+    const incompleteTimes = localReservation.UtilTimes.filter(
+      time => time.DateStatus !== "Completed" && time.DateStatus !== "Cancelled"
+    );
+    
+    if (incompleteTimes.length > 0) {
+      toast.error("Cannot proceed to payment", {
+        description: `${incompleteTimes.length} time slot(s) are not yet marked as Completed or Cancelled. 
+        Please review and update all time slots before proceeding.`,
+        duration: 5000
+      });
+      return;
+    }
+    
+    showConfirmation(
+      'Mark as Pending Payment',
+      'Are you sure you want to mark this reservation as Pending Payment? This will notify the client to proceed with payment.',
+      () => handleStatusUpdate(localReservation.id, 'Pending Payment')
+    );
+  };
+
+  const handleMarkAsCompleted = () => {
+    if (!localReservation) return;
+    showConfirmation(
+      'Mark as Completed',
+      'Are you sure you want to mark this reservation as Completed? This will finalize the process.',
+      () => handleStatusUpdate(localReservation.id, 'Completed')
+    );
+  };
+
+  const handleAcceptReservation = () => {
+    if (!localReservation) return;
+    showConfirmation(
+      'Accept Reservation',
+      'Are you sure you want to accept this reservation? This will approve the request and notify the client.',
+      handleApproveReservation
+    );
+  };
+
+  const handleRejectReservation = () => {
+    if (!localReservation) return;
+    showConfirmation(
+      'Reject Reservation',
+      'Are you sure you want to reject this reservation? This action cannot be undone.',
+      () => handleStatusUpdate(localReservation.id, 'Rejected')
+    );
+  };
+
+  const handleCancelReservation = () => {
+    if (!localReservation) return;
+    showConfirmation(
+      'Cancel Reservation',
+      'Are you sure you want to cancel this reservation? This action cannot be undone.',
+      () => handleStatusUpdate(localReservation.id, 'Cancelled')
+    );
+  };
   const isEditingDisabled = (status: string): boolean => {
     const nonEditableStatuses = ['Pending Payment', 'Paid', 'Completed'];
     return nonEditableStatuses.includes(status);
@@ -614,180 +720,257 @@ useEffect(() => {
   };
 
   // Updated handleApproveReservation function for ReviewReservation component
-const handleApproveReservation = async () => {
-  if (!localReservation) return;
-  
-  console.log("Starting approval process for reservation:", localReservation.id);
-  
-  // 1. First validate that all required services have machines assigned
-  if (!validateRequiredMachines()) {
-    console.log("Machine validation failed");
-    return;
-  }
-  
-  try {
-    // 2. Set up loading state for better UX
-    setIsLoading(true);
+  const handleApproveReservation = async () => {
+    if (!localReservation) return;
     
-    // Log services and machine selections
-    console.log("Services with machines:", editedServices.filter(s => s.selectedMachines.length > 0).length);
-    console.log("All services:", editedServices);
+    console.log("Starting approval process for reservation:", localReservation.id);
     
-    // 3. Prepare the operating times from UtilTimes
-    const operatingTimes = localReservation.UtilTimes.map(time => {
-      // Convert the StartTime and EndTime to proper format for operating times
-      let startTime = null;
-      let endTime = null;
-      
-      // Handle conversion of date strings or objects to proper format
-      if (time.StartTime) {
-        startTime = typeof time.StartTime === 'string' 
-          ? time.StartTime 
-          : new Date(time.StartTime).toISOString();
-      }
-      
-      if (time.EndTime) {
-        endTime = typeof time.EndTime === 'string' 
-          ? time.EndTime 
-          : new Date(time.EndTime).toISOString();
-      }
-      
-      // Create a standard operating time object
-      return {
-        OTDate: startTime ? new Date(startTime).toISOString().split('T')[0] : null,
-        OTStartTime: startTime,
-        OTEndTime: endTime,
-        OTTypeofProducts: localReservation.BulkofCommodity || "Not specified",
-        OTMachineOp: null // This will be filled in later by machine operators
-      };
-    });
-    
-    // 4. For each UserService with valid equipment, prepare MachineUtilization records
-    const machineUtilizations = editedServices
-      .filter(service => {
-        // Check if service has at least one machine
-        if (service.selectedMachines.length === 0) {
-          return false;
-        }
-        
-        // Check if first machine has a valid name (not empty and not "Not Specified")
-        const machineName = service.selectedMachines[0].name.trim();
-        return machineName !== '' && 
-               machineName.toLowerCase() !== 'not specified';
-      })
-      .map(service => ({
-        Machine: service.selectedMachines[0].name, // Just the machine name
-        ReviewedBy: null,  // This will be filled in later when reviewed
-        MachineApproval: false,
-        DateReviewed: null,
-        ServiceName: service.ServiceAvail,
-        // Add the operating times from the reservation's UtilTimes
-        OperatingTimes: operatingTimes,
-        DownTimes: [],     // Empty arrays for now, will be filled later
-        RepairChecks: []
-      }));
-    
-    console.log("Machine utilizations to create:", machineUtilizations.length);
-    console.log("Machine utilization data with operating times:", machineUtilizations);
-    
-    // 5. Create all machine utilization records in a single API call - only if there are any
-    if (machineUtilizations.length > 0) {
-      console.log("Calling machine utilization API");
-      const response = await fetch(`/api/admin/machine-utilization/${localReservation.id}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(machineUtilizations)
-      });
-      
-      const responseData = await response.json();
-      console.log("API response status:", response.status);
-      console.log("API response:", responseData);
-      
-      if (!response.ok) {
-        throw new Error(responseData.error || 'Failed to create machine utilization records');
-      }
-    } else {
-      console.log("No valid machine utilizations to create");
+    // 1. First validate that all required services have machines assigned
+    if (!validateRequiredMachines()) {
+      console.log("Machine validation failed");
+      return;
     }
     
-    // 6. Now update the status to Approved
-    console.log("Updating status to Approved");
-    await handleStatusUpdate(localReservation.id, 'Approved');
-  
-    // 7. Send approval email notification
-    console.log("Sending email notification");
     try {
-      const emailResponse = await fetch('/api/admin-email/approved-request', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          reservationId: localReservation.id.toString(),
-          reservationType: 'utilization' // Specifies this is a regular utilization, not EVC
-        }),
-      });
+      // 2. Set up loading state for better UX
+      setIsLoading(true);
       
-      console.log("Email API response status:", emailResponse.status);
+      // Log services and machine selections
+      console.log("Services with machines:", editedServices.filter(s => s.selectedMachines.length > 0).length);
+      console.log("All services:", editedServices);
       
-      if (!emailResponse.ok) {
-        const emailErrorText = await emailResponse.text();
-        console.warn('Email notification failed to send:', emailErrorText);
+      // 3. Prepare the operating times from UtilTimes - with proper error handling
+      const operatingTimes = [];
+      
+      // Only try to map UtilTimes if it exists and is an array
+      if (localReservation.UtilTimes && Array.isArray(localReservation.UtilTimes)) {
+        for (const time of localReservation.UtilTimes) {
+          try {
+            // Convert the StartTime and EndTime to proper format for operating times
+            let startTime = null;
+            let endTime = null;
+            
+            // Handle conversion of date strings or objects to proper format with error handling
+            if (time.StartTime) {
+              try {
+                startTime = typeof time.StartTime === 'string' 
+                  ? time.StartTime 
+                  : new Date(time.StartTime).toISOString();
+              } catch (dateError) {
+                console.warn("Error converting start time:", dateError);
+                startTime = null;
+              }
+            }
+            
+            if (time.EndTime) {
+              try {
+                endTime = typeof time.EndTime === 'string' 
+                  ? time.EndTime 
+                  : new Date(time.EndTime).toISOString();
+              } catch (dateError) {
+                console.warn("Error converting end time:", dateError);
+                endTime = null;
+              }
+            }
+            
+            // Only add valid times to the operating times array
+            const otDate = startTime ? new Date(startTime).toISOString().split('T')[0] : null;
+            
+            // Create a standard operating time object
+            operatingTimes.push({
+              OTDate: otDate,
+              OTStartTime: startTime,
+              OTEndTime: endTime,
+              OTTypeofProducts: localReservation.BulkofCommodity || "Not specified",
+              OTMachineOp: null // This will be filled in later by machine operators
+            });
+          } catch (timeError) {
+            console.error("Error processing time slot:", timeError, time);
+            // Continue with the next time slot
+          }
+        }
       } else {
-        console.log('Approval email sent successfully');
+        console.warn("No UtilTimes found or UtilTimes is not an array");
       }
-    } catch (emailError) {
-      console.error('Error sending approval email:', emailError);
-      // We don't want to fail the whole approval process if just the email fails
-    }
-    
-    // 8. Fetch the updated reservation data to ensure we have the latest MachineUtilizations
-    console.log("Fetching updated reservation data");
-    const updatedResponse = await fetch(`/api/admin/reservation-review/${localReservation.id}`);
-    console.log("Updated data API response status:", updatedResponse.status);
-    
-    if (updatedResponse.ok) {
-      const updatedReservation = await updatedResponse.json();
-      console.log("Updated reservation data received");
       
-      // Check if MachineUtilizations exist in the response
-      if (updatedReservation.MachineUtilizations) {
-        console.log("MachineUtilizations count:", updatedReservation.MachineUtilizations.length);
+      // 4. For each UserService with valid equipment, prepare MachineUtilization records
+      // Check if editedServices exists and is an array, but don't throw, just log and use an empty array
+      if (!editedServices || !Array.isArray(editedServices)) {
+        console.error("Edited services data is missing or invalid");
+        // Instead of throwing and stopping the process, we'll continue with an empty array
+        editedServices = []; 
+      }
+      
+      const machineUtilizations = editedServices
+        .filter(service => {
+          // Check if service has machines property and at least one machine
+          if (!service.selectedMachines || !Array.isArray(service.selectedMachines) || 
+              service.selectedMachines.length === 0) {
+            return false;
+          }
+          
+          // Check if first machine has a valid name (not empty and not "Not Specified")
+          const machineName = service.selectedMachines[0].name?.trim() || '';
+          return machineName !== '' && 
+                 machineName.toLowerCase() !== 'not specified';
+        })
+        .map(service => ({
+          Machine: service.selectedMachines[0].name, // Just the machine name
+          ReviewedBy: null,  // This will be filled in later when reviewed
+          MachineApproval: false,
+          DateReviewed: null,
+          ServiceName: service.ServiceAvail,
+          // Add the operating times from the reservation's UtilTimes
+          OperatingTimes: operatingTimes,
+          DownTimes: [],     // Empty arrays for now, will be filled later
+          RepairChecks: []
+        }));
+      
+      console.log("Machine utilizations to create:", machineUtilizations.length);
+      console.log("Machine utilization data with operating times:", machineUtilizations);
+      
+      // 5. Create all machine utilization records in a single API call - only if there are any
+      if (machineUtilizations.length > 0) {
+        console.log("Calling machine utilization API");
+        // Using local try/catch without throwing errors up to the main function
+        // This allows the function to continue even if creating machine utilizations fails
+        try {
+          const response = await fetch(`/api/admin/machine-utilization/${localReservation.id}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(machineUtilizations)
+          });
+          
+          let responseData;
+          try {
+            responseData = await response.json();
+          } catch (jsonError) {
+            console.error("Error parsing response JSON:", jsonError);
+            responseData = { error: "Failed to parse response" };
+          }
+          
+          console.log("API response status:", response.status);
+          console.log("API response:", responseData);
+          
+          if (!response.ok) {
+            console.error("Server error response:", responseData.error || "Unknown server error");
+            // Log the error but don't throw so we can continue with the approval process
+          }
+        } catch (fetchError) {
+          // Log the error but don't rethrow, continue with the approval process
+          console.error("Error creating machine utilization records:", fetchError);
+        }
       } else {
-        console.warn("No MachineUtilizations in the updated reservation data");
+        console.log("No valid machine utilizations to create");
       }
       
-      setLocalReservation(updatedReservation);
-      
-      // Update the edited services with the latest data
-      const updatedServices = updatedReservation.UserServices.map((service) => ({
-        ...service,
-        selectedMachines: parseMachines(service.EquipmentAvail || '')
-      }));
-      
-      setEditedServices(updatedServices);
-    } else {
-      console.error("Failed to fetch updated reservation data");
-    }
+      // 6. Now update the status to Approved
+      console.log("Updating status to Approved");
+      try {
+        await handleStatusUpdate(localReservation.id, 'Approved');
+      } catch (updateError) {
+        console.error("Error updating reservation status:", updateError);
+        toast.error("Failed to update reservation status. Please try again.");
+        throw new Error("Failed to update reservation status"); // We need to stop here if status update fails
+      }
     
-    toast.success('Reservation approved successfully with machine utilization records and operating times');
-    console.log("Approval process complete");
-  } catch (error) {
-    console.error('Error during reservation approval:', error);
-    toast.error(`Failed to approve reservation: ${error instanceof Error ? error.message : 'Unknown error'}`);
-  } finally {
-    setIsLoading(false);
-  }
-};
+      // 7. Send approval email notification
+      console.log("Sending email notification");
+      try {
+        const emailResponse = await fetch('/api/admin-email/approved-request', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            reservationId: localReservation.id.toString(),
+            reservationType: 'utilization' // Specifies this is a regular utilization, not EVC
+          }),
+        });
+        
+        console.log("Email API response status:", emailResponse.status);
+        
+        if (!emailResponse.ok) {
+          try {
+            const emailErrorText = await emailResponse.text();
+            console.warn('Email notification failed to send:', emailErrorText);
+          } catch (textError) {
+            console.warn('Email notification failed to send, could not read error text');
+          }
+        } else {
+          console.log('Approval email sent successfully');
+        }
+      } catch (emailError) {
+        console.error('Error sending approval email:', emailError);
+        // We don't want to fail the whole approval process if just the email fails
+      }
+      
+      // 8. Fetch the updated reservation data to ensure we have the latest MachineUtilizations
+      console.log("Fetching updated reservation data");
+      try {
+        const updatedResponse = await fetch(`/api/admin/reservation-review/${localReservation.id}`);
+        console.log("Updated data API response status:", updatedResponse.status);
+        
+        if (updatedResponse.ok) {
+          let updatedReservation;
+          try {
+            updatedReservation = await updatedResponse.json();
+            console.log("Updated reservation data received");
+            
+            // Check if MachineUtilizations exist in the response
+            if (updatedReservation.MachineUtilizations) {
+              console.log("MachineUtilizations count:", updatedReservation.MachineUtilizations.length);
+            } else {
+              console.warn("No MachineUtilizations in the updated reservation data");
+              // Initialize to empty array to avoid undefined errors later
+              updatedReservation.MachineUtilizations = [];
+            }
+            
+            setLocalReservation(updatedReservation);
+            
+            // Make sure UserServices exists and is an array before mapping
+            if (updatedReservation.UserServices && Array.isArray(updatedReservation.UserServices)) {
+              // Update the edited services with the latest data
+              const updatedServices = updatedReservation.UserServices.map((service) => ({
+                ...service,
+                selectedMachines: parseMachines(service.EquipmentAvail || '')
+              }));
+              
+              setEditedServices(updatedServices);
+            } else {
+              console.warn("No UserServices in updated reservation data");
+            }
+          } catch (jsonError) {
+            console.error("Error parsing updated reservation data:", jsonError);
+            // No need to throw here, we can continue with the existing data
+          }
+        } else {
+          console.error("Failed to fetch updated reservation data");
+        }
+      } catch (fetchError) {
+        console.error("Error fetching updated reservation:", fetchError);
+        // No need to throw here, we can continue with the approval flow
+      }
+      
+      toast.success('Reservation approved successfully with machine utilization records and operating times');
+      console.log("Approval process complete");
+    } catch (error) {
+      console.error('Error during reservation approval:', error);
+      toast.error(`Failed to approve reservation: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
 // Add this loading state to component
 const [isLoading, setIsLoading] = useState(false);
 
 return (
+  <>
   <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-    <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle className="text-2xl font-semibold">Reservation Details</DialogTitle>
       </DialogHeader>
@@ -973,14 +1156,13 @@ return (
             </Tabs>
 
             <DialogFooter className="mt-6">
-              <div className="w-full flex flex-col">
-                {/* Add validation error message here, above all buttons */}
-                {validationError && (
-                  <Alert variant="destructive" className="mb-4 w-full">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{validationError}</AlertDescription>
-                  </Alert>
-                )}
+            <div className="w-full flex flex-col">
+              {validationError && (
+                <Alert variant="destructive" className="mb-4 w-full">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{validationError}</AlertDescription>
+                </Alert>
+              )}
               
               <div className="flex w-full justify-between">
                 {localReservation && !editingTimes && !editingMachineUtilization && (
@@ -1063,19 +1245,18 @@ return (
                 
                 {/* Status flow section in the DialogFooter */}
                 <div className="flex gap-4">
-                  {/* Updated status flow to include "Pending Admin Approval" status */}
                   {(localReservation.Status === 'Pending' || localReservation.Status === 'Pending Admin Approval') && (
                     <>
                       <Button
                         variant="destructive"
-                        onClick={() => handleStatusUpdate(localReservation.id, 'Rejected')}
+                        onClick={handleRejectReservation}
                         disabled={isLoading}
                       >
                         Reject Reservation
                       </Button>
                       <Button
                         variant="default"
-                        onClick={handleApproveReservation}
+                        onClick={handleAcceptReservation}
                         disabled={isLoading}
                       >
                         {isLoading ? (
@@ -1094,13 +1275,13 @@ return (
                     <>
                       <Button
                         variant="destructive"
-                        onClick={() => handleStatusUpdate(localReservation.id, 'Cancelled')}
+                        onClick={handleCancelReservation}
                       >
                         Cancel Reservation
                       </Button>
                       <Button
                         variant="default"
-                        onClick={() => handleStatusUpdate(localReservation.id, 'Ongoing')}
+                        onClick={handleMarkAsOngoing}
                       >
                         Mark as Ongoing
                       </Button>
@@ -1108,30 +1289,12 @@ return (
                   )}
 
                   {localReservation.Status === 'Ongoing' && !editingMachineUtilization && !editingTimes && (
-                    <>
-                      <Button
-                        variant="default"
-                        onClick={() => {
-                          // Check if all UtilTimes are marked as Completed or Cancelled
-                          const incompleteTimes = localReservation.UtilTimes.filter(
-                            time => time.DateStatus !== "Completed" && time.DateStatus !== "Cancelled"
-                          );
-                          
-                          if (incompleteTimes.length > 0) {
-                            toast.error("Cannot proceed to payment", {
-                              description: `${incompleteTimes.length} time slot(s) are not yet marked as Completed or Cancelled. 
-                              Please review and update all time slots before proceeding.`,
-                              duration: 5000
-                            });
-                            return;
-                          }
-                          
-                          handleStatusUpdate(localReservation.id, 'Pending Payment');
-                        }}
-                      >
-                        Mark as Pending Payment
-                      </Button>
-                    </>
+                    <Button
+                      variant="default"
+                      onClick={handleMarkAsPendingPayment}
+                    >
+                      Mark as Pending Payment
+                    </Button>
                   )}
                   
                   {localReservation.Status === 'Pending Payment' && (
@@ -1144,7 +1307,7 @@ return (
                   {localReservation.Status === 'Paid' && (
                     <Button
                       variant="default"
-                      onClick={() => handleStatusUpdate(localReservation.id, 'Completed')}
+                      onClick={handleMarkAsCompleted}
                     >
                       Mark as Completed
                     </Button>
@@ -1157,6 +1320,30 @@ return (
         )}
       </DialogContent>
     </Dialog>
+
+      <Dialog open={confirmationDialog.isOpen} onOpenChange={(open) => setConfirmationDialog(prev => ({...prev, isOpen: open}))}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Confirm {confirmationDialog.action}</DialogTitle>
+            <DialogDescription>{confirmationDialog.message}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmationDialog(prev => ({...prev, isOpen: false}))}>
+              Cancel
+            </Button>
+            <Button 
+              variant="default" 
+              onClick={() => {
+                confirmationDialog.onConfirm();
+                setConfirmationDialog(prev => ({...prev, isOpen: false}));
+              }}
+            >
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 
