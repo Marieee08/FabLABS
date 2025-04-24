@@ -383,10 +383,10 @@ const DashboardTeacher = () => {
                     </li>
                     <li className="ml-6">
                       <a 
-                        href="/user-dashboard/history"
+                        href="/teacher-dashboard/history"
                         onClick={(e) => {
                           e.preventDefault();
-                          handleNavigation('/user-dashboard/history');
+                          handleNavigation('/teacher-dashboard/history');
                         }}
                         className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]"
                       >
@@ -396,10 +396,10 @@ const DashboardTeacher = () => {
                   </>
                 )}
                     <Link 
-                      href="/user-dashboard/information" 
+                      href="/teacher-dashboard/information" 
                       onClick={(e) => {
                         e.preventDefault();
-                        handleNavigation('/user-dashboard/information');
+                        handleNavigation('/teacher-dashboard/information');
                       }}
                       className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]"
                     >
