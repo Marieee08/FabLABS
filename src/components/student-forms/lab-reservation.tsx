@@ -384,6 +384,31 @@ export default function LabReservation({ formData, updateFormData, nextStep, pre
     setIsSubmitting(false);
   };
 
+  const verifyTeacherEmail = async (email: string) => {
+    if (!email) return;
+    
+    try {
+      const response = await fetch('/api/verify-teacher-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      
+      const data = await response.json();
+      if (!data.verified) {
+        setErrors(prev => ({ ...prev, TeacherEmail: "This teacher's email does not exist in our system" }));
+      } else {
+        setErrors(prev => {
+          const newErrors = {...prev};
+          delete newErrors.TeacherEmail;
+          return newErrors;
+        });
+      }
+    } catch (err) {
+      console.error('Error verifying teacher email:', err);
+    }
+  };
+
   const inputStyles = `
     .no-spin-buttons::-webkit-inner-spin-button,
     .no-spin-buttons::-webkit-outer-spin-button {
@@ -530,15 +555,16 @@ export default function LabReservation({ formData, updateFormData, nextStep, pre
                 <label htmlFor="teacherEmail" className="block text-sm font-medium mb-1 text-gray-700">
                   Teacher Email <span className="text-red-500">*</span>
                 </label>
-                <input
-                  id="teacherEmail"
-                  type="email"
-                  className={`w-full border ${errors.TeacherEmail ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition`}
-                  value={formData.TeacherEmail}
-                  onChange={(e) => handleFieldChange('TeacherEmail', e.target.value)}
-                  aria-invalid={!!errors.TeacherEmail}
-                  placeholder="e.g. teacher@school.edu"
-                />
+                  <input
+                    id="teacherEmail"
+                    type="email"
+                    className={`w-full border ${errors.TeacherEmail ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition`}
+                    value={formData.TeacherEmail}
+                    onChange={(e) => handleFieldChange('TeacherEmail', e.target.value)}
+                    onBlur={(e) => verifyTeacherEmail(e.target.value)}
+                    aria-invalid={!!errors.TeacherEmail}
+                    placeholder="e.g. teacher@school.edu"
+                  />
                 {errors.TeacherEmail && <p className="mt-1 text-sm text-red-500">{errors.TeacherEmail}</p>}
               </div>
               
