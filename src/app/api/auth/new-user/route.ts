@@ -4,52 +4,53 @@ import { currentUser, auth } from '@clerk/nextjs/server';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
-
+// app/api/auth/new-user/route.ts
 export async function GET() {
   const { userId } = auth();
-  
-  if (!userId) {
-    return new NextResponse('Unauthorized', { status: 401 });
-  }
+  if (!userId) return new NextResponse('Unauthorized', { status: 401 });
 
   const user = await currentUser();
-  
-  if (!user) {
-    return new NextResponse('User not found', { status: 404 });
-  }
+  if (!user) return new NextResponse('User not found', { status: 404 });
 
   try {
-    // Get user's email
     const email = user.emailAddresses[0].emailAddress;
     
-    // Check if the email belongs to PSHS domain
-    const isStudentEmail = email.endsWith('@evc.pshs.edu.ph');
-    
-    // Try to find existing user
-    let dbUser = await prisma.accInfo.findUnique({ 
-      where: { clerkId: user.id },
+    // Check if this is a registered teacher email
+    const teacherEmail = await prisma.teacherEmail.findUnique({
+      where: { email }
     });
-
-    // If user doesn't exist, create them
-    if (!dbUser) {
-      dbUser = await prisma.accInfo.create({ 
-        data: {
-          clerkId: user.id,
-          Name: `${user.firstName} ${user.lastName}`, 
-          email: email,
-          // Automatically assign STUDENT role if email matches pattern
-          Role: isStudentEmail ? 'STUDENT' : undefined,
-        },
+    
+    // Determine role based on email
+    let userRole = 'MSME';
+    if (teacherEmail) {
+      userRole = 'TEACHER';
+      // Mark as verified
+      await prisma.teacherEmail.update({
+        where: { email },
+        data: { verified: true }
       });
+    } else if (email.endsWith('@evc.pshs.edu.ph')) {
+      userRole = 'STUDENT';
     }
     
+    // Create or update user
+    const dbUser = await prisma.accInfo.create({ 
+      data: {
+        clerkId: userId,
+        Name: `${user.firstName} ${user.lastName}`, 
+        email,
+        Role: userRole,
+      },
+    });
 
-    // Redirect to dashboard after successful sync
+    // Redirect based on role
+    let redirectPath = '/user-dashboard';
+    if (userRole === 'TEACHER') redirectPath = '/teacher-dashboard';
+    else if (userRole === 'STUDENT') redirectPath = '/student-dashboard';
+
     return new NextResponse(null, {
       status: 302,
-      headers: {
-        Location: '/user-dashboard',
-      },
+      headers: { Location: redirectPath },
     });
   } catch (error) {
     console.error('Database error:', error);

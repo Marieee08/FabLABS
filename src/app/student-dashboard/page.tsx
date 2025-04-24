@@ -214,7 +214,7 @@ const DashboardUser = () => {
                 // EVC Reservations Table
                 evcReservations.length === 0 ? (
                   <div className="bg-blue-50 p-6 rounded-lg text-center">
-                    <p className="text-blue-800">You don't have any pending EVC reservations at the moment.</p>
+                    <p className="text-blue-800">You don't have any pendin reservations at the moment.</p>
                     <Link
                       href="/student-schedule"
                       className="mt-4 inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
