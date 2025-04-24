@@ -1,3 +1,5 @@
+
+"use client";
 import React, { useState, useEffect } from 'react';
 import { Trash2, Plus, Mail, Check, X, RefreshCw } from 'lucide-react';
 
