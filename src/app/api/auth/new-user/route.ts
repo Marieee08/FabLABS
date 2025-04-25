@@ -23,7 +23,7 @@ export async function GET() {
     // Determine role based on email
     let userRole = 'MSME';
     if (teacherEmail) {
-      userRole = 'TEACHER';
+      userRole = 'STAFF';
       // Mark as verified
       await prisma.teacherEmail.update({
         where: { email },
@@ -45,11 +45,11 @@ export async function GET() {
 
     // Redirect based on role
     let redirectPath = '/user-dashboard';
-    if (userRole === 'TEACHER') redirectPath = '/teacher-dashboard';
+    if (userRole === 'STAFF') redirectPath = '/staff-dashboard';
     else if (userRole === 'STUDENT') redirectPath = '/student-dashboard';
 
     return new NextResponse(null, {
-      status: 302,
+      status: 302,A
       headers: { Location: redirectPath },
     });
   } catch (error) {

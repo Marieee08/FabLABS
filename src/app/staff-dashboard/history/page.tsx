@@ -213,19 +213,19 @@ const HistoryPage = () => {
                 {orderDropdownOpen && (
                   <>
                     <li className="ml-6">
-                      <Link href="/teacher-dashboard" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]">
+                      <Link href="/staff-dashboard" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]">
                         General
                       </Link>
                     </li>
                     <li className="ml-6">
-                      <Link href="/teacher-dashboard/history" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-blue-800 bg-blue-100 hover:text-[#0d172c]">
+                      <Link href="/staff-dashboard/history" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-blue-800 bg-blue-100 hover:text-[#0d172c]">
                         History
                       </Link>
                     </li>
                   </>
                 )}
                   <Link 
-                    href="/teacher-dashboard/information" 
+                    href="/staff-dashboard/information" 
                     className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]"
                   >
                     Personal Info

@@ -11,7 +11,7 @@ export default authMiddleware({
         '/msme-schedule',
         '/student-schedule',
         '/admin-dashboard',
-        '/teacher-dashboard',
+        '/staff-dashboard',
         '/survey',
         '/cashier-dashboard'
       ];

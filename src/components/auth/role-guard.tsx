@@ -93,8 +93,8 @@ export default function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
               case 'CASHIER':
                 router.push('/cashier-dashboard');
                 break;
-              case 'TEACHER':
-                router.push('/teacher-dashboard');
+              case 'STAFF':
+                router.push('/staff-dashboard');
                 break;
               default:
                 router.push('/');

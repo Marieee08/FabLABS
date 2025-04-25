@@ -151,7 +151,7 @@ const PersonalInformationPage = () => {
                 <>
                   <li className="ml-6">
                     <Link 
-                      href="/user-dashboard" 
+                      href="/staff-dashboard" 
                       className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]"
                     >
                       General
@@ -159,7 +159,7 @@ const PersonalInformationPage = () => {
                   </li>
                   <li className="ml-6">
                     <Link 
-                      href="/user-dashboard/history" 
+                      href="/staff-dashboard/history" 
                       className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]"
                     >
                       History
@@ -171,7 +171,7 @@ const PersonalInformationPage = () => {
                 <div className="ml-6 mt-2 space-y-2">
  
                 <Link 
-                  href="/teacher-dashboard/information" 
+                  href="/staff-dashboard/information" 
                   className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-blue-800 bg-blue-100 hover:text-[#0d172c]"
                 >
                   Personal Info
