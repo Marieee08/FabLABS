@@ -114,15 +114,16 @@ const TeachersPage = () => {
                     </li>
                   </>
                 )}
+                <Link href="/admin-dashboard/staff" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-white border bg-[#1c2a52] border-[#5e86ca]">
+                    Staff
+                  </Link>
                 <li>
                   <Link href="/admin-dashboard/reports" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-white border border-transparent hover:bg-[#1c2a52] hover:border-[#5e86ca]">
                     Reports
                   </Link>
                 </li>
                 <li>
-                  <Link href="/admin-dashboard/teachers" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-white border bg-[#1c2a52] border-[#5e86ca]">
-                    Teachers
-                  </Link>
+                  
                 </li>
               </ul>
             </div>
@@ -171,7 +172,7 @@ const TeachersPage = () => {
           {/* Main */}
           <main>
             <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
-              <h2 className="text-[#143370] text-3xl font-bold font-qanelas3">Teacher Management</h2>
+              <h2 className="text-[#143370] text-3xl font-bold font-qanelas3">Staff Management</h2>
               <p className="text-sm text-[#143370] mb-4 font-poppins1">{formattedDate}</p>
               <div className="shadow-lg">
                 <TeacherEmailManager />

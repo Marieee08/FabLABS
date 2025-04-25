@@ -76,7 +76,7 @@ export default function TeacherEmailManager() {
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h2 className="text-xl font-semibold mb-4">Manage Teacher Emails</h2>
+      <h2 className="text-xl font-semibold mb-4">Manage Staff Emails</h2>
       
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 p-3 rounded mb-4 flex justify-between">
@@ -93,7 +93,7 @@ export default function TeacherEmailManager() {
             value={newEmail}
             onChange={(e) => setNewEmail(e.target.value)}
             className="pl-10 w-full p-2 border border-gray-300 rounded"
-            placeholder="teacher@evc.pshs.edu.ph"
+            placeholder="staff@evc.pshs.edu.ph"
           />
         </div>
         <button
@@ -128,7 +128,7 @@ export default function TeacherEmailManager() {
             ) : emails.length === 0 ? (
               <tr>
                 <td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500">
-                  No teacher emails added yet
+                  No staff emails added yet
                 </td>
               </tr>
             ) : (

@@ -152,6 +152,9 @@ const ReportsPage: React.FC = () => {
                     </li>
                   </>
                 )}
+                <Link href="/admin-dashboard/staff" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-white border bg-[#1c2a52] border-[#5e86ca]">
+                    Staff
+                  </Link>
                 <li>
                   <Link href="/admin-dashboard/reports" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-white border bg-[#1c2a52] border-[#5e86ca]">
                     Reports
