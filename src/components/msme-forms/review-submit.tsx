@@ -515,6 +515,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
           </div>
   
           {/* Business Information */}
+          {!isStaff && (
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-3 flex items-center">
               <Briefcase className="h-5 w-5 text-blue-600 mr-2" /> Business Information
@@ -551,7 +552,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
               </CardContent>
             </Card>
           </div>
-  
+          )}
           {/* Utilization Information */}
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-3 flex items-center">
