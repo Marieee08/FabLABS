@@ -1,4 +1,3 @@
-// src\components\msme-forms\review-submit.tsx
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { useUser } from "@clerk/nextjs";
@@ -435,6 +434,9 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
     );
   }
 
+  // Determine if current user is a staff member
+  const isStaff = accInfo?.Role === "STAFF";
+
   return (
     <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 pt-0 flex flex-col">
       <Card className="bg-white shadow-sm border border-gray-200 mt-6">
@@ -659,19 +661,21 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
             </Card>
           </div>
   
-          {/* Cost Breakdown */}
-          <div className="mb-6">
-            <h3 className="text-lg font-medium mb-3 flex items-center">
-              <CreditCard className="h-5 w-5 text-blue-600 mr-2" /> Cost Breakdown
-            </h3>
-            <CostReview
-            selectedServices={selectedServices}
-            days={formData.days}
-            serviceMachineNumbers={formData.serviceMachineNumbers}
-            onCostCalculated={handleCostCalculated}
-            onServiceCostsCalculated={handleServiceCostsCalculated}
-          />
-          </div>
+          {/* Cost Breakdown - Only show if user is NOT a staff member */}
+          {!isStaff && (
+            <div className="mb-6">
+              <h3 className="text-lg font-medium mb-3 flex items-center">
+                <CreditCard className="h-5 w-5 text-blue-600 mr-2" /> Cost Breakdown
+              </h3>
+              <CostReview
+                selectedServices={selectedServices}
+                days={formData.days}
+                serviceMachineNumbers={formData.serviceMachineNumbers}
+                onCostCalculated={handleCostCalculated}
+                onServiceCostsCalculated={handleServiceCostsCalculated}
+              />
+            </div>
+          )}
   
           {/* Error messages */}
           {error && (

@@ -180,10 +180,18 @@ const handleScheduleClick = async () => {
     return;
   }
   
+  
   // If all good, navigate to the appropriate scheduling page
   setIsLoading(true);
   if (userRole === "STUDENT") {
     router.push('/student-schedule');
+  } else {
+    router.push('/msme-schedule');
+  }
+
+  setIsLoading(true);
+  if (userRole === "STAFF") {
+    router.push('/staff-schedule');
   } else {
     router.push('/msme-schedule');
   }
