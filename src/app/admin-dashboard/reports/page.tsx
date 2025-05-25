@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 import { useUser, UserButton } from "@clerk/nextjs";
 import { DateRange } from 'react-day-picker';
 import { RefreshCw } from "lucide-react";
+import Image from 'next/image';
 
 import { DateRangeSelector } from '@/components/admin-reports/date-range-selector';
 import { useDashboardData } from '@/components/admin-reports/use-dashboard-data';
@@ -92,7 +93,7 @@ const ReportsPage: React.FC = () => {
           <nav className="mt-5 py-4 px-4 lg:mt-9 lg:px-6">
             <div className="flex flex-col items-center py-8">
               {user?.imageUrl ? (
-                <img 
+                <Image 
                   src={user.imageUrl} 
                   alt="Profile" 
                   className="h-36 w-36 rounded-full object-cover mb-2"

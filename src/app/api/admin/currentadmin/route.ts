@@ -1,6 +1,6 @@
 // src/app/api/admin/currentadmin/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs';
+import { auth } from '@clerk/nextjs/server';
 import { prisma } from '@/lib/prisma';
 
 export async function GET(request: NextRequest) {
@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   
   try {
     // Get the current user's ID from auth
-    const { userId } = auth();
+    const { userId } = await auth();
     console.log("Auth userId:", userId);
     
     if (!userId) {

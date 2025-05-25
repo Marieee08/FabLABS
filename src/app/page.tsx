@@ -15,9 +15,11 @@ export default function Home() {
 
     <section id="home" className="grid grid-cols-1 md:grid-cols-2 items-center h-auto pt-0 pb-5 px-4 md:px-6">
       <div className="flex items-center justify-center order-2 md:order-1 mb-6 md:mb-0 mt-8 md:mt-20">
-        <img
-          src="images/elements/landingelement.gif"
+        <Image
+          src="/images/elements/landingelement.gif"
           alt="Fabrication Laboratory of PSHS-EVC"
+          width={600}
+          height={600}
           className="w-full max-w-[90%] md:max-w-[110%] mt-2 md:mt-4 ml-12"
         />
       </div>
@@ -30,8 +32,7 @@ export default function Home() {
         <h1 className="text-5xl md:text-7xl font-qanelas2">Innovate to</h1>
         <h2 className="block text-5xl md:text-7xl font-qanelas3 text-[#f5a237] mb-5">ELEVATE</h2>
         <p className="text-md font-poppins1 mb-5">
-          The PSHS-EVC fab lab is a small-scale workshop offering digital fabrication. A fab lab is typically equipped with an array of flexible
-          computer-controlled tools that cover several different length scales and various materials with the aim to <span className="font-poppins2">make "almost anything".</span>
+          The PSHS-EVC fab lab is a small-scale workshop offering digital fabrication. A fab lab is typically equipped with an array of flexible computer-controlled tools that cover several different length scales and various materials with the aim to <span className="font-poppins2">make "almost anything".</span>
         </p>
         <div className="flex flex-col md:flex-row gap-4 items-end md:items-center">
           <a href="/services" className="border border-[#5e86ca] bg-[#193d83] text-white font-qanelas1 text-lg py-1 px-6 rounded-md hover:bg-[#2f61c2] transition duration-300 ml-auto">
@@ -60,7 +61,7 @@ export default function Home() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
           <div className="bg-white rounded-2xl border border-[#5e86ca] hover:shadow-lg hover:shadow-blue-300/50 hover:text-blue-800 transform hover:scale-105 transition-all duration-300">
             <div className="p-10">
-              <img src="images/elements/who.png" alt="who" className="size-14"/>
+              <Image src="/images/elements/who.png" alt="who" width={56} height={56} className="size-14"/>
               <h3 className="text-xl font-semibold mb-2 font-qanelas2 font-md pt-5">Who can avail?</h3>
               <p className="text-gray-700 mb-4 font-poppins1">
                 Fab labs are available as a community resource, offering open access for individuals as well as scheduled access for programs.
@@ -71,7 +72,7 @@ export default function Home() {
 
           <div className="bg-white rounded-2xl border border-[#5e86ca] hover:shadow-lg hover:shadow-blue-300/50 hover:text-blue-800 transform hover:scale-105 transition-all duration-300">
             <div className="p-10">
-              <img src="images/elements/why.png" alt="why" className="size-14"/>
+              <Image src="/images/elements/why.png" alt="why" width={56} height={56} className="size-14"/>
               <h3 className="text-xl mb-2 font-qanelas2 pt-5">Why was the FabLab established?</h3>
               <p className="text-gray-700 mb-4 font-poppins1">
                 Fab lab Eastern Visayas is set up to inspire people and MSMEs of the region to turn their ideas into new products and prototypes by giving them access to a range of digital manufacturing technology.
@@ -82,7 +83,7 @@ export default function Home() {
 
           <div className="bg-white rounded-2xl border border-[#5e86ca] hover:shadow-lg hover:shadow-blue-300/50 hover:text-blue-800 transform hover:scale-105 transition-all duration-300">
             <div className="p-10">
-              <img src="images/elements/where.png" alt="where" className="size-14"/>
+              <Image src="/images/elements/where.png" alt="where" width={56} height={56} className="size-14"/>
               <h3 className="text-xl font-semibold mb-2 font-qanelas2 font-md pt-5">Where is the FabLab located?</h3>
               <p className="text-gray-700 mb-4 font-poppins1">
                 Fab lab Eastern Visayas is located at PSHS-EVC, Ground Floor, Lab Tech Building, Pawing, Palo, Leyte.
@@ -98,11 +99,13 @@ export default function Home() {
       <div className="inline-flex flex-nowrap">
         <ul x-ref="slides" className="flex items-center animate-infinite-scroll">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-            <li key={num} className="relative bg-white p-3 shadow-lg transform transition-transform hover:scale-105 mx-2 rounded-lg">  {/* Added mx-2 for horizontal margin */}
+            <li key={num} className="relative bg-white p-3 shadow-lg transform transition-transform hover:scale-105 mx-2 rounded-lg">
               <div className="w-64 h-64 relative">
-                <img
+                <Image
                   src={`/images/slider/${num}.jpg`}
                   alt={`Slide ${num}`}
+                  width={256}
+                  height={256}
                   className="w-full h-full object-cover rounded-md"
                 />
               </div>
@@ -116,11 +119,13 @@ export default function Home() {
 
         <ul x-ref="logos" className="flex items-center animate-infinite-scroll">
           {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-            <li key={num} className="relative bg-white p-3 shadow-lg transform transition-transform hover:scale-105 mx-2 rounded-lg"> {/* Added mx-2 for horizontal margin */}
+            <li key={num} className="relative bg-white p-3 shadow-lg transform transition-transform hover:scale-105 mx-2 rounded-lg">
               <div className="w-64 h-64 relative">
-                <img
+                <Image
                   src={`/images/slider/${num}.jpg`}
                   alt={`Slide ${num}`}
+                  width={256}
+                  height={256}
                   className="w-full h-full object-cover rounded-md"
                 />
               </div>
@@ -151,8 +156,8 @@ export default function Home() {
             </div>
 
 
-            <div className="relative h-[318px]">
-                  <img src="images/machines/trylaser.png" alt="machine" className="absolute bottom-0" />
+            <div className="relative h-[318px] flex items-center justify-center">
+                  <Image src="/images/machines/trylaser.png" alt="machine" fill className="object-contain" />
             </div>
           </div>
 
@@ -167,8 +172,8 @@ export default function Home() {
             </div>
 
 
-            <div className="relative h-[318px]">
-                  <img src="images/machines/try3dprint.png" alt="machine" className="absolute bottom-0" />
+            <div className="relative h-[318px] flex items-center justify-center">
+                  <Image src="/images/machines/try3dprint.png" alt="machine" fill className="object-contain" />
             </div>
           </div>
 
@@ -183,8 +188,8 @@ export default function Home() {
             </div>
 
 
-            <div className="relative h-[318px]">
-                  <img src="images/machines/trycncmill.png" alt="machine" className="absolute bottom-0" />
+            <div className="relative h-[318px] flex items-center justify-center">
+                  <Image src="/images/machines/trycncmill.png" alt="machine" fill className="object-contain" />
             </div>
           </div>
 
@@ -268,4 +273,3 @@ export default function Home() {
     </main>
   );
 }
-

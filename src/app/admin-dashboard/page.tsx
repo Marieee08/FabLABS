@@ -7,6 +7,7 @@ import { useUser, UserButton } from "@clerk/nextjs";
 import TestCalendar from '@/components/admin-functions/admin-calendar';
 import { format } from 'date-fns';
 import RoleGuard from '@/components/auth/role-guard';
+import Image from 'next/image';
 
 interface Reservation {
   id: number;
@@ -77,7 +78,7 @@ const DashboardAdmin = () => {
         <nav className="mt-5 py-4 px-4 lg:mt-9 lg:px-6">
         <div className="flex flex-col items-center py-8">
             {user?.imageUrl ? (
-              <img 
+              <Image 
                 src={user.imageUrl} 
                 alt="Profile" 
                 className="h-36 w-36 rounded-full object-cover mb-2"

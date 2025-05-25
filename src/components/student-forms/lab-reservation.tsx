@@ -91,7 +91,7 @@ interface LabReservationProps {
 // Helper function
 const generateId = (): string => Math.random().toString(36).substring(2, 15);
 
-export default function LabReservation({ formData, updateFormData, nextStep, prevStep }: LabReservationProps) {
+export function LabReservation({ formData, updateFormData, nextStep, prevStep }: LabReservationProps) {
   const { user, isLoaded } = useUser();
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -691,3 +691,5 @@ export default function LabReservation({ formData, updateFormData, nextStep, pre
   </div>
 );
 }
+
+export default LabReservation;
