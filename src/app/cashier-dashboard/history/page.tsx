@@ -178,10 +178,12 @@ const HistoryPage = () => {
             <div className="flex flex-col items-center py-8">
               {user?.imageUrl ? (
                 <Image
-                  src={user.imageUrl} 
-                  alt="Profile" 
-                  className="h-36 w-36 rounded-full object-cover mb-2"
-                />
+                src={user.imageUrl}
+                alt="Profile"
+                width={144}
+                height={144}
+                className="h-36 w-36 rounded-full object-cover mb-2"
+              />
               ) : (
                 <span className="h-36 w-36 rounded-full bg-gray-300 mb-2"></span>
               )}

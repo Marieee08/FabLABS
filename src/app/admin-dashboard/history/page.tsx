@@ -59,6 +59,8 @@ const DashboardAdmin = () => {
                 <Image 
                   src={user.imageUrl} 
                   alt="Profile" 
+                  width={144}
+                  height={144}
                   className="h-36 w-36 rounded-full object-cover mb-2"
                 />
               ) : (
