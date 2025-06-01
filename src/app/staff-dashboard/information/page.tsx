@@ -168,15 +168,16 @@ const PersonalInformationPage = () => {
                 </>
               )}
               <li>
-                <div className="ml-6 mt-2 space-y-2">
- 
                 <Link 
                   href="/staff-dashboard/information" 
-                  className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-blue-800 bg-blue-100 hover:text-[#0d172c]"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleNavigation('/staff-dashboard/information');
+                  }}
+                  className="group relative flex w-full items-center justify-between gap-2.5 rounded-full py-2 px-4 font-medium text-blue-800 bg-blue-100 border border-[#5e86ca]"
                 >
-                  Personal Info
+                  <span>Personal Info</span>
                 </Link>
-                </div>
               </li>
             </ul>
           </div>

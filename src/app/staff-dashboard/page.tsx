@@ -394,16 +394,18 @@ const DashboardTeacher = () => {
                     </li>
                   </>
                 )}
-                    <Link 
-                      href="/staff-dashboard/information" 
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleNavigation('/staff-dashboard/information');
-                      }}
-                      className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]"
-                    >
-                      Personal Info
-                    </Link>
+                    <li>
+                      <Link 
+                        href="/staff-dashboard/information" 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleNavigation('/staff-dashboard/information');
+                        }}
+                        className="group relative flex w-full items-center justify-between gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]"
+                      >
+                        <span>Personal Info</span>
+                      </Link>
+                    </li>
               </ul>
             </div>
           </nav>
