@@ -49,7 +49,7 @@ export async function GET() {
     else if (userRole === 'STUDENT') redirectPath = '/student-dashboard';
 
     return new NextResponse(null, {
-      status: 302,A
+      status: 302,
       headers: { Location: redirectPath },
     });
   } catch (error) {

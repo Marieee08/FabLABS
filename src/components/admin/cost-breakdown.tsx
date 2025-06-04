@@ -1,14 +1,11 @@
-// Updated CostBreakdown.tsx with individual machine downtime tracking
-import React, { useState, useEffect } from 'react';
+// Updated CostBreakdown.tsx without downtime deduction functionality
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
-import { AlertCircle, RefreshCw, Clock } from 'lucide-react';
-import { Badge } from "@/components/ui/badge";
-import { Tooltip } from "@/components/ui/tooltip";
-import { TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip";
+import { AlertCircle, RefreshCw } from 'lucide-react';
 
-// Interface for DownTime
+// Interface for DownTime (kept for compatibility)
 interface DownTime {
   id?: number;
   DTDate: string | null;
@@ -19,7 +16,7 @@ interface DownTime {
   machineUtilId?: number | null;
 }
 
-// Interface for MachineUtilization
+// Interface for MachineUtilization (kept for compatibility)
 interface MachineUtilization {
   id?: number;
   Machine: string | null;
@@ -46,24 +43,12 @@ interface CostBreakdownProps {
 const CostBreakdown: React.FC<CostBreakdownProps> = ({ 
   userServices, 
   totalAmountDue,
-  machineUtilizations = [],
   reservationId,
   allowFix = false
 }) => {
   const [isFixing, setIsFixing] = useState(false);
   const [fixError, setFixError] = useState<string | null>(null);
   const [fixSuccess, setFixSuccess] = useState(false);
-  const [adjustedUserServices, setAdjustedUserServices] = useState<Array<UserService & { 
-    downtimeMinutes?: number, 
-    adjustedCost?: number,
-    originalCost?: number,
-    machineUtilization?: MachineUtilization | null 
-  }>>([]);
-
-  // Calculate downtime adjustments when component mounts or dependencies change
-  useEffect(() => {
-    calculateDowntimeAdjustments();
-  }, [userServices, machineUtilizations]);
 
   // Format price to have 2 decimal places and currency symbol
   const formatPrice = (price: number | string | null): string => {
@@ -72,73 +57,15 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
     const numericPrice = typeof price === 'string' ? parseFloat(price) : price;
     return `₱${numericPrice.toFixed(2)}`;
   };
-
-  // Calculate downtime adjustments for each service
-  const calculateDowntimeAdjustments = () => {
-    // Create a mapping of service ID to machine utilization
-    // This ensures each service is linked to a specific machine utilization record
-    const serviceToMachineUtil = new Map<string, MachineUtilization | null>();
-    
-    // Map each service to its corresponding machine utilization if available
-    userServices.forEach(service => {
-      // Get equipment name for this service
-      const equipmentName = service.EquipmentAvail.trim();
-      
-      // Try to find a matching machine utilization that hasn't been assigned yet
-      const matchingMachineUtil = machineUtilizations.find(util => 
-        util.ServiceName === service.ServiceAvail && 
-        util.Machine === equipmentName && 
-        !Array.from(serviceToMachineUtil.values()).includes(util)
-      );
-      
-      // Store the mapping
-      serviceToMachineUtil.set(service.id, matchingMachineUtil || null);
-    });
-    
-    // Now process each service with its specific machine utilization
-    const adjustedServices = userServices.map(service => {
-      // Get the specific machine utilization for this service
-      const machineUtil = serviceToMachineUtil.get(service.id);
-      
-      // Sum downtime minutes only for this specific machine utilization
-      const totalDowntimeMinutes = machineUtil
-        ? machineUtil.DownTimes.reduce((minutes, downtime) => minutes + (downtime.DTTime || 0), 0)
-        : 0;
-
-      // Get original cost
-      const originalCost = service.CostsAvail 
-        ? (typeof service.CostsAvail === 'string' 
-            ? parseFloat(service.CostsAvail) 
-            : service.CostsAvail)
-        : 0;
-
-      // Get minutes for rate calculation (default to 60 if not specified)
-      const minutes = service.MinsAvail || 60;
-      
-      // Calculate cost per minute
-      const costPerMinute = minutes > 0 ? originalCost / minutes : 0;
-      
-      // Calculate deduction based on downtime minutes
-      const downtimeDeduction = costPerMinute * totalDowntimeMinutes;
-      
-      // Calculate adjusted cost (never go below zero)
-      const adjustedCost = Math.max(0, originalCost - downtimeDeduction);
-
-      return {
-        ...service,
-        downtimeMinutes: totalDowntimeMinutes,
-        originalCost,
-        adjustedCost,
-        machineUtilization: machineUtil
-      };
-    });
-
-    setAdjustedUserServices(adjustedServices);
-  };
   
-  // Calculate total from adjusted services
-  const calculatedTotal = adjustedUserServices.reduce((sum, service) => {
-    return sum + (service.adjustedCost || 0);
+  // Calculate total from original service costs
+  const calculatedTotal = userServices.reduce((sum, service) => {
+    const cost = service.CostsAvail 
+      ? (typeof service.CostsAvail === 'string' 
+          ? parseFloat(service.CostsAvail) 
+          : service.CostsAvail)
+      : 0;
+    return sum + cost;
   }, 0);
 
   // Check if there's a discrepancy between provided total and calculated total
@@ -147,14 +74,6 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
     0;
   
   const hasDiscrepancy = Math.abs(calculatedTotal - storedTotal) > 0.01 && totalAmountDue !== null;
-
-  // Calculate total downtime
-  const totalDowntimeMinutes = adjustedUserServices.reduce((sum, service) => 
-    sum + (service.downtimeMinutes || 0), 0);
-
-  // Calculate total downtime deduction
-  const totalDowntimeDeduction = adjustedUserServices.reduce((sum, service) => 
-    sum + ((service.originalCost || 0) - (service.adjustedCost || 0)), 0);
 
   // Function to fix the total in the database
   const handleFixTotal = async () => {
@@ -207,18 +126,13 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
-          {adjustedUserServices.map((service, index) => (
+          {userServices.map((service, index) => (
             <div key={index} className="flex justify-between items-center py-1">
               <div className="flex-1">
                 <span className="font-medium">{service.ServiceAvail}</span>
                 {service.EquipmentAvail && (
                   <div className="text-sm text-gray-600 mt-1">
                     Equipment: {service.EquipmentAvail}
-                    {service.machineUtilization && (
-                      <span className="ml-1 text-xs text-gray-500">
-                        (ID: {service.machineUtilization.id})
-                      </span>
-                    )}
                   </div>
                 )}
                 {service.MinsAvail && (
@@ -226,68 +140,16 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
                     Duration: {service.MinsAvail} mins
                   </div>
                 )}
-                
-                {/* Show downtime badge if there are downtime minutes */}
-                {(service.downtimeMinutes || 0) > 0 && (
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Badge variant="destructive" className="mt-1 flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          Down: {service.downtimeMinutes} mins
-                        </Badge>
-                      </TooltipTrigger>
-                      <TooltipContent className="p-2 max-w-xs bg-white shadow-lg rounded-md">
-                        <div className="text-xs">
-                          <p className="font-medium">Downtime Adjustment</p>
-                          <p>Original Cost: {formatPrice(service.originalCost)}</p>
-                          <p>Deduction: {formatPrice((service.originalCost || 0) - (service.adjustedCost || 0))}</p>
-                          {service.machineUtilization?.DownTimes && service.machineUtilization.DownTimes.length > 0 && (
-                            <div className="mt-1 pt-1 border-t border-gray-200">
-                              <p className="font-medium">Downtime Details:</p>
-                              {service.machineUtilization.DownTimes.map((downtime, idx) => (
-                                <div key={idx} className="mt-1">
-                                  <p>{downtime.DTTime} mins - {downtime.Cause || 'No cause specified'}</p>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                )}
               </div>
               <div className="text-right">
-                {/* Show original cost with strikethrough if there's a downtime deduction */}
-                {(service.downtimeMinutes || 0) > 0 && (
-                  <div className="text-sm text-gray-500 line-through mb-1">
-                    {formatPrice(service.originalCost)}
-                  </div>
-                )}
-                <span className={`font-medium ${(service.downtimeMinutes || 0) > 0 ? 'text-amber-600' : ''}`}>
-                  {formatPrice(service.adjustedCost || service.CostsAvail)}
+                <span className="font-medium">
+                  {formatPrice(service.CostsAvail)}
                 </span>
               </div>
             </div>
           ))}
           
           <Separator className="my-3" />
-          
-          {/* Show total downtime if any */}
-          {totalDowntimeMinutes > 0 && (
-            <div className="bg-amber-50 p-2 rounded-md mb-2">
-              <div className="text-sm text-amber-700 flex justify-between">
-                <span className="flex items-center">
-                  <Clock className="h-4 w-4 mr-1" />
-                  Total Downtime: {totalDowntimeMinutes} minutes
-                </span>
-                <span>
-                  Deduction: {formatPrice(totalDowntimeDeduction)}
-                </span>
-              </div>
-            </div>
-          )}
           
           <div className="flex justify-between items-center pt-2">
             <span className="font-bold text-lg">Total</span>
@@ -297,7 +159,7 @@ const CostBreakdown: React.FC<CostBreakdownProps> = ({
               </span>
               {hasDiscrepancy && (
                 <div className="text-xs text-amber-600 mt-1">
-                  {totalDowntimeMinutes > 0 ? "Adjusted for downtime" : "Recalculated from services"}
+                  Recalculated from services
                 </div>
               )}
             </div>
