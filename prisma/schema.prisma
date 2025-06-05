@@ -8,19 +8,19 @@ datasource db {
 }
 
 model Machine {
-id           String           @id @default(cuid())
-Machine      String
-GenName      String?
-Image        String
-Desc         String
-Number       Int?
-NeedLink     Boolean          @default(false)
-Instructions String?
-Link         String?
-isAvailable  Boolean          @default(true)
-createdAt    DateTime         @default(now())
-updatedAt    DateTime         @updatedAt
-Services     MachineService[]
+  id           String           @id @default(cuid())
+  Machine      String
+  GenName      String?
+  Image        String
+  Desc         String
+  Number       Int?
+  NeedLink     Boolean          @default(false)
+  Instructions String?
+  Link         String?
+  isAvailable  Boolean          @default(true)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  Services     MachineService[]
 }
 
 model Service {
@@ -114,9 +114,9 @@ model UtilReq {
   Processedby         String?
   ReceiptNumber       String?
   PaymentDate         DateTime?
-  Remarks             String?             // by user
-  Comments            String?             // by admin
   accInfoId           Int?
+  Remarks             String?
+  Comments            String?
   CustomerFeedback    CustomerFeedback?    @relation("UtilReqToCustomerFeedback")
   EmployeeEvaluation  EmployeeEvaluation?  @relation("UtilReqToEmployeeEvaluation")
   JobandPayment       JobandPayment?       @relation("UtilReqToJobandPayment")
@@ -139,28 +139,30 @@ model UserTool {
 }
 
 model UserService {
-id             String          @id @default(cuid())
-ServiceAvail   String
-EquipmentAvail String
-CostsAvail     Decimal?
-MinsAvail      Decimal?
-Files          String?
-utilReqId      Int?
-evcId          Int?
-utilReq        UtilReq?        @relation("UtilReqToUserService", fields: [utilReqId], references: [id])
-evc            EVCReservation? @relation("EVCReservationToUserService", fields: [evcId], references: [id])
+  id             String          @id @default(cuid())
+  ServiceAvail   String
+  EquipmentAvail String
+  CostsAvail     Decimal?
+  MinsAvail      Decimal?
+  Files          String?
+  utilReqId      Int?
+  evcId          Int?
+  evc            EVCReservation? @relation("EVCReservationToUserService", fields: [evcId], references: [id])
+  utilReq        UtilReq?        @relation("UtilReqToUserService", fields: [utilReqId], references: [id])
 }
 
 model UtilTime {
-  id        Int             @id @default(autoincrement())
-  DayNum    Int?
-  StartTime DateTime?
-  EndTime   DateTime?
-  DateStatus  String?               @default("Ongoing")
-  utilReqId Int?
-  evcId     Int?
-  evc       EVCReservation? @relation("EVCReservationtoUtilTime", fields: [evcId], references: [id])
-  utilReq   UtilReq?        @relation("UtilReqToUtilTime", fields: [utilReqId], references: [id])
+  id         Int             @id @default(autoincrement())
+  DayNum     Int?
+  StartTime  DateTime?
+  EndTime    DateTime?
+  ActualStart  DateTime?
+  ActualEnd    DateTime?
+  DateStatus String?         @default("Ongoing")
+  utilReqId  Int?
+  evcId      Int?
+  utilReq    UtilReq?        @relation("UtilReqToUtilTime", fields: [utilReqId], references: [id])
+  evc        EVCReservation? @relation("EVCReservationtoUtilTime", fields: [evcId], references: [id])
 }
 
 model BlockedDate {
@@ -173,28 +175,28 @@ model BlockedDate {
 }
 
 model EVCReservation {
-id              Int              @id @default(autoincrement())
-EVCStatus       String           @default("Pending")
-ControlNo       Int?
-LvlSec          String?
-NoofStudents    Int?
-Subject         String?
-Teacher         String?
-Topic           String?
-DateRequested   DateTime?        @default(now())
-ApprovedBy      String?
-SchoolYear      Int?
-ReceivedBy      String?
-ReceivedDate    DateTime?
-InspectedBy     String?
-InspectedDate   DateTime?
-accInfoId       Int?
-TeacherEmail    String?
-accInfo         AccInfo?         @relation("AccInfoToEVCReservation", fields: [accInfoId], references: [id])
-EVCStudents     EVCStudent[]     @relation("EVCReservationtoEVCStudent")
-NeededMaterials NeededMaterial[] @relation("EVCReservationtoNeededMaterial")
-UtilTimes       UtilTime[]       @relation("EVCReservationtoUtilTime")
-userService     UserService[]     @relation("EVCReservationToUserService")
+  id              Int              @id @default(autoincrement())
+  EVCStatus       String           @default("Pending")
+  ControlNo       Int?
+  LvlSec          String?
+  NoofStudents    Int?
+  Subject         String?
+  Teacher         String?
+  Topic           String?
+  DateRequested   DateTime?        @default(now())
+  ApprovedBy      String?
+  SchoolYear      Int?
+  ReceivedBy      String?
+  ReceivedDate    DateTime?
+  InspectedBy     String?
+  InspectedDate   DateTime?
+  accInfoId       Int?
+  TeacherEmail    String?
+  accInfo         AccInfo?         @relation("AccInfoToEVCReservation", fields: [accInfoId], references: [id])
+  EVCStudents     EVCStudent[]     @relation("EVCReservationtoEVCStudent")
+  NeededMaterials NeededMaterial[] @relation("EVCReservationtoNeededMaterial")
+  userService     UserService[]    @relation("EVCReservationToUserService")
+  UtilTimes       UtilTime[]       @relation("EVCReservationtoUtilTime")
 }
 
 model EVCStudent {
@@ -217,12 +219,12 @@ model NeededMaterial {
 
 model MachineUtilization {
   id              Int             @id @default(autoincrement())
-  Machine         String?
   ReviwedBy       String?
   MachineApproval Boolean?
   DateReviewed    DateTime?
-  ServiceName     String?
   utilReqId       Int?
+  Machine         String?
+  ServiceName     String?
   DownTimes       DownTime[]      @relation("MachineUtilizationtoDownTime")
   utilReq         UtilReq?        @relation("UtilReqToMachineUtilization", fields: [utilReqId], references: [id])
   OperatingTimes  OperatingTime[] @relation("MachineUtilizationtoOperatingTime")
