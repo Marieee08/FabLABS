@@ -1,3 +1,4 @@
+// src\components\admin\review-reservation.tsx
 import React, { useState, useEffect } from 'react';
 import {
   Dialog,
@@ -41,6 +42,8 @@ interface UtilTime {
   DayNum: number | null;
   StartTime: string | null;
   EndTime: string | null;
+  ActualStart: string | null;
+  ActualEnd: string | null;
   DateStatus?: string | null;
 }
 
@@ -580,52 +583,58 @@ useEffect(() => {
     }
   };
 
-  // Handle saving updated time information
-  const handleSaveTimeChanges = async (updatedTimes: UtilTime[], updatedCost: number) => {
-    if (!localReservation) return;
+  // Updated handleSaveTimeChanges function in ReviewReservation component
+
+const handleSaveTimeChanges = async (updatedTimes: UtilTime[], updatedCost: number) => {
+  if (!localReservation) return;
+  
+  // Check if editing is disabled for this reservation status
+  if (isEditingDisabled(localReservation.Status)) {
+    alert('Cannot update times for reservations in Pending Payment, Paid, or Completed status.');
+    setEditingTimes(false);
+    return;
+  }
+  
+  try {
+    // Call the API to update the actual times and costs
+    const response = await fetch(`/api/admin/reservation-update-times/${localReservation.id}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        utilTimes: updatedTimes.map(time => ({
+          id: time.id,
+          ActualStart: time.ActualStart,
+          ActualEnd: time.ActualEnd,
+          DateStatus: time.DateStatus
+        })),
+        totalAmount: updatedCost
+      }),
+    });
     
-    // Check if editing is disabled for this reservation status
-    if (isEditingDisabled(localReservation.Status)) {
-      alert('Cannot update times for reservations in Pending Payment, Paid, or Completed status.');
-      setEditingTimes(false);
-      return;
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to update actual times');
     }
     
-    try {
-      // Call the API to update the times and costs
-      const response = await fetch(`/api/admin/reservation-update-times/${localReservation.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          utilTimes: updatedTimes,
-          totalAmount: updatedCost
-        }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update times');
-      }
-      
-      const updatedData = await response.json();
-      
-      // Update local reservation data
-      setLocalReservation({
-        ...updatedData,
-        UtilTimes: updatedData.UtilTimes,
-        TotalAmntDue: updatedData.TotalAmntDue
-      });
-      
-      // Exit time editing mode
-      setEditingTimes(false);
-      alert('Usage times and cost updated successfully');
-    } catch (error) {
-      console.error('Error updating times:', error);
-      alert(`Failed to update times: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  };
+    const updatedData = await response.json();
+    
+    // Update local reservation data with the new actual times
+    setLocalReservation({
+      ...updatedData,
+      UtilTimes: updatedData.UtilTimes,
+      TotalAmntDue: updatedData.TotalAmntDue
+    });
+    
+    // Exit time editing mode
+    setEditingTimes(false);
+    toast.success('Actual usage times and cost updated successfully');
+  } catch (error) {
+    console.error('Error updating actual times:', error);
+    toast.error(`Failed to update actual times: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+};
 
   // Handle completion of machine utilization editing
   const handleMachineUtilizationComplete = () => {

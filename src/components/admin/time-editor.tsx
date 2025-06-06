@@ -11,6 +11,8 @@ interface UtilTime {
   DayNum: number | null;
   StartTime: string | null;
   EndTime: string | null;
+  ActualStart: string | null;  // Added actual start time
+  ActualEnd: string | null;    // Added actual end time
   DateStatus?: string | null;
 }
 
@@ -49,13 +51,16 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
   onSave,
   onCancel
 }) => {
-  // Initialize editedTimes with original times, but formatted for display
+  // Initialize editedTimes with original times, including actual times
   const [editedTimes, setEditedTimes] = useState<UtilTime[]>(
     utilTimes.map(time => ({
       ...time,
-      // Keep the original date but format for display
+      // Keep the original scheduled times unchanged
       StartTime: time.StartTime ? time.StartTime : null,
       EndTime: time.EndTime ? time.EndTime : null,
+      // Initialize actual times - use existing actual times or default to scheduled times
+      ActualStart: time.ActualStart ? time.ActualStart : time.StartTime,
+      ActualEnd: time.ActualEnd ? time.ActualEnd : time.EndTime,
       DateStatus: time.DateStatus || "Ongoing"
     }))
   );
@@ -92,22 +97,6 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
       valid: true,
       message: "All time slots are properly marked."
     };
-  };
-
-  const handleTransitionToPendingPayment = () => {
-    // Validate that all time slots are completed
-    const validation = validateAllUtilTimesComplete(editedTimes);
-    
-    if (!validation.valid) {
-      // Display an error message indicating why pending payment cannot proceed
-      setError(validation.message);
-      return;
-    }
-    
-    // If all times are valid, proceed with status update
-    // You'll need to pass the actual reservation ID and implementation
-    // of handleStatusUpdate from the parent component
-    handleStatusUpdate(reservationId, 'Pending Payment');
   };
 
   // Generate time options in 15-minute increments for a 24-hour period
@@ -169,15 +158,16 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
     }
   };
 
-  // Calculate the total minutes between start and end times for active time slots
+  // Calculate the total minutes between actual start and end times for active time slots
   const calculateTotalMinutes = (times: UtilTime[]): number => {
     return times.reduce((total, time) => {
       // Don't count cancelled time slots in the total time calculation
       if (time.DateStatus === "Cancelled") return total;
-      if (!time.StartTime || !time.EndTime) return total;
+      // Use actual times instead of scheduled times
+      if (!time.ActualStart || !time.ActualEnd) return total;
       
-      const startTime = new Date(time.StartTime);
-      const endTime = new Date(time.EndTime);
+      const startTime = new Date(time.ActualStart);
+      const endTime = new Date(time.ActualEnd);
       
       if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) return total;
       
@@ -187,7 +177,7 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
     }, 0);
   };
 
-  // Calculate the cost based on updated times and service rates
+  // Calculate the cost based on updated actual times and service rates
   const calculateUpdatedCost = (): number => {
     const totalMinutes = calculateTotalMinutes(editedTimes);
     
@@ -206,16 +196,16 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
     return `${hours}h ${mins}m`;
   };
 
-  const handleTimeChange = (index: number, field: 'StartTime' | 'EndTime', timeValue: string) => {
+  // Updated to handle actual time changes instead of scheduled times
+  const handleTimeChange = (index: number, field: 'ActualStart' | 'ActualEnd', timeValue: string) => {
     setEditedTimes(prev => {
       const newTimes = [...prev];
       const time = newTimes[index];
       
-      // Update the time while keeping the same date
-      const updatedDateTime = updateTimeKeepingDate(
-        time[field],
-        timeValue
-      );
+      // Update the actual time while keeping the same date
+      // Use the original scheduled time as reference for the date, or the existing actual time
+      const referenceDate = time[field] || (field === 'ActualStart' ? time.StartTime : time.EndTime);
+      const updatedDateTime = updateTimeKeepingDate(referenceDate, timeValue);
       
       newTimes[index] = {
         ...time,
@@ -249,13 +239,14 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
       // Skip validation for cancelled time slots
       if (time.DateStatus === "Cancelled") continue;
       
-      if (!time.StartTime || !time.EndTime) {
-        setError("All active time slots must have start and end times set");
+      // Validate actual times instead of scheduled times
+      if (!time.ActualStart || !time.ActualEnd) {
+        setError("All active time slots must have actual start and end times set");
         return false;
       }
       
-      const startTime = new Date(time.StartTime);
-      const endTime = new Date(time.EndTime);
+      const startTime = new Date(time.ActualStart);
+      const endTime = new Date(time.ActualEnd);
       
       if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
         setError("Invalid date format");
@@ -263,7 +254,7 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
       }
       
       if (endTime <= startTime) {
-        setError("End time must be after start time");
+        setError("Actual end time must be after actual start time");
         return false;
       }
     }
@@ -277,7 +268,7 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
     setIsSubmitting(true);
     
     try {
-      // Calculate the updated cost
+      // Calculate the updated cost based on actual times
       const updatedCost = calculateUpdatedCost();
       
       // Call the parent's save handler
@@ -290,9 +281,24 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
     }
   };
 
-  // Calculate duration for a specific time slot
+  // Calculate duration for a specific time slot using actual times
   const calculateDuration = (time: UtilTime): number => {
     if (time.DateStatus === "Cancelled") return 0;
+    // Use actual times for duration calculation
+    if (!time.ActualStart || !time.ActualEnd) return 0;
+    
+    const startTime = new Date(time.ActualStart);
+    const endTime = new Date(time.ActualEnd);
+    
+    if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) return 0;
+    
+    // Calculate minutes difference
+    const diffMinutes = (endTime.getTime() - startTime.getTime()) / (1000 * 60);
+    return diffMinutes > 0 ? diffMinutes : 0;
+  };
+
+  // Calculate scheduled duration for comparison
+  const calculateScheduledDuration = (time: UtilTime): number => {
     if (!time.StartTime || !time.EndTime) return 0;
     
     const startTime = new Date(time.StartTime);
@@ -303,6 +309,63 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
     // Calculate minutes difference
     const diffMinutes = (endTime.getTime() - startTime.getTime()) / (1000 * 60);
     return diffMinutes > 0 ? diffMinutes : 0;
+  };
+
+  // Calculate time difference between actual and scheduled
+  const calculateTimeDifference = (time: UtilTime): { 
+    startDiff: number; 
+    endDiff: number; 
+    durationDiff: number;
+    hasChanges: boolean;
+  } => {
+    const scheduledDuration = calculateScheduledDuration(time);
+    const actualDuration = calculateDuration(time);
+    
+    let startDiff = 0;
+    let endDiff = 0;
+    
+    // Calculate start time difference in minutes
+    if (time.StartTime && time.ActualStart) {
+      const scheduledStart = new Date(time.StartTime);
+      const actualStart = new Date(time.ActualStart);
+      if (!isNaN(scheduledStart.getTime()) && !isNaN(actualStart.getTime())) {
+        startDiff = (actualStart.getTime() - scheduledStart.getTime()) / (1000 * 60);
+      }
+    }
+    
+    // Calculate end time difference in minutes
+    if (time.EndTime && time.ActualEnd) {
+      const scheduledEnd = new Date(time.EndTime);
+      const actualEnd = new Date(time.ActualEnd);
+      if (!isNaN(scheduledEnd.getTime()) && !isNaN(actualEnd.getTime())) {
+        endDiff = (actualEnd.getTime() - scheduledEnd.getTime()) / (1000 * 60);
+      }
+    }
+    
+    const durationDiff = actualDuration - scheduledDuration;
+    const hasChanges = Math.abs(startDiff) > 0 || Math.abs(endDiff) > 0 || Math.abs(durationDiff) > 0;
+    
+    return { startDiff, endDiff, durationDiff, hasChanges };
+  };
+
+  // Format time difference for display
+  const formatTimeDifference = (diffMinutes: number): string => {
+    if (diffMinutes === 0) return 'No change';
+    
+    const absMinutes = Math.abs(diffMinutes);
+    const hours = Math.floor(absMinutes / 60);
+    const mins = Math.round(absMinutes % 60);
+    
+    let timeStr = '';
+    if (hours > 0) {
+      timeStr += `${hours}h `;
+    }
+    if (mins > 0) {
+      timeStr += `${mins}m`;
+    }
+    
+    const prefix = diffMinutes > 0 ? '+' : '-';
+    return `${prefix}${timeStr.trim()}`;
   };
 
   // Calculate and display the estimated updated cost
@@ -316,10 +379,18 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
     const completedCount = editedTimes.filter(time => time.DateStatus === "Completed").length;
     const cancelledCount = editedTimes.filter(time => time.DateStatus === "Cancelled").length;
     
+    // Calculate total changes summary
+    const totalScheduledDuration = editedTimes.reduce((sum, time) => sum + calculateScheduledDuration(time), 0);
+    const totalActualDuration = editedTimes.reduce((sum, time) => sum + calculateDuration(time), 0);
+    const totalDurationDiff = totalActualDuration - totalScheduledDuration;
+    const slotsWithChanges = editedTimes.filter(time => calculateTimeDifference(time).hasChanges).length;
+    
     return (
       <div className="my-4 p-3 rounded-lg border">
-        <h4 className="font-medium mb-2">Time Slot Summary</h4>
-        <div className="grid grid-cols-3 gap-4 text-center">
+        <h4 className="font-medium mb-3">Time Slot Summary</h4>
+        
+        {/* Status counts */}
+        <div className="grid grid-cols-3 gap-4 text-center mb-4">
           <div className={`p-2 rounded-lg ${ongoingCount > 0 ? 'bg-blue-100' : 'bg-gray-100'}`}>
             <p className="font-medium">{ongoingCount}</p>
             <p className="text-sm">Ongoing</p>
@@ -333,6 +404,28 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
             <p className="text-sm">Cancelled</p>
           </div>
         </div>
+
+        {/* Overall time changes summary */}
+        {slotsWithChanges > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+            <h5 className="font-medium text-blue-900 mb-2">Overall Time Changes:</h5>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <p><span className="text-gray-600">Slots with changes:</span> <span className="font-medium">{slotsWithChanges}</span></p>
+                <p><span className="text-gray-600">Scheduled total:</span> <span className="font-medium">{formatDuration(totalScheduledDuration)}</span></p>
+              </div>
+              <div>
+                <p><span className="text-gray-600">Actual total:</span> <span className="font-medium">{formatDuration(totalActualDuration)}</span></p>
+                <p>
+                  <span className="text-gray-600">Net change:</span> 
+                  <span className={`font-medium ml-1 ${totalDurationDiff > 0 ? 'text-orange-600' : totalDurationDiff < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                    {formatTimeDifference(totalDurationDiff)}
+                  </span>
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
         
         {ongoingCount > 0 && (
           <div className="mt-3 p-2 bg-yellow-50 border border-yellow-100 rounded text-sm">
@@ -368,20 +461,86 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
       <div className="space-y-4">
         {editedTimes.map((time, index) => {
           const duration = calculateDuration(time);
-          const formattedDate = time.StartTime 
-            ? format(new Date(time.StartTime), 'MMMM d, yyyy')
+          const scheduledDuration = calculateScheduledDuration(time);
+          const timeDiff = calculateTimeDifference(time);
+          
+          // Use actual start time for date display, fallback to scheduled start time
+          const displayDate = time.ActualStart || time.StartTime;
+          const formattedDate = displayDate 
+            ? format(new Date(displayDate), 'MMMM d, yyyy')
             : 'Date not set';
             
           return (
             <div key={index} className="p-3 bg-white rounded-lg border">
-              <div className="mb-2 flex justify-between items-center">
-                <div>
-                  <h4 className="font-medium">Time Slot {index + 1} - {formattedDate}</h4>
-                  <p className="text-sm text-gray-500">
-                    Duration: {formatDuration(duration)}
-                  </p>
+              <div className="mb-3 flex justify-between items-start">
+                <div className="flex-1">
+                  <h4 className="font-medium mb-2">Time Slot {index + 1} - {formattedDate}</h4>
+                  
+                  {/* Time comparison section */}
+                  <div className="grid grid-cols-2 gap-4 text-sm mb-3">
+                    <div className="space-y-1">
+                      <p className="text-gray-600 font-medium">Scheduled Times:</p>
+                      <p className="text-gray-700">
+                        {time.StartTime ? format(new Date(time.StartTime), 'h:mm a') : 'Not set'} - {' '}
+                        {time.EndTime ? format(new Date(time.EndTime), 'h:mm a') : 'Not set'}
+                      </p>
+                      <p className="text-gray-600">Duration: {formatDuration(scheduledDuration)}</p>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <p className="text-gray-600 font-medium">Actual Times:</p>
+                      <p className="text-gray-700">
+                        {time.ActualStart ? format(new Date(time.ActualStart), 'h:mm a') : 'Not set'} - {' '}
+                        {time.ActualEnd ? format(new Date(time.ActualEnd), 'h:mm a') : 'Not set'}
+                      </p>
+                      <p className="text-gray-600">Duration: {formatDuration(duration)}</p>
+                    </div>
+                  </div>
+
+                  {/* Changes indicator */}
+                  {timeDiff.hasChanges && time.DateStatus !== "Cancelled" && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                      <h5 className="font-medium text-blue-900 mb-2">Changes Made:</h5>
+                      <div className="grid grid-cols-3 gap-3 text-sm">
+                        <div>
+                          <span className="text-blue-700 font-medium">Start Time:</span>
+                          <p className={`${timeDiff.startDiff > 0 ? 'text-orange-600' : timeDiff.startDiff < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                            {formatTimeDifference(timeDiff.startDiff)}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-blue-700 font-medium">End Time:</span>
+                          <p className={`${timeDiff.endDiff > 0 ? 'text-orange-600' : timeDiff.endDiff < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                            {formatTimeDifference(timeDiff.endDiff)}
+                          </p>
+                        </div>
+                        <div>
+                          <span className="text-blue-700 font-medium">Duration:</span>
+                          <p className={`font-medium ${timeDiff.durationDiff > 0 ? 'text-orange-600' : timeDiff.durationDiff < 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                            {formatTimeDifference(timeDiff.durationDiff)}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {/* Legend */}
+                      <div className="mt-2 pt-2 border-t border-blue-200">
+                        <p className="text-xs text-blue-700">
+                          <span className="text-orange-600">+</span> = Later/Longer than scheduled | 
+                          <span className="text-green-600 ml-1">-</span> = Earlier/Shorter than scheduled
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* No changes indicator */}
+                  {!timeDiff.hasChanges && time.DateStatus !== "Cancelled" && time.ActualStart && time.ActualEnd && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-2 mb-3">
+                      <p className="text-green-700 text-sm font-medium">✓ Times match scheduled times exactly</p>
+                    </div>
+                  )}
                 </div>
-                <div>
+                
+                <div className="ml-4">
                   <StatusBadge status={time.DateStatus} />
                 </div>
               </div>
@@ -390,12 +549,12 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Actual Start Time</label>
                   <Select
-                    value={getTimePartFromDate(time.StartTime)}
-                    onValueChange={(value) => handleTimeChange(index, 'StartTime', value)}
+                    value={getTimePartFromDate(time.ActualStart)}
+                    onValueChange={(value) => handleTimeChange(index, 'ActualStart', value)}
                     disabled={time.DateStatus === "Cancelled"}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select start time" />
+                      <SelectValue placeholder="Select actual start time" />
                     </SelectTrigger>
                     <SelectContent>
                       {timeOptions.map(option => (
@@ -410,12 +569,12 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Actual End Time</label>
                   <Select
-                    value={getTimePartFromDate(time.EndTime)}
-                    onValueChange={(value) => handleTimeChange(index, 'EndTime', value)}
+                    value={getTimePartFromDate(time.ActualEnd)}
+                    onValueChange={(value) => handleTimeChange(index, 'ActualEnd', value)}
                     disabled={time.DateStatus === "Cancelled"}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select end time" />
+                      <SelectValue placeholder="Select actual end time" />
                     </SelectTrigger>
                     <SelectContent>
                       {timeOptions.map(option => (
