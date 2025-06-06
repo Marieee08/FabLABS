@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, ChevronUp, ChevronDown, CheckCircle } from 'lucide-react';
+import { AlertCircle, ChevronUp, ChevronDown, CheckCircle, Info } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { format, addMinutes, parse, parseISO } from 'date-fns';
 
@@ -22,6 +22,31 @@ interface TimeEditorProps {
   onSave: (updatedTimes: UtilTime[], updatedCost: number, totalDuration: number) => void;
   onCancel: () => void;
 }
+
+// Simple tooltip component for information icons with landscape layout
+const InfoTooltip = ({ children, tooltip }: { children: React.ReactNode; tooltip: string }) => {
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  return (
+    <div className="relative inline-block">
+      <div
+        onMouseEnter={() => setShowTooltip(true)}
+        onMouseLeave={() => setShowTooltip(false)}
+        className="cursor-help"
+      >
+        {children}
+      </div>
+      {showTooltip && (
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-4 py-2 text-sm text-white bg-gray-800 rounded-lg shadow-lg z-50 min-w-80 max-w-96">
+          <div className="break-words text-left leading-relaxed">
+            {tooltip}
+          </div>
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-800"></div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 // Simple inline status badge component
 const StatusBadge = ({ status }: { status: string | null | undefined }) => {
@@ -99,13 +124,17 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
     };
   };
 
-  // Generate time options in 15-minute increments for a 24-hour period
+  // Generate time options in 15-minute increments from 12:00 AM to 5:00 PM
   const generateTimeOptions = () => {
     const options = [];
     const startTime = new Date();
     startTime.setHours(0, 0, 0, 0);
     
-    for (let i = 0; i < 96; i++) { // 24 hours * 4 increments per hour
+    // Calculate how many 15-minute increments from 12:00 AM to 5:00 PM
+    // 5:00 PM = 17:00, so we need 17 hours * 4 increments per hour + 1 for 5:00 PM exactly = 69 increments
+    const endIncrements = 17 * 4 + 1; // 69 total increments (0:00 to 17:00)
+    
+    for (let i = 0; i < endIncrements; i++) {
       const time = addMinutes(startTime, i * 15);
       options.push({
         value: format(time, 'HH:mm'),
@@ -196,11 +225,33 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
     return `${hours}h ${mins}m`;
   };
 
-  // Updated to handle actual time changes instead of scheduled times
+  // Updated to handle actual time changes with restrictions
   const handleTimeChange = (index: number, field: 'ActualStart' | 'ActualEnd', timeValue: string) => {
     setEditedTimes(prev => {
       const newTimes = [...prev];
       const time = newTimes[index];
+      
+      // Restriction: Actual start time cannot be changed (it's read-only)
+      if (field === 'ActualStart') {
+        setError("Actual start time cannot be modified once set.");
+        return prev; // Return unchanged times
+      }
+      
+      // Restriction: Actual end time cannot be before the reserved end time
+      if (field === 'ActualEnd' && time.EndTime) {
+        const reservedEndTime = new Date(time.EndTime);
+        const [hours, minutes] = timeValue.split(':').map(Number);
+        
+        // Create a date with the same day as reserved end time but with the new time
+        const proposedActualEnd = new Date(reservedEndTime);
+        proposedActualEnd.setHours(hours, minutes, 0, 0);
+        
+        // Check if proposed actual end time is before reserved end time
+        if (proposedActualEnd < reservedEndTime) {
+          setError(`Actual end time cannot be before the reserved end time (${format(reservedEndTime, 'h:mm a')})`);
+          return prev; // Return unchanged times
+        }
+      }
       
       // Update the actual time while keeping the same date
       // Use the original scheduled time as reference for the date, or the existing actual time
@@ -215,8 +266,10 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
       return newTimes;
     });
     
-    // Clear any previous errors
-    setError(null);
+    // Clear any previous errors only if the change was successful
+    if (field === 'ActualEnd') {
+      setError(null);
+    }
   };
 
   // Handle status change for a time slot
@@ -256,6 +309,15 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
       if (endTime <= startTime) {
         setError("Actual end time must be after actual start time");
         return false;
+      }
+
+      // Additional validation: Actual end time must not be before reserved end time
+      if (time.EndTime) {
+        const reservedEndTime = new Date(time.EndTime);
+        if (endTime < reservedEndTime) {
+          setError(`Actual end time cannot be before the reserved end time (${format(reservedEndTime, 'h:mm a')})`);
+          return false;
+        }
       }
     }
     
@@ -547,27 +609,48 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
               
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Actual Start Time</label>
+                  <label className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                    Actual Start Time
+                    <InfoTooltip tooltip="Actual start time cannot be changed once equipment starts running">
+                      <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                    </InfoTooltip>
+                  </label>
                   <Select
                     value={getTimePartFromDate(time.ActualStart)}
                     onValueChange={(value) => handleTimeChange(index, 'ActualStart', value)}
-                    disabled={time.DateStatus === "Cancelled"}
+                    disabled={true} // Always disabled - actual start time cannot be changed
                   >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select actual start time" />
+                    <SelectTrigger className="bg-gray-100 cursor-not-allowed">
+                      <SelectValue placeholder="Actual start time (fixed)" />
                     </SelectTrigger>
-                    <SelectContent>
-                      {timeOptions.map(option => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
+                    <SelectContent className="max-h-60">
+                      <div 
+                        className="max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
+                        onWheel={(e) => {
+                          e.stopPropagation();
+                          const container = e.currentTarget;
+                          container.scrollTop += e.deltaY;
+                        }}
+                      >
+                        {timeOptions.map(option => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </div>
                     </SelectContent>
                   </Select>
                 </div>
                 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Actual End Time</label>
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    Actual End Time
+                    {time.EndTime && (
+                      <InfoTooltip tooltip={`Actual end time cannot be before the reserved end time (${format(new Date(time.EndTime), 'h:mm a')}). Equipment must run for at least the reserved duration.`}>
+                        <Info className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                      </InfoTooltip>
+                    )}
+                  </label>
                   <Select
                     value={getTimePartFromDate(time.ActualEnd)}
                     onValueChange={(value) => handleTimeChange(index, 'ActualEnd', value)}
@@ -576,12 +659,34 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
                     <SelectTrigger>
                       <SelectValue placeholder="Select actual end time" />
                     </SelectTrigger>
-                    <SelectContent>
-                      {timeOptions.map(option => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
+                    <SelectContent className="max-h-60">
+                      <div 
+                        className="max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
+                        onWheel={(e) => {
+                          e.stopPropagation();
+                          const container = e.currentTarget;
+                          container.scrollTop += e.deltaY;
+                        }}
+                      >
+                        {timeOptions
+                          .filter(option => {
+                            // Filter out times that are before the reserved end time
+                            if (!time.EndTime) return true;
+                            
+                            const reservedEndTime = new Date(time.EndTime);
+                            const [hours, minutes] = option.value.split(':').map(Number);
+                            const proposedTime = new Date(reservedEndTime);
+                            proposedTime.setHours(hours, minutes, 0, 0);
+                            
+                            return proposedTime >= reservedEndTime;
+                          })
+                          .map(option => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))
+                        }
+                      </div>
                     </SelectContent>
                   </Select>
                 </div>
@@ -595,12 +700,21 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
                     <SelectTrigger>
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
-                    <SelectContent>
-                      {statusOptions.map(option => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
+                    <SelectContent className="max-h-60">
+                      <div 
+                        className="max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
+                        onWheel={(e) => {
+                          e.stopPropagation();
+                          const container = e.currentTarget;
+                          container.scrollTop += e.deltaY;
+                        }}
+                      >
+                        {statusOptions.map(option => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </div>
                     </SelectContent>
                   </Select>
                 </div>
