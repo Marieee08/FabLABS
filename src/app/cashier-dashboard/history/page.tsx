@@ -17,6 +17,7 @@ import { UserButton, useUser } from "@clerk/nextjs";
 import { useRouter } from 'next/navigation';
 import { Loader } from 'lucide-react';
 import RoleGuard from '@/components/auth/role-guard';
+import Image from 'next/image';
 
 interface UserService {
   id: string;
@@ -176,11 +177,13 @@ const HistoryPage = () => {
           <nav className="mt-5 py-4 px-4 lg:mt-9 lg:px-6">
             <div className="flex flex-col items-center py-8">
               {user?.imageUrl ? (
-                <img 
-                  src={user.imageUrl} 
-                  alt="Profile" 
-                  className="h-36 w-36 rounded-full object-cover mb-2"
-                />
+                <Image
+                    src={user.imageUrl}
+                    alt="Profile"
+                    width={144}
+                    height={144}
+                    className="rounded-full object-cover mb-2"
+                  />
               ) : (
                 <span className="h-36 w-36 rounded-full bg-gray-300 mb-2"></span>
               )}

@@ -6,6 +6,7 @@
   import AdminTools from '@/components/admin-functions/admin-tools';
   import { format } from 'date-fns';
   import { useUser, UserButton } from "@clerk/nextjs";
+  import Image from 'next/image';
   import { MoreVertical, Edit, Trash2, Mail } from 'lucide-react';
   import {
     DropdownMenu,
@@ -110,10 +111,12 @@ import RoleGuard from '@/components/auth/role-guard';
             <nav className="mt-5 py-4 px-4 lg:mt-9 lg:px-6">
             <div className="flex flex-col items-center py-8">
                 {user?.imageUrl ? (
-                  <img 
-                    src={user.imageUrl} 
-                    alt="Profile" 
-                    className="h-36 w-36 rounded-full object-cover mb-2"
+                  <Image
+                    src={user.imageUrl}
+                    alt="Profile"
+                    width={144}
+                    height={144}
+                    className="rounded-full object-cover mb-2"
                   />
                 ) : (
                   <span className="h-36 w-36 rounded-full bg-gray-600 mb-2"></span>

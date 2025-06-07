@@ -17,6 +17,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import RoleGuard from '@/components/auth/role-guard';
 import { EnhancedChartCarousel } from '@/components/admin-reports/chart-carousel';
 import CompletedSurveysPage from '@/components/admin/completed-surveys';
+import Image from 'next/image';
 
 const ReportsPage: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -92,11 +93,13 @@ const ReportsPage: React.FC = () => {
           <nav className="mt-5 py-4 px-4 lg:mt-9 lg:px-6">
             <div className="flex flex-col items-center py-8">
               {user?.imageUrl ? (
-                <img 
-                  src={user.imageUrl} 
-                  alt="Profile" 
-                  className="h-36 w-36 rounded-full object-cover mb-2"
-                />
+                <Image
+                    src={user.imageUrl}
+                    alt="Profile"
+                    width={144}
+                    height={144}
+                    className="rounded-full object-cover mb-2"
+                  />
               ) : (
                 <span className="h-36 w-36 rounded-full bg-gray-600 mb-2"></span>
               )}
