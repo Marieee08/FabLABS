@@ -8,6 +8,7 @@ import Navbar from '@/components/custom/navbar';
 import { AlertCircle, Clock, BadgeX, X, Info, Loader, Calendar as CalendarIcon } from 'lucide-react';
 import { useAuth } from '@clerk/nextjs';
 import MachineCalendar from '@/components/user/machine-calendar';
+import Image from 'next/image';
 
 interface Machine {
   id: string;
@@ -341,11 +342,13 @@ const handleScheduleClick = async () => {
                     </div>
                   )}
                   <div className="relative">
-                    <img 
-                      src={machine.Image} 
-                      alt={machine.Machine} 
-                      className="h-80 w-full object-cover rounded-lg mb-4" 
-                    />
+                    <Image
+  src={machine.Image.startsWith('/') ? machine.Image : `/${machine.Image}`}
+  alt={machine.Machine}
+  width={800} // adjust width
+  height={320} // adjust height to match aspect ratio
+  className="w-full h-80 object-cover rounded-lg mb-4"
+/>
                     {machine.isAvailable && (
                       <div className="absolute top-2 right-2 mt-2 mr-1 bg-[#1c62b5] text-white px-3 py-1 rounded-full text-sm font-poppins1 shadow-lg ">
                         Available
@@ -396,11 +399,13 @@ const handleScheduleClick = async () => {
             >
               {/* Left column - Image */}
               <div className="w-full md:w-1/2 p-8 flex items-center justify-center bg-gray-50">
-                <img 
-                  src={selectedMachine.Image} 
-                  alt={selectedMachine.Machine} 
-                  className="h-80 w-full object-cover rounded-lg"
-                />
+                <Image
+  src={selectedMachine.Image.startsWith('/') ? selectedMachine.Image : `/${selectedMachine.Image}`}
+  alt={selectedMachine.Machine}
+  width={800}   // adjust as needed
+  height={320}  // adjust as needed to match h-80 (20rem ≈ 320px)
+  className="w-full h-80 object-cover rounded-lg"
+/>
               </div>
 
               {/* Right column - Content */}
@@ -490,7 +495,7 @@ const handleScheduleClick = async () => {
               
               <div className="mb-6">
                 <p className="text-gray-700 font-poppins1 mb-4">
-                  Looks like you haven't filled out all the necessary personal or business information yet. To schedule a service, you need to complete your profile first.
+                  Looks like you haven&apos;t filled out all the necessary personal or business information yet. To schedule a service, you need to complete your profile first.
                 </p>
                 <div className="bg-amber-50 border-l-4 border-amber-500 p-4 text-amber-700">
                   <p className="font-poppins1">Would you like to proceed to your information page first before scheduling?</p>

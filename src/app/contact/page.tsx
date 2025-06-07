@@ -40,7 +40,7 @@ export default function Contact() {
           <div className="mb-12 flex w-full flex-col text-center">
             <h1 className="title-font mb-4 text-2xl font-medium text-gray-800 sm:text-3xl">Contact Us</h1>
             <p className="mx-auto text-base leading-relaxed lg:w-2/3">Feel free to reach out to us! Whether you have a question,
-              feedback, or a collaboration proposal, we'd love to hear from you.
+              feedback, or a collaboration proposal, we&apos;d love to hear from you.
             </p>
           </div>
 
