@@ -533,7 +533,7 @@ const SurveyForm = () => {
         <div className="mb-8 bg-white p-6 rounded-xl shadow-lg hover:shadow-blue-300/50 transition-all duration-300">
           <div className="mb-4 p-4 bg-gray-50 rounded border border-gray-200">
             <p className="font-qanelas2 text-sm text-gray-700">
-              <strong>INSTRUCTIONS:</strong> Check mark (✓) your answer to the Citizen's Charter (CC) questions. The Citizen's Charter is an 
+              <strong>INSTRUCTIONS:</strong> Check mark (✓) your answer to the Citizen&apos;s Charter (CC) questions. The Citizen&apos;s Charter is an 
               official document that reflects the services of a government agency/office including its requirements, fees, and processing 
               times among others.
             </p>

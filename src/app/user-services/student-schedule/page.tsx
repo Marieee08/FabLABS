@@ -92,7 +92,8 @@ export default function Schedule() {
   const [blockedDates, setBlockedDates] = useState<CalendarDate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const fetchBlockedDates = async () => {
+  useEffect(() => {
+    const fetchBlockedDates = async () => {
     setIsLoading(true);
     try {
       const response = await fetch('/api/blocked-dates');
@@ -113,8 +114,7 @@ export default function Schedule() {
       setIsLoading(false);
     }
   };
-
-  useEffect(() => {
+  
     fetchBlockedDates();
   }, []);
 

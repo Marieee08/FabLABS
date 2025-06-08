@@ -276,18 +276,18 @@ const CompletedSurveysPage = () => {
               
               {/* Citizen's Charter Questions */}
               <div className="bg-gray-50 p-4 rounded-lg">
-                <h3 className="font-semibold text-lg mb-2">Citizen's Charter Awareness</h3>
+                <h3 className="font-semibold text-lg mb-2">Citizen&apos;s Charter Awareness</h3>
                 <div className="space-y-2">
                   <div>
-                    <p className="text-sm text-gray-500">CC1: Awareness of Citizen's Charter</p>
+                    <p className="text-sm text-gray-500">CC1: Awareness of Citizen&apos;s Charter</p>
                     <p>{selectedSurvey.preliminary.CC1}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">CC2: Visibility of Citizen's Charter</p>
+                    <p className="text-sm text-gray-500">CC2: Visibility of Citizen&apos;s Charter</p>
                     <p>{selectedSurvey.preliminary.CC2}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">CC3: Helpfulness of Citizen's Charter</p>
+                    <p className="text-sm text-gray-500">CC3: Helpfulness of Citizen&apos;s Charter</p>
                     <p>{selectedSurvey.preliminary.CC3}</p>
                   </div>
                 </div>

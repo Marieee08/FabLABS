@@ -7,6 +7,7 @@ import { useUser } from "@clerk/nextjs";
 import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Navbar from "@/components/custom/navbar";
+import Image from 'next/image';
 
 
 interface EVCReservation {
@@ -182,11 +183,13 @@ const DashboardUser = () => {
               <div className="mt-4 md:mt-0">
                 <div className="flex items-center gap-4 md:justify-end">
                   {user?.imageUrl && (
-                    <img 
-                      src={user.imageUrl} 
-                      alt="Profile" 
-                      className="h-14 w-14 rounded-full object-cover md:hidden"
-                    />
+                    <Image
+  src={user.imageUrl}
+  alt="Profile"
+  width={56}
+  height={56}
+  className="rounded-full object-cover md:hidden"
+/>
                   )}
                   <span className="text-right md:hidden">
                     <span className="block text-sm font-medium text-black">
@@ -214,7 +217,7 @@ const DashboardUser = () => {
                 // EVC Reservations Table
                 evcReservations.length === 0 ? (
                   <div className="bg-blue-50 p-6 rounded-lg text-center">
-                    <p className="text-blue-800">You don't have any pendin reservations at the moment.</p>
+                    <p className="text-blue-800">You don&apos;t have any pendin reservations at the moment.</p>
                     <Link
                       href="/student-schedule"
                       className="mt-4 inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
@@ -304,7 +307,7 @@ const DashboardUser = () => {
 
             <div className="bg-white rounded-lg text-blue-800 px-6 py-6 shadow-md border border-[#5e86ca]">
               <p className="text-xl font-bold text-[#143370]">History</p>
-              <p className="text-sm text-[#143370] mb-4">Here's a summary of your previous transactions!</p>
+              <p className="text-sm text-[#143370] mb-4">Here&apos;s a summary of your previous transactions!</p>
               
               {isHistoryLoading ? (
                 <div className="flex justify-center items-center h-32">
@@ -313,7 +316,7 @@ const DashboardUser = () => {
               ) : (
                 historyReservations.length === 0 ? (
                   <div className="bg-blue-50 p-6 rounded-lg text-center">
-                    <p className="text-blue-800">You don't have any completed or rejected reservations yet.</p>
+                    <p className="text-blue-800">You don&apos;t have any completed or rejected reservations yet.</p>
                   </div>
                 ) : (
                   <div className="overflow-x-auto rounded-lg bg-blue-50 shadow-md">
@@ -547,7 +550,7 @@ const DashboardUser = () => {
               <h3 className="font-medium text-gray-900 mb-2">Processing Information</h3>
               <div className="bg-gray-50 p-3 rounded grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <p className="font-medium">Teacher's Approved By:</p>
+                  <p className="font-medium">Teacher&apos;s Approved By:</p>
                   <p className="text-gray-700">{selectedEVCReservation.ApprovedBy || 'Not yet approved'}</p>
                 </div>
                 <div>

@@ -11,6 +11,7 @@ import RoleGuard from '@/components/auth/role-guard';
 import { useRouter } from 'next/navigation';
 import { Loader } from 'lucide-react';
 import CostBreakdown from '@/components/admin/cost-breakdown';
+import Image from 'next/image';
 
 // Interface for DownTime
 interface DownTime {
@@ -332,11 +333,13 @@ const DashboardUser = () => {
           <nav className="mt-5 py-4 px-4 lg:mt-9 lg:px-6">
             <div className="flex flex-col items-center py-8">
               {user?.imageUrl ? (
-                <img 
-                  src={user.imageUrl} 
-                  alt="Profile" 
-                  className="h-36 w-36 rounded-full object-cover mb-2"
-                />
+                <Image
+  src={user.imageUrl}
+  alt="Profile"
+  width={144}
+  height={144}
+  className="rounded-full object-cover mb-2"
+/>
               ) : (
                 <span className="h-36 w-36 rounded-full bg-gray-600 mb-2"></span>
               )}
@@ -457,16 +460,16 @@ const DashboardUser = () => {
                 </button>
               </div>
               <div className="flex space-x-6 lg:space-x-10">
-                <a 
-                  href="/"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleNavigation('/');
-                  }}
-                  className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300"
-                >
-                  Home
-                </a>
+                <Link 
+  href="/"
+  onClick={(e) => {
+    e.preventDefault();
+    handleNavigation('/');
+  }}
+  className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300"
+>
+  Home
+</Link>
                 <a 
                   href="/services"
                   onClick={(e) => {
@@ -508,7 +511,7 @@ const DashboardUser = () => {
                   ) : (
                     reservations.length === 0 ? (
                       <div className="bg-blue-50 p-6 rounded-lg text-center">
-                        <p className="text-blue-800">You don't have any pending Reservations at the moment.</p>
+                        <p className="text-blue-800">You don&apos;t have any pending Reservations at the moment.</p>
                         <a 
                           href="/services"
                           onClick={(e) => {

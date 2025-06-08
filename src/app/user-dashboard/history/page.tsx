@@ -6,6 +6,7 @@ import { UserButton, useUser } from "@clerk/nextjs";
 import { format } from 'date-fns';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import Image from 'next/image';
 
 // Interfaces for the orders
 interface UserService {
@@ -174,11 +175,13 @@ const HistoryPage = () => {
           <nav className="mt-5 py-4 px-4 lg:mt-9 lg:px-6">
             <div className="flex flex-col items-center py-8">
               {user?.imageUrl ? (
-                <img 
-                  src={user.imageUrl} 
-                  alt="Profile" 
-                  className="h-36 w-36 rounded-full object-cover mb-2"
-                />
+                <Image
+  src={user.imageUrl}
+  alt="Profile"
+  width={144} // 36 x 4 = 144px
+  height={144}
+  className="rounded-full object-cover mb-2"
+/>
               ) : (
                 <span className="h-36 w-36 rounded-full bg-gray-600 mb-2"></span>
               )}

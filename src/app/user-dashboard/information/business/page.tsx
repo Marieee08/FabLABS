@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import BusinessInfoEditModal from '@/components/user/business-info-edit-modal';
 import { Loader } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 
 interface BusinessInfo {
   id: number;
@@ -192,11 +193,13 @@ const BusinessInformationPage = () => {
         <nav className="mt-5 py-4 px-4 lg:mt-9 lg:px-6">
           <div className="flex flex-col items-center py-8">
             {user?.imageUrl ? (
-              <img 
-                src={user.imageUrl} 
-                alt="Profile" 
-                className="h-36 w-36 rounded-full object-cover mb-2"
-              />
+<Image
+  src={user.imageUrl}
+  alt="Profile"
+  width={144} 
+  height={144}
+  className="rounded-full object-cover mb-2"
+/>
             ) : (
               <span className="h-36 w-36 rounded-full bg-gray-600 mb-2"></span>
             )}
@@ -605,13 +608,13 @@ const BusinessInformationPage = () => {
       <div className="mb-6">
         {pendingCheckboxValue ? (
           <p className="text-gray-600">
-            By confirming that you do not own/operate a business, all business information fields will be set to "Not applicable". 
+            By confirming that you do not own/operate a business, all business information fields will be set to {"\"Not applicable\""}. 
             <br/><br/>
             You can change this setting later if needed.
           </p>
         ) : (
           <p className="text-gray-600">
-            By unchecking this option, you'll be able to enter your business information. 
+            By unchecking this option, you&apos;ll be able to enter your business information. 
             <br/><br/>
             Previous information may need to be re-entered.
           </p>
