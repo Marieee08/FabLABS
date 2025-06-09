@@ -65,7 +65,7 @@ const BlockDateModal: React.FC<BlockDateModalProps> = ({
             {getDateReservations(selectedDate).length > 0 && (
               <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md text-sm text-yellow-800">
                 <p className="font-medium">Note: {getDateReservations(selectedDate).length} reservation(s) already exist on this date.</p>
-                <p className="mt-1 text-xs">Blocking this date won't affect existing reservations.</p>
+                <p className="mt-1 text-xs">Blocking this date won&apos;t affect existing reservations.</p>
               </div>
             )}
           </div>

@@ -30,7 +30,7 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
         <AlertDialogHeader>
           <AlertDialogTitle>Delete Account</AlertDialogTitle>
           <AlertDialogDescription>
-            Are you sure you want to delete {userName}'s account? This action cannot be undone
+            Are you sure you want to delete {userName}&apos;s account? This action cannot be undone
             and will permanently remove all their data from our systems.
           </AlertDialogDescription>
         </AlertDialogHeader>

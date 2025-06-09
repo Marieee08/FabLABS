@@ -423,22 +423,6 @@ useEffect(() => {
     fetchMachines();
   }, []);
 
-  // Debug useEffect 1: Log MachineUtilizations when a reservation is selected
-useEffect(() => {
-  if (selectedReservation) {
-    console.log("Selected reservation MachineUtilizations:", selectedReservation.MachineUtilizations);
-    // ...
-  }
-}, [selectedReservation]);
-
-// Debug useEffect 2: Log when a reservation is approved
-useEffect(() => {
-  if (localReservation && localReservation.Status === 'Approved') {
-    console.log("Reservation was approved, checking MachineUtilizations:", 
-      localReservation.MachineUtilizations);
-  }
-}, [localReservation?.Status]);
-
   const getMachinesForService = (serviceName: string) => {
     return machines.filter(machine => 
       machine.isAvailable && machine.Services.some(service => 

@@ -59,7 +59,70 @@ const AdminCalendar: React.FC = () => {
     }
   };
 
-  const fetchReservations = async () => {
+  // Add a refresh function that updates both blocked dates and reservations
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await Promise.all([
+        fetchBlockedDates(),
+        fetchReservations()
+      ]);
+      
+      toast({
+        title: "Success",
+        description: "Calendar data refreshed successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to refresh calendar data",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const formatTimeString = (timeString: string): string => {
+    try {
+      // Ensure we have a valid date string
+      if (!timeString) return '';
+      
+      const date = new Date(timeString);
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.warn('Invalid date format:', timeString);
+        return timeString;
+      }
+      
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } catch (e) {
+      console.error('Error formatting time:', e);
+      return timeString; // Return original if parsing fails
+    }
+  };
+
+  useEffect(() => {
+    const fetchBlockedDates = async () => {
+    try {
+      const response = await fetch('/api/blocked-dates');
+      const data = await response.json();
+      const dates = data.map((item: BlockedDate) => {
+        // Create date at noon to avoid timezone issues
+        const date = new Date(item.date);
+        return new Date(date.getFullYear(), date.getMonth(), date.getDate(), 12, 0, 0);
+      });
+      setBlockedDates(dates);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to fetch blocked dates",
+        variant: "destructive",
+      });
+    }
+  };
+    const fetchReservations = async () => {
     try {
       const response = await fetch('/api/admin/reservations');
       const data = await response.json();
@@ -132,51 +195,6 @@ const AdminCalendar: React.FC = () => {
     }
   };
 
-  // Add a refresh function that updates both blocked dates and reservations
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    try {
-      await Promise.all([
-        fetchBlockedDates(),
-        fetchReservations()
-      ]);
-      
-      toast({
-        title: "Success",
-        description: "Calendar data refreshed successfully",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to refresh calendar data",
-        variant: "destructive",
-      });
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
-  const formatTimeString = (timeString: string): string => {
-    try {
-      // Ensure we have a valid date string
-      if (!timeString) return '';
-      
-      const date = new Date(timeString);
-      
-      // Check if date is valid
-      if (isNaN(date.getTime())) {
-        console.warn('Invalid date format:', timeString);
-        return timeString;
-      }
-      
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    } catch (e) {
-      console.error('Error formatting time:', e);
-      return timeString; // Return original if parsing fails
-    }
-  };
-
-  useEffect(() => {
     fetchBlockedDates();
     fetchReservations();
   }, []);

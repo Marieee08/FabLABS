@@ -119,16 +119,66 @@ export function getFormattedDate(date: Date, interval: TimeInterval): string {
   }
 }
 
-// Function to aggregate values based on interval
+// Pure function to aggregate values based on interval (NOT a hook)
 export function aggregateDataByTimeInterval<T extends TimeSeriesData>(
   data: T,
   timeInterval: TimeInterval,
   dateField: string = 'date',
   valueFields: string[] = []
 ) {
-  const aggregatedData = useTimeAggregatedData(data, timeInterval, dateField);
+  if (!data || data.length === 0) return [];
+
+  // Group data by the specified time interval (pure function version)
+  const groupedData = data.reduce((acc, item) => {
+    const itemDate = typeof item[dateField] === 'string' 
+      ? parseISO(item[dateField] as string) 
+      : item[dateField] as Date;
+    
+    let groupKey: string;
+    let periodStart: Date;
+    let periodEnd: Date;
+    
+    switch (timeInterval) {
+      case 'day':
+        periodStart = startOfDay(itemDate);
+        groupKey = format(periodStart, 'yyyy-MM-dd');
+        break;
+      case 'week':
+        periodStart = startOfWeek(itemDate, { weekStartsOn: 1 });
+        periodEnd = endOfWeek(itemDate, { weekStartsOn: 1 });
+        groupKey = `${format(periodStart, 'MMM dd')} - ${format(periodEnd, 'MMM dd')}`;
+        break;
+      case 'month':
+        periodStart = startOfMonth(itemDate);
+        groupKey = format(periodStart, 'MMM yyyy');
+        break;
+      case 'year':
+        periodStart = startOfYear(itemDate);
+        groupKey = format(periodStart, 'yyyy');
+        break;
+      default:
+        periodStart = startOfDay(itemDate);
+        groupKey = format(periodStart, 'yyyy-MM-dd');
+    }
+    
+    if (!acc[groupKey]) {
+      acc[groupKey] = {
+        period: groupKey,
+        periodStart,
+        items: []
+      };
+    }
+    
+    acc[groupKey].items.push(item);
+    
+    return acc;
+  }, {} as Record<string, { period: string; periodStart: Date; items: T }>);
+
+  // Convert to array and sort by date
+  const aggregatedGroups = Object.values(groupedData)
+    .sort((a, b) => a.periodStart.getTime() - b.periodStart.getTime());
   
-  return aggregatedData.map(group => {
+  return aggregatedGroups.map(group => {
     const result: Record<string, any> = {
       period: group.period,
       date: group.periodStart
@@ -144,13 +194,15 @@ export function aggregateDataByTimeInterval<T extends TimeSeriesData>(
     } else {
       // If no specific fields are provided, aggregate all numeric fields
       const sampleItem = group.items[0];
-      Object.keys(sampleItem).forEach(key => {
-        if (key !== dateField && typeof sampleItem[key] === 'number') {
-          result[key] = group.items.reduce((sum, item) => {
-            return sum + (Number(item[key]) || 0);
-          }, 0);
-        }
-      });
+      if (sampleItem) {
+        Object.keys(sampleItem).forEach(key => {
+          if (key !== dateField && typeof sampleItem[key] === 'number') {
+            result[key] = group.items.reduce((sum, item) => {
+              return sum + (Number(item[key]) || 0);
+            }, 0);
+          }
+        });
+      }
     }
     
     // Add count of items
@@ -158,4 +210,16 @@ export function aggregateDataByTimeInterval<T extends TimeSeriesData>(
     
     return result;
   });
+}
+
+// Custom hook that combines the aggregation with React's useMemo for performance
+export function useAggregatedTimeData<T extends TimeSeriesData>(
+  data: T,
+  timeInterval: TimeInterval,
+  dateField: string = 'date',
+  valueFields: string[] = []
+) {
+  return useMemo(() => {
+    return aggregateDataByTimeInterval(data, timeInterval, dateField, valueFields);
+  }, [data, timeInterval, dateField, valueFields]);
 }

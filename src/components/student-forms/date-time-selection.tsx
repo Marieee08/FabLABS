@@ -140,7 +140,7 @@ export default function DateTimeSelection({
       
       return prevData;
     });
-  }, []);
+  }, [setFormData]);
 
   // Handle unified time changes with memoization
   const handleUnifiedTimeChange = useCallback((time: string, field: 'startTime' | 'endTime') => {
@@ -176,7 +176,7 @@ export default function DateTimeSelection({
         };
       }
     });
-  }, []);
+  }, [setFormData]);
 
   function handleIndividualTimeChange(time: string, field: 'startTime' | 'endTime', index: number) {
     // Track which day is being edited
@@ -262,7 +262,7 @@ export default function DateTimeSelection({
         };
       }
     });
-  }, []);
+  }, [setFormData]);
 
   // Memoize isDateDisabled to avoid recalculating on every render
   const isDateDisabled = useCallback((date: Date) => {

@@ -116,7 +116,7 @@ const Navbar = () => {
 
           <div className="hidden md:block absolute left-1/2 transform -translate-x-1/2">
             <div className="flex space-x-6 lg:space-x-10">
-              <a 
+              <Link 
                 href="/" 
                 onClick={(e) => {
                   e.preventDefault();
@@ -126,10 +126,10 @@ const Navbar = () => {
                 style={{color: textColor}}
               >
                 Home
-              </a>
+              </Link>
               
               <SignedIn>
-                <a 
+                <Link 
                   href="/user-dashboard" 
                   onClick={(e) => {
                     e.preventDefault();
@@ -139,10 +139,10 @@ const Navbar = () => {
                   className={linkClassName}
                 >
                   Dashboard
-                </a>
+                </Link>
               </SignedIn>
               
-              <a 
+              <Link 
                 href="/services" 
                 onClick={(e) => {
                   e.preventDefault();
@@ -152,8 +152,8 @@ const Navbar = () => {
                 style={{color: textColor}}
               >
                 Services
-              </a>
-              <a 
+              </Link>
+              <Link 
                 href="/contact" 
                 onClick={(e) => {
                   e.preventDefault();
@@ -163,7 +163,7 @@ const Navbar = () => {
                 style={{color: textColor}}
               >
                 Contact
-              </a>
+              </Link>
             </div>
           </div>
 
@@ -188,7 +188,7 @@ const Navbar = () => {
 
         <div className={`md:hidden ${isMenuOpen ? 'block' : 'hidden'} bg-white shadow-lg`}>
           <div className="px-4 pt-2 pb-3 space-y-1">
-            <a 
+            <Link 
               href="/" 
               onClick={(e) => {
                 e.preventDefault();
@@ -198,8 +198,8 @@ const Navbar = () => {
               className="block font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300"
             >
               Home
-            </a>
-            <a 
+            </Link>
+            <Link 
               href="/user-dashboard" 
               onClick={(e) => {
                 e.preventDefault();
@@ -209,8 +209,8 @@ const Navbar = () => {
               className="block font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300"
             >
               Dashboard
-            </a>
-            <a 
+            </Link>
+            <Link 
               href="/services" 
               onClick={(e) => {
                 e.preventDefault();
@@ -220,8 +220,8 @@ const Navbar = () => {
               className="block font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300"
             >
               Services
-            </a>
-            <a 
+            </Link>
+            <Link 
               href="/contact" 
               onClick={(e) => {
                 e.preventDefault();
@@ -231,7 +231,7 @@ const Navbar = () => {
               className="block font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300"
             >
               Contact
-            </a>
+            </Link>
           </div>
           
           <div className="px-4 py-3 border-t border-gray-200">

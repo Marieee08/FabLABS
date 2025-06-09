@@ -53,7 +53,7 @@ const EditRoleModal: React.FC<EditRoleModalProps> = ({
         <DialogHeader>
           <DialogTitle>Edit User Role</DialogTitle>
           <DialogDescription>
-            Change the user's role to modify their permissions in the system.
+            Change the user&apos;s role to modify their permissions in the system.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">

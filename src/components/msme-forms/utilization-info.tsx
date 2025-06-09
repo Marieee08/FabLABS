@@ -248,7 +248,7 @@ export default function ProcessInformation({
       serviceLinks: formData.serviceLinks,
       Remarks: formData.Remarks
     });
-  }, []);
+  }, [formData.ProductsManufactured, formData.BulkofCommodity, formData.serviceMachineNumbers, formData.serviceLinks, formData.Remarks]);
 
   useEffect(() => {
     console.log("Debug Render Conditions:", {
@@ -262,9 +262,6 @@ export default function ProcessInformation({
     const selectedServiceObject = servicesRef.current.find(service => 
       service.Service === selectedService
     );
-
-
-    
 
     console.log("Selected Service Object:", selectedServiceObject);
     
@@ -291,7 +288,7 @@ export default function ProcessInformation({
       console.log("Updating selectedService from formData:", newSelectedService);
       setSelectedService(newSelectedService);
     }
-  }, [formData]);
+  }, [formData.ProductsManufactured, selectedService]);
   
   useEffect(() => {
     const fetchServices = async () => {
@@ -400,12 +397,50 @@ export default function ProcessInformation({
     }
   }, [formData.serviceMachineNumbers, selectedService, hasMachines, updateFormData]);
 
+  // Validate field function
+  const validateField = useCallback((fieldName: keyof FormData, value: string) => {
+    let error = '';
+
+    if (fieldName === 'ProductsManufactured') {
+      if (!value) {
+        error = 'Please select a service';
+      }
+    }
+
+    // Add validation for other fields when not in Benchmarking mode and has machines
+    const isDisabled = (fieldName === 'BulkofCommodity' && (selectedService === 'Benchmarking' || !hasMachines)) ||
+                      (selectedService === 'Benchmarking');
+    
+    if (!isDisabled || (fieldName === 'BulkofCommodity' && hasMachines)) {
+      switch(fieldName) {
+        case 'BulkofCommodity':
+          if (!value && hasMachines) {
+            error = 'This field is required';
+          }
+          break;
+      }
+    }
+
+    setErrors(prev => {
+      // Only update if the error actually changed
+      if (prev[fieldName] === error) {
+        return prev;
+      }
+      return {
+        ...prev,
+        [fieldName]: error
+      };
+    });
+
+    return !error;
+  }, [selectedService, hasMachines]);
+
   // Handle input changes
   const handleInputChange = useCallback((e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     updateFormData(name as keyof FormData, value);
     validateField(name as keyof FormData, value);
-  }, [updateFormData]);
+  }, [updateFormData, validateField]);
 
   // Handle links for selected services
   const handleLinkChange = useCallback((service: string, value: string) => {
@@ -437,41 +472,7 @@ export default function ProcessInformation({
       return newTouchedFields;
     });
     validateField(fieldName, formData[fieldName]);
-  }, [formData]);
-
-  const validateField = useCallback((fieldName: keyof FormData, value: string) => {
-    let error = '';
-
-    if (fieldName === 'ProductsManufactured') {
-      if (!value) {
-        error = 'Please select a service';
-      }
-    }
-
-    // Add validation for other fields when not in Benchmarking mode and has machines
-    if (!isFieldDisabled(fieldName) || (fieldName === 'BulkofCommodity' && hasMachines)) {
-      switch(fieldName) {
-        case 'BulkofCommodity':
-          if (!value && hasMachines) {
-            error = 'This field is required';
-          }
-          break;
-      }
-    }
-
-    setErrors(prev => {
-      // Only update if the error actually changed
-      if (prev[fieldName] === error) {
-        return prev;
-      }
-      return {
-        ...prev,
-        [fieldName]: error
-      };
-    });
-
-    return !error;
-  }, [isFieldDisabled, hasMachines]);
+  }, [formData, validateField]);
 
   const validateForm = useCallback(() => {
     const newErrors: Partial<Record<keyof FormData, string>> = {};
@@ -507,66 +508,65 @@ export default function ProcessInformation({
   }, [selectedService, formData, hasMachines]);
 
   // Handle next button click
-  
-const handleNext = useCallback(() => {
-  // Get all field errors first
-  const newErrors: Partial<Record<keyof FormData, string>> = {};
-  let isValid = true;
+  const handleNext = useCallback(() => {
+    // Get all field errors first
+    const newErrors: Partial<Record<keyof FormData, string>> = {};
+    let isValid = true;
 
-  // Required field validation
-  if (!selectedService) {
-    newErrors.ProductsManufactured = 'Please select a service';
-    isValid = false;
-  }
-
-  // Only validate machine numbers if service has machines
-  if (selectedService && hasMachines) {
-    // Check if machine quantity is specified correctly
-    const machineQuantity = formData.serviceMachineNumbers?.[selectedService] || 0;
-    if (machineQuantity <= 0) {
-      newErrors.serviceMachineNumbers = 'Please specify at least 1 machine';
+    // Required field validation
+    if (!selectedService) {
+      newErrors.ProductsManufactured = 'Please select a service';
       isValid = false;
+    }
+
+    // Only validate machine numbers if service has machines
+    if (selectedService && hasMachines) {
+      // Check if machine quantity is specified correctly
+      const machineQuantity = formData.serviceMachineNumbers?.[selectedService] || 0;
+      if (machineQuantity <= 0) {
+        newErrors.serviceMachineNumbers = 'Please specify at least 1 machine';
+        isValid = false;
+      }
+      
+      // Validate BulkofCommodity for non-Benchmarking services with machines
+      if (selectedService !== 'Benchmarking' && !formData.BulkofCommodity) {
+        newErrors.BulkofCommodity = 'This field is required';
+        isValid = false;
+      }
     }
     
-    // Validate BulkofCommodity for non-Benchmarking services with machines
-    if (selectedService !== 'Benchmarking' && !formData.BulkofCommodity) {
-      newErrors.BulkofCommodity = 'This field is required';
-      isValid = false;
-    }
-  }
-  
-  // Update errors state
-  setErrors(prev => {
-    if (JSON.stringify(prev) === JSON.stringify(newErrors)) {
-      return prev;
-    }
-    return newErrors;
-  });
-  
-  // Set all fields as touched
-  setTouchedFields(() => {
-    return new Set(Object.keys(formData) as Array<keyof FormData>);
-  });
-  
-  // Show toast error if validation fails
-  if (!isValid) {
-    // If using React Toastify
-    toast({
-      title: "Required Fields Missing",
-      description: "Please fill in all required fields before continuing.",
-      variant: "destructive",
+    // Update errors state
+    setErrors(prev => {
+      if (JSON.stringify(prev) === JSON.stringify(newErrors)) {
+        return prev;
+      }
+      return newErrors;
     });
-    return;
-  }
-  
-  // Success case: format data and proceed
-  // Make sure ProductsManufactured is always an array before proceeding
-  if (!Array.isArray(formData.ProductsManufactured) && formData.ProductsManufactured) {
-    updateFormData('ProductsManufactured', [formData.ProductsManufactured]);
-  }
-  
-  nextStep();
-}, [nextStep, validateForm, formData, hasMachines, selectedService, updateFormData, toast]);
+    
+    // Set all fields as touched
+    setTouchedFields(() => {
+      return new Set(Object.keys(formData) as Array<keyof FormData>);
+    });
+    
+    // Show toast error if validation fails
+    if (!isValid) {
+      // If using React Toastify
+      toast({
+        title: "Required Fields Missing",
+        description: "Please fill in all required fields before continuing.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Success case: format data and proceed
+    // Make sure ProductsManufactured is always an array before proceeding
+    if (!Array.isArray(formData.ProductsManufactured) && formData.ProductsManufactured) {
+      updateFormData('ProductsManufactured', [formData.ProductsManufactured]);
+    }
+    
+    nextStep();
+  }, [nextStep, formData, hasMachines, selectedService, updateFormData]);
 
 
   // Get CSS class for input fields
@@ -664,7 +664,7 @@ const handleNext = useCallback(() => {
                   />
                   ) : (
                     <div className="p-4 border rounded-md bg-gray-50">
-                      <p className="text-sm text-gray-500">The selected service doesn't have any machines available.</p>
+                      <p className="text-sm text-gray-500">The selected service doesn&apos;t have any machines available.</p>
                     </div>
                   )}
                 </>

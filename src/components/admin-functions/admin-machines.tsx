@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Switch } from "@/components/ui/switch";
 import React, { useState, useEffect } from 'react';
 import { MultiSelect } from "@/components/ui/multi-select";
+import Image from 'next/image';
 
 interface Service {
   id: string;
@@ -499,11 +500,12 @@ export default function AdminServices() {
                 
                 {/* Machine Image */}
                 <div className="relative h-56 overflow-hidden">
-                  <img 
+                  <Image 
                     src={machine.Image} 
                     alt={machine.Machine} 
-                    className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-300" 
-                    loading="lazy"
+                    fill
+                    className="object-cover transform hover:scale-105 transition-transform duration-300" 
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       const parent = target.parentElement;
@@ -744,10 +746,12 @@ export default function AdminServices() {
                     />
                     {imagePreview && (
                       <div className="mt-2 relative h-40 bg-gray-100 rounded-md overflow-hidden">
-                        <img 
+                        <Image 
                           src={imagePreview} 
                           alt="Preview" 
-                          className="w-full h-full object-contain" 
+                          fill
+                          className="object-contain" 
+                          sizes="(max-width: 768px) 100vw, 50vw"
                         />
                       </div>
                     )}
@@ -760,7 +764,7 @@ export default function AdminServices() {
                       <div className="relative ml-2 group">
                         <Info size={16} className="text-gray-500 cursor-help" />
                         <div className="hidden group-hover:block absolute left-0 bottom-full mb-2 w-64 p-2 bg-gray-800 text-white text-xs rounded shadow-lg z-50">
-                          If no service is associated with the machine, the "Bulk of Commodity per Production" field in MSME forms will automatically be marked as "None."
+                          If no service is associated with the machine, the {"\"Bulk of Commodity per Production\""} field in MSME forms will automatically be marked as {"\"None.\""}
                         </div>
                       </div>
                     </div>

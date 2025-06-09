@@ -128,7 +128,7 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose, is
     };
 
     fetchCalendarData();
-  }, []);
+  }, [machines]); // Added machines dependency
 
   // Process reservations and blocked dates into calendar events
   useEffect(() => {

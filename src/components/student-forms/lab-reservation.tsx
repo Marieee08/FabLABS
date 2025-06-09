@@ -114,6 +114,20 @@ export default function LabReservation({ formData, updateFormData, nextStep, pre
   // Display end year based on start year
   const getEndYear = (startYear: number) => startYear + 1;
   
+  // Student handlers
+  const addStudent = useCallback(() => {
+    const highestId = students.length > 0 
+      ? Math.max(...students.map(student => student.id))
+      : 0;
+    
+    const newStudent: Student = { id: highestId + 1, name: '' };
+    const updatedStudents = [...students, newStudent];
+    
+    setStudents(updatedStudents);
+    updateFormData('Students', updatedStudents);
+    setNewStudentAdded(true); // Set flag to trigger focus
+  }, [students, updateFormData]);
+  
   // Fetch services and process machine data - This is done once, on component mount
   useEffect(() => {
     const fetchServices = async () => {
@@ -191,7 +205,7 @@ export default function LabReservation({ formData, updateFormData, nextStep, pre
       
       setSelectedMachines(machines);
     }
-  }, []); // Empty dependency array - run only once on mount
+  }, [formData.ProductsManufactured, formData.NeededMaterials]); // Include dependencies
 
   // Auto-fill user's name as first student when component loads
   useEffect(() => {
@@ -233,7 +247,7 @@ export default function LabReservation({ formData, updateFormData, nextStep, pre
       // If no user is loaded yet but we need at least one student entry
       addStudent();
     }
-  }, [isLoaded, user, students, updateFormData]);
+  }, [isLoaded, user, students, updateFormData, addStudent]); // Include addStudent
 
   // Focus on new student input when a new student is added
   useEffect(() => {
@@ -283,20 +297,6 @@ export default function LabReservation({ formData, updateFormData, nextStep, pre
       setErrors(prev => ({...prev, machines: undefined}));
     }
   }, [updateNeededMaterials]);
-
-  // Student handlers
-  const addStudent = () => {
-    const highestId = students.length > 0 
-      ? Math.max(...students.map(student => student.id))
-      : 0;
-    
-    const newStudent: Student = { id: highestId + 1, name: '' };
-    const updatedStudents = [...students, newStudent];
-    
-    setStudents(updatedStudents);
-    updateFormData('Students', updatedStudents);
-    setNewStudentAdded(true); // Set flag to trigger focus
-  };
 
   const updateStudentName = (index: number, name: string) => {
     const updatedStudents = students.map((student, i) => 
@@ -678,7 +678,7 @@ export default function LabReservation({ formData, updateFormData, nextStep, pre
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                 </svg>
-                <p className="mt-2 text-gray-500">No students added yet. Click "Add Student" to begin.</p>
+                <p className="mt-2 text-gray-500">No students added yet. Click &quot;Add Student&quot; to begin.</p>
               </div>
             )}
           </div>
