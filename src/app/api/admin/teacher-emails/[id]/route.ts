@@ -5,9 +5,12 @@ import { auth } from '@clerk/nextjs/server';
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const { userId } = auth();
+  
+  // Await the params Promise
+  const { id } = await params;
   
   // Verify admin
   const user = await prisma.accInfo.findUnique({
@@ -21,7 +24,7 @@ export async function DELETE(
   
   try {
     const deletedEmail = await prisma.teacherEmail.delete({
-      where: { id: params.id }
+      where: { id }
     });
     
     return NextResponse.json(deletedEmail);

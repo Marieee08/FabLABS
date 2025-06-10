@@ -152,17 +152,17 @@ model UserService {
 }
 
 model UtilTime {
-  id         Int             @id @default(autoincrement())
-  DayNum     Int?
-  StartTime  DateTime?
-  EndTime    DateTime?
-  ActualStart  DateTime?
-  ActualEnd    DateTime?
-  DateStatus String?         @default("Ongoing")
-  utilReqId  Int?
-  evcId      Int?
-  utilReq    UtilReq?        @relation("UtilReqToUtilTime", fields: [utilReqId], references: [id])
-  evc        EVCReservation? @relation("EVCReservationtoUtilTime", fields: [evcId], references: [id])
+  id          Int             @id @default(autoincrement())
+  DayNum      Int?
+  StartTime   DateTime?
+  EndTime     DateTime?
+  DateStatus  String?         @default("Ongoing")
+  utilReqId   Int?
+  evcId       Int?
+  ActualEnd   DateTime?
+  ActualStart DateTime?
+  utilReq     UtilReq?        @relation("UtilReqToUtilTime", fields: [utilReqId], references: [id])
+  evc         EVCReservation? @relation("EVCReservationtoUtilTime", fields: [evcId], references: [id])
 }
 
 model BlockedDate {

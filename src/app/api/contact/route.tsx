@@ -1,15 +1,21 @@
-// Create this file at: app/api/contact/route.js (for Next.js App Router)
-// OR at: pages/api/contact.js (for Next.js Pages Router)
-
+// app/api/contact/route.ts
 import nodemailer from 'nodemailer';
+import { NextRequest, NextResponse } from 'next/server';
 
-// For App Router
-export async function POST(request: { json: () => PromiseLike<{ name: any; email: any; message: any; }> | { name: any; email: any; message: any; }; }) {
+export async function POST(request: NextRequest) {
   try {
     const { name, email, message } = await request.json();
     
+    // Validate required fields
+    if (!name || !email || !message) {
+      return NextResponse.json(
+        { success: false, error: 'All fields are required' },
+        { status: 400 }
+      );
+    }
+
     // Create a transporter
-    const transporter = nodemailer.createTransport({
+    const transporter = nodemailer.createTransporter({
       service: 'gmail', // Use Gmail or your preferred service
       auth: {
         user: process.env.EMAIL_USER,
@@ -40,15 +46,12 @@ export async function POST(request: { json: () => PromiseLike<{ name: any; email
     // Send email
     await transporter.sendMail(mailOptions);
     
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
     console.error('Error sending email:', error);
-    return new Response(JSON.stringify({ success: false, error: error.message }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return NextResponse.json(
+      { success: false, error: 'Failed to send email' },
+      { status: 500 }
+    );
   }
 }

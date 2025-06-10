@@ -35,9 +35,10 @@ function validateServiceData(data: any) {
 
 export async function PUT(
   req: Request,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const params = await context.params;
     const body = await req.json();
     console.log('Update request body:', body);
     console.log('Service ID:', params.id);
@@ -107,9 +108,11 @@ export async function PUT(
 
 export async function DELETE(
   req: Request,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const params = await context.params;
+    
     // First delete all related MachineService records
     await prisma.machineService.deleteMany({
       where: { serviceId: params.id }

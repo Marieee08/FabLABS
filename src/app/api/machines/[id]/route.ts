@@ -1,4 +1,4 @@
-// src\app\api\machines\[id]\route.ts
+// src/app/api/machines/[id]/route.ts
 
 import { NextResponse } from 'next/server';
 import { Prisma, PrismaClient } from '@prisma/client';
@@ -44,9 +44,10 @@ function validateMachineData(data: any) {
 
 export async function PUT(
   req: Request,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const params = await context.params;
     const body = await req.json();
     console.log('Update request body:', body);
     console.log('Machine ID:', params.id);
@@ -150,9 +151,10 @@ export async function PUT(
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const params = await context.params;
     const body = await request.json();
     
     // Create update data object with only the provided fields
@@ -212,9 +214,11 @@ export async function PATCH(
 
 export async function DELETE(
   req: Request,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const params = await context.params;
+    
     // First, delete all related machine services
     await prisma.machineService.deleteMany({
       where: { machineId: params.id }

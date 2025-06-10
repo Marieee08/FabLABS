@@ -1,15 +1,16 @@
-// /api/cashier/confirm-payment
-
+// /api/cashier/confirm-payment/[id]/route.ts
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export async function PUT(
   req: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id);
+    // Await the params Promise
+    const { id: paramId } = await params;
+    const id = parseInt(paramId);
     const { receiptNumber } = await req.json();
 
     // Validate input

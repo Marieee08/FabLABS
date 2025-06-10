@@ -84,10 +84,10 @@ function cleanObject(obj: any): any {
 // GET handler
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = params.id;
+    const { id } = await params;
     
     // Validate ID
     if (!id) {
@@ -138,15 +138,18 @@ export async function GET(
       { error: 'Failed to fetch machine utilization data' }, 
       { status: 500 }
     );
+  } finally {
+    // Ensure Prisma connection is properly handled
+    await prisma.$disconnect();
   }
 }
 
 export async function POST(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
   ) {
     try {
-      const id = params.id;
+      const { id } = await params;
       
       // Validate ID
       if (!id) {
@@ -381,16 +384,19 @@ export async function POST(
         { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' }, 
         { status: 500 }
       );
+    } finally {
+      // Ensure Prisma connection is properly handled
+      await prisma.$disconnect();
     }
   }
 
 // DELETE handler
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = params.id;
+    const { id } = await params;
     
     if (!id) {
       return NextResponse.json(
@@ -415,10 +421,8 @@ export async function DELETE(
       { error: 'Failed to clear machine utilization data' }, 
       { status: 500 }
     );
+  } finally {
+    // Ensure Prisma connection is properly handled
+    await prisma.$disconnect();
   }
-}
-
-// Ensure Prisma connection is closed when the route is done
-export async function POST_HANDLER_CLEANUP() {
-  await prisma.$disconnect();
 }

@@ -6,10 +6,12 @@ const prisma = new PrismaClient();
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id);
+    // Await the params since it's now a Promise
+    const { id: paramId } = await params;
+    const id = parseInt(paramId);
 
     if (isNaN(id)) {
       return NextResponse.json(

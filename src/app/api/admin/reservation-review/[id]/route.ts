@@ -8,10 +8,11 @@ const prisma = new PrismaClient();
 // GET handler for fetching reservation details
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id);
+    const { id: idParam } = await params;
+    const id = parseInt(idParam);
 
     if (isNaN(id)) {
       return NextResponse.json(
@@ -64,10 +65,11 @@ export async function GET(
 // PATCH handler for updating equipment and comments
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id);
+    const { id: idParam } = await params;
+    const id = parseInt(idParam);
     const url = new URL(req.url);
     const resourceType = url.searchParams.get('type');
     const data = await req.json();
@@ -173,10 +175,11 @@ export async function PATCH(
 // POST handler for creating new UserService records
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id);
+    const { id: idParam } = await params;
+    const id = parseInt(idParam);
     const url = new URL(req.url);
     const resourceType = url.searchParams.get('type');
     const data = await req.json();
@@ -236,10 +239,11 @@ export async function POST(
 // DELETE handler for removing UserService records
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id);
+    const { id: idParam } = await params;
+    const id = parseInt(idParam);
     const url = new URL(req.url);
     const resourceType = url.searchParams.get('type');
     const serviceId = url.searchParams.get('serviceId');
@@ -283,10 +287,11 @@ export async function DELETE(
 // PUT handler for updating reservation status
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id);
+    const { id: idParam } = await params;
+    const id = parseInt(idParam);
     const { status } = await req.json();
 
     if (isNaN(id)) {

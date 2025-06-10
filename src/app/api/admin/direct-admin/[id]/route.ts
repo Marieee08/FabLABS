@@ -4,15 +4,17 @@ import { prisma } from '@/lib/prisma';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  console.log(`Direct admin lookup called with ID: ${params.id}`);
-  
   try {
-    const id = parseInt(params.id);
+    // Await the params since it's now a Promise
+    const { id: paramId } = await params;
+    console.log(`Direct admin lookup called with ID: ${paramId}`);
+    
+    const id = parseInt(paramId);
     
     if (isNaN(id)) {
-      console.error(`Invalid ID format: ${params.id}`);
+      console.error(`Invalid ID format: ${paramId}`);
       return NextResponse.json({ error: 'Invalid ID format' }, { status: 400 });
     }
 

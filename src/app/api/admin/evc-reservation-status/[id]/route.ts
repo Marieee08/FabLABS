@@ -6,14 +6,16 @@ const prisma = new PrismaClient();
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    console.log("API request received for ID:", params.id);
-    const id = parseInt(params.id);
+    // Await params since it's now a Promise
+    const { id: paramId } = await params;
+    console.log("API request received for ID:", paramId);
+    const id = parseInt(paramId);
 
     if (isNaN(id)) {
-      console.error("Invalid ID:", params.id);
+      console.error("Invalid ID:", paramId);
       return NextResponse.json(
         { error: "Invalid reservation ID" },
         { status: 400 }

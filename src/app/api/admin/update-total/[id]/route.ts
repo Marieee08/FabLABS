@@ -26,15 +26,18 @@ interface UpdateTotalBody {
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  console.log("Update total handler called for ID:", params.id);
+  // Await the params Promise
+  const { id } = await params;
+  
+  console.log("Update total handler called for ID:", id);
   
   try {
-    const reservationId = parseInt(params.id);
+    const reservationId = parseInt(id);
 
     if (isNaN(reservationId)) {
-      console.error("Invalid reservation ID:", params.id);
+      console.error("Invalid reservation ID:", id);
       return NextResponse.json(
         { error: "Invalid reservation ID" },
         { status: 400 }

@@ -6,10 +6,12 @@ const prisma = new PrismaClient();
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const id = parseInt(params.id);
+    // Await the params since they're now a Promise in Next.js 15
+    const { id: idParam } = await params;
+    const id = parseInt(idParam);
     const { status } = await req.json();
 
     if (isNaN(id)) {

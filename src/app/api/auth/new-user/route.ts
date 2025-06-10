@@ -1,19 +1,38 @@
 // app/api/auth/new-user/route.ts
 import { NextResponse } from 'next/server';
 import { currentUser, auth } from '@clerk/nextjs/server';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '@/lib/prisma'; // Use your existing prisma instance
 
-const prisma = new PrismaClient();
-// app/api/auth/new-user/route.ts
 export async function GET() {
-  const { userId } = auth();
-  if (!userId) return new NextResponse('Unauthorized', { status: 401 });
-
-  const user = await currentUser();
-  if (!user) return new NextResponse('User not found', { status: 404 });
-
   try {
+    // Fix 1: Await auth() for Next.js 15 compatibility
+    const { userId } = await auth();
+    if (!userId) return new NextResponse('Unauthorized', { status: 401 });
+
+    // Fix 2: Await currentUser() for Next.js 15 compatibility  
+    const user = await currentUser();
+    if (!user) return new NextResponse('User not found', { status: 404 });
+
     const email = user.emailAddresses[0].emailAddress;
+    
+    // Fix 3: Check if user already exists to avoid duplicate creation
+    const existingUser = await prisma.accInfo.findFirst({
+      where: {
+        OR: [
+          { clerkId: userId },
+          { email: email }
+        ]
+      }
+    });
+    
+    if (existingUser) {
+      // User already exists, just redirect
+      let redirectPath = '/user-dashboard';
+      if (existingUser.Role === 'STAFF') redirectPath = '/staff-dashboard';
+      else if (existingUser.Role === 'STUDENT') redirectPath = '/student-dashboard';
+      
+      return NextResponse.redirect(new URL(redirectPath, process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'));
+    }
     
     // Check if this is a registered teacher email
     const teacherEmail = await prisma.teacherEmail.findUnique({
@@ -33,7 +52,7 @@ export async function GET() {
       userRole = 'STUDENT';
     }
     
-    // Create or update user
+    // Create user (only if they don't exist)
     const dbUser = await prisma.accInfo.create({ 
       data: {
         clerkId: userId,
@@ -48,12 +67,10 @@ export async function GET() {
     if (userRole === 'STAFF') redirectPath = '/staff-dashboard';
     else if (userRole === 'STUDENT') redirectPath = '/student-dashboard';
 
-    return new NextResponse(null, {
-      status: 302,
-      headers: { Location: redirectPath },
-    });
+    return NextResponse.redirect(new URL(redirectPath, process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'));
+    
   } catch (error) {
-    console.error('Database error:', error);
-    return new NextResponse('Database error', { status: 500 });
+    console.error('Database error details:', error);
+    return new NextResponse(`Database error: ${error.message}`, { status: 500 });
   }
 }
