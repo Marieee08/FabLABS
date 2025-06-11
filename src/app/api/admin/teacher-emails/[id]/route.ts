@@ -9,6 +9,11 @@ export async function DELETE(
 ) {
   const { userId } = auth();
   
+  // Check if user is authenticated
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  
   // Await the params Promise
   const { id } = await params;
   

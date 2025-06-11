@@ -26,18 +26,18 @@ export async function GET(req: Request) {
   }
 }
 
-// PUT /api/tools/[id] - Update a tool
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const data = await request.json();
     const { Tool, Quantity } = data;
 
     const tool = await prisma.tool.update({
       where: {
-        id: params.id,
+        id: id,
       },
       data: {
         Tool,
@@ -55,12 +55,14 @@ export async function PUT(
 // DELETE /api/tools/[id] - Delete a tool
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
+    
     await prisma.tool.delete({
       where: {
-        id: params.id,
+        id: id,
       },
     });
 

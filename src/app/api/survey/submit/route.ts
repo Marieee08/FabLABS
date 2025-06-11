@@ -162,7 +162,7 @@ export async function POST(request: Request) {
     console.error('[COMPLETE_SURVEY_POST]', error);
     
     // Check for specific error types to give better feedback
-    if (error.message === 'Reservation not found or already completed') {
+    if (error instanceof Error && error.message === 'Reservation not found or already completed') {
       return new NextResponse(error.message, { status: 404 });
     }
     

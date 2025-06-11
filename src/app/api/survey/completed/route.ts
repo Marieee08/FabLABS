@@ -4,9 +4,58 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@clerk/nextjs/server';
 
+// Define the type for the formatted survey data
+type FormattedSurvey = {
+  id: string;
+  reservationId: number;
+  submittedAt: string;
+  customerName: string;
+  serviceAvailed: string[];
+  preliminary: {
+    clientType: string;
+    sex: string;
+    age: string;
+    region: string;
+    office: string;
+    CC1: string;
+    CC2: string;
+    CC3: string;
+  };
+  customer: {
+    SQD0: string;
+    SQD1: string;
+    SQD2: string;
+    SQD3: string;
+    SQD4: string;
+    SQD5: string;
+    SQD6: string;
+    SQD7: string;
+    SQD8: string;
+  };
+  employee: {
+    E1: string;
+    E2: string;
+    E3: string;
+    E4: string;
+    E5: string;
+    E6: string;
+    E7: string;
+    E8: string;
+    E9: string;
+    E10: string;
+    E11: string;
+    E12: string;
+    E13: string;
+    E14: string;
+    E15: string;
+    E16: string;
+    E17: string;
+  };
+};
+
 // Cache results for 1 minute to prevent multiple identical API calls in short periods
 const CACHE_DURATION = 60 * 1000; // 1 minute in milliseconds
-let cachedData = null;
+let cachedData: FormattedSurvey[] | null = null;
 let cacheTimestamp = 0;
 
 export async function GET() {
@@ -101,7 +150,7 @@ export async function GET() {
     });
 
     // Transform the data to match the expected format in the CompletedSurveysPage component
-    const formattedSurveys = completedReservations.map((reservation) => ({
+    const formattedSurveys: FormattedSurvey[] = completedReservations.map((reservation) => ({
       id: `survey-${reservation.id}`,
       reservationId: reservation.id,
       submittedAt: reservation.RequestDate?.toISOString() || new Date().toISOString(),

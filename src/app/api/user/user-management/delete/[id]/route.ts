@@ -1,20 +1,20 @@
-// pages/api/user/user-management/delete/[id]/route.ts
-import { NextApiRequest, NextApiResponse } from 'next';
+// File: /app/api/user/user-management/delete/[id]/route.ts
+import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { clerkClient } from '@clerk/nextjs/server';
 
 const prisma = new PrismaClient();
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', ['POST']);
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  const { userId } = req.body;
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  // Read userId from request body to maintain compatibility
+  const body = await request.json();
+  const { userId } = body;
 
   if (!userId) {
-    return res.status(400).json({ error: 'User ID is required' });
+    return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
   }
 
   try {
@@ -32,7 +32,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     if (!account) {
-      return res.status(404).json({ error: 'Account not found' });
+      return NextResponse.json({ error: 'Account not found' }, { status: 404 });
     }
 
     // Delete related records
@@ -78,12 +78,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       console.error('Error deleting user from Clerk:', clerkError);
     }
     
-    return res.status(200).json({ success: true, message: 'Account successfully deleted' });
+    return NextResponse.json({ 
+      success: true, 
+      message: 'Account successfully deleted' 
+    });
   } catch (error) {
     console.error('Error in delete user handler:', error);
-    return res.status(500).json({ 
+    return NextResponse.json({ 
       error: 'An error occurred while deleting the account',
       details: error instanceof Error ? error.message : 'Unknown error'
-    });
+    }, { status: 500 });
   }
 }

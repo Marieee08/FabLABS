@@ -197,10 +197,10 @@ export const generateDashboardReport = async (
     // Create key metrics table
     const keyMetricsTableData: AutoTableColumnOption[][] = [
       [
-        { content: 'Pending Requests', styles: { fontStyle: 'bold' } },
-        { content: 'Completed Requests', styles: { fontStyle: 'bold' } },
-        { content: 'Active Reservations', styles: { fontStyle: 'bold' } },
-        ...(options.showCosts ? [{ content: 'Total Revenue', styles: { fontStyle: 'bold' } }] : [])
+        { content: 'Pending Requests', styles: { fontStyle: 'bold' as const } },
+        { content: 'Completed Requests', styles: { fontStyle: 'bold' as const } },
+        { content: 'Active Reservations', styles: { fontStyle: 'bold' as const } },
+        ...(options.showCosts ? [{ content: 'Total Revenue', styles: { fontStyle: 'bold' as const } }] : [])
       ],
       [
         { content: data.pendingRequests.toString() },
@@ -246,20 +246,20 @@ export const generateDashboardReport = async (
       
       // Create machine usage table headers
       const machineHeaders = [
-        { content: 'Machine', styles: { fontStyle: 'bold', halign: 'left' } },
-        { content: 'Total Hours', styles: { fontStyle: 'bold', halign: 'center' } },
-        { content: 'Utilization %', styles: { fontStyle: 'bold', halign: 'center' } },
-        { content: 'Downtime', styles: { fontStyle: 'bold', halign: 'center' } },
-        { content: 'Maintenance', styles: { fontStyle: 'bold', halign: 'center' } }
+        { content: 'Machine', styles: { fontStyle: 'bold' as const, halign: 'left' as const } },
+        { content: 'Total Hours', styles: { fontStyle: 'bold' as const, halign: 'center' as const } },
+        { content: 'Utilization %', styles: { fontStyle: 'bold' as const, halign: 'center' as const } },
+        { content: 'Downtime', styles: { fontStyle: 'bold' as const, halign: 'center' as const } },
+        { content: 'Maintenance', styles: { fontStyle: 'bold' as const, halign: 'center' as const } }
       ];
       
       // Create machine usage table rows
       const machineRows = data.machineUsage.map(machine => [
-        { content: machine.machineName, styles: { halign: 'left' } },
-        { content: formatDuration(machine.totalHours), styles: { halign: 'center' } },
-        { content: formatPercentage(machine.utilization), styles: { halign: 'center' } },
-        { content: formatDuration(machine.downtimeHours), styles: { halign: 'center' } },
-        { content: machine.maintenanceCount.toString(), styles: { halign: 'center' } }
+        { content: machine.machineName, styles: { halign: 'left' as const } },
+        { content: formatDuration(machine.totalHours), styles: { halign: 'center' as const } },
+        { content: formatPercentage(machine.utilization), styles: { halign: 'center' as const } },
+        { content: formatDuration(machine.downtimeHours), styles: { halign: 'center' as const } },
+        { content: machine.maintenanceCount.toString(), styles: { halign: 'center' as const } }
       ]);
       
       try {
@@ -304,18 +304,18 @@ export const generateDashboardReport = async (
       
       // Create service stats table headers
       const serviceHeaders = [
-        { content: 'Service', styles: { fontStyle: 'bold', halign: 'left' } },
-        { content: 'Count', styles: { fontStyle: 'bold', halign: 'center' } },
-        ...(options.showCosts ? [{ content: 'Revenue', styles: { fontStyle: 'bold', halign: 'center' } }] : []),
-        { content: 'Most Used Machine', styles: { fontStyle: 'bold', halign: 'left' } }
+        { content: 'Service', styles: { fontStyle: 'bold' as const, halign: 'left' as const } },
+        { content: 'Count', styles: { fontStyle: 'bold' as const, halign: 'center' as const } },
+        ...(options.showCosts ? [{ content: 'Revenue', styles: { fontStyle: 'bold' as const, halign: 'center' as const } }] : []),
+        { content: 'Most Used Machine', styles: { fontStyle: 'bold' as const, halign: 'left' as const } }
       ];
       
       // Create service stats table rows
       const serviceRows = data.services.map(service => [
-        { content: service.serviceName, styles: { halign: 'left' } },
-        { content: service.count.toString(), styles: { halign: 'center' } },
-        ...(options.showCosts ? [{ content: formatCurrency(service.revenue || 0), styles: { halign: 'center' } }] : []),
-        { content: service.mostPopularMachine || 'N/A', styles: { halign: 'left' } }
+        { content: service.serviceName, styles: { halign: 'left' as const } },
+        { content: service.count.toString(), styles: { halign: 'center' as const } },
+        ...(options.showCosts ? [{ content: formatCurrency(service.revenue || 0), styles: { halign: 'center' as const } }] : []),
+        { content: service.mostPopularMachine || 'N/A', styles: { halign: 'left' as const } }
       ]);
       
       try {
@@ -360,18 +360,18 @@ export const generateDashboardReport = async (
       
       // Create user stats table headers
       const userHeaders = [
-        { content: 'User Role', styles: { fontStyle: 'bold', halign: 'left' } },
-        { content: 'Count', styles: { fontStyle: 'bold', halign: 'center' } },
-        { content: 'Reservations', styles: { fontStyle: 'bold', halign: 'center' } },
-        { content: 'Avg. Session', styles: { fontStyle: 'bold', halign: 'center' } }
+        { content: 'User Role', styles: { fontStyle: 'bold' as const, halign: 'left' as const } },
+        { content: 'Count', styles: { fontStyle: 'bold' as const, halign: 'center' as const } },
+        { content: 'Reservations', styles: { fontStyle: 'bold' as const, halign: 'center' as const } },
+        { content: 'Avg. Session', styles: { fontStyle: 'bold' as const, halign: 'center' as const } }
       ];
       
       // Create user stats table rows
       const userRows = data.userStats.map(stat => [
-        { content: stat.userRole, styles: { halign: 'left' } },
-        { content: stat.count.toString(), styles: { halign: 'center' } },
-        { content: stat.reservationsCount.toString(), styles: { halign: 'center' } },
-        { content: stat.averageSessionDuration ? formatDuration(stat.averageSessionDuration) : 'N/A', styles: { halign: 'center' } }
+        { content: stat.userRole, styles: { halign: 'left' as const } },
+        { content: stat.count.toString(), styles: { halign: 'center' as const } },
+        { content: stat.reservationsCount.toString(), styles: { halign: 'center' as const } },
+        { content: stat.averageSessionDuration ? formatDuration(stat.averageSessionDuration) : 'N/A', styles: { halign: 'center' as const } }
       ]);
       
       try {
@@ -416,16 +416,16 @@ export const generateDashboardReport = async (
       
       // Create reservation stats table headers
       const reservationHeaders = [
-        { content: 'Status', styles: { fontStyle: 'bold', halign: 'left' } },
-        { content: 'Count', styles: { fontStyle: 'bold', halign: 'center' } },
-        { content: '% of Total', styles: { fontStyle: 'bold', halign: 'center' } }
+        { content: 'Status', styles: { fontStyle: 'bold' as const, halign: 'left' as const } },
+        { content: 'Count', styles: { fontStyle: 'bold' as const, halign: 'center' as const } },
+        { content: '% of Total', styles: { fontStyle: 'bold' as const, halign: 'center' as const } }
       ];
       
       // Create reservation stats table rows
       const reservationRows = data.reservationStats.map(stat => [
-        { content: stat.status, styles: { halign: 'left' } },
-        { content: stat.count.toString(), styles: { halign: 'center' } },
-        { content: formatPercentage(stat.percentageOfTotal), styles: { halign: 'center' } }
+        { content: stat.status, styles: { halign: 'left' as const } },
+        { content: stat.count.toString(), styles: { halign: 'center' as const } },
+        { content: formatPercentage(stat.percentageOfTotal), styles: { halign: 'center' as const } }
       ]);
       
       try {

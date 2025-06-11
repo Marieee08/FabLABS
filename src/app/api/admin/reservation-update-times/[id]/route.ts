@@ -9,8 +9,8 @@ interface UtilTime {
   DayNum: number | null;
   StartTime: string | null;
   EndTime: string | null;
-  ActualStart: string | null;  // Added actual start time
-  ActualEnd: string | null;    // Added actual end time
+  ActualStart: string | null;  // This should now exist in schema
+  ActualEnd: string | null;    // This should now exist in schema
   DateStatus?: string | null;
 }
 
@@ -79,7 +79,7 @@ export async function PATCH(
     const services = await prisma.service.findMany();
     
     // Create a map of service name to hourly rate
-    const hourlyRates = new Map();
+    const hourlyRates = new Map<string, number>();
     services.forEach(service => {
       if (service.Costs) {
         hourlyRates.set(service.Service, parseFloat(service.Costs.toString()));

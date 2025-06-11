@@ -3,7 +3,7 @@ import autoTable from 'jspdf-autotable';
 import {
   AutoTableResult,
   AutoTableColumnOption
-} from '@/components/admin-functions/pdf-types';
+} from '@/components/admin-functions/pdf/pdf-types';
 
 
 

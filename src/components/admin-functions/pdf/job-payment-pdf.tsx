@@ -110,8 +110,14 @@ const drawCell = (
                 x + 2;
   const textY = y + height / 2 + fontSize / 4;
  
-  // Add the text
-  doc.text(text, textX, textY, align);
+  // Add the text with proper options object
+  if (align === 'center') {
+    doc.text(text, textX, textY, { align: 'center' });
+  } else if (align === 'right') {
+    doc.text(text, textX, textY, { align: 'right' });
+  } else {
+    doc.text(text, textX, textY);
+  }
 };
 
 

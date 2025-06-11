@@ -1,4 +1,5 @@
 import Navbar from '@/components/custom/navbar';
+import { redirect } from 'next/navigation';
 
 export default function Contact() {
   async function handleSubmit(formData: FormData) {
@@ -22,10 +23,12 @@ export default function Contact() {
         throw new Error('Failed to send message');
       }
       
-      return { success: true };
+      // Redirect to success page or show success message
+      redirect('/contact?success=true');
     } catch (error) {
       console.error('Error sending email:', error);
-      return { success: false, error: 'Failed to send message' };
+      // Redirect to error page or show error message
+      redirect('/contact?error=true');
     }
   }
 

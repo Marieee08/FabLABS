@@ -61,7 +61,7 @@ interface DetailedReservation {
   };
 }
 
-const getStatusColor = (status: string) => {
+const getStatusColor = (status: string): string => {
   switch (status) {
     case 'Approved':
       return 'bg-blue-100 text-blue-800';
@@ -88,18 +88,18 @@ const formatCurrency = (amount: number | string | null | undefined): string => {
   return numericAmount.toFixed(2);
 };
 
-const DashboardCashier = () => {
+const DashboardCashier: React.FC = () => {
   const router = useRouter();
   const { user, isLoaded } = useUser();
   const [userRole, setUserRole] = useState<string>("Loading...");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(false);
   const [reservations, setReservations] = useState<DetailedReservation[]>([]);
   const [selectedReservation, setSelectedReservation] = useState<DetailedReservation | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
-  const [receiptNumber, setReceiptNumber] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isDataLoading, setIsDataLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState<boolean>(false);
+  const [receiptNumber, setReceiptNumber] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isDataLoading, setIsDataLoading] = useState<boolean>(true);
   const [modalDates, setModalDates] = useState<{
     requestDate: string;
     startTimes: Record<number, string>;
@@ -111,14 +111,14 @@ const DashboardCashier = () => {
   });
 
   // Navigation handler with loading state
-  const handleNavigation = (href: string) => {
+  const handleNavigation = (href: string): void => {
     setIsLoading(true);
     router.push(href);
   };
 
   // useEffect to fetch user role
   useEffect(() => {
-    const fetchUserRole = async () => {
+    const fetchUserRole = async (): Promise<void> => {
       if (!isLoaded || !user) {
         setUserRole("Not logged in");
         return;
@@ -142,10 +142,10 @@ const DashboardCashier = () => {
 
   useEffect(() => {
     if (selectedReservation) {
-      const startTimes = {};
-      const endTimes = {};
+      const startTimes: Record<number, string> = {};
+      const endTimes: Record<number, string> = {};
       
-      selectedReservation.UtilTimes.forEach(time => {
+      selectedReservation.UtilTimes.forEach((time: UtilTime) => {
         // Add validation before creating Date objects
         if (time.StartTime) {
           try {
@@ -173,7 +173,7 @@ const DashboardCashier = () => {
   }, [selectedReservation]);
   
   useEffect(() => {
-    const fetchReservations = async () => {
+    const fetchReservations = async (): Promise<void> => {
       setIsDataLoading(true);
       try {
         const response = await fetch('/api/cashier/pending-payments');
@@ -190,12 +190,12 @@ const DashboardCashier = () => {
     fetchReservations();
   }, []);
 
-  const handleConfirmClick = (reservation: DetailedReservation) => {
+  const handleConfirmClick = (reservation: DetailedReservation): void => {
     setSelectedReservation(reservation);
     setIsModalOpen(true);
   };
 
-  const handleReviewClick = (reservation: DetailedReservation) => {
+  const handleReviewClick = (reservation: DetailedReservation): void => {
     setSelectedReservation(reservation);
     setIsReviewModalOpen(true);
   };
@@ -204,15 +204,15 @@ const DashboardCashier = () => {
 
   useEffect(() => {
     if (reservations.length > 0) {
-      const dates = {};
-      reservations.forEach(reservation => {
+      const dates: Record<number, string> = {};
+      reservations.forEach((reservation: DetailedReservation) => {
         dates[reservation.id] = new Date(reservation.RequestDate).toLocaleDateString();
       });
       setFormattedDates(dates);
     }
   }, [reservations]);
 
-  const handlePaymentConfirm = async () => {
+  const handlePaymentConfirm = async (): Promise<void> => {
     if (!selectedReservation || !receiptNumber) return;
 
     try {
@@ -229,8 +229,8 @@ const DashboardCashier = () => {
       if (!response.ok) throw new Error('Failed to confirm payment');
 
       // Update the local state to reflect the change
-      setReservations(prevReservations =>
-        prevReservations.filter(res => res.id !== selectedReservation.id)
+      setReservations((prevReservations: DetailedReservation[]) =>
+        prevReservations.filter((res: DetailedReservation) => res.id !== selectedReservation.id)
       );
 
       setIsModalOpen(false);
@@ -398,7 +398,7 @@ const DashboardCashier = () => {
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {!isDataLoading && reservations.length > 0 ? (
-                      reservations.map(reservation => (
+                      reservations.map((reservation: DetailedReservation) => (
                         <tr key={reservation.id}>
                           <td className="px-6 py-4">{formattedDates[reservation.id] || ''}</td>
                           <td className="px-6 py-4">{reservation.accInfo.Name}</td>
@@ -451,7 +451,7 @@ const DashboardCashier = () => {
                       </tr>
                     ) : (
                       // Show loading skeleton rows
-                      Array(5).fill(0).map((_, index) => (
+                      Array(5).fill(0).map((_, index: number) => (
                         <tr key={index}>
                           <td className="px-6 py-4"><div className="h-4 bg-gray-200 rounded animate-pulse"></div></td>
                           <td className="px-6 py-4"><div className="h-4 bg-gray-200 rounded animate-pulse"></div></td>
@@ -521,7 +521,7 @@ const DashboardCashier = () => {
                     <div>
                       <h3 className="font-medium text-gray-900 mb-2">Services Information</h3>
                       <div className="space-y-2">
-                        {selectedReservation?.UserServices?.map((service, index) => (
+                        {selectedReservation?.UserServices?.map((service: UserService, index: number) => (
                           <div key={index} className="bg-gray-50 p-3 rounded-lg">
                             <p><span className="text-gray-600">Service:</span> {service.ServiceAvail}</p>
                             <p><span className="text-gray-600">Equipment:</span> {service.EquipmentAvail}</p>
@@ -537,7 +537,7 @@ const DashboardCashier = () => {
                     <div>
                       <h3 className="font-medium text-gray-900 mb-2">Schedule</h3>
                       <div className="space-y-2">
-                        {selectedReservation?.UtilTimes?.map((time, index) => (
+                        {selectedReservation?.UtilTimes?.map((time: UtilTime, index: number) => (
                           <div key={index} className="bg-gray-50 p-3 rounded-lg">
                             <p><span className="text-gray-600">Day {time.DayNum}:</span></p>
                             <p className="ml-4">Start: {modalDates.startTimes[time.id] || 'Not set'}</p>

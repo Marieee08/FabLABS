@@ -17,10 +17,12 @@ import {
 } from 'date-fns';
 import { TimeInterval } from './time-interval-selector';
 
-type TimeSeriesData = {
+type TimeSeriesItem = {
   date: Date | string;
   [key: string]: any;
-}[];
+};
+
+type TimeSeriesData = TimeSeriesItem[];
 
 export function useTimeAggregatedData<T extends TimeSeriesData>(
   data: T,
@@ -67,15 +69,15 @@ export function useTimeAggregatedData<T extends TimeSeriesData>(
         acc[groupKey] = {
           period: groupKey,
           periodStart,
-          items: [],
+          items: [] as TimeSeriesItem[],
           aggregatedValues: {}
         };
       }
       
-      acc[groupKey].items.push(item);
+      acc[groupKey].items.push(item as TimeSeriesItem);
       
       return acc;
-    }, {} as Record<string, { period: string; periodStart: Date; items: T; aggregatedValues: Record<string, number> }>);
+    }, {} as Record<string, { period: string; periodStart: Date; items: TimeSeriesItem[]; aggregatedValues: Record<string, number> }>);
     
     // Convert to array and sort by date
     const result = Object.values(groupedData)
@@ -165,14 +167,14 @@ export function aggregateDataByTimeInterval<T extends TimeSeriesData>(
       acc[groupKey] = {
         period: groupKey,
         periodStart,
-        items: []
+        items: [] as TimeSeriesItem[]
       };
     }
     
-    acc[groupKey].items.push(item);
+    acc[groupKey].items.push(item as TimeSeriesItem);
     
     return acc;
-  }, {} as Record<string, { period: string; periodStart: Date; items: T }>);
+  }, {} as Record<string, { period: string; periodStart: Date; items: TimeSeriesItem[] }>);
 
   // Convert to array and sort by date
   const aggregatedGroups = Object.values(groupedData)

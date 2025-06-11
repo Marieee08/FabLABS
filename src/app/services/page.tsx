@@ -15,7 +15,7 @@ interface Machine {
   Machine: string;
   Image: string;
   Desc: string;
-  Number?: number | null; // Added Number field for machine quantity
+  Number?: number | undefined; // Changed from number | null | undefined to number | undefined
   Instructions?: string;
   Link?: string;
   isAvailable: boolean;
@@ -102,11 +102,16 @@ export default function Services() {
         const machinesData = await machinesResponse.json();
         const userData = userInfoResponse ? await userInfoResponse.json() : null;
   
-        // Process machines with more efficient sorting
-        const sortedMachines = machinesData.sort((a: { isAvailable: any; createdAt: string | number | Date; }, b: { isAvailable: any; createdAt: string | number | Date; }) => 
-          Number(b.isAvailable) - Number(a.isAvailable) || 
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
+        // Process machines with more efficient sorting and normalize Number field
+        const sortedMachines = machinesData
+          .map((machine: any) => ({
+            ...machine,
+            Number: machine.Number === null ? undefined : machine.Number // Convert null to undefined
+          }))
+          .sort((a: { isAvailable: any; createdAt: string | number | Date; }, b: { isAvailable: any; createdAt: string | number | Date; }) => 
+            Number(b.isAvailable) - Number(a.isAvailable) || 
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          );
   
         setMachines(sortedMachines);
   
@@ -186,12 +191,7 @@ const handleScheduleClick = async () => {
   setIsLoading(true);
   if (userRole === "STUDENT") {
     router.push('/student-schedule');
-  } else {
-    router.push('/msme-schedule');
-  }
-
-  setIsLoading(true);
-  if (userRole === "STAFF") {
+  } else if (userRole === "STAFF") {
     router.push('/staff-schedule');
   } else {
     router.push('/msme-schedule');

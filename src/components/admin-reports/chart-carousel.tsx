@@ -60,7 +60,7 @@ export const EnhancedChartCarousel: React.FC<EnhancedChartCarouselProps> = ({
 
   // Navigate charts
   const navigateChart = (direction: 'prev' | 'next') => {
-    const charts: ChartType[] = ['userRoles',, 'services'];
+    const charts: ChartType[] = ['userRoles', 'services'];
     const currentIndex = charts.indexOf(activeChart);
     
     if (direction === 'prev') {
@@ -329,7 +329,7 @@ const ServicesChart: React.FC<ChartComponentProps> = ({ data, isLoading }) => {
     }));
   
   // Calculate total for percentages
-  const total = servicesWithColors.reduce((sum, service) => sum + (service.value || 0), 0)
+  const total = servicesWithColors.reduce((sum, service) => sum + (service.value || 0), 0);
 
   const handleGeneratePdf = () => {
     generateServicesPdf({

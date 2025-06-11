@@ -71,6 +71,7 @@ export async function GET() {
     
   } catch (error) {
     console.error('Database error details:', error);
-    return new NextResponse(`Database error: ${error.message}`, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    return new NextResponse(`Database error: ${errorMessage}`, { status: 500 });
   }
 }

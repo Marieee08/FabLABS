@@ -6,9 +6,10 @@ const prisma = new PrismaClient();
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const clerkId = params.id;
+  const { id } = await params;
+  const clerkId = id;
   
   try {
     const data = await request.json();

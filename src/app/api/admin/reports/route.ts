@@ -240,25 +240,29 @@ export async function GET(request: NextRequest) {
     // Process the utilization trends data (combine both types of reservations)
     const [utilRequests, evcRequests] = utilizationTrends;
     
-    // Group by month for both types
-    const monthCounts = {};
+    // Group by month for both types - Fixed type definition
+    const monthCounts: Record<string, number> = {};
     
     // Process util requests
     utilRequests.forEach(req => {
-      const monthYear = format(req.RequestDate, 'MMM yyyy');
-      if (!monthCounts[monthYear]) {
-        monthCounts[monthYear] = 0;
+      if (req.RequestDate) {
+        const monthYear = format(req.RequestDate, 'MMM yyyy');
+        if (!monthCounts[monthYear]) {
+          monthCounts[monthYear] = 0;
+        }
+        monthCounts[monthYear] += 1;
       }
-      monthCounts[monthYear] += 1;
     });
     
     // Process EVC requests
     evcRequests.forEach(req => {
-      const monthYear = format(req.DateRequested, 'MMM yyyy');
-      if (!monthCounts[monthYear]) {
-        monthCounts[monthYear] = 0;
+      if (req.DateRequested) {
+        const monthYear = format(req.DateRequested, 'MMM yyyy');
+        if (!monthCounts[monthYear]) {
+          monthCounts[monthYear] = 0;
+        }
+        monthCounts[monthYear] += 1;
       }
-      monthCounts[monthYear] += 1;
     });
     
     const utilizationTrendsData = Object.entries(monthCounts).map(([month, count]) => ({
@@ -298,12 +302,12 @@ export async function GET(request: NextRequest) {
     ];
     
     // Calculate average scores
-    const satisfactionAverages = {};
+    const satisfactionAverages: Record<string, number> = {};
     sqdFields.forEach(field => {
       const validScores = satisfactionScores
-        .map(survey => survey[field])
+        .map(survey => survey[field as keyof typeof survey])
         .filter(score => score !== null && score !== undefined)
-        .map(score => parseInt(score));
+        .map(score => parseInt(score as string));
       
       const average = validScores.length > 0 
         ? validScores.reduce((sum, score) => sum + score, 0) / validScores.length 
@@ -319,7 +323,7 @@ export async function GET(request: NextRequest) {
     }));
     
     // Process machine downtime
-    const machineDowntimeSummary = {};
+    const machineDowntimeSummary: Record<string, number> = {};
     machineDowntime.forEach(record => {
       const machineName = record.machineUtil?.Machine || 'Unknown';
       machineDowntimeSummary[machineName] = (machineDowntimeSummary[machineName] || 0) + (record.DTTime || 0);

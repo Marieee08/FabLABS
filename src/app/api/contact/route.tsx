@@ -1,4 +1,3 @@
-// app/api/contact/route.ts
 import nodemailer from 'nodemailer';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -15,7 +14,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create a transporter
-    const transporter = nodemailer.createTransporter({
+    const transporter = nodemailer.createTransport({
       service: 'gmail', // Use Gmail or your preferred service
       auth: {
         user: process.env.EMAIL_USER,

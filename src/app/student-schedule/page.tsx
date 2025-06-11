@@ -22,6 +22,13 @@ interface Material {
   Description: string;
 }
 
+// Student interface definition
+interface Student {
+  id: string;
+  name: string;
+  // Add other student properties as needed
+}
+
 // Day interface definition
 interface Day {
   date: Date;
@@ -52,10 +59,13 @@ interface FormData {
   
   // Needed Materials array
   NeededMaterials: Material[];
+  
+  // Students array - this was missing!
+  Students: Student[];
 }
 
-// Fixed UpdateFormData type
-type UpdateFormData = <K extends keyof FormData>(field: K, value: FormData[K]) => void;
+// Fixed UpdateFormData type - make it more flexible to handle different FormData types
+type UpdateFormData = (field: string, value: any) => void;
 
 // Interface for blocked dates data structure
 interface BlockedDate {
@@ -93,7 +103,8 @@ export default function Schedule() {
     TeacherEmail: '',
     Topic: '',
     SchoolYear: new Date().getFullYear(),
-    NeededMaterials: []
+    NeededMaterials: [],
+    Students: [] // Initialize Students array
   }), []);
 
   const [step, setStep] = useState(1);
@@ -178,7 +189,7 @@ export default function Schedule() {
     );
   }, [blockedDates]);
 
-  // Memoized update function to avoid re-creation
+  // Memoized update function to avoid re-creation - made more flexible
   const updateFormData = useCallback<UpdateFormData>((field, value) => {
     setFormData(prevData => ({ ...prevData, [field]: value }));
   }, []);

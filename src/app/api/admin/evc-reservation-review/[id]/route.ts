@@ -20,8 +20,8 @@ export async function GET(
       );
     }
 
-    // Use EVCReservation with capital "EVC" to match your schema
-    const reservation = await prisma.EVCReservation.findUnique({
+    // Use eVCReservation with lowercase "e" to match your schema
+    const reservation = await prisma.eVCReservation.findUnique({
       where: { id },
       include: {
         accInfo: true,

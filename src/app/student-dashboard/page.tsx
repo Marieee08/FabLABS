@@ -140,11 +140,10 @@ const DashboardUser = () => {
     setIsEVCModalOpen(true);
   };
 
-  // Format the date for display
-  const formatDate = (dateString: string | Date | null) => {
-    if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleDateString();
-  };
+  const formatDate = (dateString: string | Date | null | undefined) => {
+  if (!dateString) return "N/A";
+  return new Date(dateString).toLocaleDateString();
+};
 
   // Get status badge color based on status
   const getStatusBadgeClass = (status: string) => {
@@ -555,7 +554,7 @@ const DashboardUser = () => {
                 </div>
                 <div>
                   <p className="font-medium">Teacher Approval Date:</p>
-                  <p className="text-gray-700">{formatDate(selectedEVCReservation.ReceivedDate) || 'Not yet approved'}</p>
+                  <p className="text-gray-700">{formatDate(selectedEVCReservation.ReceivedDate || null)}</p>
                 </div>
                 <div>
                   <p className="font-medium">Admin Approved By:</p>
@@ -563,7 +562,7 @@ const DashboardUser = () => {
                 </div>
                 <div>
                   <p className="font-medium">Admin Approval Date:</p>
-                  <p className="text-gray-700">{formatDate(selectedEVCReservation.InspectedDate) || 'Not yet approved'}</p>
+                  <p className="text-gray-700">{formatDate(selectedEVCReservation.InspectedDate || null)}</p>
                 </div>
               </div>
             </div>

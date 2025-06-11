@@ -5,6 +5,23 @@ import { PrismaClient } from '@prisma/client';
 // Create a single PrismaClient instance and reuse it
 const prisma = new PrismaClient();
 
+// Define interface for error details
+interface ErrorDetails {
+  message: string;
+  name: string;
+  stack?: string;
+  code?: string;
+  meta?: any;
+}
+
+// Define interface for time utilities
+interface UtilTime {
+  DayNum: number;
+  StartTime: Date | null;
+  EndTime: Date | null;
+  DateStatus: "Ongoing";
+}
+
 export async function POST(request: Request) {
   try {
     // 1. Authentication Check
@@ -76,7 +93,7 @@ export async function POST(request: Request) {
     });
 
     // 9. Create a map of services to machines
-    const serviceMachinesMap = new Map();
+    const serviceMachinesMap = new Map<string, string[]>();
     const serviceMachineNumbers = data.serviceMachineNumbers || {};
 
     servicesWithDetails.forEach(service => {
@@ -85,7 +102,7 @@ export async function POST(request: Request) {
     });
 
     // 10. Process user tools
-    let userTools = [];
+    let userTools: Array<{ ToolUser: string; ToolQuantity: number }> = [];
     try {
       if (data.Tools) {
         const toolsData = typeof data.Tools === 'string' ? JSON.parse(data.Tools) : data.Tools;
@@ -99,7 +116,7 @@ export async function POST(request: Request) {
     }
     
     // 11. Process time slots
-    const utilTimes = data.days.map((day, index) => {
+    const utilTimes: UtilTime[] = data.days.map((day: any, index: number): UtilTime => {
       const dateValue = typeof day.date === 'string' ? new Date(day.date) : day.date;
       
       if (!(dateValue instanceof Date) || isNaN(dateValue.getTime())) {
@@ -107,7 +124,8 @@ export async function POST(request: Request) {
         return {
           DayNum: index + 1,
           StartTime: null,
-          EndTime: null
+          EndTime: null,
+          DateStatus: "Ongoing" as const
         };
       }
       
@@ -118,12 +136,12 @@ export async function POST(request: Request) {
         DayNum: index + 1,
         StartTime: startTime,
         EndTime: endTime,
-        DateStatus: "Ongoing"
+        DateStatus: "Ongoing" as const
       };
     });
     
     // 12. Calculate total minutes
-    const totalMinutes = utilTimes.reduce((total, time) => {
+    const totalMinutes = utilTimes.reduce((total: number, time: UtilTime) => {
       if (time.StartTime && time.EndTime) {
         const diffMs = time.EndTime.getTime() - time.StartTime.getTime();
         const diffMinutes = diffMs / (1000 * 60);
@@ -133,7 +151,7 @@ export async function POST(request: Request) {
     }, 0);
 
     // 13. Process user services
-    const userServices = selectedServices.flatMap(service => {
+    const userServices = selectedServices.flatMap((service: string) => {
       const machines = serviceMachinesMap.get(service) || [];
       const serviceLink = serviceLinks[service] || '';
       
@@ -146,7 +164,7 @@ export async function POST(request: Request) {
       if (data.groupedServiceData && data.groupedServiceData[service]) {
         serviceCost = data.groupedServiceData[service].totalServiceCost || 0;
       } else if (data.serviceCostDetails) {
-        const costDetail = data.serviceCostDetails.find(d => d.serviceName === service);
+        const costDetail = data.serviceCostDetails.find((d: any) => d.serviceName === service);
         if (costDetail) serviceCost = costDetail.totalCost || 0;
       }
       
@@ -166,7 +184,7 @@ export async function POST(request: Request) {
     });
 
     // 14. Process service availed
-    const serviceAvailed = selectedServices.map(service => ({
+    const serviceAvailed = selectedServices.map((service: string) => ({
       service
     }));
 
@@ -188,7 +206,7 @@ export async function POST(request: Request) {
             create: userServices 
           },
           UtilTimes: { 
-            create: utilTimes.filter(time => time.StartTime && time.EndTime)
+            create: utilTimes.filter((time: UtilTime) => time.StartTime && time.EndTime)
           },
           ServiceAvailed: { 
             create: serviceAvailed 
@@ -214,7 +232,7 @@ export async function POST(request: Request) {
     // 17. Error handling
     console.error('Error creating reservation:', error);
     
-    const errorDetails = {
+    const errorDetails: ErrorDetails = {
       message: error instanceof Error ? error.message : 'Unknown error',
       name: error instanceof Error ? error.name : 'UnknownError',
       stack: error instanceof Error ? error.stack : undefined
@@ -222,8 +240,9 @@ export async function POST(request: Request) {
 
     // Special handling for Prisma errors
     if (error instanceof Error && error.name === 'PrismaClientKnownRequestError') {
-      errorDetails.code = (error as any).code;
-      errorDetails.meta = (error as any).meta;
+      const prismaError = error as any; // Type assertion for Prisma-specific properties
+      errorDetails.code = prismaError.code;
+      errorDetails.meta = prismaError.meta;
     }
 
     return NextResponse.json(
@@ -255,7 +274,7 @@ function parseTimeString(timeString: string, baseDate: Date): Date | null {
       return null;
     }
     
-    let [_, hours, minutes, period] = matches;
+    const [, hours, minutes, period] = matches;
     let hour = parseInt(hours, 10);
     
     // Convert to 24-hour format

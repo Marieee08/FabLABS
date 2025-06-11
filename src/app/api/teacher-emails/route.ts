@@ -6,6 +6,11 @@ import { auth } from '@clerk/nextjs/server';
 export async function POST(request: Request) {
   const { userId } = auth();
   
+  // Check if user is authenticated
+  if (!userId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  
   // Verify admin
   const user = await prisma.accInfo.findUnique({
     where: { clerkId: userId },
