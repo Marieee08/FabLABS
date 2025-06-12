@@ -72,7 +72,7 @@ export async function PUT(
     };
 
     // Start a transaction to handle both machine update and services update
-    const updatedMachine = await prisma.$transaction(async (tx) => {
+    const updatedMachine = await prisma.$transaction(async (tx: any) => {
       // Update the machine
       const machine = await tx.machine.update({
         where: { id: params.id },
@@ -117,7 +117,7 @@ export async function PUT(
     // Transform the response to match the expected format
     const transformedMachine = {
       ...updatedMachine,
-      Services: updatedMachine.Services.map(ms => ({
+      Services: updatedMachine.Services.map((ms: any) => ({
         id: ms.service.id,
         Service: ms.service.Service,
         Costs: ms.service.Costs,
@@ -192,7 +192,7 @@ export async function PATCH(
     // Transform the response
     const transformedMachine = {
       ...updatedMachine,
-      Services: updatedMachine.Services.map(ms => ({
+      Services: updatedMachine.Services.map((ms: any) => ({
         id: ms.service.id,
         Service: ms.service.Service,
         Costs: ms.service.Costs,

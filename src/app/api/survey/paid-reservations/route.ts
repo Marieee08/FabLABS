@@ -80,7 +80,7 @@ export async function GET() {
     });
 
     // Transform the data to match the DetailedReservation interface
-    const formattedReservations = reservations.map((reservation) => ({
+    const formattedReservations = reservations.map((reservation: any) => ({
       id: reservation.id,
       Status: reservation.Status,
       RequestDate: reservation.RequestDate?.toISOString() || '',
@@ -88,19 +88,19 @@ export async function GET() {
       BulkofCommodity: reservation.BulkofCommodity,
       ReceiptNumber: reservation.ReceiptNumber,
       PaymentDate: reservation.PaymentDate?.toISOString() || null,
-      UserServices: reservation.UserServices.map(service => ({
+      UserServices: reservation.UserServices.map((service: any) => ({
         id: service.id,
         ServiceAvail: service.ServiceAvail,
         EquipmentAvail: service.EquipmentAvail,
         CostsAvail: service.CostsAvail,
         MinsAvail: service.MinsAvail,
       })),
-      UserTools: reservation.UserTools.map(tool => ({
+      UserTools: reservation.UserTools.map((tool: any) => ({
         id: tool.id,
         ToolUser: tool.ToolUser,
         ToolQuantity: tool.ToolQuantity,
       })),
-      UtilTimes: reservation.UtilTimes.map(time => ({
+      UtilTimes: reservation.UtilTimes.map((time: any) => ({
         id: time.id,
         DayNum: time.DayNum,
         StartTime: time.StartTime?.toISOString() || null,

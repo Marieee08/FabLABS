@@ -80,7 +80,7 @@ export async function PATCH(
     
     // Create a map of service name to hourly rate
     const hourlyRates = new Map<string, number>();
-    services.forEach(service => {
+    services.forEach((service: any) => {
       if (service.Costs) {
         hourlyRates.set(service.Service, parseFloat(service.Costs.toString()));
       }

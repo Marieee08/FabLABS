@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
         servicesHtml = `
           <h3 style="margin-top: 20px;">Services Requested:</h3>
           <ul>
-            ${reservation.UserServices.map(service => `
+            ${reservation.UserServices.map((service: any) => `
               <li>
                 <strong>${service.ServiceAvail || 'Unknown Service'}</strong>
                 ${service.EquipmentAvail && service.EquipmentAvail !== 'Not Specified' ? ` - Equipment: ${service.EquipmentAvail}` : ''}

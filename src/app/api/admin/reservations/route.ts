@@ -38,22 +38,22 @@ export async function GET(req: NextRequest) {
     });
 
     // Transform UtilReq data into the expected format
-    const formattedUtilReservations = utilReservations.map((reservation) => {
+    const formattedUtilReservations = utilReservations.map((reservation: any) => {
       // Get all service names
-      const serviceNames = reservation.UserServices.map(service => service.ServiceAvail);
+      const serviceNames = reservation.UserServices.map((service: any) => service.ServiceAvail);
       const serviceName = serviceNames.length > 0 
         ? serviceNames.join(", ")
         : "No service";
       
       // Get all machine names from UserServices
       const userServiceMachines = reservation.UserServices
-        .filter(service => service.EquipmentAvail && service.EquipmentAvail !== "Not Specified")
-        .map(service => service.EquipmentAvail);
+        .filter((service: any) => service.EquipmentAvail && service.EquipmentAvail !== "Not Specified")
+        .map((service: any) => service.EquipmentAvail);
       
       // Get all machine names from MachineUtilizations
       const machineUtilMachines = reservation.MachineUtilizations
-        ?.filter(machine => machine.Machine && machine.Machine !== "Not Specified")
-        .map(machine => machine.Machine) || [];
+        ?.filter((machine: any) => machine.Machine && machine.Machine !== "Not Specified")
+        .map((machine: any) => machine.Machine) || [];
       
       // Combine all machine names and remove duplicates
       const allMachines = [...new Set([...userServiceMachines, ...machineUtilMachines])];
@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
         : reservation.RequestDate.toISOString();
 
       // Format all time slots
-      const timeSlots = reservation.UtilTimes.map(time => ({
+      const timeSlots = reservation.UtilTimes.map((time: any) => ({
         id: time.id,
         dayNum: time.DayNum,
         startTime: time.StartTime ? new Date(time.StartTime).toISOString() : null,
@@ -92,7 +92,7 @@ export async function GET(req: NextRequest) {
         totalAmount: reservation.TotalAmntDue ? Number(reservation.TotalAmntDue) : null,
         type: 'utilization',
         timeSlots: timeSlots,
-        totalScheduledTime: timeSlots.reduce((total, slot) => 
+        totalScheduledTime: timeSlots.reduce((total: any, slot: any) => 
           total + (slot.duration || 0), 0)
       };
     });
@@ -116,7 +116,7 @@ export async function GET(req: NextRequest) {
     });
 
     // Transform EVCReservation data into the expected format
-    const formattedEVCReservations = evcReservations.map((reservation) => {
+    const formattedEVCReservations = evcReservations.map((reservation: any) => {
       // Determine the date from UtilTimes if available, otherwise use DateRequested
       const firstTime = reservation.UtilTimes.length > 0 ? reservation.UtilTimes[0] : null;
       const date = firstTime && firstTime.StartTime 
@@ -126,7 +126,7 @@ export async function GET(req: NextRequest) {
           : new Date().toISOString();
 
       // Format all time slots
-      const timeSlots = reservation.UtilTimes.map(time => ({
+      const timeSlots = reservation.UtilTimes.map((time: any) => ({
         id: time.id,
         dayNum: time.DayNum,
         startTime: time.StartTime ? new Date(time.StartTime).toISOString() : null,
@@ -148,7 +148,7 @@ export async function GET(req: NextRequest) {
         totalAmount: null,
         type: 'evc',
         timeSlots: timeSlots,
-        totalScheduledTime: timeSlots.reduce((total, slot) => 
+        totalScheduledTime: timeSlots.reduce((total: any, slot: any) => 
           total + (slot.duration || 0), 0)
       };
     });

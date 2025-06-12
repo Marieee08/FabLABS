@@ -79,7 +79,7 @@ export async function POST(request: Request) {
 
     // Use transaction to ensure all operations succeed or fail together
     // This improves data consistency and performance
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: any) => {
       // Create the main reservation with relations in a single operation
       const evcReservation = await tx.eVCReservation.create({
         data: {

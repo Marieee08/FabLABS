@@ -96,8 +96,8 @@ export async function POST(request: Request) {
     const serviceMachinesMap = new Map<string, string[]>();
     const serviceMachineNumbers = data.serviceMachineNumbers || {};
 
-    servicesWithDetails.forEach(service => {
-      const machineNames = service.Machines.map(machineService => machineService.machine.Machine);
+    servicesWithDetails.forEach((service: any) => {
+      const machineNames = service.Machines.map((machineService: any) => machineService.machine.Machine);
       serviceMachinesMap.set(service.Service, machineNames);
     });
 
@@ -189,7 +189,7 @@ export async function POST(request: Request) {
     }));
 
     // 15. Create reservation in a transaction
-    const utilReq = await prisma.$transaction(async (tx) => {
+    const utilReq = await prisma.$transaction(async (tx: any) => {
       return tx.utilReq.create({
         data: {
           Status: "Pending Admin Approval",

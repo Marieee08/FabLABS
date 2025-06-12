@@ -150,12 +150,12 @@ export async function GET() {
     });
 
     // Transform the data to match the expected format in the CompletedSurveysPage component
-    const formattedSurveys: FormattedSurvey[] = completedReservations.map((reservation) => ({
+    const formattedSurveys: FormattedSurvey[] = completedReservations.map((reservation: any) => ({
       id: `survey-${reservation.id}`,
       reservationId: reservation.id,
       submittedAt: reservation.RequestDate?.toISOString() || new Date().toISOString(),
       customerName: reservation.accInfo?.Name || 'Unknown',
-      serviceAvailed: reservation.ServiceAvailed.map(s => s.service),
+      serviceAvailed: reservation.ServiceAvailed.map((s: any) => s.service),
       preliminary: {
         clientType: reservation.PreliminarySurvey?.clientType || 'Not specified',
         sex: reservation.PreliminarySurvey?.sex || 'Not specified',

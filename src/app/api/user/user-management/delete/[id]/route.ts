@@ -36,7 +36,7 @@ export async function POST(
     }
 
     // Delete related records
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       // Delete BusinessInfo if exists
       if (account.BusinessInfo) {
         await tx.businessInfo.delete({

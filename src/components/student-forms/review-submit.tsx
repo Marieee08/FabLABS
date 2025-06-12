@@ -200,7 +200,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
           console.log('Tools array after processing:', toolsArray);
           
           // Process the array of tools
-          toolsArray.forEach(tool => {
+          toolsArray.forEach((tool: any) => {
             // Check if the tool is an object with a Tool property (from JSON)
             if (typeof tool === 'object' && tool !== null && 'Tool' in tool) {
               const toolItem = {

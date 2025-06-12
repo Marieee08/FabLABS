@@ -37,33 +37,33 @@ export async function GET(req: NextRequest) {
     ]);
 
     // Logging for debugging
-    console.log('UTIL RESERVATIONS DETAILS:', JSON.stringify(utilReservations.map(ur => ({
+    console.log('UTIL RESERVATIONS DETAILS:', JSON.stringify(utilReservations.map((ur: any) => ({
       id: ur.id,
       status: ur.Status,
       userRole: ur.accInfo?.Role,
       userName: ur.accInfo?.Name,
-      machineUtils: ur.MachineUtilizations.map(mu => mu.Machine),
-      userServices: ur.UserServices.map(us => us.EquipmentAvail)
+      machineUtils: ur.MachineUtilizations.map((mu: any) => mu.Machine),
+      userServices: ur.UserServices.map((us: any) => us.EquipmentAvail)
     })), null, 2));
 
-    console.log('EVC RESERVATIONS DETAILS:', JSON.stringify(evcReservations.map(er => ({
+    console.log('EVC RESERVATIONS DETAILS:', JSON.stringify(evcReservations.map((er: any) => ({
       id: er.id,
       status: er.EVCStatus,
       userRole: er.accInfo?.Role,
       userName: er.accInfo?.Name,
-      neededMaterials: er.NeededMaterials.map(nm => nm.Item)
+      neededMaterials: er.NeededMaterials.map((nm: any) => nm.Item)
     })), null, 2));
 
     // Transform reservations (similar to previous implementation)
-    const formattedUtilReservations = utilReservations.map((reservation) => {
+    const formattedUtilReservations = utilReservations.map((reservation: any) => {
       // Combine machine sources
       const machinesFromUtils = reservation.MachineUtilizations
-        .filter(mu => mu.Machine && mu.Machine !== 'Not Specified')
-        .map(mu => mu.Machine);
+        .filter((mu: any) => mu.Machine && mu.Machine !== 'Not Specified')
+        .map((mu: any) => mu.Machine);
       
       const machinesFromServices = reservation.UserServices
-        .filter(us => us.EquipmentAvail && us.EquipmentAvail !== 'Not Specified')
-        .map(us => us.EquipmentAvail);
+        .filter((us: any) => us.EquipmentAvail && us.EquipmentAvail !== 'Not Specified')
+        .map((us: any) => us.EquipmentAvail);
 
       const allMachines = [...new Set([...machinesFromUtils, ...machinesFromServices])];
 
@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
         ? new Date(firstTime.StartTime).toISOString() 
         : reservation.RequestDate.toISOString();
 
-      const timeSlots = reservation.UtilTimes.map(time => ({
+      const timeSlots = reservation.UtilTimes.map((time: any) => ({
         id: time.id,
         dayNum: time.DayNum,
         startTime: time.StartTime ? new Date(time.StartTime).toISOString() : null,
@@ -94,10 +94,10 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    const formattedEVCReservations = evcReservations.map((reservation) => {
+    const formattedEVCReservations = evcReservations.map((reservation: any) => {
       const machines = reservation.NeededMaterials
-        .filter(material => material.Item && material.Item !== "Not Specified")
-        .map(material => material.Item);
+        .filter((material: any) => material.Item && material.Item !== "Not Specified")
+        .map((material: any) => material.Item);
 
       const firstTime = reservation.UtilTimes.length > 0 ? reservation.UtilTimes[0] : null;
       const date = firstTime && firstTime.StartTime 
@@ -106,7 +106,7 @@ export async function GET(req: NextRequest) {
           ? reservation.DateRequested.toISOString() 
           : new Date().toISOString();
 
-      const timeSlots = reservation.UtilTimes.map(time => ({
+      const timeSlots = reservation.UtilTimes.map((time: any) => ({
         id: time.id,
         dayNum: time.DayNum,
         startTime: time.StartTime ? new Date(time.StartTime).toISOString() : null,

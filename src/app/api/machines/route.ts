@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the machine and its service relationships in a transaction
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: any) => {
       // Create the machine
       const machine = await tx.machine.create({
         data: {
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
     // Transform the response
     const transformedMachine = result ? {
       ...result,
-      Services: result.Services.map(ms => ({
+      Services: result.Services.map((ms: any) => ({
         id: ms.service.id,
         Service: ms.service.Service,
         Costs: ms.service.Costs,
@@ -106,9 +106,9 @@ export async function GET(request: NextRequest) {
     });
 
     // Transform the response to match the expected format
-    const transformedMachines = machines.map(machine => ({
+    const transformedMachines = machines.map((machine: any) => ({
       ...machine,
-      Services: machine.Services.map(ms => ({
+      Services: machine.Services.map((ms: any) => ({
         id: ms.service.id,
         Service: ms.service.Service,
         Costs: ms.service.Costs,

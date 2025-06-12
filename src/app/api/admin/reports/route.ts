@@ -244,7 +244,7 @@ export async function GET(request: NextRequest) {
     const monthCounts: Record<string, number> = {};
     
     // Process util requests
-    utilRequests.forEach(req => {
+    utilRequests.forEach((req: any) => {
       if (req.RequestDate) {
         const monthYear = format(req.RequestDate, 'MMM yyyy');
         if (!monthCounts[monthYear]) {
@@ -255,7 +255,7 @@ export async function GET(request: NextRequest) {
     });
     
     // Process EVC requests
-    evcRequests.forEach(req => {
+    evcRequests.forEach((req: any) => {
       if (req.DateRequested) {
         const monthYear = format(req.DateRequested, 'MMM yyyy');
         if (!monthCounts[monthYear]) {
@@ -276,13 +276,13 @@ export async function GET(request: NextRequest) {
     });
     
     // Process service stats
-    const serviceStats = servicesData.map(service => ({
+    const serviceStats = servicesData.map((service: any) => ({
       name: service.service,
       value: service._count.service
     }));
     
     // Process user role distribution
-    const userRoles = userRoleDistribution.map(role => ({
+    const userRoles = userRoleDistribution.map((role: any) => ({
       name: role.Role || 'Unknown',
       value: role._count.id
     }));
@@ -305,12 +305,12 @@ export async function GET(request: NextRequest) {
     const satisfactionAverages: Record<string, number> = {};
     sqdFields.forEach(field => {
       const validScores = satisfactionScores
-        .map(survey => survey[field as keyof typeof survey])
-        .filter(score => score !== null && score !== undefined)
-        .map(score => parseInt(score as string));
+        .map((survey: any) => survey[field as keyof typeof survey])
+        .filter((score: any) => score !== null && score !== undefined)
+        .map((score: any) => parseInt(score as string));
       
       const average = validScores.length > 0 
-        ? validScores.reduce((sum, score) => sum + score, 0) / validScores.length 
+        ? validScores.reduce((sum: any, score: any) => sum + score, 0) / validScores.length 
         : 0;
       
       satisfactionAverages[field] = Number(average.toFixed(1));
@@ -324,7 +324,7 @@ export async function GET(request: NextRequest) {
     
     // Process machine downtime
     const machineDowntimeSummary: Record<string, number> = {};
-    machineDowntime.forEach(record => {
+    machineDowntime.forEach((record: any) => {
       const machineName = record.machineUtil?.Machine || 'Unknown';
       machineDowntimeSummary[machineName] = (machineDowntimeSummary[machineName] || 0) + (record.DTTime || 0);
     });
@@ -335,16 +335,16 @@ export async function GET(request: NextRequest) {
     }));
     
     // Process repairs by type
-    const repairsByTypeFormatted = repairsByType.map(repair => ({
+    const repairsByTypeFormatted = repairsByType.map((repair: any) => ({
       type: repair.Service || 'Unknown',
       count: repair._count.id
     }));
     
     // Process machines used
-    const machinesUsed = machinesUsedData.map(machine => ({
+    const machinesUsed = machinesUsedData.map((machine: any) => ({
       machine: machine.Machine || 'Unknown',
       count: machine._count.id
-    })).sort((a, b) => b.count - a.count);
+    })).sort((a: any, b: any) => b.count - a.count);
     
     // Return the final data structure
     return NextResponse.json({

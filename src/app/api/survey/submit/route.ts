@@ -57,7 +57,7 @@ export async function POST(request: Request) {
     const parsedAge = surveyData.preliminary.age ? parseInt(surveyData.preliminary.age) : 0;
     
     // Use Prisma transactions to ensure atomicity
-    const updatedReservation = await prisma.$transaction(async (prisma) => {
+    const updatedReservation = await prisma.$transaction(async (prisma: any) => {
       // First check if the reservation exists and is in 'Paid' status
       const existingReservation = await prisma.utilReq.findFirst({
         where: {

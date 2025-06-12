@@ -54,7 +54,7 @@ async function migrate() {
         const services = await prisma.service.findMany({
           where: {
             Service: {
-              in: utilReq.UserServices.map(s => s.ServiceAvail)
+              in: utilReq.UserServices.map((s: { ServiceAvail: string }) => s.ServiceAvail)
             }
           },
           include: {
@@ -75,7 +75,7 @@ async function migrate() {
           // Find the service this machine belongs to
           for (const service of services) {
             const matchingMachine = service.Machines.find(
-              m => m.machine.Machine === machine.Machine
+              (m: { machine: { Machine: string } }) => m.machine.Machine === machine.Machine
             );
             
             if (matchingMachine) {

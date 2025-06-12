@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       
       // Format scheduled dates
       if (reservation.UtilTimes && Array.isArray(reservation.UtilTimes)) {
-        scheduledDates = reservation.UtilTimes.map(time => {
+        scheduledDates = reservation.UtilTimes.map((time: any) => {
           const startTime = time.StartTime ? new Date(time.StartTime) : null;
           const endTime = time.EndTime ? new Date(time.EndTime) : null;
           
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
         servicesHtml = `
           <h3 style="margin-top: 20px;">Services Approved:</h3>
           <ul>
-            ${reservation.UserServices.map(service => `
+            ${reservation.UserServices.map((service: any) => `
               <li>
                 <strong>${service.ServiceAvail || 'Unknown Service'}</strong>
                 ${service.EquipmentAvail ? ` - Equipment: ${service.EquipmentAvail}` : ''}
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
       
       // Format scheduled dates
       if (reservation.UtilTimes && Array.isArray(reservation.UtilTimes)) {
-        scheduledDates = reservation.UtilTimes.map(time => {
+        scheduledDates = reservation.UtilTimes.map((time: any) => {
           const startTime = time.StartTime ? new Date(time.StartTime) : null;
           const endTime = time.EndTime ? new Date(time.EndTime) : null;
           
