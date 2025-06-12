@@ -22,9 +22,9 @@ interface Material {
   Description: string;
 }
 
-// Student interface definition
-interface Student {
-  id: string;
+// Student interface definition - ensure this matches the expected type
+interface StudentData {
+  id: string; // Keep as string to match your current definition
   name: string;
   // Add other student properties as needed
 }
@@ -36,7 +36,8 @@ interface Day {
   endTime: string | null;
 }
 
-interface FormData {
+// Rename to avoid conflict with browser's FormData
+interface ScheduleFormData {
   days: Day[];
   syncTimes: boolean;
   unifiedStartTime: string | null;
@@ -60,12 +61,12 @@ interface FormData {
   // Needed Materials array
   NeededMaterials: Material[];
   
-  // Students array - this was missing!
-  Students: Student[];
+  // Students array
+  Students: StudentData[];
 }
 
-// Fixed UpdateFormData type - make it more flexible to handle different FormData types
-type UpdateFormData = (field: string, value: any) => void;
+// More flexible UpdateFormData type
+type UpdateFormData = <K extends keyof ScheduleFormData>(field: K, value: ScheduleFormData[K]) => void;
 
 // Interface for blocked dates data structure
 interface BlockedDate {
@@ -84,7 +85,7 @@ interface Machine {
 
 export default function Schedule() {
   // Use memoized initial state to avoid re-creating on each render
-  const initialFormData = useMemo<FormData>(() => ({
+  const initialFormData = useMemo<ScheduleFormData>(() => ({
     days: [],
     syncTimes: false,
     unifiedStartTime: null,
@@ -108,7 +109,7 @@ export default function Schedule() {
   }), []);
 
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState<FormData>(initialFormData);
+  const [formData, setFormData] = useState<ScheduleFormData>(initialFormData);
   const [blockedDates, setBlockedDates] = useState<CalendarDate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showMachineCalendar, setShowMachineCalendar] = useState(false);
@@ -189,7 +190,7 @@ export default function Schedule() {
     );
   }, [blockedDates]);
 
-  // Memoized update function to avoid re-creation - made more flexible
+  // Memoized update function to avoid re-creation
   const updateFormData = useCallback<UpdateFormData>((field, value) => {
     setFormData(prevData => ({ ...prevData, [field]: value }));
   }, []);

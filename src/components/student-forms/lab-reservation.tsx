@@ -40,7 +40,8 @@ interface Student {
   name: string;
 }
 
-interface FormData {
+// Renamed to avoid conflict with built-in FormData
+interface LabReservationFormData {
   days: any[];
   syncTimes: boolean;
   unifiedStartTime: string | null;
@@ -82,8 +83,8 @@ interface FormErrors {
 }
 
 interface LabReservationProps {
-  formData: FormData;
-  updateFormData: <K extends keyof FormData>(field: K, value: FormData[K]) => void;
+  formData: LabReservationFormData;
+  updateFormData: <K extends keyof LabReservationFormData>(field: K, value: LabReservationFormData[K]) => void;
   nextStep: () => void;
   prevStep: () => void;
 }
@@ -210,7 +211,9 @@ export default function LabReservation({ formData, updateFormData, nextStep, pre
   // Auto-fill user's name as first student when component loads
   useEffect(() => {
     if (isLoaded && user) {
-      const userName = `${user.firstName || ''} ${user.lastName || ''}`.trim();
+      const firstName = user.firstName || '';
+      const lastName = user.lastName || '';
+      const userName = `${firstName} ${lastName}`.trim();
       
       // If we have a valid user name and no students exist yet
       if (userName && students.length === 0) {
@@ -316,7 +319,7 @@ export default function LabReservation({ formData, updateFormData, nextStep, pre
   };
 
   // Handle field change
-  const handleFieldChange = <K extends keyof FormData>(field: K, value: FormData[K]) => {
+  const handleFieldChange = <K extends keyof LabReservationFormData>(field: K, value: LabReservationFormData[K]) => {
     updateFormData(field, value);
   };
 
@@ -639,39 +642,47 @@ export default function LabReservation({ formData, updateFormData, nextStep, pre
           <div className="bg-gray-50 p-6 rounded-lg border border-gray-100">
             {students.length > 0 ? (
               <div className="space-y-3 max-h-64 overflow-y-auto rounded-md">
-                {students.map((student, index) => (
-                  <div key={index} className="flex items-center bg-white p-3 rounded-lg shadow-sm">
-                    <span className="text-sm font-bold w-8 h-8 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center">{index + 1}</span>
-                    <div className="flex-1 mx-3">
-                    <input
-                        type="text"
-                        placeholder={`Student ${index + 1} name`}
-                        className={`w-full border ${errors.Students && errors.Students[index] ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition`}
-                        value={student.name}
-                        onChange={(e) => updateStudentName(index, e.target.value)}
-                        aria-invalid={!!(errors.Students && errors.Students[index])}
-                        disabled={index === 0 && user && student.name === `${user.firstName || ''} ${user.lastName || ''}`.trim()}
-                        ref={index === students.length - 1 && newStudentAdded ? newStudentInputRef : null}
-                      />
-                      {errors.Students && errors.Students[index] && (
-                        <p className="mt-1 text-sm text-red-500">{errors.Students[index]}</p>
+                {students.map((student, index) => {
+                  // Check if this is the logged-in user's entry
+                  const firstName = user?.firstName ?? '';
+                  const lastName = user?.lastName ?? '';
+                  const userFullName = `${firstName} ${lastName}`.trim();
+                  const isUserEntry = Boolean(index === 0 && user && student.name === userFullName);
+
+                  return (
+                    <div key={index} className="flex items-center bg-white p-3 rounded-lg shadow-sm">
+                      <span className="text-sm font-bold w-8 h-8 bg-blue-100 text-blue-700 rounded-full flex items-center justify-center">{index + 1}</span>
+                      <div className="flex-1 mx-3">
+                        <input
+                          type="text"
+                          placeholder={`Student ${index + 1} name`}
+                          className={`w-full border ${errors.Students && errors.Students[index] ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition`}
+                          value={student.name}
+                          onChange={(e) => updateStudentName(index, e.target.value)}
+                          aria-invalid={!!(errors.Students && errors.Students[index])}
+                          disabled={isUserEntry}
+                          ref={index === students.length - 1 && newStudentAdded ? newStudentInputRef : null}
+                        />
+                        {errors.Students && errors.Students[index] && (
+                          <p className="mt-1 text-sm text-red-500">{errors.Students[index]}</p>
+                        )}
+                      </div>
+                      {students.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeStudent(index)}
+                          className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 transition"
+                          aria-label={`Remove student ${index + 1}`}
+                          disabled={isUserEntry}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
                       )}
                     </div>
-                    {students.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => removeStudent(index)}
-                        className="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 transition"
-                        aria-label={`Remove student ${index + 1}`}
-                        disabled={index === 0 && user && student.name === `${user.firstName || ''} ${user.lastName || ''}`.trim()}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-8 bg-white rounded-lg border border-dashed border-gray-300">

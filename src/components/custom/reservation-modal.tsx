@@ -110,57 +110,62 @@ const ReservationModal: React.FC<ReservationModalProps> = ({
   };
 
   // Function to handle status updates for utilization reservations
-  const handleStatusUpdate = async (
-    reservationId: number,
-    newStatus: 'Approved' | 'Ongoing' | 'Pending payment' | 'Paid' | 'Completed' | 'Cancelled'
-  ) => {
-    try {
-      const response = await fetch(`/api/admin/reservation-status/${reservationId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status: newStatus }),
-      });
+  // Updated signature to match the expected interface: (id: number, status: string) => void
+  const handleStatusUpdate = (id: number, status: string): void => {
+    // Convert to async operation internally
+    (async () => {
+      try {
+        const response = await fetch(`/api/admin/reservation-status/${id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ status }),
+        });
 
-      if (!response.ok) {
-        throw new Error(`Failed to update status: ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`Failed to update status: ${response.status}`);
+        }
+
+        // Close the modal and potentially refresh the data
+        setIsReviewModalOpen(false);
+        // You might want to refresh the reservations in the parent component
+      } catch (error) {
+        console.error('Error updating reservation status:', error);
+        alert('Failed to update status. Please try again.');
       }
-
-      // Close the modal and potentially refresh the data
-      setIsReviewModalOpen(false);
-      // You might want to refresh the reservations in the parent component
-    } catch (error) {
-      console.error('Error updating reservation status:', error);
-      alert('Failed to update status. Please try again.');
-    }
+    })();
   };
 
   // Function to handle status updates for EVC reservations
-  const handleEVCStatusUpdate = async (
+  // Updated signature to match the expected interface
+  const handleEVCStatusUpdate = (
     reservationId: number,
-    newStatus: 'Pending' | 'Approved' | 'Rejected' | 'Completed' | 'Cancelled'
-  ) => {
-    try {
-      const response = await fetch(`/api/admin/evc-reservation-status/${reservationId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status: newStatus }),
-      });
+    newStatus: 'Pending Admin Approval' | 'Approved' | 'Ongoing' | 'Completed' | 'Rejected' | 'Cancelled'
+  ): void => {
+    // Convert to async operation internally
+    (async () => {
+      try {
+        const response = await fetch(`/api/admin/evc-reservation-status/${reservationId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ status: newStatus }),
+        });
 
-      if (!response.ok) {
-        throw new Error(`Failed to update EVC status: ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`Failed to update EVC status: ${response.status}`);
+        }
+
+        // Close the modal and potentially refresh the data
+        setIsEVCReviewModalOpen(false);
+        // You might want to refresh the reservations in the parent component
+      } catch (error) {
+        console.error('Error updating EVC reservation status:', error);
+        alert('Failed to update status. Please try again.');
       }
-
-      // Close the modal and potentially refresh the data
-      setIsEVCReviewModalOpen(false);
-      // You might want to refresh the reservations in the parent component
-    } catch (error) {
-      console.error('Error updating EVC reservation status:', error);
-      alert('Failed to update status. Please try again.');
-    }
+    })();
   };
 
   return (

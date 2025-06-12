@@ -195,230 +195,224 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
     setServiceCostData(serviceData);
   }, []);
 
-  const handleSubmit = async () => {
-    try {
-      // Set submission state
-      setIsSubmitting(true);
-      setError('');
-  
-      // Get authentication token
-      const token = await getToken();
-      
-      // Create a clean version of service cost data to avoid circular references
-      const simplifiedServiceData = {};
-      Object.entries(serviceCostData).forEach(([service, data]) => {
-        simplifiedServiceData[service] = {
-          totalServiceCost: data.totalServiceCost,
-          dates: data.dates.map(date => ({
-            day: {
-              date: date.day.date,
-              startTime: date.day.startTime,
-              endTime: date.day.endTime
-            },
-            duration: date.duration,
-            billableHours: date.billableHours,
-            cost: date.cost
-          }))
-        };
-      });
-      
-      // Prepare service cost details array for the API
-      const serviceCostDetails = Object.entries(serviceCostData).map(([serviceName, data]) => ({
-        serviceName,
-        totalCost: data.totalServiceCost,
-        daysCount: data.dates.length
-      }));
-      
-      // Helper function to calculate total minutes across selected days
-      const calculateTotalMinutes = (days: Day[]) => {
-        return days.reduce((total, day) => {
-          if (day.startTime && day.endTime) {
-            const start = new Date(`1970-01-01T${day.startTime}`);
-            const end = new Date(`1970-01-01T${day.endTime}`);
-            return total + (end.getTime() - start.getTime()) / (1000 * 60);
-          }
-          return total;
-        }, 0);
+const handleSubmit = async () => {
+  try {
+    // Set submission state
+    setIsSubmitting(true);
+    setError('');
+
+    // Get authentication token
+    const token = await getToken();
+    
+    // Create a clean version of service cost data to avoid circular references
+    // Fix: Add proper type annotation
+    const simplifiedServiceData: Record<string, any> = {};
+    Object.entries(serviceCostData).forEach(([service, data]) => {
+      simplifiedServiceData[service] = {
+        totalServiceCost: data.totalServiceCost,
+        dates: data.dates.map(date => ({
+          day: {
+            date: date.day.date,
+            startTime: date.day.startTime,
+            endTime: date.day.endTime
+          },
+          duration: date.duration,
+          billableHours: date.billableHours,
+          cost: date.cost
+        }))
       };
-  
-      const prepareUserServices = () => {
-        const userServices: any[] = [];
-      
-        // Iterate through selected services
-        Object.entries(formData.serviceMachineNumbers || {}).forEach(([service, quantity]) => {
-          // Get the total cost for this service
-          const serviceData = serviceCostData[service];
-          const totalServiceCost = serviceData?.totalServiceCost || 0;
-          const totalMinutes = calculateTotalMinutes(formData.days);
-      
-          // Check if this service has any machines assigned to it
-          // This assumes we have access to a serviceMachinesMap similar to the API route
-          // We'll need to modify the component to fetch this information if it's not available
-          
-          // Set equipment availability - Change to "None" when no machines exist
-          const equipmentAvail = 'None'; // Default to None for services with no machines
-          
-          // Create multiple UserService entries based on quantity
-          for (let i = 0; i < quantity; i++) {
-            userServices.push({
-              ServiceAvail: service,
-              EquipmentAvail: equipmentAvail,
-              CostsAvail: totalServiceCost / quantity,
-              MinsAvail: totalMinutes,
-              Files: formData.serviceLinks?.[service] || ''
-            });
-          }
-        });
-      
-        return userServices;
-      };
-  
-      // Prepare tools data for submission
-      const prepareUserTools = () => {
-        try {
-          if (formData.Tools) {
-            const toolsData = typeof formData.Tools === 'string' 
-              ? JSON.parse(formData.Tools) 
-              : formData.Tools;
-            
-            return Array.isArray(toolsData) 
-              ? toolsData.map(tool => ({
-                  ToolUser: tool.Tool,
-                  ToolQuantity: parseInt(tool.Quantity) || 1
-                }))
-              : [];
-          }
-          return [];
-        } catch (e) {
-          console.warn('Error parsing tools data:', e);
-          return [];
+    });
+    
+    // Prepare service cost details array for the API
+    const serviceCostDetails = Object.entries(serviceCostData).map(([serviceName, data]) => ({
+      serviceName,
+      totalCost: data.totalServiceCost,
+      daysCount: data.dates.length
+    }));
+    
+    // Helper function to calculate total minutes across selected days
+    const calculateTotalMinutes = (days: Day[]) => {
+      return days.reduce((total, day) => {
+        if (day.startTime && day.endTime) {
+          const start = new Date(`1970-01-01T${day.startTime}`);
+          const end = new Date(`1970-01-01T${day.endTime}`);
+          return total + (end.getTime() - start.getTime()) / (1000 * 60);
         }
-      };
-  
-      // Remove any circular references from form data
-      const cleanedFormData = {
-        ...formData,
-        // Normalize dates
-        days: formData.days.map(day => ({
-          date: day.date instanceof Date ? day.date.toISOString() : day.date,
-          startTime: day.startTime,
-          endTime: day.endTime
-        })),
-        // Ensure ProductsManufactured is always an array
-        ProductsManufactured: Array.isArray(formData.ProductsManufactured) 
-          ? formData.ProductsManufactured 
-          : [formData.ProductsManufactured],
-        // Add processed data
-        TotalAmntDue: totalCost,
-        serviceCostDetails,
-        groupedServiceData: simplifiedServiceData,
-        UserServices: prepareUserServices(),
-        UserTools: prepareUserTools()
-      };
-  
-      // Log cleaned data for debugging
-      console.log("Submitting reservation with cleaned data:", JSON.stringify(cleanedFormData, null, 2));
-  
-      // Send reservation request
-      const response = await fetch('/api/user/create-reservation', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          ...cleanedFormData,
-          userInfo: {
-            clientInfo: accInfo?.ClientInfo,
-            businessInfo: accInfo?.BusinessInfo
-          }
-        }),
+        return total;
+      }, 0);
+    };
+
+    const prepareUserServices = () => {
+      const userServices: any[] = [];
+    
+      // Iterate through selected services
+      Object.entries(formData.serviceMachineNumbers || {}).forEach(([service, quantity]) => {
+        // Get the total cost for this service
+        const serviceData = serviceCostData[service];
+        const totalServiceCost = serviceData?.totalServiceCost || 0;
+        const totalMinutes = calculateTotalMinutes(formData.days);
+    
+        // Check if this service has any machines assigned to it
+        // This assumes we have access to a serviceMachinesMap similar to the API route
+        // We'll need to modify the component to fetch this information if it's not available
+        
+        // Set equipment availability - Change to "None" when no machines exist
+        const equipmentAvail = 'None'; // Default to None for services with no machines
+        
+        // Create multiple UserService entries based on quantity
+        for (let i = 0; i < quantity; i++) {
+          userServices.push({
+            ServiceAvail: service,
+            EquipmentAvail: equipmentAvail,
+            CostsAvail: totalServiceCost / quantity,
+            MinsAvail: totalMinutes,
+            Files: formData.serviceLinks?.[service] || ''
+          });
+        }
       });
-  
-      // Log full response details for debugging
-      console.log('Response status:', response.status);
-  
-      // Parse response
-      let responseData: any;
+    
+      return userServices;
+    };
+
+    // Prepare tools data for submission
+    const prepareUserTools = () => {
       try {
-        responseData = await response.text();
-        
-        // Try to parse the text as JSON
-        try {
-          responseData = JSON.parse(responseData);
-        } catch {
-          // If parsing fails, keep the original text
-          console.warn('Response was not JSON', responseData);
+        if (formData.Tools) {
+          const toolsData = typeof formData.Tools === 'string' 
+            ? JSON.parse(formData.Tools) 
+            : formData.Tools;
+          
+          return Array.isArray(toolsData) 
+            ? toolsData.map(tool => ({
+                ToolUser: tool.Tool,
+                ToolQuantity: parseInt(tool.Quantity) || 1
+              }))
+            : [];
         }
-        
-        // Log the parsed or raw response data
-        console.log('Full response body:', responseData);
-      } catch (parseError) {
-        console.error('Error parsing response:', parseError);
-        responseData = { error: 'Failed to parse server response' };
+        return [];
+      } catch (e) {
+        console.warn('Error parsing tools data:', e);
+        return [];
       }
-  
-      // Handle non-successful responses
-      if (!response.ok) {
-        // More comprehensive error logging
-        console.error('Reservation submission error details:', {
-          status: response.status,
-          responseData,
-          cleanedFormData
-        });
-        
-        // Extract most informative error message
-        const errorMessage = 
-          // Check for nested error messages
-          (typeof responseData === 'object' && 
-            (responseData.details?.message || 
-             responseData.details?.error || 
-             responseData.error || 
-             responseData.message)) || 
-          // Fallback to response status text
-          response.statusText || 
-          // Ultimate fallback
-          'Failed to submit reservation';
-        
-        // Throw an error with the extracted message
-        throw new Error(errorMessage);
+    };
+
+    // Remove any circular references from form data
+    const cleanedFormData = {
+      ...formData,
+      // Normalize dates
+      days: formData.days.map(day => ({
+        date: day.date instanceof Date ? day.date.toISOString() : day.date,
+        startTime: day.startTime,
+        endTime: day.endTime
+      })),
+      // Ensure ProductsManufactured is always an array
+      ProductsManufactured: Array.isArray(formData.ProductsManufactured) 
+        ? formData.ProductsManufactured 
+        : [formData.ProductsManufactured],
+      // Add processed data
+      TotalAmntDue: totalCost,
+      serviceCostDetails,
+      groupedServiceData: simplifiedServiceData,
+      UserServices: prepareUserServices(),
+      UserTools: prepareUserTools()
+    };
+
+    // Log cleaned data for debugging
+    console.log("Submitting reservation with cleaned data:", JSON.stringify(cleanedFormData, null, 2));
+
+    // Send reservation request
+    const response = await fetch('/api/user/create-reservation', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        ...cleanedFormData,
+        userInfo: {
+          clientInfo: accInfo?.ClientInfo,
+          businessInfo: accInfo?.BusinessInfo
+        }
+      }),
+    });
+
+    // Log full response details for debugging
+    console.log('Response status:', response.status);
+
+    // Parse response
+    let responseData: any;
+    try {
+      responseData = await response.text();
+      
+      // Try to parse the text as JSON
+      try {
+        responseData = JSON.parse(responseData);
+      } catch {
+        // If parsing fails, keep the original text
+        console.warn('Response was not JSON', responseData);
       }
-  
-      // Log successful reservation
-      console.log("Reservation created successfully:", responseData);
-  
-      // Show success toast
-      toast({
-        title: "Success!",
-        description: "Your service has been scheduled successfully!",
-      });
-  
-      // Redirect to dashboard
-      router.push('/user-dashboard');
       
-    } catch (err) {
-      // Handle submission errors
-      console.error('Submission error:', err);
-      
-      // Extract error message
-      const errorMessage = err instanceof Error 
-        ? err.message 
-        : 'Failed to submit reservation';
-      
-      // Set error state
-      setError(errorMessage);
-      
-      // Show error toast
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
-    } finally {
-      // Reset submission state
-      setIsSubmitting(false);
+      // Log the parsed or raw response data
+      console.log('Full response body:', responseData);
+    } catch (parseError) {
+      console.error('Error parsing response:', parseError);
+      responseData = { error: 'Failed to parse server response' };
     }
-  };
+
+    // Handle non-successful responses
+    if (!response.ok) {
+      // More comprehensive error logging
+      console.error('Reservation submission error details:', {
+        status: response.status,
+        responseData,
+        cleanedFormData
+      });
+      
+      // Extract most informative error message
+      const errorMessage = 
+        // Check for nested error messages
+        (typeof responseData === 'object' && 
+          (responseData.details?.message || 
+           responseData.details?.error || 
+           responseData.error || 
+           responseData.message)) || 
+        // Fallback to response status text
+        response.statusText || 
+        // Ultimate fallback
+        'Failed to submit reservation';
+      
+      // Throw an error with the extracted message
+      throw new Error(errorMessage);
+    }
+
+    // Log successful reservation
+    console.log("Reservation created successfully:", responseData);
+
+    // Fix 2: Correct toast usage
+    toast.success("Your service has been scheduled successfully!");
+
+    // Redirect to dashboard
+    router.push('/user-dashboard');
+    
+  } catch (err) {
+    // Handle submission errors
+    console.error('Submission error:', err);
+    
+    // Extract error message
+    const errorMessage = err instanceof Error 
+      ? err.message 
+      : 'Failed to submit reservation';
+    
+    // Set error state
+    setError(errorMessage);
+    
+    // Fix 3: Correct toast usage for error
+    toast.error(errorMessage);
+  } finally {
+    // Reset submission state
+    setIsSubmitting(false);
+  }
+};
 
   if (loading) {
     return (

@@ -48,7 +48,6 @@ interface ProcessInformationProps {
   standalonePage?: boolean;
 }
 
-
 // Machine Quantity Selector Component
 interface MachineQuantitySelectorProps {
   selectedServices: string[];
@@ -85,8 +84,8 @@ const MachineQuantitySelector: React.FC<MachineQuantitySelectorProps> = ({
         if (!response.ok) throw new Error('Failed to fetch machine data');
         const data = await response.json();
         
-        // Update machine availability for current services
-        const newMachineData = {};
+        // Update machine availability for current services - FIX: Add proper typing
+        const newMachineData: Record<string, { machineCount: number, hasMachines: boolean }> = {};
         data.forEach((service: { Service: string; Machines: any[]; }) => {
           if (selectedServices.includes(service.Service)) {
             // Count only available machines
@@ -300,9 +299,9 @@ export default function ProcessInformation({
         const data = await response.json();
         setServices(data);
         
-        // Process machine data correctly by summing actual quantities
-        const machineData = {};
-        data.forEach((service: { Machines: { machine: { Number: number; }; }[]; Service: string | number; }) => {
+        // Process machine data correctly by summing actual quantities - FIX: Add proper typing
+        const machineData: Record<string, { machineCount: number, hasMachines: boolean }> = {};
+        data.forEach((service: { Machines: { machine: { Number: number; }; }[]; Service: string; }) => {
           let totalMachineQuantity = 0;
           
           if (service.Machines && Array.isArray(service.Machines)) {
@@ -548,14 +547,9 @@ export default function ProcessInformation({
       return new Set(Object.keys(formData) as Array<keyof FormData>);
     });
     
-    // Show toast error if validation fails
+    // Show toast error if validation fails - FIX: Use correct toast API
     if (!isValid) {
-      // If using React Toastify
-      toast({
-        title: "Required Fields Missing",
-        description: "Please fill in all required fields before continuing.",
-        variant: "destructive",
-      });
+      toast.error("Please fill in all required fields before continuing.");
       return;
     }
     

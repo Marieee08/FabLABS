@@ -99,7 +99,7 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
     { value: "Cancelled", label: "Cancelled" }
   ];
 
-  const validateAllUtilTimesComplete = (utilTimes) => {
+  const validateAllUtilTimesComplete = (utilTimes: UtilTime[]) => {
     if (!utilTimes || !Array.isArray(utilTimes) || utilTimes.length === 0) {
       return {
         valid: false,
@@ -255,7 +255,13 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
       
       // Update the actual time while keeping the same date
       // Use the original scheduled time as reference for the date, or the existing actual time
-      const referenceDate = time[field] || (field === 'ActualStart' ? time.StartTime : time.EndTime);
+      let referenceDate: string | null;
+      const isActualStart = field === 'ActualStart';
+      if (isActualStart) {
+        referenceDate = time.ActualStart || time.StartTime;
+      } else {
+        referenceDate = time.ActualEnd || time.EndTime;
+      }
       const updatedDateTime = updateTimeKeepingDate(referenceDate, timeValue);
       
       newTimes[index] = {
@@ -267,7 +273,8 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
     });
     
     // Clear any previous errors only if the change was successful
-    if (field === 'ActualEnd') {
+    const isActualEnd = field === 'ActualEnd';
+    if (isActualEnd) {
       setError(null);
     }
   };
@@ -333,8 +340,11 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
       // Calculate the updated cost based on actual times
       const updatedCost = calculateUpdatedCost();
       
+      // Calculate the total duration in minutes
+      const totalDuration = calculateTotalMinutes(editedTimes);
+      
       // Call the parent's save handler
-      await onSave(editedTimes, updatedCost);
+      await onSave(editedTimes, updatedCost, totalDuration);
     } catch (err) {
       setError("Failed to save time changes");
       console.error(err);

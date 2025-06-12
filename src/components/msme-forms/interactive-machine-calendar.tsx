@@ -542,10 +542,10 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
     const totalMachinesForService = machinesForService.reduce((sum, machine) =>
       machine.isAvailable !== false ? sum + (machine.Number || 1) : sum, 0);
  
-    // Get all reservations for this date
+    // Get all reservations for this date - Fix the null check here
     const dayReservations = reservations.filter(reservation =>
       reservation.timeSlots.some(slot =>
-        new Date(slot.startTime).toDateString() === dateStr
+        slot.startTime && new Date(slot.startTime).toDateString() === dateStr
       ) &&
       // Ensure the reservation uses machines from this service
       reservation.machines.some(machineName =>
