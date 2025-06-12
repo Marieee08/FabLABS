@@ -1,6 +1,7 @@
 // app/api/services/[id]/route.ts
 import { NextResponse } from 'next/server';
 import { PrismaClient, Prisma } from '@prisma/client';
+import { Decimal, PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 const prisma = new PrismaClient();
 
@@ -54,8 +55,8 @@ export async function PUT(
     let costsValue = null;
     if (body.Costs !== null && body.Costs !== undefined && body.Costs !== '') {
       try {
-        costsValue = new Prisma.Decimal(body.Costs);
-      } catch (error) {
+        costsValue = new Decimal(body.Costs);
+      } catch (decimalError) {
         return NextResponse.json(
           { error: 'Invalid cost value' },
           { status: 400 }
@@ -86,9 +87,9 @@ export async function PUT(
     });
     
     return NextResponse.json(service);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error updating service:', error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error instanceof PrismaClientKnownRequestError) {
       if (error.code === 'P2025') {
         return NextResponse.json(
           { error: 'Service not found' },
@@ -124,9 +125,9 @@ export async function DELETE(
     });
     
     return NextResponse.json(service);
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error deleting service:', error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error instanceof PrismaClientKnownRequestError) {
       if (error.code === 'P2025') {
         return NextResponse.json(
           { error: 'Service not found' },

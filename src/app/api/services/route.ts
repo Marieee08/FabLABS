@@ -1,6 +1,11 @@
 // app/api/services/route.ts
 import { NextResponse } from 'next/server';
 import { PrismaClient, Prisma } from '@prisma/client';
+import { 
+  PrismaClientKnownRequestError, 
+  PrismaClientInitializationError 
+} from '@prisma/client/runtime/library';
+import { Decimal } from '@prisma/client/runtime/library';
 
 // Initialize Prisma client - moved outside function to avoid multiple instances
 const prisma = new PrismaClient();
@@ -63,14 +68,14 @@ export async function GET() {
         'Cache-Control': 'no-store, max-age=0'
       }
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error fetching services:', error);
     
     // Determine if this is a Prisma error or something else
     let errorMessage = 'Failed to fetch services';
     let statusCode = 500;
     
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error instanceof PrismaClientKnownRequestError) {
       // Handle specific Prisma errors
       if (error.code === 'P2002') {
         errorMessage = 'A service with that name already exists';
@@ -79,12 +84,15 @@ export async function GET() {
         errorMessage = 'The requested record does not exist';
         statusCode = 404;
       }
-    } else if (error instanceof Prisma.PrismaClientInitializationError) {
+    } else if (error instanceof PrismaClientInitializationError) {
       errorMessage = 'Database connection failed';
       statusCode = 503;
     }
     
-    return NextResponse.json({ error: errorMessage, details: error instanceof Error ? error.message : 'Unknown error' }, {
+    return NextResponse.json({ 
+      error: errorMessage, 
+      details: error instanceof Error ? error.message : 'Unknown error' 
+    }, {
       status: statusCode
     });
   }
@@ -106,7 +114,7 @@ export async function POST(req: Request) {
     let costsValue = null;
     if (body.Costs !== null && body.Costs !== undefined && body.Costs !== '') {
       try {
-        costsValue = new Prisma.Decimal(body.Costs);
+        costsValue = new Decimal(body.Costs);
       } catch (error) {
         return NextResponse.json({ error: 'Invalid cost value' }, {
           status: 400
@@ -136,11 +144,11 @@ export async function POST(req: Request) {
     return NextResponse.json(service, {
       status: 201
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Server error creating service:', error);
     
     // Handle specific Prisma errors
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+    if (error instanceof PrismaClientKnownRequestError) {
       if (error.code === 'P2002') {
         return NextResponse.json({ error: 'A service with that name already exists' }, {
           status: 409

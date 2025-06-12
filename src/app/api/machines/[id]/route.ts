@@ -1,7 +1,7 @@
 // src/app/api/machines/[id]/route.ts
 
 import { NextResponse } from 'next/server';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -131,14 +131,18 @@ export async function PUT(
     
   } catch (error) {
     console.error('Error updating machine:', error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2025') {
+    
+    // Type guard for Prisma errors
+    if (error && typeof error === 'object' && 'code' in error) {
+      const prismaError = error as { code: string };
+      if (prismaError.code === 'P2025') {
         return NextResponse.json(
           { error: 'Machine not found' },
           { status: 404 }
         );
       }
     }
+    
     return NextResponse.json(
       { 
         error: 'Failed to update machine',
@@ -232,14 +236,18 @@ export async function DELETE(
     return NextResponse.json(machine);
   } catch (error) {
     console.error('Error deleting machine:', error);
-    if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2025') {
+    
+    // Type guard for Prisma errors
+    if (error && typeof error === 'object' && 'code' in error) {
+      const prismaError = error as { code: string };
+      if (prismaError.code === 'P2025') {
         return NextResponse.json(
           { error: 'Machine not found' },
           { status: 404 }
         );
       }
     }
+    
     return NextResponse.json(
       { error: 'Failed to delete machine' },
       { status: 500 }

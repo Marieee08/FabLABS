@@ -327,7 +327,7 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose, is
       }
     }
     
-    const style = {
+    const style: React.CSSProperties = {
       backgroundColor,
       borderLeft: `4px solid ${borderColor}`,
       color: 'white',
@@ -337,7 +337,7 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose, is
       boxShadow: '0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24)',
       overflow: 'hidden',
       textOverflow: 'ellipsis',
-      whiteSpace: 'nowrap',
+      whiteSpace: 'nowrap' as const, // This is the fix - use 'as const' to ensure proper typing
       transition: 'all 0.2s ease-in-out',
       opacity
     };

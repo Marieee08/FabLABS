@@ -2,21 +2,34 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Check, ChevronsUpDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+interface Option {
+  value: any;
+  label: string;
+}
+
+interface MultiSelectProps {
+  options: Option[];
+  selected: any[];
+  onChange: (selected: any[]) => void;
+  className?: string;
+  placeholder?: string;
+}
+
 export const MultiSelect = ({
   options,
   selected,
   onChange,
   className,
   placeholder = "Select options..."
-}) => {
+}: MultiSelectProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const containerRef = useRef(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Handle click outside to close dropdown
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && event.target && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
@@ -26,26 +39,26 @@ export const MultiSelect = ({
   }, []);
 
   // Filter options based on search term
-  const filteredOptions = options?.filter(option =>
+  const filteredOptions = options?.filter((option: Option) =>
     option.label.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const toggleOption = (value) => {
+  const toggleOption = (value: any) => {
     const updatedSelection = selected?.includes(value)
-      ? selected.filter(item => item !== value)
+      ? selected.filter((item: any) => item !== value)
       : [...(selected || []), value];
     onChange(updatedSelection);
   };
 
-  const removeOption = (e, value) => {
+  const removeOption = (e: React.MouseEvent, value: any) => {
     e.stopPropagation();
-    onChange(selected.filter(item => item !== value));
+    onChange(selected.filter((item: any) => item !== value));
   };
 
-  const getSelectedLabels = () => {
-    return selected?.map(value => 
-      options?.find(option => option.value === value)?.label
-    ).filter(Boolean) || [];
+  const getSelectedLabels = (): string[] => {
+    return selected?.map((value: any) => 
+      options?.find((option: Option) => option.value === value)?.label
+    ).filter(Boolean) as string[] || [];
   };
 
   return (
@@ -55,7 +68,7 @@ export const MultiSelect = ({
         onClick={() => setIsOpen(!isOpen)}
       >
         <div className="flex flex-wrap gap-1">
-          {getSelectedLabels().map((label, i) => (
+          {getSelectedLabels().map((label: string, i: number) => (
             <span
               key={i}
               className="bg-blue-100 text-blue-800 rounded-md px-2 py-1 text-sm flex items-center"
@@ -63,7 +76,7 @@ export const MultiSelect = ({
               {label}
               <X
                 className="ml-1 h-4 w-4 hover:text-blue-500 cursor-pointer"
-                onClick={(e) => removeOption(e, options.find(opt => opt.label === label).value)}
+                onClick={(e) => removeOption(e, options.find((opt: Option) => opt.label === label)?.value)}
               />
             </span>
           ))}
@@ -84,7 +97,7 @@ export const MultiSelect = ({
             onClick={(e) => e.stopPropagation()}
           />
           <div className="max-h-[200px] overflow-auto">
-            {filteredOptions?.map((option) => (
+            {filteredOptions?.map((option: Option) => (
               <div
                 key={option.value}
                 className={cn(

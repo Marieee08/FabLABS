@@ -427,54 +427,54 @@ const InteractiveMachineCalendar: React.FC<InteractiveMachineCalendarProps> = ({
 
 
 
-  const eventStyleGetter = (event: any) => {
-    let backgroundColor = '#4F46E5'; // Default Indigo
-    let borderColor = '#4338CA';
-    let textColor = 'white';
-   
-    if (event.resource) {
-      if (event.resource.isBlocked) {
-        backgroundColor = '#EF4444'; // Red for blocked dates
-        borderColor = '#DC2626';
-      } else if (event.resource.isSelected) {
-        backgroundColor = '#22C55E'; // Green for selected dates
-        borderColor = '#16A34A';
-      } else if (event.resource.isReservation) {
-        if (event.resource.timeSlot === 'morning') {
-          backgroundColor = '#10B981'; // Green for morning
-          borderColor = '#059669';
-        } else if (event.resource.timeSlot === 'afternoon') {
-          backgroundColor = '#F59E0B'; // Amber for afternoon
-          borderColor = '#D97706';
-        } else {
-          backgroundColor = '#4F46E5'; // Indigo for all day
-          borderColor = '#4338CA';
-        }
+const eventStyleGetter = (event: any) => {
+  let backgroundColor = '#4F46E5'; // Default Indigo
+  let borderColor = '#4338CA';
+  let textColor = 'white';
+ 
+  if (event.resource) {
+    if (event.resource.isBlocked) {
+      backgroundColor = '#EF4444'; // Red for blocked dates
+      borderColor = '#DC2626';
+    } else if (event.resource.isSelected) {
+      backgroundColor = '#22C55E'; // Green for selected dates
+      borderColor = '#16A34A';
+    } else if (event.resource.isReservation) {
+      if (event.resource.timeSlot === 'morning') {
+        backgroundColor = '#10B981'; // Green for morning
+        borderColor = '#059669';
+      } else if (event.resource.timeSlot === 'afternoon') {
+        backgroundColor = '#F59E0B'; // Amber for afternoon
+        borderColor = '#D97706';
+      } else {
+        backgroundColor = '#4F46E5'; // Indigo for all day
+        borderColor = '#4338CA';
       }
     }
-   
-    const style = {
-      backgroundColor,
-      borderLeft: `3px solid ${borderColor}`,
-      color: textColor,
-      borderRadius: '3px',
-      fontSize: '0.7rem',
-      padding: '1px 4px',
-      margin: '1px 0',
-      height: '20px',
-      lineHeight: '18px',
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
-      whiteSpace: 'nowrap',
-      transition: 'all 0.2s ease-in-out',
-      opacity: event.resource?.isSelected ? 1 : 0.85 // Slightly transparent for reservations
-    };
-   
-    return {
-      style,
-      className: 'event-item hover:opacity-100'
-    };
+  }
+ 
+  const style: React.CSSProperties = {
+    backgroundColor,
+    borderLeft: `3px solid ${borderColor}`,
+    color: textColor,
+    borderRadius: '3px',
+    fontSize: '0.7rem',
+    padding: '1px 4px',
+    margin: '1px 0',
+    height: '20px',
+    lineHeight: '18px',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap' as const, // Type assertion to fix the TypeScript error
+    transition: 'all 0.2s ease-in-out',
+    opacity: event.resource?.isSelected ? 1 : 0.85 // Slightly transparent for reservations
   };
+ 
+  return {
+    style,
+    className: 'event-item hover:opacity-100'
+  };
+};
 
 
 

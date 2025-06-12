@@ -43,6 +43,13 @@ interface Student {
   name: string;
 }
 
+interface UserService {
+  ServiceAvail: string;
+  EquipmentAvail: string;
+  CostsAvail: number;
+  MinsAvail: number;
+}
+
 interface FormData {
   days: Day[];
   syncTimes?: boolean;
@@ -98,7 +105,6 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
   const [loading, setLoading] = useState(true);
   const [submittingReservation, setSubmittingReservation] = useState(false);
 
-  // NEW: Add this useEffect to scroll to top of the page when component mounts
   useEffect(() => {
     window.scrollTo({
       top: 0,
@@ -134,9 +140,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
   
       const token = await getToken();
       
-      // Format UtilTimes to match the Prisma model
       const utilTimes = formData.days.map((day, index) => {
-        // Make sure we have a proper date object
         const dateObj = day.date instanceof Date ? day.date : new Date(day.date);
         
         let startTimeISO = null;
@@ -163,33 +167,29 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
         };
       });
   
-      // Format needed materials to match the model
       const neededMaterials = formData.NeededMaterials?.map(material => ({
         Item: material.Item,
         ItemQty: Number(material.ItemQty),
         Description: material.Description,
       })) || [];
       
-      // Add tools to the needed materials with blank description
       if (formData.Tools) {
         console.log('Adding tools to NeededMaterials:', formData.Tools);
         
         try {
-          // First, check if it's a JSON string and try to parse it
           let toolsArray = [];
           
           if (typeof formData.Tools === 'string') {
-            // Check if it's a JSON string
             if (formData.Tools.startsWith('[') && formData.Tools.includes('Tool')) {
               try {
                 toolsArray = JSON.parse(formData.Tools);
                 console.log('Successfully parsed Tools JSON:', toolsArray);
               } catch (e) {
                 console.error('Error parsing Tools JSON:', e);
-                toolsArray = [formData.Tools]; // Fallback to treating it as a plain string
+                toolsArray = [formData.Tools];
               }
             } else {
-              toolsArray = [formData.Tools]; // It's a plain string
+              toolsArray = [formData.Tools];
             }
           } else if (Array.isArray(formData.Tools)) {
             toolsArray = formData.Tools;
@@ -199,9 +199,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
           
           console.log('Tools array after processing:', toolsArray);
           
-          // Process the array of tools
           toolsArray.forEach((tool: any) => {
-            // Check if the tool is an object with a Tool property (from JSON)
             if (typeof tool === 'object' && tool !== null && 'Tool' in tool) {
               const toolItem = {
                 Item: tool.Tool,
@@ -211,7 +209,6 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
               console.log('Adding structured tool to NeededMaterials:', toolItem);
               neededMaterials.push(toolItem);
             } 
-            // Otherwise handle it as a simple string
             else if (tool && typeof tool === 'string' && tool.trim() !== '') {
               const toolItem = {
                 Item: tool,
@@ -233,49 +230,40 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
         Students: student.name
       })) || [];
   
-      // Get student information for email
       const studentName = user?.firstName && user?.lastName 
         ? `${user.firstName} ${user.lastName}` 
         : accInfo?.Name || 'Student';
       
       const studentEmail = user?.emailAddresses[0]?.emailAddress || accInfo?.email || '';
       
-      // Create user services for the selected services
-      const userServices = [];
+      const userServices: UserService[] = [];
       
-      // Handle ProductsManufactured (services to be availed)
       const products = Array.isArray(formData.ProductsManufactured) 
         ? formData.ProductsManufactured 
         : formData.ProductsManufactured ? [formData.ProductsManufactured] : [];
         
-      // Handle Equipment - assuming each service corresponds to a specific equipment
       const equipment = Array.isArray(formData.Equipment)
         ? formData.Equipment
         : formData.Equipment ? [formData.Equipment] : [];
       
-      // Create user services by matching services with equipment
-      // Assuming there's a one-to-one relationship or we use the first equipment for all services
       if (products.length > 0) {
-        // If we have more services than equipment, use the first equipment for additional services
         const defaultEquipment = equipment.length > 0 ? equipment[0] : '';
         
         products.forEach((product, index) => {
           if (product) {
-            // Use the corresponding equipment if available, otherwise use the default
             const equip = index < equipment.length ? equipment[index] : defaultEquipment;
             
             userServices.push({
               ServiceAvail: product,
               EquipmentAvail: equip,
-              CostsAvail: 0, // Default values
-              MinsAvail: 0,  // Default values
+              CostsAvail: 0,
+              MinsAvail: 0,
             });
           }
         });
       }
       
       const submissionData = {
-        // EVCReservation base fields
         ControlNo: formData.ControlNo ? Number(formData.ControlNo) : undefined,
         LvlSec: formData.LvlSec || undefined,
         NoofStudents: formData.Students?.length || 0,
@@ -286,23 +274,19 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
         SchoolYear: formData.SchoolYear ? Number(formData.SchoolYear) : undefined,
         EVCStatus: 'Pending Teacher Approval',
         
-        // Related data collections
         UtilTimes: utilTimes,
         EVCStudents: evcStudents,
         NeededMaterials: neededMaterials,
         UserServices: userServices,
         
-        // Utilization information
         ProductsManufactured: formData.ProductsManufactured,
         Equipment: formData.Equipment,
         
-        // Link to user account
         accInfoId: accInfo?.id
       };
   
       console.log('Sending data to API:', JSON.stringify(submissionData, null, 2));
   
-      // First create the reservation in pending state
       const response = await fetch('/api/user/create-evc-reservation', {
         method: 'POST',
         headers: {
@@ -312,7 +296,6 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
         body: JSON.stringify(submissionData),
       });
       
-      // Handle the response
       if (!response.ok) {
         const responseText = await response.text();
         console.log('Raw error response:', responseText);
@@ -325,19 +308,16 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
             console.error('Failed to parse response as JSON:', e);
           }
         }
-  
+
         const errorMessage = errorData?.details || errorData?.error || 'Failed to submit reservation';
         throw new Error(errorMessage);
       }
       
-      // Parse the successful response
       const data = await response.json();
       console.log('Reservation created:', data);
       
-      // Now send the teacher approval email if teacher email is provided
       if (formData.TeacherEmail) {
         try {
-          // Send approval request email
           const approvalResponse = await fetch('/api/teacher-email/approval-request', {
             method: 'POST',
             headers: {
@@ -345,7 +325,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
               'Authorization': `Bearer ${token}`,
             },
             body: JSON.stringify({
-              reservationId: data.id, // The created reservation ID
+              reservationId: data.id,
               studentName,
               studentEmail,
               studentGrade: formData.LvlSec || 'Not specified',
@@ -373,7 +353,6 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
             console.error('Teacher approval request failed:', approvalError);
             setError('Reservation created but teacher approval email failed to send');
           } else {
-            // Display success message with approval info
             setSuccessMessage('Your reservation request has been submitted and an approval request has been sent to your teacher.');
           }
         } catch (emailError) {
@@ -381,18 +360,15 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
           setError('Reservation created but there was an error sending the teacher approval email');
         }
       } else {
-        // No teacher email provided
         setSuccessMessage('Your reservation request has been submitted successfully.');
       }
       
-      // Redirect to dashboard after a short delay
       setTimeout(() => {
         router.push('/student-dashboard');
       }, 3000);
       
     } catch (err) {
       console.error('Submission error:', err);
-      // Handle error object properly
       let errorMessage = 'Failed to submit reservation';
       if (err instanceof Error) {
         errorMessage = err.message;
@@ -405,13 +381,11 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
     }
   };
 
-  // Update the handleSubmit function to use the new state
   const handleSubmitWithBuffer = async () => {
     try {
       setSubmittingReservation(true);
       await handleSubmit();
     } finally {
-      // This will only run if we don't redirect
       setTimeout(() => {
         setSubmittingReservation(false);
       }, 3000);
@@ -432,7 +406,6 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
     );
   }
 
-  // Show buffering screen when submitting
   if (submittingReservation) {
     return (
       <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 pt-0 flex flex-col">
