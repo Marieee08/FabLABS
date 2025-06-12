@@ -22,9 +22,9 @@ interface Material {
   Description: string;
 }
 
-// Student interface definition - ensure this matches the expected type
-interface StudentData {
-  id: string; // Keep as string to match your current definition
+// Student interface definition - match what components expect
+interface Student {
+  id: number; // Change to number to match component expectations
   name: string;
   // Add other student properties as needed
 }
@@ -36,8 +36,8 @@ interface Day {
   endTime: string | null;
 }
 
-// Rename to avoid conflict with browser's FormData
-interface ScheduleFormData {
+// Rename to avoid conflict with browser's FormData - use a more generic name
+interface AppFormData {
   days: Day[];
   syncTimes: boolean;
   unifiedStartTime: string | null;
@@ -62,11 +62,11 @@ interface ScheduleFormData {
   NeededMaterials: Material[];
   
   // Students array
-  Students: StudentData[];
+  Students: Student[];
 }
 
 // More flexible UpdateFormData type
-type UpdateFormData = <K extends keyof ScheduleFormData>(field: K, value: ScheduleFormData[K]) => void;
+type UpdateFormData = (field: string, value: any) => void;
 
 // Interface for blocked dates data structure
 interface BlockedDate {
@@ -85,7 +85,7 @@ interface Machine {
 
 export default function Schedule() {
   // Use memoized initial state to avoid re-creating on each render
-  const initialFormData = useMemo<ScheduleFormData>(() => ({
+  const initialFormData = useMemo<AppFormData>(() => ({
     days: [],
     syncTimes: false,
     unifiedStartTime: null,
@@ -109,7 +109,7 @@ export default function Schedule() {
   }), []);
 
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState<ScheduleFormData>(initialFormData);
+  const [formData, setFormData] = useState<AppFormData>(initialFormData);
   const [blockedDates, setBlockedDates] = useState<CalendarDate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [showMachineCalendar, setShowMachineCalendar] = useState(false);
@@ -194,6 +194,23 @@ export default function Schedule() {
   const updateFormData = useCallback<UpdateFormData>((field, value) => {
     setFormData(prevData => ({ ...prevData, [field]: value }));
   }, []);
+
+  // Create a wrapper for setFormData that matches DateTimeSelection expectations
+  const setFormDataWrapper = useCallback((updater: any) => {
+    if (typeof updater === 'function') {
+      setFormData(prevData => {
+        const result = updater(prevData);
+        return { ...prevData, ...result };
+      });
+    } else {
+      setFormData(prevData => ({ ...prevData, ...updater }));
+    }
+  }, []);
+
+  // Create a generic update function for components that expect different signatures
+  const genericUpdateFormData = useCallback((field: any, value: any) => {
+    setFormData(prevData => ({ ...prevData, [field]: value }));
+  }, []);
   
   // Navigation functions with scrolling
   const nextStep = useCallback(() => {
@@ -244,7 +261,8 @@ export default function Schedule() {
           <LabReservation 
             formData={formData} 
             updateFormData={updateFormData} 
-            nextStep={nextStep} 
+            nextStep={nextStep}
+            prevStep={prevStep}
           />
         );
       case 2:
@@ -281,12 +299,10 @@ export default function Schedule() {
             
             <DateTimeSelection
               formData={formData}
-              updateFormData={updateFormData}
-              setFormData={setFormData}
+              setFormData={setFormDataWrapper}
               nextStep={nextStep}
               prevStep={prevStep} 
               isDateBlocked={isDateBlocked}
-              maxDates={MAX_DATES}
             />
           </div>
         );
@@ -295,7 +311,7 @@ export default function Schedule() {
           <ReviewSubmit 
             formData={formData} 
             prevStep={prevStep} 
-            updateFormData={updateFormData} 
+            updateFormData={genericUpdateFormData} 
             nextStep={nextStep} 
           />
         );
@@ -304,11 +320,12 @@ export default function Schedule() {
           <LabReservation 
             formData={formData} 
             updateFormData={updateFormData} 
-            nextStep={nextStep} 
+            nextStep={nextStep}
+            prevStep={prevStep}
           />
         );
     }
-  }, [step, isLoading, formData, nextStep, prevStep, updateFormData, isDateBlocked, showMachineCalendar, toggleMachineCalendar, machines]);
+  }, [step, isLoading, formData, nextStep, prevStep, updateFormData, isDateBlocked, showMachineCalendar, toggleMachineCalendar, machines, setFormDataWrapper, genericUpdateFormData]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
