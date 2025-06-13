@@ -237,8 +237,10 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
         return prev; // Return unchanged times
       }
       
+      // From here we know field is 'ActualEnd' since we returned early for 'ActualStart'
+      
       // Restriction: Actual end time cannot be before the reserved end time
-      if (field === 'ActualEnd' && time.EndTime) {
+      if (time.EndTime) {
         const reservedEndTime = new Date(time.EndTime);
         const [hours, minutes] = timeValue.split(':').map(Number);
         
@@ -254,27 +256,20 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
       }
       
       // Update the actual time while keeping the same date
-      // Use the original scheduled time as reference for the date, or the existing actual time
-      let referenceDate: string | null;
-      const isActualStart = field === 'ActualStart';
-      if (isActualStart) {
-        referenceDate = time.ActualStart || time.StartTime;
-      } else {
-        referenceDate = time.ActualEnd || time.EndTime;
-      }
+      // Use the existing actual end time or fallback to scheduled end time
+      const referenceDate = time.ActualEnd || time.EndTime;
       const updatedDateTime = updateTimeKeepingDate(referenceDate, timeValue);
       
       newTimes[index] = {
         ...time,
-        [field]: updatedDateTime
+        ActualEnd: updatedDateTime
       };
       
       return newTimes;
     });
     
-    // Clear any previous errors only if the change was successful
-    const isActualEnd = field === 'ActualEnd';
-    if (isActualEnd) {
+    // Clear any previous errors only if we successfully updated ActualEnd
+    if (field === 'ActualEnd') {
       setError(null);
     }
   };
@@ -633,7 +628,7 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
                     <SelectTrigger className="bg-gray-100 cursor-not-allowed">
                       <SelectValue placeholder="Actual start time (fixed)" />
                     </SelectTrigger>
-                    <SelectContent className="max-h-60">
+                    <SelectContent>
                       <div 
                         className="max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
                         onWheel={(e) => {
@@ -669,7 +664,7 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
                     <SelectTrigger>
                       <SelectValue placeholder="Select actual end time" />
                     </SelectTrigger>
-                    <SelectContent className="max-h-60">
+                    <SelectContent>
                       <div 
                         className="max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
                         onWheel={(e) => {
@@ -710,7 +705,7 @@ const TimeEditor: React.FC<TimeEditorProps> = ({
                     <SelectTrigger>
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
-                    <SelectContent className="max-h-60">
+                    <SelectContent>
                       <div 
                         className="max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100"
                         onWheel={(e) => {

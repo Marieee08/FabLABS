@@ -2,21 +2,25 @@ import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import * as LucideIcons from 'lucide-react';
 
-const DynamicIcon = ({ iconName }) => {
+interface DynamicIconProps {
+  iconName: string;
+}
+
+const DynamicIcon = ({ iconName }: DynamicIconProps) => {
   if (!iconName) return null;
   
   // Handle different formats that might be stored in your database
   // This assumes icon names in the database could be in various formats like:
   // "file-text", "fileText", "FileText" or "file_text"
-  const formatIconName = (name) => {
+  const formatIconName = (name: any) => {
     // Convert kebab-case or snake_case to camelCase first
-    const camelCase = name.replace(/[-_](.)/g, (_, c) => c.toUpperCase());
+    const camelCase = name.replace(/[-_](.)/g, (_: any, c: any) => c.toUpperCase());
     // Then convert to PascalCase (first letter uppercase)
     return camelCase.charAt(0).toUpperCase() + camelCase.slice(1);
   };
   
   const formattedIconName = formatIconName(iconName);
-  const IconComponent = LucideIcons[formattedIconName];
+  const IconComponent = (LucideIcons as any)[formattedIconName];
   
   if (!IconComponent) {
     console.warn(`Icon "${iconName}" not found as "${formattedIconName}" in Lucide icons`);
@@ -80,11 +84,11 @@ const PricingTable = () => {
 
   // Format database services
   const formattedServices = dbServices.map(service => ({
-    name: service.Service,
-    rate: service.Costs !== null ? service.Costs.toString() : '0',
-    unit: service.Per || '',
-    icon: service.Icon,
-    description: service.Info || ''
+    name: (service as any).Service,
+    rate: (service as any).Costs !== null ? (service as any).Costs.toString() : '0',
+    unit: (service as any).Per || '',
+    icon: (service as any).Icon,
+    description: (service as any).Info || ''
   }));
 
   // Loading skeleton component

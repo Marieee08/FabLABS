@@ -56,22 +56,6 @@ const Navbar = () => {
     }
   }, [isLoaded, user, userRole, router]);
 
-  // Set up loading state for navigation
-  useEffect(() => {
-    const handleStart = () => setIsLoading(true);
-    const handleComplete = () => setIsLoading(false);
-
-    router.events?.on('routeChangeStart', handleStart);
-    router.events?.on('routeChangeComplete', handleComplete);
-    router.events?.on('routeChangeError', handleComplete);
-
-    return () => {
-      router.events?.off('routeChangeStart', handleStart);
-      router.events?.off('routeChangeComplete', handleComplete);
-      router.events?.off('routeChangeError', handleComplete);
-    };
-  }, [router]);
-
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
   };
@@ -79,6 +63,11 @@ const Navbar = () => {
   const handleNavigation = (href: string) => {
     setIsLoading(true);
     router.push(href);
+    // Set a timeout to hide loading after navigation starts
+    // This is a fallback since we can't reliably detect when navigation completes in App Router
+    setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
   };
 
   const linkClassName = `font-qanelas1 px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300 ${

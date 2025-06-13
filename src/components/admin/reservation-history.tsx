@@ -53,6 +53,8 @@ interface UtilTime {
   DayNum: number | null;
   StartTime: string | null;
   EndTime: string | null;
+  ActualStart: string | null; // Remove undefined, only allow string | null
+  ActualEnd: string | null;   // Remove undefined, only allow string | null
 }
 
 interface DetailedReservation {
@@ -175,6 +177,34 @@ interface LabRequestFormData {
   students: StudentInfo[];
   endorsedBy: string;
   approvedBy: string;
+  preferredLabRoom: string; // Make this required, not optional
+}
+
+// Add a separate interface for Lab Reservation if it's different
+interface LabReservationFormData {
+  campus: string;
+  controlNo: string;
+  schoolYear: string;
+  gradeLevel: string;
+  numberOfStudents: string;
+  subject: string;
+  concurrentTopic: string;
+  unit: string;
+  teacherInCharge: string;
+  venue: string;
+  inclusiveTimeOfUse: string;
+  date: string;
+  materials: MaterialItem[];
+  receivedBy: string;
+  receivedAndInspectedBy: string;
+  receivedDate: string;
+  inspectedDate: string;
+  requestedBy: string;
+  dateRequested: string;
+  students: StudentInfo[];
+  endorsedBy: string;
+  approvedBy: string;
+  preferredLabRoom: string; // Required field
 }
 
 const ReservationHistory = () => {
@@ -428,8 +458,8 @@ const ReservationHistory = () => {
           }
         }
         
-        // Create lab request form data
-        const labFormData = {
+        // Create lab request form data with preferredLabRoom
+        const labFormData: LabRequestFormData = {
           campus: 'Eastern Visayas Campus',
           controlNo: detailedData.ControlNo?.toString() || '',
           schoolYear: detailedData.SchoolYear?.toString() || new Date().getFullYear().toString(),
@@ -451,7 +481,35 @@ const ReservationHistory = () => {
           dateRequested: detailedData.DateRequested ? new Date(detailedData.DateRequested).toLocaleDateString() : '',
           students: studentList, // Use the properly formatted student list
           endorsedBy: detailedData.Teacher || '',
-          approvedBy: detailedData.ApprovedBy || ''
+          approvedBy: detailedData.ApprovedBy || '',
+          preferredLabRoom: 'Fabrication Laboratory' // Required field with default value
+        };
+
+        // For lab reservation, create the proper type
+        const labReservationFormData: LabReservationFormData = {
+          campus: 'Eastern Visayas Campus',
+          controlNo: detailedData.ControlNo?.toString() || '',
+          schoolYear: detailedData.SchoolYear?.toString() || new Date().getFullYear().toString(),
+          gradeLevel: detailedData.LvlSec || '',
+          numberOfStudents: detailedData.NoofStudents?.toString() || '',
+          subject: detailedData.Subject || '',
+          concurrentTopic: detailedData.Topic || '',
+          unit: '',
+          teacherInCharge: detailedData.Teacher || '',
+          venue: '',
+          inclusiveTimeOfUse: inclusiveTime,
+          date: detailedData.DateRequested ? new Date(detailedData.DateRequested).toLocaleDateString() : '',
+          materials: materialItems,
+          receivedBy: detailedData.ReceivedBy || '',
+          receivedAndInspectedBy: detailedData.InspectedBy || '',
+          receivedDate: detailedData.ReceivedDate ? new Date(detailedData.ReceivedDate).toLocaleDateString() : '',
+          inspectedDate: detailedData.InspectedDate ? new Date(detailedData.InspectedDate).toLocaleDateString() : '',
+          requestedBy: detailedData.accInfo?.Name || '',
+          dateRequested: detailedData.DateRequested ? new Date(detailedData.DateRequested).toLocaleDateString() : '',
+          students: studentList,
+          endorsedBy: detailedData.Teacher || '',
+          approvedBy: detailedData.ApprovedBy || '',
+          preferredLabRoom: 'Fabrication Laboratory' // Required field with default value
         };
         
         try {
@@ -459,8 +517,8 @@ const ReservationHistory = () => {
             console.log('Generating lab request PDF with data:', labFormData);
             downloadLabRequestFormPDF(labFormData);
           } else if (formType === 'lab-reservation') {
-            console.log('Generating lab reservation PDF with data:', labFormData);
-            downloadLabReservationFormPDF(labFormData);
+            console.log('Generating lab reservation PDF with data:', labReservationFormData);
+            downloadLabReservationFormPDF(labReservationFormData);
           }
         } catch (error) {
           console.error(`Error in ${formType} PDF generation:`, error);
@@ -504,7 +562,11 @@ const ReservationHistory = () => {
           BulkofCommodity: detailedData.BulkofCommodity || '',
           UserServices: detailedData.UserServices || [],
           UserTools: detailedData.UserTools || [],
-          UtilTimes: detailedData.UtilTimes || [],
+          UtilTimes: (detailedData.UtilTimes || []).map((time: any) => ({
+            ...time,
+            ActualStart: time.ActualStart || null,
+            ActualEnd: time.ActualEnd || null
+          })),
           accInfo: {
             Name: detailedData.accInfo?.Name || 'Name Not Available',
             email: detailedData.accInfo?.email || 'Email Not Available',
@@ -542,6 +604,7 @@ const ReservationHistory = () => {
             // Create job payment data from reservation details
             const jobPaymentData = {
               id: detailedData.id || 0,
+              orderNumber: `ORD-${detailedData.id || '0'}`, // Add this missing field
               invoiceNumber: `INV-${detailedData.id || '0'}`,
               dateIssued: new Date().toISOString(),
               dueDate: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString(),
@@ -684,8 +747,8 @@ const ReservationHistory = () => {
                 }
               }
               
-              // Create a lab request form data object 
-              const labRequestData = {
+              // Create a lab request form data object with all required fields
+              const labRequestData: LabRequestFormData = {
                 campus: 'Eastern Visayas Campus',
                 controlNo: `U-${detailedData.id}`,
                 schoolYear: new Date().getFullYear().toString(),
@@ -707,7 +770,8 @@ const ReservationHistory = () => {
                 dateRequested: new Date(detailedData.RequestDate).toLocaleDateString(),
                 students: [{ name: detailedData.accInfo?.Name || '' }],
                 endorsedBy: '',
-                approvedBy: ''
+                approvedBy: '',
+                preferredLabRoom: 'Fabrication Laboratory' // Add this required field
               };
               
               console.log('Lab request data with material items:', labRequestData);
@@ -758,8 +822,8 @@ const ReservationHistory = () => {
               }))
             ];
            
-            // Create a basic lab reservation form for non-EVC reservations
-            const labReservationData = {
+            // Create a basic lab reservation form for non-EVC reservations with all required fields
+            const labReservationData: LabReservationFormData = {
               campus: 'Eastern Visayas Campus', // Default value
               controlNo: `S-${detailedData.id}`,
               schoolYear: new Date().getFullYear().toString(),
@@ -781,7 +845,8 @@ const ReservationHistory = () => {
               dateRequested: new Date(detailedData.RequestDate).toLocaleDateString(),
               students: [{ name: detailedData.accInfo?.Name || '' }],
               endorsedBy: '',
-              approvedBy: ''
+              approvedBy: '',
+              preferredLabRoom: 'Fabrication Laboratory' // Required field with proper value
             };
            
             console.log('Lab reservation data for regular utilization:', labReservationData);
@@ -813,7 +878,7 @@ const ReservationHistory = () => {
 
   const handleStatusUpdate = async (
     reservationId: number,
-    newStatus: 'Approved' | 'Ongoing' | 'Pending Payment' | 'Paid' | 'Completed' | 'Cancelled' | 'Rejected'
+    newStatus: string // Changed from specific union type to string
   ) => {
     try {
       // Update database status

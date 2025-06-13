@@ -19,7 +19,7 @@ import TimeEditor from './time-editor';
 import { downloadMachineUtilPDF } from "@/components/admin-functions/pdf/machine-utilization-pdf";
 import CostBreakdown from './cost-breakdown'; // Import the new CostBreakdown component
 import { toast } from 'sonner';
-import  MachineUtilization from './machine-utilization';
+import MachineUtilizationComponent from './machine-utilization'; // Renamed to avoid conflict
 
 // Updated interface definitions
 interface UserService {
@@ -109,6 +109,9 @@ interface Machine {
   id: string;
   name: string;
   isAvailable: boolean;
+  Machine: string;
+  Image: string;
+  Desc: string;
   Services: {
     id: string;
     Service: string;
@@ -175,6 +178,8 @@ const ReviewReservation: React.FC<ReviewReservationProps> = ({
   const [comments, setComments] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  // Add this loading state to component
+  const [isLoading, setIsLoading] = useState(false);
 
   const [confirmationDialog, setConfirmationDialog] = useState({
     isOpen: false,
@@ -415,7 +420,16 @@ useEffect(() => {
         const response = await fetch('/api/machines?includeServices=true');
         if (!response.ok) throw new Error('Failed to fetch machines');
         const data = await response.json();
-        setMachines(data);
+        
+        // Ensure each machine has all required properties
+        const processedData = data.map((machine: any) => ({
+          ...machine,
+          Machine: machine.Machine || machine.name || 'Unknown Machine',
+          Image: machine.Image || '',
+          Desc: machine.Desc || ''
+        }));
+        
+        setMachines(processedData);
       } catch (error) {
         console.error('Error fetching machines:', error);
       }
@@ -548,7 +562,7 @@ useEffect(() => {
       }
       
       // Update the local data with the new services
-      const updatedServices = updatedData.UserServices.map((service) => ({
+      const updatedServices = updatedData.UserServices.map((service: any) => ({
         ...service,
         selectedMachines: parseMachines(service.EquipmentAvail || '')
       }));
@@ -733,7 +747,13 @@ const handleSaveTimeChanges = async (updatedTimes: UtilTime[], updatedCost: numb
       console.log("All services:", editedServices);
       
       // 3. Prepare the operating times from UtilTimes - with proper error handling
-      const operatingTimes = [];
+      const operatingTimes: Array<{
+        OTDate: string | null;
+        OTStartTime: string | null;
+        OTEndTime: string | null;
+        OTTypeofProducts: string;
+        OTMachineOp: string | null;
+      }> = [];
       
       // Only try to map UtilTimes if it exists and is an array
       if (localReservation.UtilTimes && Array.isArray(localReservation.UtilTimes)) {
@@ -788,13 +808,14 @@ const handleSaveTimeChanges = async (updatedTimes: UtilTime[], updatedCost: numb
       
       // 4. For each UserService with valid equipment, prepare MachineUtilization records
       // Check if editedServices exists and is an array, but don't throw, just log and use an empty array
-      if (!editedServices || !Array.isArray(editedServices)) {
+      let currentEditedServices = editedServices;
+      if (!currentEditedServices || !Array.isArray(currentEditedServices)) {
         console.error("Edited services data is missing or invalid");
         // Instead of throwing and stopping the process, we'll continue with an empty array
-        editedServices = []; 
+        currentEditedServices = []; 
       }
       
-      const machineUtilizations = editedServices
+      const machineUtilizations = currentEditedServices
         .filter(service => {
           // Check if service has machines property and at least one machine
           if (!service.selectedMachines || !Array.isArray(service.selectedMachines) || 
@@ -926,7 +947,7 @@ const handleSaveTimeChanges = async (updatedTimes: UtilTime[], updatedCost: numb
             // Make sure UserServices exists and is an array before mapping
             if (updatedReservation.UserServices && Array.isArray(updatedReservation.UserServices)) {
               // Update the edited services with the latest data
-              const updatedServices = updatedReservation.UserServices.map((service) => ({
+              const updatedServices = updatedReservation.UserServices.map((service: any) => ({
                 ...service,
                 selectedMachines: parseMachines(service.EquipmentAvail || '')
               }));
@@ -957,9 +978,6 @@ const handleSaveTimeChanges = async (updatedTimes: UtilTime[], updatedCost: numb
     }
   };
 
-// Add this loading state to component
-const [isLoading, setIsLoading] = useState(false);
-
 return (
   <>
   <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
@@ -972,7 +990,7 @@ return (
         <div className="space-y-6">
             {/* Display notification if reservation is in non-editable state */}
             {isEditingDisabled(localReservation.Status) && (
-              <Alert variant="warning" className="bg-amber-50">
+              <Alert variant="destructive" className="bg-amber-50">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
                   This reservation is in {localReservation.Status} status. Details can no longer be edited.
@@ -990,7 +1008,7 @@ return (
               <TabsContent value="reservation" className="mt-4 space-y-6">
                 {/* Display machine utilization editor when in machine utilization editing mode */}
                 {editingMachineUtilization ? (
-                  <MachineUtilization
+                  <MachineUtilizationComponent
                     reservationId={localReservation.id}
                     userServices={localReservation.UserServices}
                     onClose={() => setEditingMachineUtilization(false)}
@@ -1140,7 +1158,12 @@ return (
                   <CostBreakdown 
                     userServices={localReservation.UserServices}
                     totalAmountDue={localReservation.TotalAmntDue}
-                    machineUtilizations={localReservation.MachineUtilizations || []}
+                    machineUtilizations={(localReservation.MachineUtilizations || []).map(mu => ({
+                      ...mu,
+                      DownTimes: mu.DownTimes || [],
+                      OperatingTimes: mu.OperatingTimes || [],
+                      RepairChecks: mu.RepairChecks || []
+                    }))}
                     reservationId={localReservation.id}
                     allowFix={true}
                   />
