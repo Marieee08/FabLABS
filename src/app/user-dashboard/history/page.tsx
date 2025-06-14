@@ -166,9 +166,12 @@ const HistoryPage = () => {
   }, 300); // 300ms buffer
 };
 
-  function handleNavigation(arg0: string) {
-    throw new Error('Function not implemented.');
-  }
+  const handleNavigation = (path: string) => {
+    setIsNavigating(true);
+    setTimeout(() => {
+      window.location.href = path;
+    }, 300);
+  };
 
   return (
       <div className="flex h-screen overflow-hidden bg-[#f1f5f9]">
@@ -200,13 +203,13 @@ const HistoryPage = () => {
               <p className="text-[#1c62b5]">{userRole}</p>
             </div>
 
-            <div>
+          <div>
               <h3 className="mb-4 ml-4 text-sm font-semibold text-gray-600">MENU</h3>
               <ul className="mb-6 flex flex-col gap-1.5">
                 <li>
                   <button
                     onClick={() => setOrderDropdownOpen(!orderDropdownOpen)}
-                    className="group relative flex w-full items-center justify-between gap-2.5 rounded-full py-2 px-4 font-medium text-[#0d172c] text-blue-800 bg-blue-100 border border-[#5e86ca]"
+                    className="group relative flex w-full items-center justify-between gap-2.5 rounded-full py-2 px-4 font-medium text-blue-800 bg-blue-100 border border-[#5e86ca]"
                   >
                     <span>Reservations</span>
                     <svg
@@ -226,25 +229,78 @@ const HistoryPage = () => {
                 {orderDropdownOpen && (
                   <>
                     <li className="ml-6">
-                      <Link href="/staff-dashboard" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]">
+                      <Link 
+                        href="/user-dashboard" 
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleNavigation('/user-dashboard');
+                        }}
+                        className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]"
+                      >
                         General
                       </Link>
                     </li>
                     <li className="ml-6">
-                      <Link href="/staff-dashboard/history" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-blue-800 bg-blue-100 hover:text-[#0d172c]">
+                      <Link 
+                        href="/user-dashboard/history"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleNavigation('/user-dashboard/history');
+                        }}
+                        className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-blue-800 bg-blue-100 hover:text-[#0d172c]"
+                      >
                         History
                       </Link>
                     </li>
                   </>
                 )}
-                  <Link 
-                    href="/staff-dashboard/information" 
-                    className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]"
+                <li>
+                  <button
+                    onClick={() => setInformationDropdownOpen(!informationDropdownOpen)}
+                    className="group relative flex w-full items-center justify-between gap-2.5 rounded-full py-2 px-4 font-medium text-[#0d172c] border border-transparent hover:text-blue-800 hover:bg-blue-100 hover:border-[#5e86ca]"
                   >
-                    Personal Info
-                  </Link>
+                    <span>Information</span>
+                    <svg
+                      className={`w-4 h-4 transform transition-transform duration-300 ${informationDropdownOpen ? 'rotate-180' : ''}`}
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
+                </li>
+                {informationDropdownOpen && (
+                  <div className="ml-6 mt-2 space-y-2">
+                    <Link 
+                      href="/user-dashboard/information" 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleNavigation('/user-dashboard/information');
+                      }}
+                      className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]"
+                    >
+                      Personal Info
+                    </Link>
+                    <Link 
+                      href="/user-dashboard/information/business" 
+                      onClick={(e) => {
+                        e.preventDefault();
+                        handleNavigation('/user-dashboard/information/business');
+                      }}
+                      className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]"
+                    >
+                      Business Info
+                    </Link>
+                  </div>
+                )}
               </ul>
             </div>
+          
           </nav>
         </aside>
 

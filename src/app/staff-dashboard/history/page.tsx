@@ -12,6 +12,7 @@ interface UserService {
   id: string;
   ServiceAvail: string;
   EquipmentAvail: string;
+  CostsAvail: number | null;
   MinsAvail: number | null;
 }
 
@@ -33,7 +34,9 @@ interface Reservation {
   Status: string;
   RequestDate: Date;
   BulkofCommodity: string | null;
+  TotalAmntDue: number | null;
   ReceiptNumber: string | null;
+  PaymentDate: Date | null;
   UserServices: UserService[];
   UserTools: UserTool[];
   UtilTimes: UtilTime[];
@@ -130,6 +133,19 @@ const HistoryPage = () => {
   const formatDate = (date: Date | null) => {
     if (!date) return 'N/A';
     return new Date(date).toLocaleDateString();
+  };
+
+  // Format currency for display
+  const formatCurrency = (amount: number | null) => {
+    if (amount === null) return 'N/A';
+    
+    // Convert to number first to ensure toFixed works
+    const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
+    
+    // Check if it's a valid number after conversion
+    if (isNaN(numAmount)) return 'N/A';
+    
+    return `₱${numAmount.toFixed(2)}`;
   };
 
   // Filter reservations based on selected status
@@ -324,7 +340,8 @@ const HistoryPage = () => {
                               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Services</th>
-                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Receipt #</th>
                               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                             </tr>
                           </thead>
@@ -344,9 +361,10 @@ const HistoryPage = () => {
                                   {reservation.UserServices.map(service => service.ServiceAvail).join(', ')}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                  {reservation.UserServices.some(service => service.MinsAvail) 
-                                    ? `${reservation.UserServices.find(service => service.MinsAvail)?.MinsAvail} mins`
-                                    : 'N/A'}
+                                  {formatCurrency(reservation.TotalAmntDue)}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                  {reservation.ReceiptNumber || 'N/A'}
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                   <button
@@ -393,7 +411,8 @@ const HistoryPage = () => {
                                 {selectedReservation.UserServices.map((service, idx) => (
                                   <li key={idx} className="text-gray-700">
                                     {service.ServiceAvail} ({service.EquipmentAvail})
-                                    {service.MinsAvail ? ` - ${service.MinsAvail} mins` : ''}
+                                    {service.CostsAvail && service.MinsAvail ? 
+                                      ` - ${formatCurrency(service.CostsAvail)} for ${service.MinsAvail} mins` : ''}
                                   </li>
                                 ))}
                               </ul>
@@ -448,12 +467,39 @@ const HistoryPage = () => {
                               </div>
                             </div>
                           )}
+
+                          <div className="col-span-1 md:col-span-2">
+                            <h3 className="font-medium text-gray-900 mb-2">Payment Information</h3>
+                            <div className="bg-gray-50 p-4 rounded-lg">
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                  <h4 className="text-sm font-semibold mb-1">Total Amount:</h4>
+                                  <p className="text-xl font-bold text-[#143370]">
+                                    {formatCurrency(selectedReservation.TotalAmntDue)}
+                                  </p>
+                                </div>
+                                <div>
+                                  <h4 className="text-sm font-semibold mb-1">Receipt Number:</h4>
+                                  <p className="text-gray-700">{selectedReservation.ReceiptNumber || 'Not issued'}</p>
+                                </div>
+                                <div>
+                                  <h4 className="text-sm font-semibold mb-1">Payment Date:</h4>
+                                  <p className="text-gray-700">{selectedReservation.PaymentDate ? formatDate(selectedReservation.PaymentDate) : 'Not paid'}</p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                         </div>
 
                         <div className="flex justify-end space-x-3 pt-4 border-t">
+                          {selectedReservation.Status === 'Completed' && (
+                            <button className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 transition-colors">
+                              Download Receipt
+                            </button>
+                          )}
                           {selectedReservation.Status === 'Pending' && (
                             <button className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors">
-                              Cancel Reservation
+                              Cancel Reservaton
                             </button>
                           )}
                         </div>

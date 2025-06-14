@@ -334,12 +334,12 @@ const DashboardUser = () => {
             <div className="flex flex-col items-center py-8">
               {user?.imageUrl ? (
                 <Image
-  src={user.imageUrl}
-  alt="Profile"
-  width={144}
-  height={144}
-  className="rounded-full object-cover mb-2"
-/>
+                src={user.imageUrl}
+                alt="Profile"
+                width={144}
+                height={144}
+                className="rounded-full object-cover mb-2"
+              />
               ) : (
                 <span className="h-36 w-36 rounded-full bg-gray-600 mb-2"></span>
               )}
@@ -461,15 +461,15 @@ const DashboardUser = () => {
               </div>
               <div className="flex space-x-6 lg:space-x-10">
                 <Link 
-  href="/"
-  onClick={(e) => {
-    e.preventDefault();
-    handleNavigation('/');
-  }}
-  className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300"
->
-  Home
-</Link>
+                  href="/"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleNavigation('/');
+                  }}
+                  className="font-qanelas1 text-black px-4 py-2 rounded-full hover:bg-[#d5d7e2] transition duration-300"
+                >
+                  Home
+                </Link>
                 <a 
                   href="/services"
                   onClick={(e) => {
