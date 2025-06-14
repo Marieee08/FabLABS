@@ -8,7 +8,6 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Image from 'next/image';
 
-// Interfaces for the orders
 interface UserService {
   id: string;
   ServiceAvail: string;
@@ -55,15 +54,14 @@ const HistoryPage = () => {
   const today = new Date();
   const formattedDate = format(today, 'EEEE, dd MMMM yyyy');
   const [informationDropdownOpen, setInformationDropdownOpen] = useState(true);
-  
-  // Order history states and functionality
+  const [isNavigating, setIsNavigating] = useState(false);
+
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [filterStatus, setFilterStatus] = useState<string>('all');
 
-  // useEffect to fetch user role
   useEffect(() => {
     const fetchUserRole = async () => {
       if (!isLoaded || !user) {
@@ -109,7 +107,7 @@ const HistoryPage = () => {
     fetchReservations();
   }, []);
 
-  // Function to get the appropriate color for status badges
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Pending':
@@ -120,8 +118,12 @@ const HistoryPage = () => {
         return 'bg-green-100 text-green-800';
       case 'Cancelled':
         return 'bg-red-100 text-red-800';
-      case 'Pending payment':
-        return 'bg-orange-100 text-orange-800';
+      case 'Rejected':
+        return 'bg-red-100 text-red-800';
+      case 'Ongoing':
+        return 'bg-indigo-100 text-indigo-800';
+      case 'Survey':
+        return 'bg-purple-100 text-purple-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -157,6 +159,13 @@ const HistoryPage = () => {
     setIsModalOpen(true);
   };
 
+  const handleNewOrderClick = () => {
+  setIsNavigating(true);
+  setTimeout(() => {
+    window.location.href = '/services';
+  }, 300); // 300ms buffer
+};
+
   function handleNavigation(arg0: string) {
     throw new Error('Function not implemented.');
   }
@@ -176,12 +185,12 @@ const HistoryPage = () => {
             <div className="flex flex-col items-center py-8">
               {user?.imageUrl ? (
                 <Image
-  src={user.imageUrl}
-  alt="Profile"
-  width={144} // 36 x 4 = 144px
-  height={144}
-  className="rounded-full object-cover mb-2"
-/>
+                src={user.imageUrl}
+                alt="Profile"
+                width={144}
+                height={144}
+                className="rounded-full object-cover mb-2"
+              />
               ) : (
                 <span className="h-36 w-36 rounded-full bg-gray-600 mb-2"></span>
               )}
@@ -190,6 +199,7 @@ const HistoryPage = () => {
               </h2>
               <p className="text-[#1c62b5]">{userRole}</p>
             </div>
+
             <div>
               <h3 className="mb-4 ml-4 text-sm font-semibold text-gray-600">MENU</h3>
               <ul className="mb-6 flex flex-col gap-1.5">
@@ -216,53 +226,23 @@ const HistoryPage = () => {
                 {orderDropdownOpen && (
                   <>
                     <li className="ml-6">
-                      <Link href="/user-dashboard" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]">
+                      <Link href="/staff-dashboard" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]">
                         General
                       </Link>
                     </li>
                     <li className="ml-6">
-                      <Link href="/user-dashboard/history" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-blue-800 bg-blue-100 hover:text-[#0d172c]">
+                      <Link href="/staff-dashboard/history" className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-blue-800 bg-blue-100 hover:text-[#0d172c]">
                         History
                       </Link>
                     </li>
                   </>
                 )}
-                <li>
-                <button
-                  onClick={() => setInformationDropdownOpen(!informationDropdownOpen)}
-                  className="group relative flex w-full items-center justify-between gap-2.5 rounded-full py-2 px-4 font-medium text-[#0d172c] border border-transparent hover:text-blue-800 hover:bg-blue-100 hover:border-[#5e86ca]"
-                >
-                  <span>Information</span>
-                  <svg
-                    className={`w-4 h-4 transform transition-transform duration-300 ${informationDropdownOpen ? 'rotate-180' : ''}`}
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <polyline points="6 9 12 15 18 9" />
-                  </svg>
-                </button>
-              </li>
-              {informationDropdownOpen && (
-                <div className="ml-6 mt-2 space-y-2">
                   <Link 
-                    href="/user-dashboard/information" 
+                    href="/staff-dashboard/information" 
                     className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]"
                   >
                     Personal Info
                   </Link>
-                  <Link 
-                    href="/user-dashboard/information/business" 
-                    className="group relative flex items-center gap-2.5 rounded-full py-2 px-4 font-medium text-gray-600 hover:text-[#0d172c]"
-                  >
-                    Business Info
-                  </Link>
-                </div>
-              )}
               </ul>
             </div>
           </nav>
@@ -300,19 +280,27 @@ const HistoryPage = () => {
             <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
               <div className="flex justify-between items-center mb-4">
                 <div>
-                  <h2 className="text-[#143370] text-3xl font-bold font-qanelas3">Order History</h2>
+                  <h2 className="text-[#143370] text-3xl font-bold font-qanelas3">Reservation History</h2>
                   <p className="text-sm text-[#143370] font-poppins1">{formattedDate}</p>
                 </div>
-                <Link href="/services" className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-md transition-colors">
-                  New Order
-                </Link>
+                <div className="flex justify-between items-center mb-4">
+                
+                <button 
+                  onClick={handleNewOrderClick}
+                  disabled={isNavigating}
+                  className="px-6 py-2 rounded-full text-sm font-medium transition-all duration-300 text-blue-800 bg-blue-100 border border-[#5e86ca] hover:bg-blue-200 hover:border-blue-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isNavigating ? 'Loading...' : 'New Reservation'}
+                </button>
+              </div>
+
               </div>
               
               {/* Order History Content - Integrated from UserOrderHistory component */}
               <div className="container mx-auto p-4">
-                <Card className="mb-6">
+                <Card className="mb-6 border border-[#5e86ca]">
                   <CardHeader>
-                    <CardTitle className="text-2xl font-bold text-[#143370]">Order History</CardTitle>
+                    <CardTitle className="text-2xl font-bold text-[#143370]">Reservation History</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="mb-4">
@@ -326,11 +314,12 @@ const HistoryPage = () => {
                         className="w-full md:w-64 p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
                       >
                         <option value="all">All Reservations</option>
-                        <option value="completed">Completed</option>
                         <option value="approved">Approved</option>
-                        <option value="pending">Pending</option>
                         <option value="cancelled">Cancelled</option>
-                        <option value="pending payment">Pending Payment</option>
+                        <option value="completed">Completed</option>
+                        <option value="ongoing">Ongoing</option>
+                        <option value="pending">Pending</option>
+                        <option value="rejected">Rejected</option>
                       </select>
                     </div>
 
@@ -343,11 +332,11 @@ const HistoryPage = () => {
                         <p className="text-gray-500">No reservations found with the selected filter.</p>
                       </div>
                     ) : (
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200 border border-gray-200 rounded-lg">
+                      <div className="overflow-x-auto rounded-lg bg-blue-100 shadow-ld">
+                        <table className="min-w-full divide-y divide-gray-200 rounded-xl">
                           <thead className="bg-gray-50">
                             <tr>
-                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
+                              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reservation ID</th>
                               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Services</th>
@@ -398,14 +387,14 @@ const HistoryPage = () => {
                 <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                   <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
                     <DialogHeader>
-                      <DialogTitle className="text-2xl font-semibold">Order Details</DialogTitle>
+                      <DialogTitle className="text-2xl font-semibold">Reservation Details</DialogTitle>
                     </DialogHeader>
                     
                     {selectedReservation && (
                       <div className="mt-4 space-y-6">
                         <div className="flex justify-between items-center border-b pb-4">
                           <div>
-                            <h3 className="text-lg font-semibold text-gray-900">Order #{selectedReservation.id}</h3>
+                            <h3 className="text-lg font-semibold text-gray-900">Reservation #{selectedReservation.id}</h3>
                             <p className="text-sm text-gray-500">Requested on {formatDate(selectedReservation.RequestDate)}</p>
                           </div>
                           <span className={`px-3 py-1 text-sm font-semibold rounded-full ${getStatusColor(selectedReservation.Status)}`}>
@@ -510,7 +499,7 @@ const HistoryPage = () => {
                           )}
                           {selectedReservation.Status === 'Pending' && (
                             <button className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors">
-                              Cancel Order
+                              Cancel Reservaton
                             </button>
                           )}
                         </div>
