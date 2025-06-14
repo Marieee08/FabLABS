@@ -288,13 +288,16 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
   const getStatusColor = (status: string) => {
     const colors = {
       Pending: 'bg-yellow-100 text-yellow-800',
+      'Pending Teacher Approval': 'bg-amber-100 text-amber-800',
+      'Pending Admin Approval': 'bg-orange-100 text-orange-800',
       Approved: 'bg-blue-100 text-blue-800',
       Completed: 'bg-green-100 text-green-800',
       Rejected: 'bg-red-100 text-red-800',
       Cancelled: 'bg-red-100 text-red-800',
-      'Pending payment': 'bg-orange-100 text-orange-800',
+      'Pending payment': 'bg-yellow-100 text-yellow-800',
       Paid: 'bg-emerald-100 text-emerald-800',
-      Ongoing: 'bg-indigo-100 text-indigo-800'
+      Ongoing: 'bg-indigo-100 text-indigo-800',
+      Survey: 'bg-purple-100 text-purple-800'
     };
     return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
   };

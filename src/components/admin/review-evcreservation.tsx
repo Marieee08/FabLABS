@@ -68,13 +68,14 @@ const ReviewEVCReservation: React.FC<ReviewEVCReservationProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const getStatusColor = (status: string) => {
     const colors = {
-      'Pending Teacher Approval': 'bg-purple-100 text-purple-800',
-      'Pending Admin Approval': 'bg-yellow-100 text-yellow-800',
-      'Approved': 'bg-green-100 text-green-800',
-      'Ongoing': 'bg-blue-100 text-blue-800',
-      'Completed': 'bg-indigo-100 text-indigo-800',
-      'Rejected': 'bg-red-100 text-red-800',
-      'Cancelled': 'bg-red-100 text-red-800'
+      'Pending Teacher Approval': 'bg-amber-100 text-amber-800',
+      'Pending Admin Approval': 'bg-orange-100 text-orange-800',
+      Approved: 'bg-blue-100 text-blue-800',
+      Completed: 'bg-green-100 text-green-800',
+      Rejected: 'bg-red-100 text-red-800',
+      Cancelled: 'bg-red-100 text-red-800',
+      Ongoing: 'bg-indigo-100 text-indigo-800',
+      Survey: 'bg-purple-100 text-purple-800'
     };
     return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
   };
@@ -90,7 +91,7 @@ const ReviewEVCReservation: React.FC<ReviewEVCReservationProps> = ({
 
   const handleStatusUpdateWithApprover = async (
     reservationId: number, 
-    newStatus: 'Pending Admin Approval' | 'Approved' | 'Ongoing' | 'Completed' | 'Cancelled' | 'Rejected'
+    newStatus: 'Pending Admin Approval' | 'Pending Teacher Approval' | 'Approved' | 'Ongoing' | 'Completed' | 'Cancelled' | 'Rejected'
   ) => {
     try {
       setIsLoading(true);
@@ -422,11 +423,23 @@ const ReviewEVCReservation: React.FC<ReviewEVCReservationProps> = ({
                       variant="default"
                       onClick={() => handleStatusUpdateWithApprover(selectedReservation.id, 'Completed')}
                     >
-                      Mark as Completed
+                      Send to Survey
                     </Button>
                   </>
                 )}
                 
+                {/* When student completes the job they should go into survey*/}
+                {selectedReservation.EVCStatus === 'Survey' && (
+                  <>
+                    <Button
+                      variant="default"
+                      onClick={() => handleStatusUpdateWithApprover(selectedReservation.id, 'Completed')}
+                    >
+                      Mark as Completed
+                    </Button>
+                  </>
+                )}
+
                 {/* For completed/rejected/cancelled reservations, only show close button */}
                 {(selectedReservation.EVCStatus === 'Completed' || 
                   selectedReservation.EVCStatus === 'Rejected' ||
