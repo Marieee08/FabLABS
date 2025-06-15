@@ -13,6 +13,7 @@ export default authMiddleware({
         '/admin-dashboard',
         '/staff-dashboard',
         '/survey',
+        '/student-dashboard',
         '/cashier-dashboard'
       ];
 

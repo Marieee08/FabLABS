@@ -8,7 +8,7 @@ import { format } from 'date-fns';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Navbar from "@/components/custom/navbar";
 import Image from 'next/image';
-
+import { Loader } from 'lucide-react';
 
 interface EVCReservation {
   id: number;
@@ -18,7 +18,7 @@ interface EVCReservation {
   NoofStudents?: number;
   Subject?: string;
   Teacher?: string;
-  TeacherEmail?: string; // Added missing property
+  TeacherEmail?: string;
   Topic?: string;
   DateRequested: Date;
   SchoolYear?: number;
@@ -52,6 +52,46 @@ interface EVCReservation {
   }>;
 }
 
+// Loading Spinner Component
+const LoadingSpinner = () => (
+  <div className="flex items-center justify-center">
+    <Loader className="h-6 w-6 animate-spin text-blue-600" />
+  </div>
+);
+
+// Full Page Loading Component
+const FullPageLoading = () => {
+  const [loadingProgress, setLoadingProgress] = useState(0);
+
+  useEffect(() => {
+    const progressInterval = setInterval(() => {
+      setLoadingProgress(prev => {
+        if (prev >= 85) return prev;
+        return prev + Math.random() * 20;
+      });
+    }, 300);
+
+    return () => clearInterval(progressInterval);
+  }, []);
+
+  return (
+    <div className="fixed inset-0 bg-white z-50 flex flex-col items-center justify-center">
+      <div className="flex flex-col items-center max-w-md mx-auto p-6">
+        <Loader className="h-12 w-12 animate-spin text-blue-600 mb-4" />
+        <p className="text-blue-600 font-medium text-lg mb-4">Loading dashboard...</p>
+        
+        {/* Progress bar with realistic animation */}
+        <div className="w-64 h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-blue-600 transition-all duration-300 ease-out"
+            style={{ width: `${loadingProgress}%` }}
+          ></div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const DashboardUser = () => {
   const { user, isLoaded } = useUser();
   const [userRole, setUserRole] = useState<string>("Loading...");
@@ -61,10 +101,19 @@ const DashboardUser = () => {
   const [isEVCModalOpen, setIsEVCModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isHistoryLoading, setIsHistoryLoading] = useState(true);
+  const [showLoading, setShowLoading] = useState(true); // Force loading screen
   const today = new Date();
   const formattedDate = format(today, 'EEEE, dd MMMM yyyy');
   const [isCreatingReservation, setIsCreatingReservation] = useState(false);
 
+  // Force loading screen for minimum time (like RoleGuard does)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowLoading(false);
+    }, 2000); // 2 second minimum loading
+
+    return () => clearTimeout(timer);
+  }, []);
 
   // useEffect to fetch EVC reservations for the current user
   useEffect(() => {
@@ -112,29 +161,29 @@ const DashboardUser = () => {
     }
   }, [user, isLoaded]);
 
- // useEffect to fetch user role
- useEffect(() => {
-  const fetchUserRole = async () => {
-    if (!isLoaded || !user) {
-      setUserRole("Not logged in");
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/auth/check-roles');
-      if (!response.ok) {
-        throw new Error('Failed to fetch role');
+  // useEffect to fetch user role
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      if (!isLoaded || !user) {
+        setUserRole("Loading...");
+        return;
       }
-      const data = await response.json();
-      setUserRole(data.role || "No role assigned");
-    } catch (error) {
-      console.error("Error fetching user role:", error);
-      setUserRole("Error fetching role");
-    }
-  };
 
-  fetchUserRole();
-}, [user, isLoaded]);
+      try {
+        const response = await fetch('/api/auth/check-roles');
+        if (!response.ok) {
+          throw new Error('Failed to fetch role');
+        }
+        const data = await response.json();
+        setUserRole(data.role || "No role assigned");
+      } catch (error) {
+        console.error("Error fetching user role:", error);
+        setUserRole("Error fetching role");
+      }
+    };
+
+    fetchUserRole();
+  }, [user, isLoaded]);
 
   const handleEVCReviewClick = (reservation: EVCReservation) => {
     setSelectedEVCReservation(reservation);
@@ -142,31 +191,36 @@ const DashboardUser = () => {
   };
 
   const formatDate = (dateString: string | Date | null | undefined) => {
-  if (!dateString) return "N/A";
-  return new Date(dateString).toLocaleDateString();
-};
+    if (!dateString) return "N/A";
+    return new Date(dateString).toLocaleDateString();
+  };
 
   // Get status badge color based on status
   const getStatusBadgeClass = (status: string) => {
     switch (status.toLowerCase()) {
       case 'pending teacher approval':
-        return 'bg-amber-100 text-amber-800';  // Amber for teacher approval
+        return 'bg-amber-100 text-amber-800';
       case 'pending admin approval':
-        return 'bg-yellow-100 text-yellow-800'; // Yellow for regular pending
+        return 'bg-yellow-100 text-yellow-800';
       case 'approved':
-        return 'bg-green-100 text-green-800';  // Green for approved
+        return 'bg-green-100 text-green-800';
       case 'rejected':
-        return 'bg-red-100 text-red-800';      // Red for rejected
+        return 'bg-red-100 text-red-800';
       case 'ongoing':
-        return 'bg-indigo-100 text-indigo-800'; // Indigo for ongoing
+        return 'bg-indigo-100 text-indigo-800';
       case 'cancelled':
-        return 'bg-rose-100 text-rose-800';    // Rose for cancelled
+        return 'bg-rose-100 text-rose-800';
       case 'completed':
-        return 'bg-blue-100 text-blue-800';    // Blue for completed
+        return 'bg-blue-100 text-blue-800';
       default:
-        return 'bg-gray-100 text-gray-800';    // Gray for any others
+        return 'bg-gray-100 text-gray-800';
     }
   };
+
+  // Show loading screen for minimum time OR while Clerk is loading
+  if (showLoading || !isLoaded || !user) {
+    return <FullPageLoading />;
+  }
   
   return (
     <div className="flex h-screen overflow-hidden bg-[#f1f5f9]">
@@ -184,12 +238,12 @@ const DashboardUser = () => {
                 <div className="flex items-center gap-4 md:justify-end">
                   {user?.imageUrl && (
                     <Image
-  src={user.imageUrl}
-  alt="Profile"
-  width={56}
-  height={56}
-  className="rounded-full object-cover md:hidden"
-/>
+                      src={user.imageUrl}
+                      alt="Profile"
+                      width={56}
+                      height={56}
+                      className="rounded-full object-cover md:hidden"
+                    />
                   )}
                   <span className="text-right md:hidden">
                     <span className="block text-sm font-medium text-black">
@@ -211,13 +265,14 @@ const DashboardUser = () => {
               
               {isLoading ? (
                 <div className="flex justify-center items-center h-32">
-                  <p>Loading your reservations...</p>
+                  <LoadingSpinner />
+                  <p className="ml-3">Loading your reservations...</p>
                 </div>
               ) : (
                 // EVC Reservations Table
                 evcReservations.length === 0 ? (
                   <div className="bg-blue-50 p-6 rounded-lg text-center">
-                    <p className="text-blue-800">You don&apos;t have any pendin reservations at the moment.</p>
+                    <p className="text-blue-800">You don&apos;t have any pending reservations at the moment.</p>
                     <Link
                       href="/student-schedule"
                       className="mt-4 inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
@@ -225,11 +280,8 @@ const DashboardUser = () => {
                     >
                       {isCreatingReservation ? (
                         <>
-                          <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                          </svg>
-                          Creating...
+                          <LoadingSpinner />
+                          <span className="ml-2">Creating...</span>
                         </>
                       ) : (
                         "Create a New Reservation"
@@ -252,42 +304,31 @@ const DashboardUser = () => {
                       <tbody className="bg-white divide-y divide-gray-200">
                         {evcReservations.map((reservation) => (
                           <tr key={reservation.id} className="hover:bg-blue-50 transition-colors">
-                            {/* Date */}
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm font-medium text-gray-900">
                                 {formatDate(reservation.DateRequested)}
                               </div>
                             </td>
-
-                            {/* Status */}
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeClass(reservation.EVCStatus)}`}>
                                 {reservation.EVCStatus}
                               </span>
                             </td>
-
-                            {/* Subject */}
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-900">
                                 {reservation.Subject || 'Not specified'}
                               </div>
                             </td>
-
-                            {/* Topic */}
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-900">
                                 {reservation.Topic || 'Not specified'}
                               </div>
                             </td>
-
-                            {/* Level/Section */}
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-900">
                                 {reservation.LvlSec || 'Not specified'}
                               </div>
                             </td>
-
-                            {/* Actions */}
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                               <button
                                 onClick={() => handleEVCReviewClick(reservation)}
@@ -311,7 +352,8 @@ const DashboardUser = () => {
               
               {isHistoryLoading ? (
                 <div className="flex justify-center items-center h-32">
-                  <p>Loading your history...</p>
+                  <LoadingSpinner />
+                  <p className="ml-3">Loading your history...</p>
                 </div>
               ) : ( 
                 historyReservations.length === 0 ? (
@@ -334,42 +376,31 @@ const DashboardUser = () => {
                       <tbody className="bg-white divide-y divide-gray-200">
                         {historyReservations.map((reservation) => (
                           <tr key={reservation.id} className="hover:bg-blue-50 transition-colors">
-                            {/* Date */}
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm font-medium text-gray-900">
                                 {formatDate(reservation.DateRequested)}
                               </div>
                             </td>
-
-                            {/* Status */}
                             <td className="px-6 py-4 whitespace-nowrap">
                               <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusBadgeClass(reservation.EVCStatus)}`}>
                                 {reservation.EVCStatus}
                               </span>
                             </td>
-
-                            {/* Subject */}
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-900">
                                 {reservation.Subject || 'Not specified'}
                               </div>
                             </td>
-
-                            {/* Topic */}
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-900">
                                 {reservation.Topic || 'Not specified'}
                               </div>
                             </td>
-
-                            {/* Level/Section */}
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-900">
                                 {reservation.LvlSec || 'Not specified'}
                               </div>
                             </td>
-
-                            {/* Actions */}
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                               <button
                                 onClick={() => handleEVCReviewClick(reservation)}
@@ -529,49 +560,48 @@ const DashboardUser = () => {
                 )}
               </div>
 
-          
-          {/* Rejection Notice */}
-          {selectedEVCReservation.EVCStatus === 'Rejected' && (
-            <div className="mt-4 mb-2">
-              <div className="bg-red-50 border-l-4 border-red-500 p-4">
-                <div className="flex items-start">
-                  <div className="ml-3">
-                    <p className="text-sm text-red-700 font-medium">
-                      This reservation was rejected by your teacher.
-                    </p>
-                    <p className="text-sm text-red-600 mt-1">
-                      You may want to contact your teacher for more details and consider submitting a new request with any requested changes.
-                    </p>
+              {/* Rejection Notice */}
+              {selectedEVCReservation.EVCStatus === 'Rejected' && (
+                <div className="mt-4 mb-2">
+                  <div className="bg-red-50 border-l-4 border-red-500 p-4">
+                    <div className="flex items-start">
+                      <div className="ml-3">
+                        <p className="text-sm text-red-700 font-medium">
+                          This reservation was rejected by your teacher.
+                        </p>
+                        <p className="text-sm text-red-600 mt-1">
+                          You may want to contact your teacher for more details and consider submitting a new request with any requested changes.
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          )}
+              )}
 
-          {/* Approval Information */}
-          {selectedEVCReservation.EVCStatus !== 'Pending' && (
-            <div className="border-t pt-4">
-              <h3 className="font-medium text-gray-900 mb-2">Processing Information</h3>
-              <div className="bg-gray-50 p-3 rounded grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="font-medium">Teacher&apos;s Approved By:</p>
-                  <p className="text-gray-700">{selectedEVCReservation.ApprovedBy || 'Not yet approved'}</p>
+              {/* Approval Information */}
+              {selectedEVCReservation.EVCStatus !== 'Pending' && (
+                <div className="border-t pt-4">
+                  <h3 className="font-medium text-gray-900 mb-2">Processing Information</h3>
+                  <div className="bg-gray-50 p-3 rounded grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="font-medium">Teacher&apos;s Approved By:</p>
+                      <p className="text-gray-700">{selectedEVCReservation.ApprovedBy || 'Not yet approved'}</p>
+                    </div>
+                    <div>
+                      <p className="font-medium">Teacher Approval Date:</p>
+                      <p className="text-gray-700">{formatDate(selectedEVCReservation.ReceivedDate || null)}</p>
+                    </div>
+                    <div>
+                      <p className="font-medium">Admin Approved By:</p>
+                      <p className="text-gray-700">{selectedEVCReservation.ReceivedBy || 'Not yet approved'}</p>
+                    </div>
+                    <div>
+                      <p className="font-medium">Admin Approval Date:</p>
+                      <p className="text-gray-700">{formatDate(selectedEVCReservation.InspectedDate || null)}</p>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium">Teacher Approval Date:</p>
-                  <p className="text-gray-700">{formatDate(selectedEVCReservation.ReceivedDate || null)}</p>
-                </div>
-                <div>
-                  <p className="font-medium">Admin Approved By:</p>
-                  <p className="text-gray-700">{selectedEVCReservation.ReceivedBy || 'Not yet approved'}</p>
-                </div>
-                <div>
-                  <p className="font-medium">Admin Approval Date:</p>
-                  <p className="text-gray-700">{formatDate(selectedEVCReservation.InspectedDate || null)}</p>
-                </div>
-              </div>
-            </div>
-          )}
+              )}
             </div>
           )}
         </DialogContent>
