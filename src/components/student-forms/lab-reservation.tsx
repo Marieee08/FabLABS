@@ -587,7 +587,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                   value={formData.Teacher}
                   onChange={(e) => handleFieldChange('Teacher', e.target.value)}
                   aria-invalid={!!errors.Teacher}
-                  placeholder="e.g. Dr. Jane Smith"
+                  placeholder="e.g. Cyrill Tapales"
                 />
                 {errors.Teacher && <p className="mt-1 text-sm text-red-500">{errors.Teacher}</p>}
               </div>

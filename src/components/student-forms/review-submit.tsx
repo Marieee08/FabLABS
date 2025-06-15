@@ -104,6 +104,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
   const [accInfo, setAccInfo] = useState<AccInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [submittingReservation, setSubmittingReservation] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   useEffect(() => {
     window.scrollTo({
@@ -354,18 +355,20 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
             setError('Reservation created but teacher approval email failed to send');
           } else {
             setSuccessMessage('Your reservation request has been submitted and an approval request has been sent to your teacher.');
+            setIsRedirecting(true);
           }
-        } catch (emailError) {
+          } catch (emailError) {
           console.error('Error sending approval email:', emailError);
           setError('Reservation created but there was an error sending the teacher approval email');
-        }
-      } else {
-        setSuccessMessage('Your reservation request has been submitted successfully.');
-      }
-      
-      setTimeout(() => {
-        router.push('/student-dashboard');
-      }, 3000);
+          }
+          } else {
+          setSuccessMessage('Your reservation request has been submitted successfully.');
+          setIsRedirecting(true);
+          }
+
+          setTimeout(() => {
+          router.push('/student-dashboard');
+          }, 3000);
       
     } catch (err) {
       console.error('Submission error:', err);
@@ -417,6 +420,25 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
               <p className="text-gray-600 text-center max-w-md">
                 Please wait while we submit your request and notify your teacher. This may take a few moments.
               </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (isRedirecting) {
+    return (
+      <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 pt-0 flex flex-col">
+        <Card className="p-6 mt-6 bg-white shadow-sm border border-gray-200">
+          <CardContent className="pt-4">
+            <div className="flex flex-col items-center justify-center py-12">
+              <CheckCircle className="w-16 h-16 text-green-600 mb-6"/>
+              <h3 className="text-xl font-semibold text-green-800 mb-2">Successfully Submitted!</h3>
+              <p className="text-gray-600 text-center max-w-md mb-4">
+                Your reservation request has been submitted successfully. Redirecting you to your dashboard...
+              </p>
+              <div className="w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full animate-spin"/>
             </div>
           </CardContent>
         </Card>
