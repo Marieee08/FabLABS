@@ -13,8 +13,9 @@ export default function Home() {
     <Navbar />
 
 
-    <section id="home" className="grid grid-cols-1 md:grid-cols-2 items-center h-auto pt-0 pb-5 px-4 md:px-6">
-      <div className="flex items-center justify-center order-2 md:order-1 mb-6 md:mb-0 mt-8 md:mt-20">
+    <section id="home" className="flex flex-col md:grid md:grid-cols-2 items-center h-auto pt-0 pb-5 px-4 md:px-6 pt-12">
+      {/* Desktop: Image on left */}
+      <div className="hidden md:flex items-center justify-center order-2 md:order-1 mb-6 md:mb-0 mt-8 md:mt-20">
         <Image
           src="/images/elements/landingelement.gif"
           alt="Fabrication Laboratory of PSHS-EVC"
@@ -24,22 +25,34 @@ export default function Home() {
         />
       </div>
 
-
-      <div className="relative z-1 flex flex-col justify-center text-right order-1 md:order-2 px-4 md:px-20 py-6 md:p-10 md:pl-28">
-        <p className="inline-block px-4 py-2 rounded-full bg-blue-100 text-blue-800 font-medium text-sm ml-auto mb-2 border border-[#5e86ca]">
+      {/* Text content */}
+      <div className="relative z-1 flex flex-col justify-center text-center md:text-right order-1 md:order-2 px-4 md:px-20 py-6 md:p-10 md:pl-28">
+        <p className="inline-block px-4 py-2 rounded-full bg-blue-100 text-blue-800 font-medium text-sm mb-2 border border-[#5e86ca] mx-auto md:mx-0 md:ml-auto">
           Turn your Imagination into Reality
         </p>
         <h1 className="text-5xl md:text-7xl font-qanelas2">Innovate to</h1>
         <h2 className="block text-5xl md:text-7xl font-qanelas3 text-[#f5a237] mb-5">ELEVATE</h2>
+        
+        {/* Mobile: Image after the main heading */}
+        <div className="flex md:hidden items-center justify-center mb-6">
+          <Image
+            src="/images/elements/landingelement.gif"
+            alt="Fabrication Laboratory of PSHS-EVC"
+            width={1000}
+            height={600}
+            className="w-full max-w-[90%]"
+          />
+        </div>
+        
         <p className="text-md font-poppins1 mb-5">
           The PSHS-EVC fab lab is a small-scale workshop offering digital fabrication. A fab lab is typically equipped with an array of flexible
           computer-controlled tools that cover several different length scales and various materials with the aim to <span className="font-poppins2">make {"\"almost anything\""}.</span>
         </p>
-        <div className="flex flex-col md:flex-row gap-4 items-end md:items-center">
-          <a href="/services" className="border border-[#5e86ca] bg-[#193d83] text-white font-qanelas1 text-lg py-1 px-6 rounded-md hover:bg-[#2f61c2] transition duration-300 ml-auto">
+        <div className="md:mx-0 md:ml-auto mx-auto flex flex-col md:flex-row gap-4 items-center md:items-end md:items-center">
+          <a href="/services" className="border border-[#5e86ca] bg-[#193d83] text-white font-qanelas1 text-lg py-1 px-6 rounded-md hover:bg-[#2f61c2] transition duration-300 mx-auto md:ml-auto">
             Get Started
           </a>
-          <a href="https://www.facebook.com/fablabeasternvisayas" className="text-[#1c62b5] font-qanelas1 text-lg py-1 px-6 rounded-md transition-all duration-300 flex items-center justify-end transform hover:scale-105">
+          <a href="https://www.facebook.com/fablabeasternvisayas" className="text-[#1c62b5] font-qanelas1 text-lg py-1 px-6 rounded-md transition-all duration-300 flex items-center justify-center md:justify-end transform hover:scale-105">
             Learn More
             <span className="ml-2 text-[#1c62b5] transition-all duration-300 hover:translate-x-1">→</span>
           </a>
@@ -48,9 +61,10 @@ export default function Home() {
     </section>
 
 
-    <section id="events" className="relative p-10 pl-20 pr-20 py-20">
-      <div className="absolute left-20 right-20 h-[60%] top-5 bg-[#0b1d41] rounded-3xl" />
-      <div className="px-20 relative">
+    <section id="events" className="relative p-4 md:p-10 md:pl-20 md:pr-20 py-20">
+      {/* Mobile: Full width blue background, Desktop: Left/right margins */}
+      <div className="absolute left-0 right-0 md:left-20 md:right-20 h-full md:h-[60%] top-0 md:top-5 bg-[#0b1d41] md:rounded-3xl" />
+      <div className="px-4 md:px-20 relative">
         <h2 className="text-4xl font-qanelas2 mb-5 text-center text-white">
           Let us help you <span className="text-[#f5a237]">create!</span>
         </h2>
@@ -59,16 +73,16 @@ export default function Home() {
           Check back often for the latest updates and event details!
         </p>
        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-10 mx-4 md:mx-0">
           <div className="bg-white rounded-2xl border border-[#5e86ca] hover:shadow-lg hover:shadow-blue-300/50 hover:text-blue-800 transform hover:scale-105 transition-all duration-300">
             <div className="p-10">
              <Image
-  src="/images/elements/who.png"
-  alt="who"
-  width={56} // size-14 in Tailwind = 3.5rem = 56px
-  height={56}
-  className="size-14"
-/>
+                src="/images/elements/who.png"
+                alt="who"
+                width={56} // size-14 in Tailwind = 3.5rem = 56px
+                height={56}
+                className="size-14"
+              />
               <h3 className="text-xl font-semibold mb-2 font-qanelas2 font-md pt-5">Who can avail?</h3>
               <p className="text-gray-700 mb-4 font-poppins1">
                 Fab labs are available as a community resource, offering open access for individuals as well as scheduled access for programs.
@@ -80,13 +94,13 @@ export default function Home() {
           <div className="bg-white rounded-2xl border border-[#5e86ca] hover:shadow-lg hover:shadow-blue-300/50 hover:text-blue-800 transform hover:scale-105 transition-all duration-300">
             <div className="p-10">
               
-<Image
-  src="/images/elements/why.png"
-  alt="why"
-  width={56} // Tailwind 'size-14' = 3.5rem = 56px
-  height={56}
-  className="size-14"
-/>
+            <Image
+              src="/images/elements/why.png"
+              alt="why"
+              width={56} // Tailwind 'size-14' = 3.5rem = 56px
+              height={56}
+              className="size-14"
+            />
               <h3 className="text-xl mb-2 font-qanelas2 pt-5">Why was the FabLab established?</h3>
               <p className="text-gray-700 mb-4 font-poppins1">
                 Fab lab Eastern Visayas is set up to inspire people and MSMEs of the region to turn their ideas into new products and prototypes by giving them access to a range of digital manufacturing technology.
@@ -175,15 +189,14 @@ export default function Home() {
               <h3 className="text-2xl font-qanelas3">Laser Cutter</h3>
             </div>
 
-
-            <div className="relative h-[318px]">
-                  <Image
-    src="/images/machines/trylaser.png"
-    alt="machine"
-    width={500} // You can adjust this to fit your layout
-    height={300} // Adjust this too as needed
-    className="w-auto h-auto"
-  />
+            <div className="relative h-[318px] flex items-end">
+              <Image
+                src="/images/machines/trylaser.png"
+                alt="machine"
+                width={500}
+                height={300}
+                className="w-full h-auto object-contain object-bottom"
+              />
             </div>
           </div>
 
@@ -197,14 +210,14 @@ export default function Home() {
               <h3 className="text-2xl font-qanelas3">3D Printer</h3>
             </div>
 
-
-            <div className="relative h-[318px]">
-                  <Image
-    src="/images/machines/try3dprint.png"
-    alt="machine"
-    fill
-    className="object-contain"
-  />
+            <div className="relative h-[318px] flex items-end">
+              <Image
+                src="/images/machines/try3dprint.png"
+                alt="machine"
+                width={500}
+                height={300}
+                className="w-full h-auto object-contain object-bottom"
+              />
             </div>
           </div>
 
@@ -218,14 +231,14 @@ export default function Home() {
               <h3 className="text-2xl font-qanelas3">CNC Mill</h3>
             </div>
 
-
-            <div className="relative h-[318px]">
-                  <Image
-    src="/images/machines/trycncmill.png"
-    alt="machine"
-    fill
-    className="object-contain"
-  />
+            <div className="relative h-[318px] flex items-end">
+              <Image
+                src="/images/machines/trycncmill.png"
+                alt="machine"
+                width={500}
+                height={300}
+                className="w-full h-auto object-contain object-bottom"
+              />
             </div>
           </div>
 
@@ -309,4 +322,3 @@ export default function Home() {
     </main>
   );
 }
-
