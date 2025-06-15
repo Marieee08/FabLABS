@@ -55,7 +55,7 @@ interface ReviewEVCReservationProps {
   selectedReservation: DetailedEVCReservation | null;
   handleStatusUpdate: (
     reservationId: number,
-    newStatus: 'Pending Admin Approval' | 'Approved' | 'Ongoing' | 'Completed' | 'Cancelled' | 'Rejected'
+    newStatus: 'Pending Teacher Approval' | 'Pending Admin Approval' | 'Approved' | 'Ongoing' | 'Completed' | 'Cancelled' | 'Rejected'
   ) => void;
 }
 

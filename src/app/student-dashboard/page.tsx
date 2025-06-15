@@ -18,6 +18,7 @@ interface EVCReservation {
   NoofStudents?: number;
   Subject?: string;
   Teacher?: string;
+  TeacherEmail?: string; // Added missing property
   Topic?: string;
   DateRequested: Date;
   SchoolYear?: number;

@@ -112,7 +112,11 @@ const BusinessInfoEditModal = ({
     
     // Clear error for this field
     if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: undefined }));
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[name];
+        return newErrors;
+      });
     }
   };
 
@@ -185,7 +189,7 @@ const BusinessInfoEditModal = ({
           <div className="p-4 bg-gray-50 rounded-lg mb-6">
             <p className="text-gray-600">
               You have indicated that you do not own or operate a business. 
-              All business information fields have been set to "Not applicable".
+              All business information fields have been set to {"\"Not applicable\""}.
             </p>
           </div>
           <div className="flex justify-end">

@@ -29,7 +29,16 @@ const PersonalInfoEditModal = ({
   currentInfo,
   userId
 }: PersonalInfoEditModalProps) => {
-  const [formData, setFormData] = useState<any>(currentInfo || {});
+  // Create a default ClientInfo object
+  const getDefaultFormData = (): ClientInfo => ({
+    ContactNum: '',
+    Address: null,
+    City: null,
+    Province: null,
+    Zipcode: null
+  });
+
+  const [formData, setFormData] = useState<ClientInfo>(currentInfo || getDefaultFormData());
   const [loading, setLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [errors, setErrors] = useState<ValidationErrors>({});
@@ -37,14 +46,14 @@ const PersonalInfoEditModal = ({
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   useEffect(() => {
-    setFormData(currentInfo || {});
+    setFormData(currentInfo || getDefaultFormData());
     setErrors({});
     setHasUnsavedChanges(false);
   }, [currentInfo]);
 
   // Check if form has changes compared to original data
-  const checkForChanges = (newFormData: any) => {
-    const original = currentInfo || {};
+  const checkForChanges = (newFormData: ClientInfo) => {
+    const original = currentInfo || getDefaultFormData();
     const hasChanges = 
       (newFormData.ContactNum || '') !== (original.ContactNum || '') ||
       (newFormData.Address || '') !== (original.Address || '') ||
@@ -119,13 +128,13 @@ const PersonalInfoEditModal = ({
     const contactError = validateContactNumber(formData.ContactNum || '');
     if (contactError) newErrors.ContactNum = contactError;
     
-    const addressError = validateTextField(formData.Address, 'Address');
+    const addressError = validateTextField(formData.Address || '', 'Address');
     if (addressError) newErrors.Address = addressError;
     
-    const cityError = validateTextField(formData.City, 'City');
+    const cityError = validateTextField(formData.City || '', 'City');
     if (cityError) newErrors.City = cityError;
     
-    const provinceError = validateTextField(formData.Province, 'Province');
+    const provinceError = validateTextField(formData.Province || '', 'Province');
     if (provinceError) newErrors.Province = provinceError;
     
     const zipcodeError = validateZipcode(formData.Zipcode?.toString() || '');
@@ -138,14 +147,18 @@ const PersonalInfoEditModal = ({
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     
-    let processedValue = value;
+    let processedValue: string | number | null = value;
     if (name === 'ContactNum') {
       processedValue = value.replace(/[^\d\s\-\(\)\+]/g, '');
+    } else if (name === 'Zipcode') {
+      processedValue = value === '' ? null : parseInt(value) || null;
+    } else {
+      processedValue = value === '' ? null : value;
     }
     
-    const newFormData = {
+    const newFormData: ClientInfo = {
       ...formData,
-      [name]: processedValue === '' ? null : processedValue
+      [name]: processedValue
     };
     
     setFormData(newFormData);

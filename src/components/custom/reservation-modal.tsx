@@ -138,10 +138,10 @@ const ReservationModal: React.FC<ReservationModalProps> = ({
   };
 
   // Function to handle status updates for EVC reservations
-  // Updated signature to match the expected interface
+  // Updated signature to match the expected interface - now includes "Pending Teacher Approval"
   const handleEVCStatusUpdate = (
     reservationId: number,
-    newStatus: 'Pending Admin Approval' | 'Approved' | 'Ongoing' | 'Completed' | 'Rejected' | 'Cancelled'
+    newStatus: 'Pending Admin Approval' | 'Pending Teacher Approval' | 'Approved' | 'Ongoing' | 'Completed' | 'Rejected' | 'Cancelled'
   ): void => {
     // Convert to async operation internally
     (async () => {
