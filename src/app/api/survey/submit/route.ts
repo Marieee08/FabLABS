@@ -58,17 +58,17 @@ export async function POST(request: Request) {
     
     // Use Prisma transactions to ensure atomicity
     const updatedReservation = await prisma.$transaction(async (prisma: any) => {
-      // First check if the reservation exists and is in 'Paid' status
+      // First check if the reservation exists and is in 'Ongoing' status
       const existingReservation = await prisma.utilReq.findFirst({
         where: {
           id: parseInt(reservationId),
-          Status: 'Paid'
+          Status: 'Ongoing'
         },
         select: { id: true }
       });
       
       if (!existingReservation) {
-        throw new Error('Reservation not found or already completed');
+        throw new Error('Reservation not found or not in ongoing status');
       }
       
       // Update the reservation and create related survey data
@@ -146,7 +146,7 @@ export async function POST(request: Request) {
       });
     });
 
-    // Invalidate the cache for paid-reservations API if it's implemented
+    // Invalidate the cache for ongoing-reservations API if it's implemented
     // This could be done through a cache invalidation mechanism
 
     return NextResponse.json({
@@ -162,7 +162,7 @@ export async function POST(request: Request) {
     console.error('[COMPLETE_SURVEY_POST]', error);
     
     // Check for specific error types to give better feedback
-    if (error instanceof Error && error.message === 'Reservation not found or already completed') {
+    if (error instanceof Error && error.message === 'Reservation not found or not in ongoing status') {
       return new NextResponse(error.message, { status: 404 });
     }
     

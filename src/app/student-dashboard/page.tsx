@@ -442,6 +442,10 @@ const DashboardUser = () => {
                       <p className="text-gray-700">{selectedEVCReservation.Teacher || 'Not specified'}</p>
                     </div>
                     <div>
+                      <p className="font-medium">Teacher Email:</p>
+                      <p className="text-gray-700">{selectedEVCReservation.TeacherEmail || 'Not specified'}</p>
+                    </div>
+                    <div>
                       <p className="font-medium">Topic:</p>
                       <p className="text-gray-700">{selectedEVCReservation.Topic || 'Not specified'}</p>
                     </div>

@@ -75,7 +75,6 @@ const ReviewEVCReservation: React.FC<ReviewEVCReservationProps> = ({
       Rejected: 'bg-red-100 text-red-800',
       Cancelled: 'bg-red-100 text-red-800',
       Ongoing: 'bg-indigo-100 text-indigo-800',
-      Survey: 'bg-purple-100 text-purple-800'
     };
     return colors[status as keyof typeof colors] || 'bg-gray-100 text-gray-800';
   };
@@ -419,26 +418,9 @@ const ReviewEVCReservation: React.FC<ReviewEVCReservationProps> = ({
                     >
                       Cancel Reservation
                     </Button>
-                    <Button
-                      variant="default"
-                      onClick={() => handleStatusUpdateWithApprover(selectedReservation.id, 'Completed')}
-                    >
-                      Send to Survey
-                    </Button>
                   </>
                 )}
                 
-                {/* When student completes the job they should go into survey*/}
-                {selectedReservation.EVCStatus === 'Survey' && (
-                  <>
-                    <Button
-                      variant="default"
-                      onClick={() => handleStatusUpdateWithApprover(selectedReservation.id, 'Completed')}
-                    >
-                      Mark as Completed
-                    </Button>
-                  </>
-                )}
 
                 {/* For completed/rejected/cancelled reservations, only show close button */}
                 {(selectedReservation.EVCStatus === 'Completed' || 

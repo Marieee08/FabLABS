@@ -94,6 +94,8 @@ ReservationCard.displayName = 'ReservationCard';
 // Extracted pure functions
 const getStatusColor = (status: string) => {
   switch (status) {
+    case 'Ongoing':
+      return 'bg-blue-100 text-blue-800';
     case 'Paid':
       return 'bg-purple-100 text-purple-800';
     case 'Completed':
@@ -138,7 +140,7 @@ const SurveyDashboard = () => {
     
     const fetchReservations = async () => {
       try {
-        const response = await fetch('/api/survey/paid-reservations', {
+        const response = await fetch('/api/survey/ongoing-reservations', {
           signal: abortController.signal
         });
         
@@ -194,12 +196,12 @@ const SurveyDashboard = () => {
           </CardHeader>
           <CardContent className="p-6">
             <p className="text-gray-600 mb-6">
-              The following services are ready for your feedback. Please select a service to begin the survey.
+              The following ongoing services are ready for your feedback. Please select a service to begin the survey.
             </p>
             
             {reservations.length === 0 ? (
               <div className="text-center py-8">
-                <p className="text-gray-500 text-lg">No pending surveys available at this time.</p>
+                <p className="text-gray-500 text-lg">No ongoing surveys available at this time.</p>
               </div>
             ) : (
               <div className="space-y-4">
