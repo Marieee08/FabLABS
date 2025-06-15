@@ -107,6 +107,9 @@ export default function LabReservation({ formData, updateFormData, nextStep, pre
   const [availableMachines, setAvailableMachines] = useState<Record<string, any[]>>({});
   const [selectedService, setSelectedService] = useState<string>('');
   const [selectedMachines, setSelectedMachines] = useState<SelectedMachine[]>([]);
+  const [isVerifyingEmail, setIsVerifyingEmail] = useState(false);
+  const [emailVerificationStatus, setEmailVerificationStatus] = useState<'valid' | 'invalid' | 'pending' | null>(null);
+
   
   // Initialize students state
   const [students, setStudents] = useState<Student[]>(formData.Students || []);
@@ -324,93 +327,129 @@ export default function LabReservation({ formData, updateFormData, nextStep, pre
   };
 
   // Validate form
-  const validateForm = useCallback((): boolean => {
-    const newErrors: FormErrors = {};
-    
-    // Basic validation
-    if (!formData.LvlSec.trim()) newErrors.LvlSec = "Level/Section is required";
-    if (!formData.Subject.trim()) newErrors.Subject = "Subject is required";
-    if (!formData.Teacher.trim()) newErrors.Teacher = "Teacher's name is required";
-    if (!formData.TeacherEmail.trim()) newErrors.TeacherEmail = "Teacher's email is required";
-    if (!formData.Topic.trim()) newErrors.Topic = "Topic is required";
-    
-    if (!formData.SchoolYear) {
-      newErrors.SchoolYear = "School year is required";
-    } else if (formData.SchoolYear < currentYear - 5 || formData.SchoolYear > currentYear + 5) {
-      newErrors.SchoolYear = "Please enter a valid school year";
+  const validateForm = useCallback(async (): Promise<boolean> => {
+  const newErrors: FormErrors = {};
+  
+  // Basic validation (keep existing code)
+  if (!formData.LvlSec.trim()) newErrors.LvlSec = "Level/Section is required";
+  if (!formData.Subject.trim()) newErrors.Subject = "Subject is required";
+  if (!formData.Teacher.trim()) newErrors.Teacher = "Teacher's name is required";
+  if (!formData.Topic.trim()) newErrors.Topic = "Topic is required";
+  
+  // Teacher email validation - now async
+  if (!formData.TeacherEmail.trim()) {
+    newErrors.TeacherEmail = "Teacher's email is required";
+  } else {
+    // Verify teacher email during form validation
+    const isEmailValid = await verifyTeacherEmail(formData.TeacherEmail);
+    if (!isEmailValid) {
+      newErrors.TeacherEmail = errors.TeacherEmail || "Invalid teacher email";
     }
+  }
+  
+  if (!formData.SchoolYear) {
+    newErrors.SchoolYear = "School year is required";
+  } else if (formData.SchoolYear < currentYear - 5 || formData.SchoolYear > currentYear + 5) {
+    newErrors.SchoolYear = "Please enter a valid school year";
+  }
+  
+  // Validate students (keep existing code)
+  const studentErrors: Record<number, string> = {};
+  students.forEach((student, index) => {
+    if (!student.name.trim()) studentErrors[index] = "Student name is required";
+  });
+  
+  if (Object.keys(studentErrors).length > 0) {
+    newErrors.Students = studentErrors;
+  }
+  
+  // Validate service selection (keep existing code)
+  if (!selectedService) {
+    newErrors.service = "Please select a service";
+  }
+  
+  // Validate machine selection (keep existing code)
+  const currentService = selectedService;
+  const hasMachinesForService = currentService && 
+    availableMachines[currentService] && 
+    availableMachines[currentService].length > 0;
     
-    // Validate students
-    const studentErrors: Record<number, string> = {};
-    students.forEach((student, index) => {
-      if (!student.name.trim()) studentErrors[index] = "Student name is required";
+  if (hasMachinesForService && selectedMachines.length === 0) {
+    newErrors.machines = "Please select at least one machine";
+  }
+  
+  setErrors(newErrors);
+  return Object.keys(newErrors).length === 0;
+}, [formData, students, currentYear, selectedService, selectedMachines, availableMachines, errors.TeacherEmail]);
+
+
+  // Update the handleSubmit function to be async
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setShowValidation(true);
+  setIsSubmitting(true);
+  
+  // Now validateForm is async
+  const isValid = await validateForm();
+  
+  if (isValid) {
+    nextStep();
+  } else {
+    const firstErrorElement = document.querySelector('[aria-invalid="true"]');
+    if (firstErrorElement) {
+      firstErrorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+  
+  setIsSubmitting(false);
+};
+
+  const verifyTeacherEmail = async (email: string): Promise<boolean> => {
+  if (!email || !email.trim()) {
+    setEmailVerificationStatus(null);
+    return false;
+  }
+  
+  setIsVerifyingEmail(true);
+  setEmailVerificationStatus('pending');
+  
+  try {
+    const response = await fetch('/api/verify-teacher-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim() })
     });
     
-    if (Object.keys(studentErrors).length > 0) {
-      newErrors.Students = studentErrors;
-    }
+    const data = await response.json();
     
-    // Validate service selection
-    if (!selectedService) {
-      newErrors.service = "Please select a service";
-    }
-    
-    // Validate machine selection only if the service has machines available
-    const currentService = selectedService;
-    const hasMachinesForService = currentService && 
-      availableMachines[currentService] && 
-      availableMachines[currentService].length > 0;
-      
-    if (hasMachinesForService && selectedMachines.length === 0) {
-      newErrors.machines = "Please select at least one machine";
-    }
-    
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  }, [formData, students, currentYear, selectedService, selectedMachines, availableMachines]);
-
-  // Handle form submission
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setShowValidation(true);
-    setIsSubmitting(true);
-    
-    if (validateForm()) {
-      nextStep();
-    } else {
-      const firstErrorElement = document.querySelector('[aria-invalid="true"]');
-      if (firstErrorElement) {
-        firstErrorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
-    }
-    
-    setIsSubmitting(false);
-  };
-
-  const verifyTeacherEmail = async (email: string) => {
-    if (!email) return;
-    
-    try {
-      const response = await fetch('/api/verify-teacher-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email })
+    if (data.verified) {
+      setEmailVerificationStatus('valid');
+      setErrors(prev => {
+        const newErrors = {...prev};
+        delete newErrors.TeacherEmail;
+        return newErrors;
       });
-      
-      const data = await response.json();
-      if (!data.verified) {
-        setErrors(prev => ({ ...prev, TeacherEmail: "This teacher's email does not exist in our system" }));
-      } else {
-        setErrors(prev => {
-          const newErrors = {...prev};
-          delete newErrors.TeacherEmail;
-          return newErrors;
-        });
-      }
-    } catch (err) {
-      console.error('Error verifying teacher email:', err);
+      return true;
+    } else {
+      setEmailVerificationStatus('invalid');
+      setErrors(prev => ({ 
+        ...prev, 
+        TeacherEmail: "This teacher's email is not registered in our system" 
+      }));
+      return false;
     }
-  };
+  } catch (err) {
+    console.error('Error verifying teacher email:', err);
+    setEmailVerificationStatus('invalid');
+    setErrors(prev => ({ 
+      ...prev, 
+      TeacherEmail: "Error verifying teacher email. Please try again." 
+    }));
+    return false;
+  } finally {
+    setIsVerifyingEmail(false);
+  }
+};
 
   const inputStyles = `
     .no-spin-buttons::-webkit-inner-spin-button,
@@ -558,17 +597,45 @@ export default function LabReservation({ formData, updateFormData, nextStep, pre
                 <label htmlFor="teacherEmail" className="block text-sm font-medium mb-1 text-gray-700">
                   Teacher Email <span className="text-red-500">*</span>
                 </label>
+                <div className="relative">
                   <input
                     id="teacherEmail"
                     type="email"
-                    className={`w-full border ${errors.TeacherEmail ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition`}
+                    className={`w-full border ${errors.TeacherEmail ? 'border-red-500' : emailVerificationStatus === 'valid' ? 'border-green-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-300 focus:border-blue-500 outline-none transition pr-10`}
                     value={formData.TeacherEmail}
-                    onChange={(e) => handleFieldChange('TeacherEmail', e.target.value)}
+                    onChange={(e) => {
+                      handleFieldChange('TeacherEmail', e.target.value);
+                      // Clear previous verification status when typing
+                      if (emailVerificationStatus) {
+                        setEmailVerificationStatus(null);
+                      }
+                    }}
                     onBlur={(e) => verifyTeacherEmail(e.target.value)}
                     aria-invalid={!!errors.TeacherEmail}
                     placeholder="e.g. teacher@school.edu"
                   />
+                  
+                  {/* Verification status indicator */}
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    {isVerifyingEmail && (
+                      <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    )}
+                    {!isVerifyingEmail && emailVerificationStatus === 'valid' && (
+                      <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                    {!isVerifyingEmail && emailVerificationStatus === 'invalid' && (
+                      <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    )}
+                  </div>
+                </div>
                 {errors.TeacherEmail && <p className="mt-1 text-sm text-red-500">{errors.TeacherEmail}</p>}
+                {emailVerificationStatus === 'valid' && !errors.TeacherEmail && (
+                  <p className="mt-1 text-sm text-green-600">✓ Teacher email verified</p>
+                )}
               </div>
               
               {/* Topic */}
