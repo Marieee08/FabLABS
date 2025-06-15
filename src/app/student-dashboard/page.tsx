@@ -312,7 +312,7 @@ const DashboardUser = () => {
                 <div className="flex justify-center items-center h-32">
                   <p>Loading your history...</p>
                 </div>
-              ) : (
+              ) : ( 
                 historyReservations.length === 0 ? (
                   <div className="bg-blue-50 p-6 rounded-lg text-center">
                     <p className="text-blue-800">You don&apos;t have any completed or rejected reservations yet.</p>

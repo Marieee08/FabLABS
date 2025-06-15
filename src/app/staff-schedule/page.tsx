@@ -595,7 +595,7 @@ export default function Schedule() {
                       </Button>
                     </div>
                   </div>
-                ) : (
+                ) : ( 
                   <ReviewSubmit 
                     formData={formData} 
                     prevStep={prevStep}
