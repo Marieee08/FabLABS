@@ -225,10 +225,20 @@ const Navbar = () => {
           
           <div className="px-4 py-3 border-t border-gray-200">
             <div className="flex items-center">
-              <span className="h-10 w-10 rounded-full bg-gray-300"></span>
               <div className="ml-3">
-                <span className="block text-sm font-medium text-black">Leila Sabando</span>
-                <span className="block text-xs text-gray-500">Student</span>
+              <SignedOut>
+              <SignUpButton mode='modal'>
+                <button 
+                  style={{color: bgColor === 'transparent' ? 'white' : '#143370'}} 
+                  className="bg-[#193d83] hover:bg-[#2f61c2] text-white font-qanelas1 font-medium py-2 px-6 rounded-full transition duration-300 shadow-sm hover:shadow-md flex items-center justify-center"
+                >
+                  Sign Up
+                </button>
+              </SignUpButton>
+            </SignedOut>
+              <SignedIn>
+                <UserButton showName />
+              </SignedIn>
               </div>
             </div>
           </div>
