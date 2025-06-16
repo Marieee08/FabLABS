@@ -1,4 +1,4 @@
-// /api/survey/paid-reservations
+// /api/survey/ongoing-reservations
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
@@ -12,7 +12,7 @@ let cacheTimestamp = 0;
 
 export async function GET() {
   try {
-    const { userId } = auth();
+    const { userId } = await auth();
 
     if (!userId) {
       return new NextResponse("Unauthorized", { status: 401 });
@@ -31,7 +31,7 @@ export async function GET() {
     // Use a more focused select to reduce data transferred
     const reservations = await prisma.utilReq.findMany({
       where: {
-        Status: 'Paid'
+        Status: 'Ongoing'
       },
       select: {
         id: true,
@@ -121,9 +121,12 @@ export async function GET() {
         'Cache-Control': 'private, max-age=60',
       },
     });
+    
 
   } catch (error) {
-    console.error('[PAID_RESERVATIONS_GET]', error);
+    console.error('[ONGOING_RESERVATIONS_GET]', error);
     return new NextResponse("Internal Error", { status: 500 });
   }
+  
 }
+
