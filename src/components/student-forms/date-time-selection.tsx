@@ -269,10 +269,17 @@ export default function DateTimeSelection({
     const today = new Date();
     const oneMonthLater = new Date();
     oneMonthLater.setMonth(today.getMonth() + 1);
+    
+    // Calculate the minimum date (7 days from today)
+    const minDate = new Date();
+    minDate.setDate(today.getDate() + 7);
+    
     today.setHours(0, 0, 0, 0);
     oneMonthLater.setHours(0, 0, 0, 0);
+    minDate.setHours(0, 0, 0, 0);
 
-    if (date < today || date > oneMonthLater || date.getDay() === 0 || date.getDay() === 6) {
+    // Check if date is before minimum date (7 days from now), after one month, or on weekends
+    if (date < minDate || date > oneMonthLater || date.getDay() === 0 || date.getDay() === 6) {
       return true;
     }
 
@@ -340,7 +347,7 @@ export default function DateTimeSelection({
             <h3 className="text-xl font-medium text-gray-800 mb-3 flex items-center">
               <CheckCircle className="h-5 w-5 text-blue-600 mr-2" /> Select Available Dates
             </h3>
-            <p className="text-sm text-gray-600 mb-4">Click on a date to select it. You can choose up to {MAX_DATES} dates.</p>
+            <p className="text-sm text-gray-600 mb-4">Click on a date to select it. You can choose up to {MAX_DATES} dates. Reservations must be made at least 7 days in advance.</p>
             
             <div className="border rounded-lg overflow-hidden p-2 sm:p-4">
               <Calendar
@@ -370,7 +377,7 @@ export default function DateTimeSelection({
             
             <div className="mt-2 text-sm text-gray-500 flex items-center">
               <div className="w-4 h-4 rounded-full bg-gray-200 mr-2"></div>
-              <span>Unavailable (weekends, past dates, or blocked)</span>
+              <span>Unavailable (weekends, within 7 days, or blocked)</span>
             </div>
           </div>
         </div>

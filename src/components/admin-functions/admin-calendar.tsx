@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Calendar, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { toast } from "@/components/ui/use-toast";
@@ -40,7 +40,7 @@ const AdminCalendar: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
-  const fetchBlockedDates = async () => {
+  const fetchBlockedDates = useCallback(async () => {
     try {
       const response = await fetch('/api/blocked-dates');
       const data = await response.json();
@@ -57,7 +57,7 @@ const AdminCalendar: React.FC = () => {
         variant: "destructive",
       });
     }
-  };
+  }, []);
 
   const formatTimeString = (timeString: string): string => {
     try {
@@ -79,7 +79,7 @@ const AdminCalendar: React.FC = () => {
     }
   };
 
-  const fetchReservations = async () => {
+  const fetchReservations = useCallback(async () => {
     try {
       const response = await fetch('/api/admin/reservations');
       const data = await response.json();
@@ -150,10 +150,10 @@ const AdminCalendar: React.FC = () => {
         variant: "destructive",
       });
     }
-  };
+  }, []);
 
   // Add a refresh function that updates both blocked dates and reservations
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
       await Promise.all([
@@ -174,12 +174,12 @@ const AdminCalendar: React.FC = () => {
     } finally {
       setIsRefreshing(false);
     }
-  };
+  }, [fetchBlockedDates, fetchReservations]);
 
   useEffect(() => {
     fetchBlockedDates();
     fetchReservations();
-  }, []);
+  }, [fetchBlockedDates, fetchReservations]);
 
   const handleBlockDate = async () => {
     if (!selectedDate || isDateBlocked(selectedDate)) return;

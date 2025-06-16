@@ -55,7 +55,7 @@ interface EVCReservation {
 // Loading Spinner Component
 const LoadingSpinner = () => (
   <div className="flex items-center justify-center">
-    <Loader className="h-6 w-6 animate-spin text-blue-600" />
+    <Loader className="h-6 w-6 animate-spin text-white-600" />
   </div>
 );
 

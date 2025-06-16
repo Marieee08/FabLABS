@@ -99,6 +99,7 @@ export default function LabReservation({ formData, updateFormData, nextStep, pre
   const [showValidation, setShowValidation] = useState(false);
   const [newStudentAdded, setNewStudentAdded] = useState(false);
   const newStudentInputRef = useRef<HTMLInputElement>(null);
+  const hasInitialized = useRef(false);
   
   // Services and machines handling
   const [services, setServices] = useState<Service[]>([]);
@@ -187,29 +188,43 @@ export default function LabReservation({ formData, updateFormData, nextStep, pre
     fetchServices();
   }, []);
 
-  // Initialize data from formData on mount only
-  useEffect(() => {
-    // Initialize selected service from formData
-    if (formData.ProductsManufactured) {
-      const serviceValue = Array.isArray(formData.ProductsManufactured) 
-        ? formData.ProductsManufactured[0] 
-        : formData.ProductsManufactured;
-        
-      setSelectedService(serviceValue);
-    }
-    
-    // Initialize selected machines from NeededMaterials
-    if (formData.NeededMaterials && formData.NeededMaterials.length > 0) {
-      const machines = formData.NeededMaterials.map(material => ({
-        id: material.id || generateId(),
-        name: material.Item,
-        quantity: material.ItemQty,
-        description: material.Description
-      }));
+useEffect(() => {
+  if (formData.ProductsManufactured && !selectedService) {
+    const serviceValue = Array.isArray(formData.ProductsManufactured) 
+      ? formData.ProductsManufactured[0] 
+      : formData.ProductsManufactured;
       
-      setSelectedMachines(machines);
-    }
-  }, [formData.ProductsManufactured, formData.NeededMaterials]); // Include dependencies
+    setSelectedService(serviceValue);
+  }
+}, [formData.ProductsManufactured, selectedService]);
+
+useEffect(() => {
+  // Only run initialization once
+  if (hasInitialized.current) return;
+  
+  // Only initialize if not already set
+  if (formData.ProductsManufactured && !selectedService) {
+    const serviceValue = Array.isArray(formData.ProductsManufactured) 
+      ? formData.ProductsManufactured[0] 
+      : formData.ProductsManufactured;
+      
+    setSelectedService(serviceValue);
+  }
+  
+  // Only initialize if not already set
+  if (formData.NeededMaterials && formData.NeededMaterials.length > 0 && selectedMachines.length === 0) {
+    const machines = formData.NeededMaterials.map(material => ({
+      id: material.id || generateId(),
+      name: material.Item,
+      quantity: material.ItemQty,
+      description: material.Description
+    }));
+    
+    setSelectedMachines(machines);
+  }
+  
+  hasInitialized.current = true;
+}, [formData.ProductsManufactured, formData.NeededMaterials, selectedService, selectedMachines.length]);
 
   // Auto-fill user's name as first student when component loads
   useEffect(() => {
@@ -253,7 +268,7 @@ export default function LabReservation({ formData, updateFormData, nextStep, pre
       // If no user is loaded yet but we need at least one student entry
       addStudent();
     }
-  }, [isLoaded, user, students, updateFormData, addStudent]); // Include addStudent
+  }, [isLoaded, user, students, updateFormData, addStudent]);
 
   // Focus on new student input when a new student is added
   useEffect(() => {
@@ -293,9 +308,14 @@ export default function LabReservation({ formData, updateFormData, nextStep, pre
     updateFormData('NeededMaterials', materials);
   }, [updateFormData]);
 
-  // Handle machine selection changes from OptimizedMachineSelector
+  // FIXED: Improved machine selection handler with better state management
   const handleMachineSelectionChange = useCallback((machines: SelectedMachine[]) => {
+    console.log('Machine selection changed:', machines); // Debug log
+    
+    // Update local state immediately
     setSelectedMachines(machines);
+    
+    // Update form data - this should not cause the component to reset
     updateNeededMaterials(machines);
     
     // Clear any machine selection error if at least one machine is selected
@@ -508,13 +528,14 @@ const handleSubmit = async (e: React.FormEvent) => {
               {serviceError && <p className="mt-1 text-sm text-red-500">{serviceError}</p>}
             </div>
 
-            {/* Machine Selection - Using the optimized component */}
+            {/* Machine Selection - FIXED: Added key prop and better prop management */}
             <div>
               <label className="block text-sm font-medium mb-3 text-gray-700">
                 Available Equipment <span className="text-red-500">*</span>
               </label>
               
               <OptimizedMachineSelector 
+                key={`${selectedService}-machine-selector`} // Add key to prevent unwanted re-renders
                 selectedService={selectedService}
                 availableMachines={availableMachines}
                 initialSelectedMachines={selectedMachines}
