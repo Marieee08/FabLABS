@@ -177,9 +177,9 @@ const AdminCalendar: React.FC = () => {
   }, [fetchBlockedDates, fetchReservations]);
 
   useEffect(() => {
-    fetchBlockedDates();
-    fetchReservations();
-  }, []);
+  fetchBlockedDates();
+  fetchReservations();
+}, [fetchBlockedDates, fetchReservations]); 
 
   const handleBlockDate = async () => {
     if (!selectedDate || isDateBlocked(selectedDate)) return;
