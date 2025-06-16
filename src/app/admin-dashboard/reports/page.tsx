@@ -21,7 +21,7 @@ import Image from 'next/image';
 
 const ReportsPage: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [orderDropdownOpen, setOrderDropdownOpen] = useState(false);
+  const [orderDropdownOpen, setOrderDropdownOpen] = useState(true);
   const today = new Date();
   const formattedDate = format(today, 'EEEE, dd MMMM yyyy');
   const { user, isLoaded } = useUser();

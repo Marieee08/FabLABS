@@ -154,49 +154,36 @@ export default function Services() {
   }, [userId]);
 
   
-  // Update the handleScheduleClick function to check if user info is loaded
-const handleScheduleClick = async () => {
-  // If user info isn't loaded yet, show loading state and wait
-  if (!isUserInfoLoaded) {
+  const handleScheduleClick = async () => {
+    // If user is not logged in, redirect to login
+    if (!userId) {
+      router.push('/sign-in');
+      return;
+    }
+    
+    // Don't show loading for user info checks
+    if (!userRole) {
+      console.log('User role not loaded yet');
+      return;
+    }
+    
+    // Check business info only for MSME users
+    if (userRole === "MSME" && isBusinessInfoMissing) {
+      setIsMissingInfoModalOpen(true);
+      return;
+    }
+    
+    // Only show loading when actually navigating
     setIsLoading(true);
-    // Wait for the user info to be fully loaded first
-    await new Promise(resolve => {
-      const checkLoaded = () => {
-        if (isUserInfoLoaded) {
-          resolve(true);
-        } else {
-          setTimeout(checkLoaded, 100); // Check again in 100ms
-        }
-      };
-      checkLoaded();
-    });
-    setIsLoading(false);
-  }
-  
-  // If user is not logged in, redirect to login
-  if (!userId || !userRole) {
-    setIsLoading(true);
-    router.push('/sign-in');
-    return;
-  }
-  
-  // Now that we're sure user info is loaded, check business info
-  if (userRole === "MSME" && isBusinessInfoMissing) {
-    setIsMissingInfoModalOpen(true);
-    return;
-  }
-  
-  
-  // If all good, navigate to the appropriate scheduling page
-  setIsLoading(true);
-  if (userRole === "STUDENT") {
-    router.push('/student-schedule');
-  } else if (userRole === "STAFF") {
-    router.push('/staff-schedule');
-  } else {
-    router.push('/msme-schedule');
-  }
-};
+    
+    if (userRole === "STUDENT") {
+      router.push('/student-schedule');
+    } else if (userRole === "STAFF") {
+      router.push('/staff-schedule');
+    } else {
+      router.push('/msme-schedule');
+    }
+  };
 
   const redirectToInformation = () => {
     setIsLoading(true);

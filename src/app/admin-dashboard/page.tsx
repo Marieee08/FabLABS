@@ -32,7 +32,10 @@ interface Reservation {
 
 const DashboardAdmin = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [orderDropdownOpen, setOrderDropdownOpen] = useState(false);
+  const [orderDropdownOpen, setOrderDropdownOpen] = useState(() => {
+    console.log('Setting initial dropdown state to true');
+    return true;
+  });
   const today = new Date();
   const formattedDate = format(today, 'EEEE, dd MMMM yyyy');
   const { user, isLoaded } = useUser();
@@ -154,11 +157,6 @@ const DashboardAdmin = () => {
         </nav>
       </aside>
 
-
-
-
-
-
       {/* Main Content */}
       <div className="relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden">
         {/* Header */}
@@ -198,7 +196,6 @@ const DashboardAdmin = () => {
           </div>
         </header>
 
-
         {/* Main */}
         <main>
           <div className="mx-auto max-w-screen-2xl p-4 md:p-6 2xl:p-10">
@@ -214,6 +211,5 @@ const DashboardAdmin = () => {
     </RoleGuard>
   );
 };
-
 
 export default DashboardAdmin;
