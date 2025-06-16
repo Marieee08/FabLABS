@@ -32,6 +32,33 @@ interface DetailedReservation {
   };
 }
 
+// Loading skeleton component
+const LoadingSkeleton = memo(() => (
+  <div className="space-y-4">
+    {[1, 2, 3].map((i) => (
+      <div key={i} className="bg-white rounded-lg shadow p-4 border border-gray-100 animate-pulse">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="flex-1">
+            <div className="h-6 bg-gray-200 rounded w-3/4 mb-2"></div>
+            <div className="flex gap-2 items-center">
+              <div className="h-4 bg-gray-200 rounded w-20"></div>
+              <div className="h-3 w-1 bg-gray-200 rounded-full"></div>
+              <div className="h-4 bg-gray-200 rounded w-24"></div>
+              <div className="h-6 bg-gray-200 rounded-full w-16"></div>
+            </div>
+          </div>
+          <div className="flex gap-3 w-full md:w-auto">
+            <div className="h-10 bg-gray-200 rounded flex-1 md:w-24"></div>
+            <div className="h-10 bg-gray-200 rounded flex-1 md:w-24"></div>
+          </div>
+        </div>
+      </div>
+    ))}
+  </div>
+));
+
+LoadingSkeleton.displayName = 'LoadingSkeleton';
+
 // Memoized components to prevent unnecessary re-renders
 const ReservationCard = memo(({ 
   reservation, 
@@ -96,8 +123,6 @@ const getStatusColor = (status: string) => {
   switch (status) {
     case 'Ongoing':
       return 'bg-blue-100 text-blue-800';
-    case 'Paid':
-      return 'bg-purple-100 text-purple-800';
     case 'Completed':
       return 'bg-green-100 text-green-800';
     default:
@@ -179,14 +204,6 @@ const SurveyDashboard = () => {
     }
   }, [selectedReservation, handleStartSurvey]);
 
-  if (isLoading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen bg-gray-50">
-        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"/>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4">
@@ -199,7 +216,9 @@ const SurveyDashboard = () => {
               The following ongoing services are ready for your feedback. Please select a service to begin the survey.
             </p>
             
-            {reservations.length === 0 ? (
+            {isLoading ? (
+              <LoadingSkeleton />
+            ) : reservations.length === 0 ? (
               <div className="text-center py-8">
                 <p className="text-gray-500 text-lg">No ongoing surveys available at this time.</p>
               </div>

@@ -203,7 +203,7 @@ const SurveyForm = () => {
   const [userRole, setUserRole] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [demographicData, setDemographicData] = useState<DemographicData>({
     clientType: undefined,
     sex: undefined,
@@ -225,6 +225,25 @@ const SurveyForm = () => {
   const [employeeFormData, setEmployeeFormData] = useState<Record<string, string | undefined>>(
     Object.fromEntries(SURVEY_QUESTIONS.employee.map((_, i) => [`E${i + 1}`, undefined]))
   );
+
+  const validateAge = useCallback((age: string): string => {
+    if (!age) return 'Age is required';
+    const ageNum = parseInt(age);
+    if (isNaN(ageNum) || ageNum < 1 || ageNum > 120) return 'Age must be between 1 and 120';
+    return '';
+  }, []);
+
+  const validateOffice = useCallback((office: string): string => {
+    if (!office.trim()) return 'Office name is required';
+    if (office.trim().length < 2) return 'Office name must be at least 2 characters';
+    return '';
+  }, []);
+
+  const validateOtherService = useCallback((service: string): string => {
+    if (!service.trim()) return 'Please specify the other service';
+    if (service.trim().length < 3) return 'Service description must be at least 3 characters';
+    return '';
+  }, []);
 
   // Fetch user role only once on mount
   useEffect(() => {
@@ -284,7 +303,23 @@ const SurveyForm = () => {
   // Memoized handlers to prevent unnecessary re-renders
   const handleInputChange = useCallback((question: string, value: string) => {
     setDemographicData(prev => ({ ...prev, [question]: value }));
-  }, []);
+    
+    // Real-time validation
+    let error = '';
+    switch (question) {
+      case 'age':
+        error = validateAge(value);
+        break;
+      case 'office':
+        error = validateOffice(value);
+        break;
+      case 'otherService':
+        error = validateOtherService(value);
+        break;
+    }
+  
+  setValidationErrors(prev => ({ ...prev, [question]: error }));
+}, [validateAge, validateOffice, validateOtherService]);
 
   const handleCheckboxChange = useCallback((service: string, checked: boolean) => {
     setDemographicData(prev => {
