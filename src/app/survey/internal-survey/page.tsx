@@ -314,21 +314,39 @@ const InternalSurveyForm = () => {
   }, []);
 
   // Memoized validation check
-  const formComplete = useMemo(() => Boolean(
-    surveyData.clientType && 
-    surveyData.sex && 
-    surveyData.age && 
-    surveyData.age !== '0' &&
-    !validationErrors.age &&
-    surveyData.dateOfTransaction &&
-    !validationErrors.dateOfTransaction &&
-    surveyData.officeAvailed &&
-    surveyData.serviceAvailed.length > 0 &&
-    !(surveyData.serviceAvailed.includes("Others") && (!surveyData.otherService || surveyData.otherService.trim() === '' || validationErrors.otherService)) &&
-    surveyData.CC1 &&
-    (surveyData.CC1 === CC1_OPTIONS[3] || (surveyData.CC2 && surveyData.CC3)) &&
-    Object.values(sqdFormData).every(value => value !== undefined)
-  ), [surveyData, validationErrors, sqdFormData]);
+  const formComplete = useMemo(() => {
+    // Check basic required fields that user needs to fill
+    const basicFieldsComplete = Boolean(
+      surveyData.sex && 
+      surveyData.age && 
+      surveyData.age !== '0' &&
+      !validationErrors.age &&
+      surveyData.dateOfTransaction &&
+      !validationErrors.dateOfTransaction
+    );
+
+    // Check service validation (always has "Availment of school facilities" pre-checked)
+    const serviceComplete = surveyData.serviceAvailed.length > 0 &&
+      !(surveyData.serviceAvailed.includes("Others") && (!surveyData.otherService || surveyData.otherService.trim() === '' || validationErrors.otherService));
+
+    // Check CC questions - if CC1 is option 4, CC2 and CC3 are not required
+    const ccComplete = surveyData.CC1 && 
+      (surveyData.CC1 === CC1_OPTIONS[3] || (surveyData.CC2 && surveyData.CC3));
+
+    // Check all SQD questions are answered
+    const sqdComplete = Object.values(sqdFormData).every(value => value !== undefined && value !== '');
+
+    console.log('Validation check:', {
+      basicFieldsComplete,
+      serviceComplete,
+      ccComplete,
+      sqdComplete,
+      surveyData,
+      sqdFormData
+    });
+
+    return basicFieldsComplete && serviceComplete && ccComplete && sqdComplete;
+  }, [surveyData, validationErrors, sqdFormData]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -688,7 +706,17 @@ const InternalSurveyForm = () => {
 
               {!formComplete && (
                 <div className="text-red-500 text-sm text-center mt-2">
-                  Please complete all required fields
+                  <p>Please complete all required fields:</p>
+                  <ul className="list-disc list-inside mt-1 text-left max-w-md mx-auto">
+                    {!surveyData.sex && <li>Select your sex</li>}
+                    {(!surveyData.age || surveyData.age === '0') && <li>Enter your age</li>}
+                    {!surveyData.dateOfTransaction && <li>Enter date of transaction</li>}
+                    {!surveyData.CC1 && <li>Answer CC1 question</li>}
+                    {surveyData.CC1 && surveyData.CC1 !== CC1_OPTIONS[3] && !surveyData.CC2 && <li>Answer CC2 question</li>}
+                    {surveyData.CC1 && surveyData.CC1 !== CC1_OPTIONS[3] && !surveyData.CC3 && <li>Answer CC3 question</li>}
+                    {Object.values(sqdFormData).some(value => value === undefined || value === '') && <li>Answer all Service Quality Dimension questions</li>}
+                    {surveyData.serviceAvailed.includes("Others") && (!surveyData.otherService || surveyData.otherService.trim() === '') && <li>Specify other service</li>}
+                  </ul>
                 </div>
               )}
             </form>
