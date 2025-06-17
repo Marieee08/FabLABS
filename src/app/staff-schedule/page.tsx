@@ -1,4 +1,4 @@
-// src/app/staff-schedule/page.tsx - Revised to use lab reservation components
+// src/app/staff-schedule/page.tsx - FIXED VERSION WITH CORRECT TYPES
 
 'use client';
 
@@ -6,12 +6,10 @@ import React, { useState, useEffect } from 'react';
 import ProgressBar from '@/components/msme-forms/progress-bar';
 import Navbar from '@/components/custom/navbar';
 import LabReservation from '@/components/staff-forms/lab-reservation-staff';
-import DateTimeSelection from '@/components/student-forms/date-time-selection';
+import DateTimeSelection from '@/components/staff-forms/staff-date-time-selection'; // Keep using the original for now
 import ReviewSubmit from '@/components/student-forms/review-submit';
 import { toast } from "@/components/ui/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { ArrowRight, ArrowLeft, Clock, AlertCircle, Calendar } from 'lucide-react';
 
 // Material interface for staff equipment requests
 interface Material {
@@ -34,29 +32,29 @@ interface DayInfo {
   endTime: string | null;
 }
 
-// Staff reservation form data - same structure as student EVC but with staff defaults
+// Staff reservation form data - FIXED: Match exactly what components expect
 interface StaffReservationFormData {
   days: DayInfo[];
   syncTimes: boolean;
   unifiedStartTime: string | null;
   unifiedEndTime: string | null;
 
-  // Lab reservation fields - staff will use "N/A" defaults
+  // Lab reservation fields
   ProductsManufactured: string | string[];
   ControlNo?: number;
-  LvlSec: string;        // "N/A" for staff
-  NoofStudents: number;  // 0 for staff
-  Subject: string;       // "N/A" for staff  
-  Teacher: string;       // "N/A" for staff
-  TeacherEmail: string;  // "N/A" for staff
-  Topic: string;         // "N/A" for staff
-  SchoolYear: number;    // Current year for staff
+  LvlSec: string;
+  NoofStudents: number;
+  Subject: string;
+  Teacher: string;
+  TeacherEmail: string;
+  Topic: string;
+  SchoolYear: number;
   
   // Equipment and materials
   NeededMaterials: Material[];
-  Students: Student[];   // Empty array for staff
+  Students: Student[];
   
-  // Additional fields
+  // Additional fields that ReviewSubmit expects
   serviceLinks?: {[service: string]: string};
   Remarks?: string;
   Equipment?: string[] | string;
@@ -89,6 +87,7 @@ export default function StaffSchedule() {
     
     serviceLinks: {},
     Remarks: '',
+    BulkofCommodity: 'N/A', // Add this default
   });
   
   const [isLoading, setIsLoading] = useState(false);
@@ -119,19 +118,38 @@ export default function StaffSchedule() {
     );
   };
 
-  // Update form data
+  // FIXED: Single updateFormData function (remove the duplicate)
   const updateFormData = <K extends keyof StaffReservationFormData>(
     field: K, 
     value: StaffReservationFormData[K]
   ) => {
+    console.log(`🔧 Staff form updating ${String(field)}:`, value);
     setFormData(prevData => {
-      console.log(`Staff form updating ${String(field)}:`, value);
-      return {
+      const newData = {
         ...prevData,
         [field]: value
       };
+      console.log('📊 New staff form data:', newData);
+      return newData;
     });
   };
+
+  // FIXED: Create a wrapper for setFormData that matches DateTimeSelection expectations
+  const setFormDataWrapper = React.useCallback((updater: any) => {
+    console.log('🔄 Staff setFormDataWrapper called with:', updater);
+    
+    if (typeof updater === 'function') {
+      setFormData(prevData => {
+        console.log('📊 Previous staff data:', prevData);
+        const result = updater(prevData);
+        console.log('📊 Updated staff data:', result);
+        return { ...prevData, ...result };
+      });
+    } else {
+      console.log('📊 Direct staff data update:', updater);
+      setFormData(prevData => ({ ...prevData, ...updater }));
+    }
+  }, []);
   
   const nextStep = () => {
     // Validation for each step
@@ -217,13 +235,12 @@ export default function StaffSchedule() {
                   <div className="space-y-8">
                     <h2 className="text-xl font-semibold text-gray-800 mb-4">Lab Equipment & Information</h2>
                     <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-                      {/* Pass staff mode flag to modify behavior */}
                       <LabReservation 
                         formData={formData} 
                         updateFormData={updateFormData} 
                         nextStep={nextStep} 
                         prevStep={prevStep}
-                        isStaffMode={true}  // NEW: Enable staff mode
+                        isStaffMode={true}
                       />
                     </div>
                   </div>
@@ -233,11 +250,11 @@ export default function StaffSchedule() {
                     
                     <DateTimeSelection
                       formData={formData}
-                      setFormData={setFormData}
+                      setFormData={setFormDataWrapper}
                       nextStep={nextStep}
                       prevStep={prevStep}
                       isDateBlocked={isDateBlocked}
-                      standalonePage={false}
+                      standalonePage={true}
                     />
                   </div>
                 ) : ( 
@@ -248,7 +265,6 @@ export default function StaffSchedule() {
                       formData={formData} 
                       prevStep={prevStep}
                       updateFormData={updateFormData}
-                      // Staff submissions skip teacher approval
                     />
                   </div>
                 )
