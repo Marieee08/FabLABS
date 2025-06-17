@@ -1,4 +1,4 @@
-// src/components/student-forms/review-submit.tsx - Modified to support staff mode
+// src/components/staff-forms/review-submit.tsx - Fixed version for staff mode
 
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
@@ -96,6 +96,45 @@ const formatSchoolYear = (year: number | undefined): string => {
   return `${year} to ${year + 1}`;
 };
 
+// Fixed time parsing function
+const parseTimeString = (timeString: string, baseDate: Date): Date | null => {
+  if (!timeString || timeString === '--:-- AM' || timeString === '--:-- PM') {
+    return null;
+  }
+  
+  try {
+    // Handle time format like "09:00 AM"
+    const timeRegex = /^(\d+):(\d+)\s+(AM|PM)$/;
+    const matches = timeString.match(timeRegex);
+    
+    if (!matches) {
+      console.warn(`Time string '${timeString}' doesn't match expected format`);
+      return null;
+    }
+    
+    const [, hours, minutes, period] = matches;
+    let hour = parseInt(hours, 10);
+    
+    // Convert to 24-hour format
+    if (period === 'PM' && hour !== 12) hour += 12;
+    if (period === 'AM' && hour === 12) hour = 0;
+    
+    const resultDate = new Date(baseDate);
+    resultDate.setHours(hour, parseInt(minutes, 10), 0, 0);
+    
+    // Validate the resulting date
+    if (isNaN(resultDate.getTime())) {
+      console.warn('Resulting date is invalid after parsing time');
+      return null;
+    }
+    
+    return resultDate;
+  } catch (error) {
+    console.error('Error parsing time string:', error);
+    return null;
+  }
+};
+
 export default function ReviewSubmit({ 
   formData, 
   prevStep, 
@@ -149,6 +188,7 @@ export default function ReviewSubmit({
   
       const token = await getToken();
       
+      // Fixed time processing logic
       const utilTimes = formData.days.map((day, index) => {
         const dateObj = day.date instanceof Date ? day.date : new Date(day.date);
         
@@ -156,17 +196,17 @@ export default function ReviewSubmit({
         let endTimeISO = null;
         
         if (day.startTime) {
-          const [hours, minutes] = day.startTime.split(':');
-          const startTimeDate = new Date(dateObj);
-          startTimeDate.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
-          startTimeISO = startTimeDate.toISOString();
+          const startTimeDate = parseTimeString(day.startTime, dateObj);
+          if (startTimeDate) {
+            startTimeISO = startTimeDate.toISOString();
+          }
         }
         
         if (day.endTime) {
-          const [hours, minutes] = day.endTime.split(':');
-          const endTimeDate = new Date(dateObj);
-          endTimeDate.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
-          endTimeISO = endTimeDate.toISOString();
+          const endTimeDate = parseTimeString(day.endTime, dateObj);
+          if (endTimeDate) {
+            endTimeISO = endTimeDate.toISOString();
+          }
         }
         
         return {
@@ -287,9 +327,9 @@ export default function ReviewSubmit({
           serviceLinks: formData.serviceLinks || {},
         };
 
-        console.log('Sending staff data to utilization API:', JSON.stringify(submissionData, null, 2));
+        console.log('Sending staff data to staff reservation API:', JSON.stringify(submissionData, null, 2));
 
-        const response = await fetch('/api/user/create-reservation', {
+        const response = await fetch('/api/user/create-staff-reservation', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -425,7 +465,7 @@ export default function ReviewSubmit({
         }
 
         setTimeout(() => {
-          router.push('/student-dashboard');
+          router.push('/staff-dashboard');
         }, 3000);
       }
       
@@ -571,7 +611,7 @@ export default function ReviewSubmit({
             </div>
           </div>
 
-          {/* School/Class Information - Modified for staff */}
+          {/* School/Class Information - Hidden for staff */}
           {!isStaffMode && (
             <div className="mb-6">
               <h3 className="text-lg font-medium mb-3 flex items-center">
@@ -618,7 +658,7 @@ export default function ReviewSubmit({
             </div>
           )}
 
-          {/* Students List - Hide for staff */}
+          {/* Students List - Hidden for staff */}
           {!isStaffMode && formData.Students && formData.Students.length > 0 && (
             <div className="mb-6">
               <h3 className="text-lg font-medium mb-3 flex items-center">
