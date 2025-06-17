@@ -7,7 +7,7 @@ import ProgressBar from '@/components/msme-forms/progress-bar';
 import Navbar from '@/components/custom/navbar';
 import LabReservation from '@/components/staff-forms/lab-reservation-staff';
 import DateTimeSelection from '@/components/staff-forms/staff-date-time-selection'; // Keep using the original for now
-import ReviewSubmit from '@/components/student-forms/review-submit';
+import ReviewSubmit from '@/components/staff-forms/review-submit';
 import { toast } from "@/components/ui/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
