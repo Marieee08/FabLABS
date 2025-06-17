@@ -90,7 +90,7 @@ const RadioOption = memo(({
 
 RadioOption.displayName = 'RadioOption';
 
-// Memoized RatingScale component
+// Fixed RatingScale component with proper RadioGroup wrapper
 const RatingScale = memo(({ 
   question, 
   questionKey, 
@@ -111,14 +111,14 @@ const RatingScale = memo(({
   return (
     <div className="mb-6 bg-white p-4 rounded-xl shadow-lg hover:shadow-blue-300/50 transition-all duration-300">
       <Label className="block mb-3 font-qanelas2 text-md text-gray-700">{question}</Label>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+      <RadioGroup value={value} onValueChange={handleChange} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
         {options.map((option) => (
           <div key={option} className="flex items-center space-x-2">
             <RadioGroupItem value={option} id={`${questionKey}-${option}`} className="text-[#193d83] border-[#5e86ca]" />
             <Label htmlFor={`${questionKey}-${option}`} className="font-poppins1 text-sm text-gray-600">{option}</Label>
           </div>
         ))}
-      </div>
+      </RadioGroup>
     </div>
   );
 });
@@ -167,12 +167,12 @@ const InternalSurveyForm = () => {
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   
   const [surveyData, setSurveyData] = useState<InternalSurveyData>({
-    clientType: undefined,
+    clientType: "Government (Employee or another agency)", // Pre-filled for staff
     sex: undefined,
     age: '',
     dateOfTransaction: '',
     officeAvailed: 'SRA OFFICE',
-    serviceAvailed: [],
+    serviceAvailed: ["Availment of school facilities"], // Pre-filled
     otherService: '',
     CC1: undefined,
     CC2: undefined,
@@ -398,89 +398,126 @@ const InternalSurveyForm = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Pre-filled Information Display */}
+              {/* Client Information */}
               <div className="bg-white p-6 rounded-xl shadow-lg">
                 <h3 className="text-lg font-qanelas2 text-gray-800 mb-4">Client Information</h3>
                 
+                <div className="mb-6">
+                  <Label className="block mb-3 font-qanelas2 text-lg text-gray-700">Client type:</Label>
+                  <RadioGroup 
+                    className="flex flex-wrap gap-4" 
+                    value={surveyData.clientType} 
+                    onValueChange={(val) => handleInputChange('clientType', val)}
+                  >
+                    {CLIENT_TYPE_OPTIONS.map((option) => (
+                      <RadioOption 
+                        key={option}
+                        id={`clientType-${option}`}
+                        value={option}
+                        label={option}
+                      />
+                    ))}
+                  </RadioGroup>
+                </div>
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                   <div>
-                    <Label className="block mb-2 font-qanelas2 text-gray-700">Client type:</Label>
-                    <div className="flex gap-4 text-sm">
-                      <span className="flex items-center gap-2">
-                        <span className="w-4 h-4 border border-gray-400"></span> Citizen
-                      </span>
-                      <span className="flex items-center gap-2">
-                        <span className="w-4 h-4 border border-gray-400"></span> Business
-                      </span>
-                      <span className="flex items-center gap-2">
-                        <span className="w-4 h-4 border border-gray-400 bg-black flex items-center justify-center">
-                          <span className="text-white text-xs">✓</span>
-                        </span> Government (Employee or another agency)
-                      </span>
-                    </div>
+                    <Label className="block mb-3 font-qanelas2 text-lg text-gray-700">Sex:</Label>
+                    <RadioGroup 
+                      className="flex space-x-6" 
+                      value={surveyData.sex} 
+                      onValueChange={(val) => handleInputChange('sex', val)}
+                    >
+                      {SEX_OPTIONS.map((option) => (
+                        <RadioOption 
+                          key={option}
+                          id={`sex-${option}`}
+                          value={option}
+                          label={option}
+                        />
+                      ))}
+                    </RadioGroup>
                   </div>
                   <div>
-                    <Label className="block mb-2 font-qanelas2 text-gray-700">Region of residence:</Label>
-                    <div className="border-b border-gray-400 pb-1">
-                      <span className="font-medium">VIII</span>
-                    </div>
+                    <Label htmlFor="age" className="block mb-3 font-qanelas2 text-lg text-gray-700">Age:</Label>
+                    <Input 
+                      id="age" 
+                      type="number" 
+                      min="0" 
+                      max="120" 
+                      placeholder="Enter your age" 
+                      value={surveyData.age} 
+                      onChange={(e) => handleInputChange('age', e.target.value)}
+                      className="w-full border-[#5e86ca] focus:ring-[#193d83]"
+                    />
+                    {validationErrors.age && (
+                      <p className="text-red-500 text-sm mt-1">{validationErrors.age}</p>
+                    )}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                   <div>
-                    <Label className="block mb-2 font-qanelas2 text-gray-700">Sex:</Label>
-                    <div className="flex gap-4 text-sm">
-                      <span className="flex items-center gap-2">
-                        <span className="w-4 h-4 border border-gray-400"></span> Male
-                      </span>
-                      <span className="flex items-center gap-2">
-                        <span className="w-4 h-4 border border-gray-400"></span> Female
-                      </span>
-                    </div>
-                    <Label className="block mt-4 mb-2 font-qanelas2 text-gray-700">Age:</Label>
-                    <div className="border-b border-gray-400 pb-1 w-24">
-                      <span className="text-gray-500">_______</span>
-                    </div>
+                    <Label htmlFor="dateOfTransaction" className="block mb-3 font-qanelas2 text-lg text-gray-700">Date of Transaction:</Label>
+                    <Input 
+                      id="dateOfTransaction" 
+                      type="date"
+                      value={surveyData.dateOfTransaction} 
+                      onChange={(e) => handleInputChange('dateOfTransaction', e.target.value)}
+                      className="w-full border-[#5e86ca] focus:ring-[#193d83]"
+                    />
+                    {validationErrors.dateOfTransaction && (
+                      <p className="text-red-500 text-sm mt-1">{validationErrors.dateOfTransaction}</p>
+                    )}
                   </div>
                   <div>
-                    <Label className="block mb-2 font-qanelas2 text-gray-700">Date of Transaction:</Label>
-                    <div className="border-b border-gray-400 pb-1">
-                      <span className="text-gray-500">_________________</span>
-                    </div>
-                    <Label className="block mt-4 mb-2 font-qanelas2 text-gray-700">Office where the service was availed:</Label>
-                    <div className="border-b border-gray-400 pb-1">
-                      <span className="font-medium">SRA OFFICE</span>
-                    </div>
+                    <Label htmlFor="office" className="block mb-3 font-qanelas2 text-lg text-gray-700">Office where the service was availed:</Label>
+                    <Input 
+                      id="office" 
+                      type="text"
+                      placeholder="Enter office name" 
+                      value={surveyData.officeAvailed} 
+                      onChange={(e) => handleInputChange('officeAvailed', e.target.value)}
+                      className="w-full border-[#5e86ca] focus:ring-[#193d83]"
+                    />
                   </div>
                 </div>
 
                 <div className="mb-6">
-                  <Label className="block mb-3 font-qanelas2 text-gray-700">Service Availed (please check):</Label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="w-4 h-4 border border-gray-400 bg-black flex items-center justify-center">
-                          <span className="text-white text-xs">✓</span>
-                        </span>
-                        <span className="text-sm">Availment of school facilities</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="w-4 h-4 border border-gray-400"></span>
-                        <span className="text-sm">Processing of requests for school credentials<br/>(Students of the current school year)</span>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <span className="w-4 h-4 border border-gray-400"></span>
-                        <span className="text-sm">Processing of requests for personnel documents</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <span className="w-4 h-4 border border-gray-400 mt-1"></span>
-                        <div className="text-sm">
-                          <span>Others (Please specify): </span>
-                          <span className="border-b border-gray-400">____________________</span>
-                        </div>
+                  <Label className="block mb-3 font-qanelas2 text-lg text-gray-700">Service Availed (please check):</Label>
+                  <div className="space-y-2">
+                    {SERVICE_OPTIONS.slice(0, -1).map((service) => (
+                      <CheckboxOption
+                        key={service}
+                        id={`service-${service}`}
+                        label={service}
+                        checked={surveyData.serviceAvailed.includes(service)}
+                        onChange={(checked) => handleCheckboxChange(service, checked)}
+                      />
+                    ))}
+                    
+                    <div className="flex items-start space-x-2">
+                      <Checkbox 
+                        id="service-others" 
+                        checked={surveyData.serviceAvailed.includes("Others")}
+                        onCheckedChange={(checked) => handleCheckboxChange("Others", checked === true)}
+                        className="mt-1 text-[#193d83] border-[#5e86ca]"
+                      />
+                      <div className="flex flex-col">
+                        <Label htmlFor="service-others" className="font-poppins1 text-gray-600">Others (Please specify):</Label>
+                        {surveyData.serviceAvailed.includes("Others") && (
+                          <Input 
+                            id="otherService" 
+                            type="text" 
+                            placeholder="Specify other service" 
+                            value={surveyData.otherService} 
+                            onChange={(e) => handleInputChange('otherService', e.target.value)}
+                            className="mt-2 w-full border-[#5e86ca] focus:ring-[#193d83]"
+                          />
+                        )}
+                        {validationErrors.otherService && (
+                          <p className="text-red-500 text-sm mt-1">{validationErrors.otherService}</p>
+                        )}
                       </div>
                     </div>
                   </div>

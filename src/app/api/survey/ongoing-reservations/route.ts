@@ -7,7 +7,38 @@ import { Decimal } from '@prisma/client/runtime/library';
 
 // Cache results for 1 minute to prevent multiple identical API calls in short periods
 const CACHE_DURATION = 60 * 1000; // 1 minute in milliseconds
-let cachedData: { id: number; Status: string; RequestDate: string; TotalAmntDue: Decimal | null; BulkofCommodity: string | null; ReceiptNumber: string | null; PaymentDate: string | null; UserServices: { id: string; ServiceAvail: string; EquipmentAvail: string; CostsAvail: Decimal | null; MinsAvail: Decimal | null; }[]; UserTools: { id: string; ToolUser: string; ToolQuantity: number; }[]; UtilTimes: { id: number; DayNum: number | null; StartTime: string | null; EndTime: string | null; }[]; accInfo: { Name: string; email: string; }; }[] | null = null;
+let cachedData: { 
+  id: number; 
+  Status: string; 
+  RequestDate: string; 
+  TotalAmntDue: Decimal | null; 
+  BulkofCommodity: string | null; 
+  ReceiptNumber: string | null; 
+  PaymentDate: string | null; 
+  UserServices: { 
+    id: string; 
+    ServiceAvail: string; 
+    EquipmentAvail: string; 
+    CostsAvail: Decimal | null; 
+    MinsAvail: Decimal | null; 
+  }[]; 
+  UserTools: { 
+    id: string; 
+    ToolUser: string; 
+    ToolQuantity: number; 
+  }[]; 
+  UtilTimes: { 
+    id: number; 
+    DayNum: number | null; 
+    StartTime: string | null; 
+    EndTime: string | null; 
+  }[]; 
+  accInfo: { 
+    Name: string; 
+    email: string; 
+    Role: string; // Added Role to the cached data type
+  }; 
+}[] | null = null;
 let cacheTimestamp = 0;
 
 export async function GET() {
@@ -28,7 +59,7 @@ export async function GET() {
       });
     }
 
-    // Use a more focused select to reduce data transferred
+    // Use a more focused select to reduce data transferred, now including Role
     const reservations = await prisma.utilReq.findMany({
       where: {
         Status: 'Ongoing'
@@ -69,6 +100,7 @@ export async function GET() {
           select: {
             Name: true,
             email: true,
+            Role: true, // Added Role to the select
           }
         }
       },
@@ -109,6 +141,7 @@ export async function GET() {
       accInfo: {
         Name: reservation.accInfo?.Name || '',
         email: reservation.accInfo?.email || '',
+        Role: reservation.accInfo?.Role || 'MSME', // Include Role with default fallback
       }
     }));
 
@@ -127,6 +160,4 @@ export async function GET() {
     console.error('[ONGOING_RESERVATIONS_GET]', error);
     return new NextResponse("Internal Error", { status: 500 });
   }
-  
 }
-
