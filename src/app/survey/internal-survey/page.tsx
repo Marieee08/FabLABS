@@ -16,10 +16,9 @@ const SEX_OPTIONS = ["Male", "Female"];
 const CLIENT_TYPE_OPTIONS = ["Citizen", "Business", "Government (Employee or another agency)"];
 
 const SERVICE_OPTIONS = [
-  "Application for Incoming Grade 7 Students",
-  "Freshmen Enrollment", 
-  "Application for Incoming Grade 8 and Grade 9 Transfer Student",
-  "Processing of request for School credentials (alumni)",
+  "Availment of school facilities",
+  "Processing of requests for school credentials (Students of the current school year)",
+  "Processing of requests for personnel documents",
   "Others"
 ];
 
@@ -161,10 +160,10 @@ const InternalSurveyForm = () => {
   const searchParams = useSearchParams();
   const reservationId = searchParams.get('reservationId');
   
-  const [userRole, setUserRole] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+  const [reservationData, setReservationData] = useState<any>(null);
   
   const [surveyData, setSurveyData] = useState<InternalSurveyData>({
     clientType: "Government (Employee or another agency)", // Pre-filled for staff
@@ -172,7 +171,7 @@ const InternalSurveyForm = () => {
     age: '',
     dateOfTransaction: '',
     officeAvailed: 'SRA OFFICE',
-    serviceAvailed: ["Availment of school facilities"], // Pre-filled
+    serviceAvailed: ["Availment of school facilities"], // Pre-filled and locked
     otherService: '',
     CC1: undefined,
     CC2: undefined,
@@ -202,7 +201,7 @@ const InternalSurveyForm = () => {
     return '';
   }, []);
 
-  // Fetch user role only once on mount
+  // Fetch reservation data and validate access
   useEffect(() => {
     if (!reservationId) {
       toast({
@@ -216,41 +215,58 @@ const InternalSurveyForm = () => {
     
     const abortController = new AbortController();
     
-    const fetchUserRole = async () => {
+    const fetchReservationData = async () => {
       try {
-        const response = await fetch('/api/auth/check-roles', {
+        // First, get the ongoing reservations to check the reservation owner's role
+        const response = await fetch('/api/survey/ongoing-reservations', {
           signal: abortController.signal
         });
         
         if (!response.ok) {
-          throw new Error('Failed to fetch user role');
+          throw new Error('Failed to fetch reservations');
         }
         
-        const data = await response.json();
+        const reservations = await response.json();
+        const reservation = reservations.find((r: any) => r.id === parseInt(reservationId));
         
-        if (data.role !== 'STAFF') {
+        if (!reservation) {
           toast({
-            title: "Access Denied",
-            description: "You need staff access to view this page.",
+            title: "Error",
+            description: "Reservation not found.",
             variant: "destructive",
           });
-          router.push('/');
+          router.push('/survey');
           return;
         }
         
-        setUserRole('STAFF');
+        // Check if this reservation belongs to a STAFF member
+        if (reservation.accInfo.Role !== 'STAFF') {
+          toast({
+            title: "Access Denied",
+            description: "This survey is only for staff reservations.",
+            variant: "destructive",
+          });
+          router.push(`/survey/questionnaire?reservationId=${reservationId}`);
+          return;
+        }
+        
+        setReservationData(reservation);
       } catch (error) {
         if (!(error instanceof DOMException && error.name === 'AbortError')) {
-          console.error('Error fetching user role:', error);
-          // Fallback for development
-          setUserRole('STAFF');
+          console.error('Error fetching reservation data:', error);
+          toast({
+            title: "Error",
+            description: "Failed to load reservation data.",
+            variant: "destructive",
+          });
+          router.push('/survey');
         }
       } finally {
         setIsLoading(false);
       }
     };
   
-    fetchUserRole();
+    fetchReservationData();
     
     return () => {
       abortController.abort();
@@ -279,6 +295,11 @@ const InternalSurveyForm = () => {
   }, [validateAge, validateDate, validateOtherService]);
 
   const handleCheckboxChange = useCallback((service: string, checked: boolean) => {
+    // Prevent unchecking "Availment of school facilities" as it's locked
+    if (service === "Availment of school facilities" && !checked) {
+      return;
+    }
+    
     setSurveyData(prev => {
       if (checked) {
         return { ...prev, serviceAvailed: [...prev.serviceAvailed, service] };
@@ -363,8 +384,29 @@ const InternalSurveyForm = () => {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <p className="text-xl text-gray-600">Loading survey...</p>
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="py-8 pt-28 px-4">
+          <div className="flex justify-center items-center h-64">
+            <div className="inline-flex items-center gap-3">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+              <p className="text-xl text-gray-600">Loading survey...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!reservationData) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="py-8 pt-28 px-4">
+          <div className="flex justify-center items-center h-64">
+            <p className="text-xl text-gray-600">Survey not found or access denied.</p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -386,6 +428,11 @@ const InternalSurveyForm = () => {
                 CLIENT SATISFACTION SURVEY
               </CardTitle>
               <p className="text-sm text-gray-600">(Internal Clients)</p>
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-sm text-blue-800">
+                  Survey for: <strong>{reservationData.accInfo.Name}</strong> (STAFF)
+                </p>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -404,20 +451,22 @@ const InternalSurveyForm = () => {
                 
                 <div className="mb-6">
                   <Label className="block mb-3 font-qanelas2 text-lg text-gray-700">Client type:</Label>
-                  <RadioGroup 
-                    className="flex flex-wrap gap-4" 
-                    value={surveyData.clientType} 
-                    onValueChange={(val) => handleInputChange('clientType', val)}
-                  >
-                    {CLIENT_TYPE_OPTIONS.map((option) => (
-                      <RadioOption 
-                        key={option}
-                        id={`clientType-${option}`}
-                        value={option}
-                        label={option}
-                      />
-                    ))}
-                  </RadioGroup>
+                  <div className="flex flex-wrap gap-4">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-4 h-4 border-2 border-gray-400 rounded-sm"></div>
+                      <Label className="font-poppins1 text-gray-600">Citizen</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-4 h-4 border-2 border-gray-400 rounded-sm"></div>
+                      <Label className="font-poppins1 text-gray-600">Business</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <div className="w-4 h-4 border-2 border-gray-400 rounded-sm bg-black flex items-center justify-center">
+                        <span className="text-white text-xs font-bold">✓</span>
+                      </div>
+                      <Label className="font-poppins1 text-gray-600 font-semibold">Government (Employee or another agency)</Label>
+                    </div>
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -458,6 +507,18 @@ const InternalSurveyForm = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                   <div>
+                    <Label className="block mb-3 font-qanelas2 text-lg text-gray-700">Region of residence:</Label>
+                    <div className="p-3 bg-gray-50 rounded border border-gray-300">
+                      <span className="font-semibold text-gray-800">VIII</span>
+                    </div>
+                  </div>
+                  <div>
+                    {/* Empty space - no second age field needed */}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                  <div>
                     <Label htmlFor="dateOfTransaction" className="block mb-3 font-qanelas2 text-lg text-gray-700">Date of Transaction:</Label>
                     <Input 
                       id="dateOfTransaction" 
@@ -471,22 +532,26 @@ const InternalSurveyForm = () => {
                     )}
                   </div>
                   <div>
-                    <Label htmlFor="office" className="block mb-3 font-qanelas2 text-lg text-gray-700">Office where the service was availed:</Label>
-                    <Input 
-                      id="office" 
-                      type="text"
-                      placeholder="Enter office name" 
-                      value={surveyData.officeAvailed} 
-                      onChange={(e) => handleInputChange('officeAvailed', e.target.value)}
-                      className="w-full border-[#5e86ca] focus:ring-[#193d83]"
-                    />
+                    <Label className="block mb-3 font-qanelas2 text-lg text-gray-700">Office where the service was availed:</Label>
+                    <div className="p-3 bg-gray-50 rounded border border-gray-300">
+                      <span className="font-semibold text-gray-800">SRA OFFICE</span>
+                    </div>
                   </div>
                 </div>
 
                 <div className="mb-6">
                   <Label className="block mb-3 font-qanelas2 text-lg text-gray-700">Service Availed (please check):</Label>
                   <div className="space-y-2">
-                    {SERVICE_OPTIONS.slice(0, -1).map((service) => (
+                    {/* Pre-checked and locked "Availment of school facilities" */}
+                    <div className="flex items-start space-x-2">
+                      <div className="w-4 h-4 border-2 border-gray-400 rounded-sm bg-black flex items-center justify-center mt-1">
+                        <span className="text-white text-xs font-bold">✓</span>
+                      </div>
+                      <Label className="font-poppins1 text-gray-600 font-semibold">Availment of school facilities</Label>
+                    </div>
+                    
+                    {/* Other selectable options */}
+                    {SERVICE_OPTIONS.slice(1, -1).map((service) => (
                       <CheckboxOption
                         key={service}
                         id={`service-${service}`}
