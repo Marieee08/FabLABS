@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import ProgressBar from '@/components/msme-forms/progress-bar';
 import Navbar from '@/components/custom/navbar';
-import LabReservation from '@/components/student-forms/lab-reservation';
+import LabReservation from '@/components/staff-forms/lab-reservation-staff';
 import DateTimeSelection from '@/components/student-forms/date-time-selection';
 import ReviewSubmit from '@/components/student-forms/review-submit';
 import { toast } from "@/components/ui/use-toast";
