@@ -84,13 +84,15 @@ const ReservationCard = memo(({
     <div className="bg-white rounded-lg shadow p-4 border border-gray-100 hover:border-blue-200 transition-all">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h3 className="font-semibold text-lg">{reservation.UserServices?.map(s => s.ServiceAvail).join(', ') || 'No services'}</h3>
+          <h3 className="font-semibold text-lg">{reservation.accInfo.Name}</h3>
           <div className="flex flex-wrap gap-2 mt-1.5">
+            <span className="text-gray-600 text-sm">
+              {reservation.UserServices?.map(s => s.ServiceAvail).join(', ') || 'No services'}
+            </span>
+            <span className="text-gray-600 text-sm">•</span>
             <span className="text-gray-600 text-sm">
               {reservation.RequestDate ? new Date(reservation.RequestDate).toLocaleDateString() : 'No date'}
             </span>
-            <span className="text-gray-600 text-sm">•</span>
-            <span className="text-gray-600 text-sm">{reservation.accInfo.Name}</span>
             <span className={`text-sm px-2 py-0.5 rounded-full ${statusColor}`}>
               {reservation.Status}
             </span>
