@@ -100,16 +100,20 @@ export default function LabReservation({
   updateFormData, 
   nextStep, 
   prevStep,
-  userRole = "STUDENT" // NEW: Default to false for students
+  userRole = "STUDENT"
 }: LabReservationProps) {
+  // State declarations
   const { user, isLoaded } = useUser();
   const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
   const [newStudentAdded, setNewStudentAdded] = useState(false);
+  const [isVerifyingEmail, setIsVerifyingEmail] = useState(false);
+  const [emailVerificationStatus, setEmailVerificationStatus] = useState<'valid' | 'invalid' | 'pending' | null>(null);
   const newStudentInputRef = useRef<HTMLInputElement>(null);
   const hasInitialized = useRef(false);
-   const isStaff = userRole === 'STAFF';
+  const isStaff = userRole === 'STAFF';
+  
   // Services and machines handling
   const [services, setServices] = useState<Service[]>([]);
   const [isLoadingServices, setIsLoadingServices] = useState(true);
@@ -117,12 +121,62 @@ export default function LabReservation({
   const [availableMachines, setAvailableMachines] = useState<Record<string, any[]>>({});
   const [selectedService, setSelectedService] = useState<string>('');
   const [selectedMachines, setSelectedMachines] = useState<SelectedMachine[]>([]);
-  const [isVerifyingEmail, setIsVerifyingEmail] = useState(false);
-  const [emailVerificationStatus, setEmailVerificationStatus] = useState<'valid' | 'invalid' | 'pending' | null>(null);
+
+  // Only one verifyTeacherEmail function (using useCallback)
+  const verifyTeacherEmail = useCallback(async (email: string): Promise<boolean> => {
+    if (isStaff) return true;
+    
+    if (!email || !email.trim()) {
+      setEmailVerificationStatus(null);
+      return false;
+    }
+    
+    setIsVerifyingEmail(true);
+    setEmailVerificationStatus('pending');
+    
+    try {
+      const response = await fetch('/api/verify-teacher-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim() })
+      });
+      
+      const data = await response.json();
+      
+      if (data.verified) {
+        setEmailVerificationStatus('valid');
+        setErrors(prev => {
+          const newErrors = {...prev};
+          delete newErrors.TeacherEmail;
+          return newErrors;
+        });
+        return true;
+      } else {
+        setEmailVerificationStatus('invalid');
+        setErrors(prev => ({ 
+          ...prev, 
+          TeacherEmail: "This teacher's email is not registered in our system" 
+        }));
+        return false;
+      }
+    } catch (err) {
+      console.error('Error verifying teacher email:', err);
+      setEmailVerificationStatus('invalid');
+      setErrors(prev => ({ 
+        ...prev, 
+        TeacherEmail: "Error verifying teacher email. Please try again." 
+      }));
+      return false;
+    } finally {
+      setIsVerifyingEmail(false);
+    }
+  }, [isStaff]);
 
   // Initialize students state
   const [students, setStudents] = useState<Student[]>(formData.Students || []);
   const currentYear = new Date().getFullYear();
+
+  // Rest of your component code...
 
   // NEW: Initialize staff defaults when in staff mode
   useEffect(() => {
@@ -444,7 +498,17 @@ const verifyTeacherEmail = async (email: string): Promise<boolean> => {
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [formData, students, currentYear, selectedService, selectedMachines, availableMachines, errors.TeacherEmail, isStaff, verifyTeacherEmail]);
+  }, [
+    formData, 
+    students, 
+    currentYear, 
+    selectedService, 
+    selectedMachines, 
+    availableMachines, 
+    errors.TeacherEmail, 
+    isStaff, 
+    verifyTeacherEmail // Add verifyTeacherEmail to dependencies
+  ]);
 
   // Handle submit
   const handleSubmit = async (e: React.FormEvent) => {
