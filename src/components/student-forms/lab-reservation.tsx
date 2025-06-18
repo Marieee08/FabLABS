@@ -589,7 +589,7 @@ export default function LabReservation({
                     value={formData.LvlSec}
                     onChange={(e) => handleFieldChange('LvlSec', e.target.value)}
                     aria-invalid={!!errors.LvlSec}
-                    placeholder={isStaff ? "N/A (Staff)" : "e.g. Grade 10-A"}
+                    placeholder={isStaff ? "N/A (Staff)" : "e.g. 11-A"}
                     readOnly={isStaff}
                   />
                   {errors.LvlSec && <p className="mt-1 text-sm text-red-500">{errors.LvlSec}</p>}
