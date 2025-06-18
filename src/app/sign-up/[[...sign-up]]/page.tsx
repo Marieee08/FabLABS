@@ -10,24 +10,74 @@ export default function Page() {
     const { isSignedIn } = useAuth();
     const router = useRouter();
     const [showTransition, setShowTransition] = useState(false);
+    const [isRedirecting, setIsRedirecting] = useState(false);
     
-    // Monitor sign-up state
+    // Monitor sign-up state and handle redirect manually
     useEffect(() => {
-        // When user signs up successfully, show transition screen
-        if (isSignedIn && !showTransition) {
+        const handleSuccessfulSignUp = async () => {
+            if (!isSignedIn || showTransition) return;
+            
             setShowTransition(true);
+            setIsRedirecting(true);
             
-            // Add delay before redirecting to ensure transition is visible
-            const redirectTimer = setTimeout(() => {
-                router.push('/user-dashboard');
-            }, 2500);
-            
-            return () => clearTimeout(redirectTimer);
-        }
+            try {
+                // Wait a bit for Clerk to fully process the user
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Call your new-user endpoint to create database record
+                const newUserResponse = await fetch('/api/auth/new-user', {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+                
+                if (!newUserResponse.ok) {
+                    console.error('Failed to create user in database');
+                    // Still continue with role check
+                }
+                
+                // Add delay for transition animation
+                await new Promise(resolve => setTimeout(resolve, 800));
+                
+                // Check user role and redirect (same logic as sign-in page)
+                const response = await fetch('/api/auth/check-roles');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch role');
+                }
+                
+                const data = await response.json();
+                const userRole = data.role;
+
+                // Add another small delay before redirecting
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                // Redirect based on role (same as sign-in page)
+                if (userRole === "SURVEY") {
+                    router.push('/survey');
+                } else if (userRole === "ADMIN") {
+                    router.push('/admin-dashboard');
+                } else if (userRole === "STUDENT") {
+                    router.push('/student-dashboard');
+                } else if (userRole === "CASHIER") {
+                    router.push('/cashier-dashboard');
+                } else {
+                    router.push('/user-dashboard');
+                }
+                
+            } catch (error) {
+                console.error('Error during sign-up completion:', error);
+                setIsRedirecting(false);
+                setShowTransition(false);
+                // Fallback redirect
+                setTimeout(() => router.push('/user-dashboard'), 1000);
+            }
+        };
+        
+        handleSuccessfulSignUp();
     }, [isSignedIn, showTransition, router]);
+
     return (
         <>
-            {/* Full-screen transition overlay - shows after successful sign-up */}
+            {/* Full-screen transition overlay */}
             {showTransition && (
                 <div className="fixed inset-0 bg-[#0b1d41] bg-opacity-95 z-50 flex flex-col items-center justify-center transition-opacity duration-500">
                     <Image src="/images/logos/SSF-logo.png" alt="FabLAB Logo" width={72} height={72} className="mb-6 animate-pulse" />
@@ -98,19 +148,26 @@ export default function Page() {
                 
                 {/* Right Side - Sign Up Form */}
                 <div className="w-full md:w-1/2 flex justify-center items-center p-4 md:p-8">
-                    <div className="w-full max-w-md p-8 bg-white rounded-xl shadow-md">
-                        <SignUp 
-                            routing="path" 
-                            path="/sign-up" 
-                            redirectUrl="/"
-                            appearance={{
-                                layout: {
-                                    socialButtonsPlacement: "top",
-                                    socialButtonsVariant: "blockButton",
-                                }
-                            }}
-                        />
-                    </div>
+                    {isRedirecting ? (
+                        <div className="flex flex-col items-center justify-center">
+                            <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-200 border-t-blue-600 mb-4"></div>
+                            <p className="text-lg font-medium text-gray-700">Creating your account...</p>
+                        </div>
+                    ) : (
+                        <div className="w-full max-w-md p-8 bg-white rounded-xl shadow-md">
+                            <SignUp 
+                                routing="path" 
+                                path="/sign-up"
+                                // Remove the redirectUrl to let us handle it manually
+                                appearance={{
+                                    layout: {
+                                        socialButtonsPlacement: "top",
+                                        socialButtonsVariant: "blockButton",
+                                    }
+                                }}
+                            />
+                        </div>
+                    )}
                 </div>
             </div>
             

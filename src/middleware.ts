@@ -34,7 +34,7 @@ export default authMiddleware({
     '/sign-up',
     '/sign-up/(.*)',
     '/contact',
-    '/api/new-user',
+    '/api/auth/new-user',
     '/api/auth/check-roles'
   ],
 });

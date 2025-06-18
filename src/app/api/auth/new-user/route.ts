@@ -1,21 +1,19 @@
 // app/api/auth/new-user/route.ts
 import { NextResponse } from 'next/server';
 import { currentUser, auth } from '@clerk/nextjs/server';
-import { prisma } from '@/lib/prisma'; // Use your existing prisma instance
+import { prisma } from '@/lib/prisma';
 
 export async function GET() {
   try {
-    // Fix 1: Await auth() for Next.js 15 compatibility
     const { userId } = await auth();
     if (!userId) return new NextResponse('Unauthorized', { status: 401 });
 
-    // Fix 2: Await currentUser() for Next.js 15 compatibility  
     const user = await currentUser();
     if (!user) return new NextResponse('User not found', { status: 404 });
 
     const email = user.emailAddresses[0].emailAddress;
     
-    // Fix 3: Check if user already exists to avoid duplicate creation
+    // Check if user already exists to avoid duplicate creation
     const existingUser = await prisma.accInfo.findFirst({
       where: {
         OR: [
@@ -52,8 +50,8 @@ export async function GET() {
       userRole = 'STUDENT';
     }
     
-    // Create user (only if they don't exist)
-    const dbUser = await prisma.accInfo.create({ 
+    // Create user
+    await prisma.accInfo.create({ 
       data: {
         clerkId: userId,
         Name: `${user.firstName} ${user.lastName}`, 

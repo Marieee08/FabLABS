@@ -60,20 +60,40 @@ export default function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
         } else {
           console.log('Fetching fresh role from API');
           setLoadingText("Verifying your access...");
-          const response = await fetch('/api/auth/check-roles');
-          const data = await response.json();
-          role = data.role;
+          
+          try {
+            const response = await fetch('/api/auth/check-roles');
+            
+            if (!response.ok) {
+              throw new Error(`API responded with status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            role = data.role;
+            
+            // Add validation to ensure role exists
+            if (!role) {
+              console.error('No role returned from API');
+              role = 'MSME'; // Default fallback role
+            }
 
-          // Save to cache
-          roleCache = {
-            role,
-            timestamp: Date.now()
-          };
+            // Save to cache
+            roleCache = {
+              role,
+              timestamp: Date.now()
+            };
+          } catch (fetchError) {
+            console.error('Failed to fetch role:', fetchError);
+            // Fallback to default role if API fails
+            role = 'MSME';
+          }
         }
 
         // If user isn't authorized for this page, redirect to their appropriate dashboard
         if (!allowedRoles.includes(role)) {
-          setLoadingText(`Redirecting to ${role.toLowerCase()} dashboard...`);
+          // Add null check for role before calling toLowerCase()
+          const roleText = role ? role.toLowerCase() : 'default';
+          setLoadingText(`Redirecting to ${roleText} dashboard...`);
           setLoadingProgress(100);
           
           setTimeout(() => {
@@ -97,10 +117,10 @@ export default function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
                 router.push('/staff-dashboard');
                 break;
               default:
-                router.push('/');
+                router.push('/user-dashboard'); // Changed from '/' to '/user-dashboard'
                 break;
             }
-          }, 700); // Small delay for smooth transition
+          }, 700);
           return;
         }
         
