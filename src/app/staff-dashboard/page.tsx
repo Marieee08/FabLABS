@@ -272,7 +272,7 @@ const DashboardUser = () => {
                   <div className="bg-blue-50 p-6 rounded-lg text-center">
                     <p className="text-blue-800">You don&apos;t have any pending reservations at the moment.</p>
                     <Link
-                      href="/student-schedule"
+                      href="/staff-schedule"
                       className="mt-4 inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                       onClick={() => setIsCreatingReservation(true)}
                     >
@@ -471,21 +471,7 @@ const DashboardUser = () => {
                 </div>
               </div>
 
-              {/* Students Information */}
-              <div className="border-b pb-4">
-                <h3 className="font-medium text-gray-900 mb-2">Students</h3>
-                {selectedEVCReservation.EVCStudents && selectedEVCReservation.EVCStudents.length > 0 ? (
-                  <div className="bg-gray-50 p-3 rounded">
-                    <ul className="list-disc pl-5 space-y-1">
-                      {selectedEVCReservation.EVCStudents.map((student, index) => (
-                        <li key={index} className="text-gray-700">{student.Students || 'Unnamed student'}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : (
-                  <p className="text-gray-500 bg-gray-50 p-3 rounded">No student information available</p>
-                )}
-              </div>
+        
 
               {/* Materials Information */}
               <div>
