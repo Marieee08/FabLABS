@@ -392,55 +392,6 @@ export default function LabReservation({
     updateFormData(field, value);
   };
 
-// Teacher email verification (skip for staff)
-const verifyTeacherEmail = async (email: string): Promise<boolean> => {
-  if (isStaff) return true; // Skip verification for staff
-  
-  if (!email || !email.trim()) {
-    setEmailVerificationStatus(null);
-    return false;
-  }
-  
-  setIsVerifyingEmail(true);
-  setEmailVerificationStatus('pending');
-  
-  try {
-    const response = await fetch('/api/verify-teacher-email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.trim() })
-    });
-    
-    const data = await response.json();
-    
-    if (data.verified) {
-      setEmailVerificationStatus('valid');
-      setErrors(prev => {
-        const newErrors = {...prev};
-        delete newErrors.TeacherEmail;
-        return newErrors;
-      });
-      return true;
-    } else {
-      setEmailVerificationStatus('invalid');
-      setErrors(prev => ({ 
-        ...prev, 
-        TeacherEmail: "This teacher's email is not registered in our system" 
-      }));
-      return false;
-    }
-  } catch (err) {
-    console.error('Error verifying teacher email:', err);
-    setEmailVerificationStatus('invalid');
-    setErrors(prev => ({ 
-      ...prev, 
-      TeacherEmail: "Error verifying teacher email. Please try again." 
-    }));
-    return false;
-  } finally {
-    setIsVerifyingEmail(false);
-  }
-};
 
   // Validate form - modified for staff mode
   const validateForm = useCallback(async (): Promise<boolean> => {
