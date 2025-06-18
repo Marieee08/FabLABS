@@ -65,7 +65,7 @@ interface AppFormData {
   Students: Student[];
 }
 
-// Fixed UpdateFormData type to match what ReviewSubmit expects
+// More flexible UpdateFormData type
 type UpdateFormData = <K extends keyof AppFormData>(field: K, value: AppFormData[K]) => void;
 
 // Interface for blocked dates data structure
@@ -190,10 +190,10 @@ export default function Schedule() {
     );
   }, [blockedDates]);
 
-  // Fixed updateFormData function with proper typing
+  // Memoized update function to avoid re-creation
   const updateFormData = useCallback<UpdateFormData>(<K extends keyof AppFormData>(field: K, value: AppFormData[K]) => {
-    setFormData(prevData => ({ ...prevData, [field]: value }));
-  }, []);
+  setFormData(prevData => ({ ...prevData, [field]: value }));
+}, []);
 
   // Create a wrapper for setFormData that matches DateTimeSelection expectations
   const setFormDataWrapper = useCallback((updater: any) => {
@@ -205,6 +205,11 @@ export default function Schedule() {
     } else {
       setFormData(prevData => ({ ...prevData, ...updater }));
     }
+  }, []);
+
+  // Create a generic update function for components that expect different signatures
+  const genericUpdateFormData = useCallback((field: any, value: any) => {
+    setFormData(prevData => ({ ...prevData, [field]: value }));
   }, []);
   
   // Navigation functions with scrolling
@@ -320,7 +325,7 @@ export default function Schedule() {
           />
         );
     }
-  }, [step, isLoading, formData, nextStep, prevStep, updateFormData, isDateBlocked, showMachineCalendar, toggleMachineCalendar, machines, setFormDataWrapper]);
+  }, [step, isLoading, formData, nextStep, prevStep, updateFormData, isDateBlocked, showMachineCalendar, toggleMachineCalendar, machines, setFormDataWrapper, genericUpdateFormData]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">

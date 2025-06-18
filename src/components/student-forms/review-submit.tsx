@@ -53,25 +53,30 @@ interface UserService {
 
 interface FormData {
   days: Day[];
-  syncTimes?: boolean;
-  unifiedStartTime?: string | null;
-  unifiedEndTime?: string | null;
+  syncTimes: boolean;
+  unifiedStartTime: string | null;
+  unifiedEndTime: string | null;
+  // UtilizationInfo fields
   ProductsManufactured: string | string[];
-  BulkofCommodity?: string;
+  BulkofCommodity: string;
   Equipment: string[] | string;
   Tools: string;
-  ToolsQty?: number;
+  serviceLinks?: {[service: string]: string};
+  Remarks?: string;
   ControlNo?: number;
-  LvlSec?: string;
-  NoofStudents?: number;
-  Subject?: string;
-  Teacher?: string;
-  TeacherEmail?: string;
-  Topic?: string;
-  SchoolYear?: number;
-  NeededMaterials?: Material[];
-  Students?: Student[];
-  [key: string]: any;
+  LvlSec: string;
+  NoofStudents: number;
+  Subject: string;
+  Teacher: string;
+  TeacherEmail: string; 
+  Topic: string;
+  SchoolYear: number;
+  
+  // Needed Materials array
+  NeededMaterials: Material[];
+  
+  // Students array
+  Students: Student[];
 }
 
 interface ReviewSubmitProps {
