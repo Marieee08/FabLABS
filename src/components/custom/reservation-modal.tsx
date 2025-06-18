@@ -49,20 +49,38 @@ const ReservationModal: React.FC<ReservationModalProps> = ({
   const getReservationStatusBadge = (status: string): JSX.Element => {
     let color = "";
     switch (status.toLowerCase()) {
-      case 'approved':
-        color = "bg-green-100 text-green-700 border-green-300";
-        break;
       case 'pending':
-        color = "bg-yellow-100 text-yellow-700 border-yellow-300";
+        color = "bg-yellow-100 text-yellow-800 border-yellow-300";
         break;
-      case 'rejected':
-        color = "bg-red-100 text-red-700 border-red-300";
+      case 'pending teacher approval':
+        color = "bg-amber-100 text-amber-800 border-amber-300";
+        break;
+      case 'pending admin approval':
+        color = "bg-orange-100 text-orange-800 border-orange-300";
+        break;
+      case 'approved':
+        color = "bg-blue-100 text-blue-800 border-blue-300";
         break;
       case 'completed':
-        color = "bg-blue-100 text-blue-700 border-blue-300";
+        color = "bg-green-100 text-green-800 border-green-300";
+        break;
+      case 'rejected':
+        color = "bg-red-100 text-red-800 border-red-300";
+        break;
+      case 'cancelled':
+        color = "bg-red-100 text-red-800 border-red-300";
+        break;
+      case 'pending payment':
+        color = "bg-yellow-100 text-yellow-800 border-yellow-300";
+        break;
+      case 'paid':
+        color = "bg-emerald-100 text-emerald-800 border-emerald-300";
+        break;
+      case 'ongoing':
+        color = "bg-indigo-100 text-indigo-800 border-indigo-300";
         break;
       default:
-        color = "bg-gray-100 text-gray-700 border-gray-300";
+        color = "bg-gray-100 text-gray-800 border-gray-300";
     }
     
     return (
@@ -71,7 +89,6 @@ const ReservationModal: React.FC<ReservationModalProps> = ({
       </Badge>
     );
   };
-
   const handleViewDetails = async () => {
     try {
       // Close the current basic modal
