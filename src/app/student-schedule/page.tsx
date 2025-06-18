@@ -325,7 +325,7 @@ export default function Schedule() {
           />
         );
     }
-  }, [step, isLoading, formData, nextStep, prevStep, updateFormData, isDateBlocked, showMachineCalendar, toggleMachineCalendar, machines, setFormDataWrapper, genericUpdateFormData]);
+  }, [step, isLoading, formData, nextStep, prevStep, updateFormData, isDateBlocked, showMachineCalendar, toggleMachineCalendar, machines, setFormDataWrapper]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">

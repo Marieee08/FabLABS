@@ -338,6 +338,56 @@ export default function LabReservation({
     updateFormData(field, value);
   };
 
+// Teacher email verification (skip for staff)
+const verifyTeacherEmail = async (email: string): Promise<boolean> => {
+  if (isStaff) return true; // Skip verification for staff
+  
+  if (!email || !email.trim()) {
+    setEmailVerificationStatus(null);
+    return false;
+  }
+  
+  setIsVerifyingEmail(true);
+  setEmailVerificationStatus('pending');
+  
+  try {
+    const response = await fetch('/api/verify-teacher-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim() })
+    });
+    
+    const data = await response.json();
+    
+    if (data.verified) {
+      setEmailVerificationStatus('valid');
+      setErrors(prev => {
+        const newErrors = {...prev};
+        delete newErrors.TeacherEmail;
+        return newErrors;
+      });
+      return true;
+    } else {
+      setEmailVerificationStatus('invalid');
+      setErrors(prev => ({ 
+        ...prev, 
+        TeacherEmail: "This teacher's email is not registered in our system" 
+      }));
+      return false;
+    }
+  } catch (err) {
+    console.error('Error verifying teacher email:', err);
+    setEmailVerificationStatus('invalid');
+    setErrors(prev => ({ 
+      ...prev, 
+      TeacherEmail: "Error verifying teacher email. Please try again." 
+    }));
+    return false;
+  } finally {
+    setIsVerifyingEmail(false);
+  }
+};
+
   // Validate form - modified for staff mode
   const validateForm = useCallback(async (): Promise<boolean> => {
     const newErrors: FormErrors = {};
@@ -394,7 +444,7 @@ export default function LabReservation({
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [formData, students, currentYear, selectedService, selectedMachines, availableMachines, errors.TeacherEmail, isStaff]);
+  }, [formData, students, currentYear, selectedService, selectedMachines, availableMachines, errors.TeacherEmail, isStaff, verifyTeacherEmail]);
 
   // Handle submit
   const handleSubmit = async (e: React.FormEvent) => {
@@ -416,55 +466,6 @@ export default function LabReservation({
     setIsSubmitting(false);
   };
 
-  // Teacher email verification (skip for staff)
-  const verifyTeacherEmail = async (email: string): Promise<boolean> => {
-    if (isStaff) return true; // Skip verification for staff
-    
-    if (!email || !email.trim()) {
-      setEmailVerificationStatus(null);
-      return false;
-    }
-    
-    setIsVerifyingEmail(true);
-    setEmailVerificationStatus('pending');
-    
-    try {
-      const response = await fetch('/api/verify-teacher-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim() })
-      });
-      
-      const data = await response.json();
-      
-      if (data.verified) {
-        setEmailVerificationStatus('valid');
-        setErrors(prev => {
-          const newErrors = {...prev};
-          delete newErrors.TeacherEmail;
-          return newErrors;
-        });
-        return true;
-      } else {
-        setEmailVerificationStatus('invalid');
-        setErrors(prev => ({ 
-          ...prev, 
-          TeacherEmail: "This teacher's email is not registered in our system" 
-        }));
-        return false;
-      }
-    } catch (err) {
-      console.error('Error verifying teacher email:', err);
-      setEmailVerificationStatus('invalid');
-      setErrors(prev => ({ 
-        ...prev, 
-        TeacherEmail: "Error verifying teacher email. Please try again." 
-      }));
-      return false;
-    } finally {
-      setIsVerifyingEmail(false);
-    }
-  };
 
   const inputStyles = `
     .no-spin-buttons::-webkit-inner-spin-button,
@@ -493,7 +494,7 @@ export default function LabReservation({
               <div>
                 <h4 className="text-blue-800 font-medium">Staff Reservation Mode</h4>
                 <p className="text-blue-700 text-sm mt-1">
-                  Educational fields have been pre-filled with "N/A" as this is a staff equipment reservation.
+                  Educational fields have been pre-filled with &quot;N/A&quot; as this is a staff equipment reservation.
                   Your request will go directly to admin approval without requiring teacher approval.
                 </p>
               </div>
@@ -798,7 +799,7 @@ export default function LabReservation({
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                     </svg>
-                    <p className="mt-2 text-gray-500">No students added yet. Click "Add Student" to begin.</p>
+                    <p className="mt-2 text-gray-500">No students added yet. Click &quot;Add Student&quot; to begin.</p>
                   </div>
                 )}
               </div>
