@@ -1,15 +1,13 @@
-// /api/user/create-evc-reservation
+// /api/user/create-evc-reservation/route.ts
 
 import { auth } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 
-// Create a single instance for better connection management
 const prisma = new PrismaClient();
 
 export async function POST(request: Request) {
   try {
-    // Get auth data synchronously - no need for await here
     const { userId } = auth();
     
     if (!userId) {
@@ -18,7 +16,7 @@ export async function POST(request: Request) {
     
     const data = await request.json();
     
-    // Validate required data early to fail fast
+    // Validate required data
     if (!data.UtilTimes?.length) {
       return NextResponse.json(
         { error: 'At least one date and time must be selected' },
@@ -26,10 +24,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check if the user account exists - use findUnique for better performance
+    // Check if the user account exists and get their role
     const userAccount = await prisma.accInfo.findUnique({
       where: { clerkId: userId },
-      select: { id: true } // Only select what we need - improves query speed
+      select: { id: true, Role: true }
     });
 
     if (!userAccount) {
@@ -39,36 +37,49 @@ export async function POST(request: Request) {
       );
     }
 
-    // Prepare all structures before database access for better execution planning
+    // Determine initial status based on user role
+    let initialStatus: string;
+    if (userAccount.Role === 'STUDENT') {
+      initialStatus = "Pending Teacher Approval";
+    } else if (userAccount.Role === 'STAFF') {
+      initialStatus = "Pending Admin Approval"; // Skip teacher approval for staff
+    } else {
+      return NextResponse.json(
+        { error: 'Invalid user role for EVC reservations' },
+        { status: 403 }
+      );
+    }
+
+    // Prepare EVC reservation data with conditional fields
     const evcReservationData = {
       ControlNo: data.ControlNo || null,
-      LvlSec: data.LvlSec || null,
-      NoofStudents: data.NoofStudents || 0,
-      Subject: data.Subject || null,
-      Teacher: data.Teacher || null,
-      TeacherEmail: data.TeacherEmail || null, 
-      Topic: data.Topic || null,
-      SchoolYear: data.SchoolYear || null,
-      EVCStatus: data.EVCStatus || "Pending Teacher Approval",
+      LvlSec: userAccount.Role === 'STUDENT' ? (data.LvlSec || null) : 'N/A',
+      NoofStudents: userAccount.Role === 'STUDENT' ? (data.NoofStudents || 0) : 0,
+      Subject: userAccount.Role === 'STUDENT' ? (data.Subject || null) : 'N/A',
+      Teacher: userAccount.Role === 'STUDENT' ? (data.Teacher || null) : 'N/A',
+      TeacherEmail: userAccount.Role === 'STUDENT' ? (data.TeacherEmail || null) : 'N/A',
+      Topic: userAccount.Role === 'STUDENT' ? (data.Topic || null) : 'N/A',
+      SchoolYear: userAccount.Role === 'STUDENT' ? (data.SchoolYear || null) : null,
+      EVCStatus: initialStatus,
       DateRequested: new Date(),
       accInfoId: userAccount.id
     };
 
-    // Process UtilTimes data once
+    // Process UtilTimes data
     const utilTimesData = data.UtilTimes.map((time: any, index: number) => ({
       DayNum: time.DayNum || index + 1,
       StartTime: time.StartTime ? new Date(time.StartTime) : null,
       EndTime: time.EndTime ? new Date(time.EndTime) : null
     }));
 
-    // Process StudentData once 
-    const studentsData = (data.EVCStudents?.length > 0) 
+    // Process StudentData (only for students)
+    const studentsData = (userAccount.Role === 'STUDENT' && data.EVCStudents?.length > 0) 
       ? data.EVCStudents.map((student: any) => ({
           Students: student.Students || ''
         }))
       : [];
 
-    // Process MaterialsData once
+    // Process MaterialsData (for both students and staff)
     const materialsData = (data.NeededMaterials?.length > 0) 
       ? data.NeededMaterials.map((material: any) => ({
           Item: material.Item || '',
@@ -78,20 +89,16 @@ export async function POST(request: Request) {
       : [];
 
     // Use transaction to ensure all operations succeed or fail together
-    // This improves data consistency and performance
     const result = await prisma.$transaction(async (tx: any) => {
-      // Create the main reservation with relations in a single operation
       const evcReservation = await tx.eVCReservation.create({
         data: {
           ...evcReservationData,
           
-          // Create all related records nested in one call
-          // This reduces round trips to the database
           UtilTimes: { 
             create: utilTimesData 
           },
           
-          // Only create if we have data
+          // Only create student records for students
           ...(studentsData.length > 0 && {
             EVCStudents: {
               create: studentsData
@@ -104,7 +111,6 @@ export async function POST(request: Request) {
             }
           })
         },
-        // Only select what we need for the response
         select: {
           id: true,
           EVCStatus: true,
@@ -115,25 +121,24 @@ export async function POST(request: Request) {
       return evcReservation;
     });
 
-    // Return minimal response with only what the client needs
     return NextResponse.json({
       success: true,
-      message: 'EVC reservation created successfully',
+      message: 'Reservation created successfully',
       id: result.id,
       status: result.EVCStatus,
-      dateRequested: result.DateRequested
+      dateRequested: result.DateRequested,
+      userRole: userAccount.Role
     });
     
   } catch (error: any) {
     console.error('Error creating EVC reservation:', error);
     
-    // Structured error handling with useful debug info
     const errorMessage = error?.message || 'Unknown error';
     const errorDetails = error?.meta?.cause || error?.code || errorMessage;
     
     return NextResponse.json(
       { 
-        error: 'Failed to create EVC reservation', 
+        error: 'Failed to create reservation', 
         details: errorDetails,
         message: errorMessage
       },

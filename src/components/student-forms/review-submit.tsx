@@ -1,3 +1,5 @@
+// src/components/student-forms/review-submit.tsx - Fixed version for staff mode
+
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@clerk/nextjs';
 import { useUser } from "@clerk/nextjs";
@@ -5,8 +7,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Clock, School, Book, User, CreditCard, FileText } from 'lucide-react';
-import Link from 'next/link';
+import { CheckCircle, Clock, School, Book, User, CreditCard, FileText, Info } from 'lucide-react';
 
 interface ClientInfo {
   ContactNum: string;
@@ -78,6 +79,7 @@ interface ReviewSubmitProps {
   prevStep: () => void;
   nextStep?: () => void;
   updateFormData: <K extends keyof FormData>(field: K, value: FormData[K]) => void;
+  userRole?: string; // Change from isStaff to userRole
 }
 
 const formatDate = (date: Date): string => {
@@ -94,7 +96,52 @@ const formatSchoolYear = (year: number | undefined): string => {
   return `${year} to ${year + 1}`;
 };
 
-export default function ReviewSubmit({ formData, prevStep, updateFormData, nextStep }: ReviewSubmitProps) {
+// Fixed time parsing function
+const parseTimeString = (timeString: string, baseDate: Date): Date | null => {
+  if (!timeString || timeString === '--:-- AM' || timeString === '--:-- PM') {
+    return null;
+  }
+  
+  try {
+    // Handle time format like "09:00 AM"
+    const timeRegex = /^(\d+):(\d+)\s+(AM|PM)$/;
+    const matches = timeString.match(timeRegex);
+    
+    if (!matches) {
+      console.warn(`Time string '${timeString}' doesn't match expected format`);
+      return null;
+    }
+    
+    const [, hours, minutes, period] = matches;
+    let hour = parseInt(hours, 10);
+    
+    // Convert to 24-hour format
+    if (period === 'PM' && hour !== 12) hour += 12;
+    if (period === 'AM' && hour === 12) hour = 0;
+    
+    const resultDate = new Date(baseDate);
+    resultDate.setHours(hour, parseInt(minutes, 10), 0, 0);
+    
+    // Validate the resulting date
+    if (isNaN(resultDate.getTime())) {
+      console.warn('Resulting date is invalid after parsing time');
+      return null;
+    }
+    
+    return resultDate;
+  } catch (error) {
+    console.error('Error parsing time string:', error);
+    return null;
+  }
+};
+
+export default function ReviewSubmit({ 
+  formData, 
+  prevStep, 
+  updateFormData, 
+  nextStep,
+  userRole = "STUDENT" // Change from isStaff to userRole with default
+}: ReviewSubmitProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -105,6 +152,9 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
   const [loading, setLoading] = useState(true);
   const [submittingReservation, setSubmittingReservation] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
+
+  // Add role check
+  const isStaff = userRole === 'STAFF';
 
   useEffect(() => {
     window.scrollTo({
@@ -135,38 +185,39 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
   }, [user, isLoaded]);
 
   const handleSubmit = async () => {
-    try {
-      setIsSubmitting(true);
-      setError('');
-  
-      const token = await getToken();
+     try {
+    setIsSubmitting(true);
+    setError('');
+
+    const token = await getToken();
+    
+    // Fixed time processing logic (keep existing parseTimeString logic)
+    const utilTimes = formData.days.map((day, index) => {
+      const dateObj = day.date instanceof Date ? day.date : new Date(day.date);
       
-      const utilTimes = formData.days.map((day, index) => {
-        const dateObj = day.date instanceof Date ? day.date : new Date(day.date);
-        
-        let startTimeISO = null;
-        let endTimeISO = null;
-        
-        if (day.startTime) {
-          const [hours, minutes] = day.startTime.split(':');
-          const startTimeDate = new Date(dateObj);
-          startTimeDate.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+      let startTimeISO = null;
+      let endTimeISO = null;
+      
+      if (day.startTime) {
+        const startTimeDate = parseTimeString(day.startTime, dateObj);
+        if (startTimeDate) {
           startTimeISO = startTimeDate.toISOString();
         }
-        
-        if (day.endTime) {
-          const [hours, minutes] = day.endTime.split(':');
-          const endTimeDate = new Date(dateObj);
-          endTimeDate.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+      }
+      
+      if (day.endTime) {
+        const endTimeDate = parseTimeString(day.endTime, dateObj);
+        if (endTimeDate) {
           endTimeISO = endTimeDate.toISOString();
         }
-        
-        return {
-          DayNum: index + 1,
-          StartTime: startTimeISO,
-          EndTime: endTimeISO,
-        };
-      });
+      }
+      
+      return {
+        DayNum: index + 1,
+        StartTime: startTimeISO,
+        EndTime: endTimeISO,
+      };
+    });
   
       const neededMaterials = formData.NeededMaterials?.map(material => ({
         Item: material.Item,
@@ -175,8 +226,6 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
       })) || [];
       
       if (formData.Tools) {
-        console.log('Adding tools to NeededMaterials:', formData.Tools);
-        
         try {
           let toolsArray = [];
           
@@ -184,9 +233,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
             if (formData.Tools.startsWith('[') && formData.Tools.includes('Tool')) {
               try {
                 toolsArray = JSON.parse(formData.Tools);
-                console.log('Successfully parsed Tools JSON:', toolsArray);
               } catch (e) {
-                console.error('Error parsing Tools JSON:', e);
                 toolsArray = [formData.Tools];
               }
             } else {
@@ -198,8 +245,6 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
             toolsArray = [String(formData.Tools)];
           }
           
-          console.log('Tools array after processing:', toolsArray);
-          
           toolsArray.forEach((tool: any) => {
             if (typeof tool === 'object' && tool !== null && 'Tool' in tool) {
               const toolItem = {
@@ -207,7 +252,6 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
                 ItemQty: tool.Quantity || 1,
                 Description: ''
               };
-              console.log('Adding structured tool to NeededMaterials:', toolItem);
               neededMaterials.push(toolItem);
             } 
             else if (tool && typeof tool === 'string' && tool.trim() !== '') {
@@ -216,7 +260,6 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
                 ItemQty: 1,
                 Description: ''
               };
-              console.log('Adding string tool to NeededMaterials:', toolItem);
               neededMaterials.push(toolItem);
             }
           });
@@ -224,19 +267,16 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
           console.error('Error processing tools:', toolsError);
         }
       }
-      
-      console.log('Final NeededMaterials array:', neededMaterials);
   
       const evcStudents = formData.Students?.map(student => ({
         Students: student.name
       })) || [];
-  
+
       const studentName = user?.firstName && user?.lastName 
-        ? `${user.firstName} ${user.lastName}` 
-        : accInfo?.Name || 'Student';
+      ? `${user.firstName} ${user.lastName}` 
+      : accInfo?.Name || (isStaff ? 'Staff Member' : 'Student');
       
       const studentEmail = user?.emailAddresses[0]?.emailAddress || accInfo?.email || '';
-      
       const userServices: UserService[] = [];
       
       const products = Array.isArray(formData.ProductsManufactured) 
@@ -264,6 +304,67 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
         });
       }
       
+        // STAFF MODE: Different submission logic
+    if (isStaff) {
+      const submissionData = {
+        ControlNo: formData.ControlNo ? Number(formData.ControlNo) : undefined,
+        LvlSec: 'N/A',
+        NoofStudents: 0,
+        Subject: 'N/A',
+        Teacher: 'N/A',
+        TeacherEmail: 'N/A',
+        Topic: 'N/A',
+        SchoolYear: formData.SchoolYear ? Number(formData.SchoolYear) : new Date().getFullYear(),
+        EVCStatus: 'Pending Admin Approval', // Skip teacher approval
+        
+        UtilTimes: utilTimes,
+        EVCStudents: [], // Empty for staff
+        NeededMaterials: neededMaterials,
+        UserServices: userServices,
+        
+        ProductsManufactured: formData.ProductsManufactured,
+        Equipment: formData.Equipment,
+        
+        accInfoId: accInfo?.id
+      };
+
+      console.log('Sending staff data to EVC API:', JSON.stringify(submissionData, null, 2));
+
+      const response = await fetch('/api/user/create-evc-reservation', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(submissionData),
+      });
+      
+      if (!response.ok) {
+        const responseText = await response.text();
+        let errorData = null;
+        if (responseText) {
+          try {
+            errorData = JSON.parse(responseText);
+          } catch (e) {
+            console.error('Failed to parse response as JSON:', e);
+          }
+        }
+        const errorMessage = errorData?.details || errorData?.error || 'Failed to submit staff reservation';
+        throw new Error(errorMessage);
+      }
+      
+      const data = await response.json();
+      console.log('Staff reservation created:', data);
+      
+      setSuccessMessage('Your equipment reservation has been submitted successfully and is pending admin approval.');
+      setIsRedirecting(true);
+      
+      setTimeout(() => {
+        router.push('/staff-dashboard');
+      }, 3000);
+      
+    } else {
+      // STUDENT MODE: Original EVC submission logic with teacher email
       const submissionData = {
         ControlNo: formData.ControlNo ? Number(formData.ControlNo) : undefined,
         LvlSec: formData.LvlSec || undefined,
@@ -285,104 +386,102 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
         
         accInfoId: accInfo?.id
       };
-  
-      console.log('Sending data to API:', JSON.stringify(submissionData, null, 2));
-  
-      const response = await fetch('/api/user/create-evc-reservation', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(submissionData),
-      });
-      
-      if (!response.ok) {
-        const responseText = await response.text();
-        console.log('Raw error response:', responseText);
-        
-        let errorData = null;
-        if (responseText) {
-          try {
-            errorData = JSON.parse(responseText);
-          } catch (e) {
-            console.error('Failed to parse response as JSON:', e);
-          }
-        }
 
-        const errorMessage = errorData?.details || errorData?.error || 'Failed to submit reservation';
-        throw new Error(errorMessage);
-      }
-      
-      const data = await response.json();
-      console.log('Reservation created:', data);
-      
-      if (formData.TeacherEmail) {
-        try {
-          const approvalResponse = await fetch('/api/teacher-email/approval-request', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              reservationId: data.id,
-              studentName,
-              studentEmail,
-              studentGrade: formData.LvlSec || 'Not specified',
-              teacherEmail: formData.TeacherEmail,
-              teacherName: formData.Teacher || 'Teacher',
-              subject: formData.Subject || 'Not specified',
-              topic: formData.Topic || 'Not specified',
-              dates: formData.days.map(day => ({
-                date: new Date(day.date).toLocaleDateString('en-US', { 
-                  weekday: 'long', 
-                  month: 'long', 
-                  day: 'numeric',
-                  year: 'numeric'
-                }),
-                startTime: day.startTime || 'Not specified',
-                endTime: day.endTime || 'Not specified'
-              })),
-              materials: formData.NeededMaterials || [],
-              students: formData.Students || []
-            }),
-          });
-          
-          if (!approvalResponse.ok) {
-            const approvalError = await approvalResponse.text();
-            console.error('Teacher approval request failed:', approvalError);
-            setError('Reservation created but teacher approval email failed to send');
-          } else {
-            setSuccessMessage('Your reservation request has been submitted and an approval request has been sent to your teacher.');
-            setIsRedirecting(true);
+
+        console.log('Sending student data to EVC API:', JSON.stringify(submissionData, null, 2));
+
+        const response = await fetch('/api/user/create-evc-reservation', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify(submissionData),
+        });
+        
+        if (!response.ok) {
+          const responseText = await response.text();
+          let errorData = null;
+          if (responseText) {
+            try {
+              errorData = JSON.parse(responseText);
+            } catch (e) {
+              console.error('Failed to parse response as JSON:', e);
+            }
           }
+          const errorMessage = errorData?.details || errorData?.error || 'Failed to submit reservation';
+          throw new Error(errorMessage);
+        }
+        
+        const data = await response.json();
+        console.log('Student reservation created:', data);
+        
+        // Send teacher approval email for students
+        if (formData.TeacherEmail && formData.TeacherEmail !== 'N/A') {
+          try {
+            const approvalResponse = await fetch('/api/teacher-email/approval-request', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                reservationId: data.id,
+                studentName,
+                studentEmail,
+                studentGrade: formData.LvlSec || 'Not specified',
+                teacherEmail: formData.TeacherEmail,
+                teacherName: formData.Teacher || 'Teacher',
+                subject: formData.Subject || 'Not specified',
+                topic: formData.Topic || 'Not specified',
+                dates: formData.days.map(day => ({
+                  date: new Date(day.date).toLocaleDateString('en-US', { 
+                    weekday: 'long', 
+                    month: 'long', 
+                    day: 'numeric',
+                    year: 'numeric'
+                  }),
+                  startTime: day.startTime || 'Not specified',
+                  endTime: day.endTime || 'Not specified'
+                })),
+                materials: formData.NeededMaterials || [],
+                students: formData.Students || []
+              }),
+            });
+            
+            if (!approvalResponse.ok) {
+              const approvalError = await approvalResponse.text();
+              console.error('Teacher approval request failed:', approvalError);
+              setError('Reservation created but teacher approval email failed to send');
+            } else {
+              setSuccessMessage('Your reservation request has been submitted and an approval request has been sent to your teacher.');
+              setIsRedirecting(true);
+            }
           } catch (emailError) {
-          console.error('Error sending approval email:', emailError);
-          setError('Reservation created but there was an error sending the teacher approval email');
+            console.error('Error sending approval email:', emailError);
+            setError('Reservation created but there was an error sending the teacher approval email');
           }
-          } else {
+        } else {
           setSuccessMessage('Your reservation request has been submitted successfully.');
           setIsRedirecting(true);
-          }
+        }
 
-          setTimeout(() => {
+        setTimeout(() => {
           router.push('/student-dashboard');
-          }, 3000);
-      
-    } catch (err) {
-      console.error('Submission error:', err);
-      let errorMessage = 'Failed to submit reservation';
-      if (err instanceof Error) {
-        errorMessage = err.message;
-      } else if (typeof err === 'object' && err !== null) {
-        errorMessage = JSON.stringify(err);
+        }, 3000);
       }
-      setError(errorMessage);
+      
+      } catch (err) {
+        console.error('Submission error:', err);
+        let errorMessage = 'Failed to submit reservation';
+        if (err instanceof Error) {
+        errorMessage = err.message;
+        }
+        setError(errorMessage);
     } finally {
-      setIsSubmitting(false);
+        setIsSubmitting(false);
     }
-  };
+    };
 
   const handleSubmitWithBuffer = async () => {
     try {
@@ -416,9 +515,14 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
           <CardContent className="pt-4">
             <div className="flex flex-col items-center justify-center py-12">
               <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-6"/>
-              <h3 className="text-xl font-semibold text-blue-800 mb-2">Processing Your Reservation</h3>
+              <h3 className="text-xl font-semibold text-blue-800 mb-2">
+                {isStaff ? 'Processing Staff Reservation' : 'Processing Your Reservation'}
+              </h3>
               <p className="text-gray-600 text-center max-w-md">
-                Please wait while we submit your request and notify your teacher. This may take a few moments.
+                {isStaff 
+                  ? 'Please wait while we submit your equipment request for admin approval.'
+                  : 'Please wait while we submit your request and notify your teacher. This may take a few moments.'
+                }
               </p>
             </div>
           </CardContent>
@@ -436,7 +540,10 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
               <CheckCircle className="w-16 h-16 text-green-600 mb-6"/>
               <h3 className="text-xl font-semibold text-green-800 mb-2">Successfully Submitted!</h3>
               <p className="text-gray-600 text-center max-w-md mb-4">
-                Your reservation request has been submitted successfully. Redirecting you to your dashboard...
+                {isStaff 
+                  ? 'Your equipment reservation has been submitted successfully. Redirecting you to your dashboard...'
+                  : 'Your reservation request has been submitted successfully. Redirecting you to your dashboard...'
+                }
               </p>
               <div className="w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full animate-spin"/>
             </div>
@@ -446,10 +553,24 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
     );
   }
 
-  return (
+    return (
     <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 pt-0 flex flex-col">
-      <Card className="bg-white shadow-sm border border-gray-200 mt-6">
-        
+        {/* Staff Mode Info Banner */}
+        {isStaff && (
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start">
+            <Info className="h-5 w-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
+            <div>
+                <h4 className="text-blue-800 font-medium">Staff Equipment Reservation</h4>
+                <p className="text-blue-700 text-sm mt-1">
+                Your request will go directly to admin approval without requiring teacher approval.
+                </p>
+            </div>
+            </div>
+        </div>
+        )}
+
+        <Card className="bg-white shadow-sm border border-gray-200 mt-6">
         <CardContent className="pt-0">
           {/* Dates and Times */}
           <div className="mb-6">
@@ -489,57 +610,59 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
             </div>
           </div>
 
-          {/* School/Class Information */}
+            {/* School/Class Information - Hidden for staff */}
+            {!isStaff && (
+            <div className="mb-6">
+                <h3 className="text-lg font-medium mb-3 flex items-center">
+                <School className="h-5 w-5 text-blue-600 mr-2" /> School Information
+                </h3>
+              <Card className="border-gray-200 shadow-none">
+                <CardContent className="p-4">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Control Number</p>
+                      <p className="mt-1 text-gray-800">{formData.ControlNo || 'Not provided'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">School Year</p>
+                      <p className="mt-1 text-gray-800">{formatSchoolYear(formData.SchoolYear)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Level/Section</p>
+                      <p className="mt-1 text-gray-800">{formData.LvlSec || 'Not provided'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Number of Students</p>
+                      <p className="mt-1 text-gray-800">{formData.Students?.length || 'Not provided'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Teacher</p>
+                      <p className="mt-1 text-gray-800">{formData.Teacher || 'Not provided'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Teacher Email</p>
+                      <p className="mt-1 text-gray-800">{formData.TeacherEmail || 'Not provided'}</p>
+                    </div>                 
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Topic</p>
+                      <p className="mt-1 text-gray-800">{formData.Topic || 'Not provided'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Subject</p>
+                      <p className="mt-1 text-gray-800">{formData.Subject || 'Not provided'}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+           {/* Students List - Hidden for staff */}
+        {!isStaff && formData.Students && formData.Students.length > 0 && (
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-3 flex items-center">
-              <School className="h-5 w-5 text-blue-600 mr-2" /> School Information
+              <User className="h-5 w-5 text-blue-600 mr-2" /> Students
             </h3>
-            <Card className="border-gray-200 shadow-none">
-              <CardContent className="p-4">
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Control Number</p>
-                    <p className="mt-1 text-gray-800">{formData.ControlNo || 'Not provided'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">School Year</p>
-                    <p className="mt-1 text-gray-800">{formatSchoolYear(formData.SchoolYear)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Level/Section</p>
-                    <p className="mt-1 text-gray-800">{formData.LvlSec || 'Not provided'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Number of Students</p>
-                    <p className="mt-1 text-gray-800">{formData.Students?.length || 'Not provided'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Teacher</p>
-                    <p className="mt-1 text-gray-800">{formData.Teacher || 'Not provided'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Teacher Email</p>
-                    <p className="mt-1 text-gray-800">{formData.TeacherEmail || 'Not provided'}</p>
-                  </div>                 
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Topic</p>
-                    <p className="mt-1 text-gray-800">{formData.Topic || 'Not provided'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">Subject</p>
-                    <p className="mt-1 text-gray-800">{formData.Subject || 'Not provided'}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Students List */}
-          {formData.Students && formData.Students.length > 0 && (
-            <div className="mb-6">
-              <h3 className="text-lg font-medium mb-3 flex items-center">
-                <User className="h-5 w-5 text-blue-600 mr-2" /> Students
-              </h3>
               <Card className="border-gray-200 shadow-none">
                 <CardContent className="p-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
@@ -558,7 +681,8 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
           {formData.NeededMaterials && formData.NeededMaterials.length > 0 && (
             <div className="mb-6">
               <h3 className="text-lg font-medium mb-3 flex items-center">
-                <FileText className="h-5 w-5 text-blue-600 mr-2" /> Materials Needed
+                <FileText className="h-5 w-5 text-blue-600 mr-2" /> 
+                {isStaff ? 'Equipment Requested' : 'Materials Needed'}
               </h3>
               <Card className="border-gray-200 shadow-none">
                 <CardContent className="p-4">
@@ -603,6 +727,12 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
                     <p className="text-sm font-medium text-gray-700">Email</p>
                     <p className="mt-1 text-gray-800">{user?.emailAddresses[0]?.emailAddress || accInfo?.email}</p>
                   </div>
+                  {isStaff && (
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Role</p>
+                      <p className="mt-1 text-gray-800">Staff Member</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -623,14 +753,14 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
             </Alert>
           )}
 
-          {/* Teacher Email Warning */}
-          {!formData.TeacherEmail && (
-            <Alert className="mt-4 bg-yellow-50 border-yellow-100">
-              <AlertDescription className="text-yellow-800">
-                A teacher email is required for approval. Please go back and add a teacher email.
-              </AlertDescription>
-            </Alert>
-          )}
+          {/* Teacher Email Warning - Only for students */}
+             {!isStaff && !formData.TeacherEmail && (
+          <Alert className="mt-4 bg-yellow-50 border-yellow-100">
+            <AlertDescription className="text-yellow-800">
+              A teacher email is required for approval. Please go back and add a teacher email.
+            </AlertDescription>
+          </Alert>
+        )}
 
           {/* Navigation buttons */}
           <div className="mt-6 flex justify-between">
@@ -643,10 +773,10 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
             </Button>
             <Button
               onClick={handleSubmitWithBuffer}
-              disabled={isSubmitting || loading || !formData.TeacherEmail}
+              disabled={isSubmitting || loading || (!isStaff && !formData.TeacherEmail)}
               className="bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50"
             >
-              {isSubmitting ? 'Submitting...' : 'Submit Request'}
+              {isSubmitting ? 'Submitting...' : (isStaff ? 'Submit Equipment Request' : 'Submit Request')}
             </Button>
           </div>
         </CardContent>
