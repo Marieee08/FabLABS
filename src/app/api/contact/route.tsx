@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     // Email options
     const mailOptions = {
       from: process.env.EMAIL_USER,
-      to: 'leilasabando@gmail.com',
+      to: 'fablab@evc.pshs.edu.ph',
       subject: `New FabLABS Inquiry from ${name}`,
       text: `
         Name: ${name}
