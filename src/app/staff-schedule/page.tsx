@@ -5,7 +5,7 @@
 import React, { useState, useEffect } from 'react';
 import ProgressBar from '@/components/msme-forms/progress-bar';
 import Navbar from '@/components/custom/navbar';
-import LabReservation from '@/components/staff-forms/lab-reservation-staff';
+import LabReservation from '@/components/student-forms/lab-reservation';
 import DateTimeSelection from '@/components/staff-forms/staff-date-time-selection'; // Keep using the original for now
 import ReviewSubmit from '@/components/student-forms/review-submit';
 import { toast } from "@/components/ui/use-toast";
@@ -39,8 +39,13 @@ interface StaffReservationFormData {
   unifiedStartTime: string | null;
   unifiedEndTime: string | null;
 
-  // Lab reservation fields
+  // Lab reservation fields - FIXED: Match LabReservationFormData exactly
   ProductsManufactured: string | string[];
+  BulkofCommodity: string; // ❌ Remove the optional - make it required
+  Equipment: string[] | string; // ❌ Remove the optional - make it required
+  Tools: string; // ❌ Remove the optional - make it required
+  serviceLinks?: {[service: string]: string};
+  Remarks?: string;
   ControlNo?: number;
   LvlSec: string;
   NoofStudents: number;
@@ -54,13 +59,6 @@ interface StaffReservationFormData {
   NeededMaterials: Material[];
   Students: Student[];
   
-  // Additional fields that ReviewSubmit expects
-  serviceLinks?: {[service: string]: string};
-  Remarks?: string;
-  Equipment?: string[] | string;
-  Tools?: string;
-  BulkofCommodity?: string;
-  
   [key: string]: any;
 }
 
@@ -72,8 +70,11 @@ export default function StaffSchedule() {
     unifiedStartTime: null,
     unifiedEndTime: null,
 
-    // Initialize with staff defaults
+    // Initialize with staff defaults - FIXED: Add required fields
     ProductsManufactured: '',
+    BulkofCommodity: 'Staff Equipment Request', // ❌ Required field
+    Equipment: [], // ❌ Required field  
+    Tools: '', // ❌ Required field
     LvlSec: 'N/A',
     NoofStudents: 0,
     Subject: 'N/A',
@@ -87,7 +88,6 @@ export default function StaffSchedule() {
     
     serviceLinks: {},
     Remarks: '',
-    BulkofCommodity: 'N/A', // Add this default
   });
   
   const [isLoading, setIsLoading] = useState(false);
@@ -238,9 +238,9 @@ export default function StaffSchedule() {
                       <LabReservation 
                         formData={formData} 
                         updateFormData={updateFormData} 
-                        nextStep={nextStep} 
+                        nextStep={nextStep}
                         prevStep={prevStep}
-                        isStaffMode={true}
+                        userRole="STAFF"
                       />
                     </div>
                   </div>

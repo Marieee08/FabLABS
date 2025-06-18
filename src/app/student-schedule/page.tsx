@@ -309,10 +309,10 @@ export default function Schedule() {
       case 3:
         return (
           <ReviewSubmit 
-            formData={formData} 
-            prevStep={prevStep} 
-            updateFormData={genericUpdateFormData} 
-            nextStep={nextStep} 
+            formData={formData}
+            prevStep={prevStep}
+            updateFormData={updateFormData}
+            userRole="STUDENT"
           />
         );
       default:
