@@ -465,7 +465,7 @@ export default function DateTimeSelection({
         })}
       </h4>
       
-      {!formData.syncTimes ? (
+      {!formData.syncTimes || formData.days.length === 1 ? (
         <div className="grid grid-cols-2 gap-4">
           <TimePicker
             required

@@ -1,4 +1,4 @@
-// src/app/staff-schedule/page.tsx - FIXED VERSION WITH CORRECT TYPES
+// src/app/staff-schedule/page.tsx - Updated with proper DateTimeSelection integration
 
 'use client';
 
@@ -6,10 +6,13 @@ import React, { useState, useEffect } from 'react';
 import ProgressBar from '@/components/msme-forms/progress-bar';
 import Navbar from '@/components/custom/navbar';
 import LabReservation from '@/components/student-forms/lab-reservation';
-import DateTimeSelection from '@/components/staff-forms/staff-date-time-selection'; // Keep using the original for now
+import DateTimeSelection from '@/components/student-forms/date-time-selection';
 import ReviewSubmit from '@/components/student-forms/review-submit';
 import { toast } from "@/components/ui/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Calendar, Info } from "lucide-react";
+import MachineCalendar from '@/components/user/machine-calendar';
 
 // Material interface for staff equipment requests
 interface Material {
@@ -32,18 +35,26 @@ interface DayInfo {
   endTime: string | null;
 }
 
-// Staff reservation form data - FIXED: Match exactly what components expect
+// Machine interface for calendar
+interface Machine {
+  id: string;
+  Machine: string;
+  isAvailable: boolean;
+  Number?: number;
+}
+
+// Staff reservation form data
 interface StaffReservationFormData {
   days: DayInfo[];
   syncTimes: boolean;
   unifiedStartTime: string | null;
   unifiedEndTime: string | null;
 
-  // Lab reservation fields - FIXED: Match LabReservationFormData exactly
+  // Lab reservation fields
   ProductsManufactured: string | string[];
-  BulkofCommodity: string; // ❌ Remove the optional - make it required
-  Equipment: string[] | string; // ❌ Remove the optional - make it required
-  Tools: string; // ❌ Remove the optional - make it required
+  BulkofCommodity: string;
+  Equipment: string[] | string;
+  Tools: string;
   serviceLinks?: {[service: string]: string};
   Remarks?: string;
   ControlNo?: number;
@@ -70,11 +81,11 @@ export default function StaffSchedule() {
     unifiedStartTime: null,
     unifiedEndTime: null,
 
-    // Initialize with staff defaults - FIXED: Add required fields
+    // Initialize with staff defaults
     ProductsManufactured: '',
-    BulkofCommodity: 'Staff Equipment Request', // ❌ Required field
-    Equipment: [], // ❌ Required field  
-    Tools: '', // ❌ Required field
+    BulkofCommodity: 'Staff Equipment Request',
+    Equipment: [],
+    Tools: '',
     LvlSec: 'N/A',
     NoofStudents: 0,
     Subject: 'N/A',
@@ -92,6 +103,8 @@ export default function StaffSchedule() {
   
   const [isLoading, setIsLoading] = useState(false);
   const [blockedDates, setBlockedDates] = useState<Date[]>([]);
+  const [showMachineCalendar, setShowMachineCalendar] = useState(false);
+  const [machines, setMachines] = useState<Machine[]>([]);
 
   // Fetch blocked dates for calendar
   useEffect(() => {
@@ -111,6 +124,23 @@ export default function StaffSchedule() {
     fetchBlockedDates();
   }, []);
 
+  // Fetch machines for calendar
+  useEffect(() => {
+    const fetchMachines = async () => {
+      try {
+        const response = await fetch('/api/machines');
+        if (response.ok) {
+          const machinesData = await response.json();
+          setMachines(machinesData);
+        }
+      } catch (error) {
+        console.error('Error fetching machines:', error);
+      }
+    };
+
+    fetchMachines();
+  }, []);
+
   // Check if date is blocked
   const isDateBlocked = (date: Date): boolean => {
     return blockedDates.some(blockedDate => 
@@ -118,7 +148,7 @@ export default function StaffSchedule() {
     );
   };
 
-  // FIXED: Single updateFormData function (remove the duplicate)
+  // Update form data function
   const updateFormData = <K extends keyof StaffReservationFormData>(
     field: K, 
     value: StaffReservationFormData[K]
@@ -134,7 +164,7 @@ export default function StaffSchedule() {
     });
   };
 
-  // FIXED: Create a wrapper for setFormData that matches DateTimeSelection expectations
+  // Create a wrapper for setFormData that matches DateTimeSelection expectations
   const setFormDataWrapper = React.useCallback((updater: any) => {
     console.log('🔄 Staff setFormDataWrapper called with:', updater);
     
@@ -200,6 +230,11 @@ export default function StaffSchedule() {
     setStep(prevStep => prevStep - 1);
   };
 
+  // Toggle machine calendar
+  const toggleMachineCalendar = () => {
+    setShowMachineCalendar(prev => !prev);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
       <Navbar />
@@ -248,14 +283,45 @@ export default function StaffSchedule() {
                   <div className="space-y-8">
                     <h2 className="text-xl font-semibold text-gray-800 mb-4">Date and Time Selection</h2>
                     
-                    <DateTimeSelection
-                      formData={formData}
-                      setFormData={setFormDataWrapper}
-                      nextStep={nextStep}
-                      prevStep={prevStep}
-                      isDateBlocked={isDateBlocked}
-                      standalonePage={true}
-                    />
+                    <div className="border rounded-lg bg-white p-6 shadow-sm">
+                      <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-xl font-semibold text-blue-700">Select Date & Time</h3>
+                        
+                        {/* Machine Calendar Button */}
+                        <Button
+                          onClick={toggleMachineCalendar}
+                          variant="outline"
+                          className="flex items-center gap-2 border-blue-300 text-blue-600 hover:bg-blue-50"
+                        >
+                          <Calendar className="h-4 w-4" />
+                          {showMachineCalendar ? "Hide Machine Calendar" : "View Machine Availability"}
+                        </Button>
+                      </div>
+                      
+                      {/* Machine Calendar Modal */}
+                      {showMachineCalendar && (
+                        <div className="mb-6 border rounded-lg shadow-sm overflow-hidden">
+                          <div className="bg-blue-50 p-3 border-b border-blue-100 flex items-start gap-2">
+                            <Info className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                            <p className="text-sm text-blue-800">
+                              Check machine availability before selecting your dates. This calendar shows when machines are reserved or unavailable.
+                            </p>
+                          </div>
+                          <div className="h-[500px]">
+                            <MachineCalendar machines={machines} isOpen={true} />
+                          </div>
+                        </div>
+                      )}
+                      
+                      <DateTimeSelection
+                        formData={formData}
+                        setFormData={setFormDataWrapper}
+                        nextStep={nextStep}
+                        prevStep={prevStep}
+                        isDateBlocked={isDateBlocked}
+                        standalonePage={true}
+                      />
+                    </div>
                   </div>
                 ) : ( 
                   <div className="space-y-8">

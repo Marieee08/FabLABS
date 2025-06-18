@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       Teacher: userAccount.Role === 'STUDENT' ? (data.Teacher || null) : 'N/A',
       TeacherEmail: userAccount.Role === 'STUDENT' ? (data.TeacherEmail || null) : 'N/A',
       Topic: userAccount.Role === 'STUDENT' ? (data.Topic || null) : 'N/A',
-      SchoolYear: userAccount.Role === 'STUDENT' ? (data.SchoolYear || null) : null,
+      SchoolYear: data.SchoolYear || null,
       EVCStatus: initialStatus,
       DateRequested: new Date(),
       accInfoId: userAccount.id
