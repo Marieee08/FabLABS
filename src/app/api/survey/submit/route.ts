@@ -75,21 +75,37 @@ export async function POST(request: Request) {
     
     // Use Prisma transactions to ensure atomicity
     const updatedReservation = await prisma.$transaction(async (prisma: any) => {
-      // Check both utilReq and evcReservation tables
+      // Check both utilReq (for MSME) and evcReservation (for STUDENT) tables
       const [utilReservation, evcReservation] = await Promise.all([
+        // MSME reservations are in utilReq
         prisma.utilReq.findFirst({
           where: {
             id: parseInt(reservationId),
             Status: 'Ongoing'
           },
-          select: { id: true }
+          select: { 
+            id: true,
+            accInfo: {
+              select: {
+                Role: true
+              }
+            }
+          }
         }),
+        // STUDENT reservations are in evcReservation
         prisma.eVCReservation.findFirst({
           where: {
             id: parseInt(reservationId),
             EVCStatus: 'Ongoing'
           },
-          select: { id: true }
+          select: { 
+            id: true,
+            accInfo: {
+              select: {
+                Role: true
+              }
+            }
+          }
         })
       ]);
 
@@ -100,19 +116,31 @@ export async function POST(request: Request) {
         throw new Error('Reservation not found or not in ongoing status');
       }
 
-      // Handle utilReq reservations
+      // Get the account role to determine next status
+      const accountRole = utilReservation?.accInfo?.Role || evcReservation?.accInfo?.Role;
+      
+      // Determine next status based on role:
+      // STUDENT -> Completed
+      // MSME -> Pending Payment
+      const nextStatus = accountRole === 'MSME' ? 'Pending Payment' : 'Completed';
+      
+      console.log('Account role:', accountRole);
+      console.log('Next status:', nextStatus);
+
+      // Handle utilReq reservations (MSME)
       if (utilReservation) {
+        // For MSME: Survey completion -> Pending Payment
         return prisma.utilReq.update({
           where: {
             id: parseInt(reservationId)
           },
           data: {
-            Status: 'Completed',
+            Status: 'Pending Payment', // MSME always goes to Pending Payment
             // Store the survey data
             ...(surveyData?.preliminary && {
               PreliminarySurvey: {
                 create: {
-                  userRole: surveyData.preliminary.userRole || 'STUDENT',
+                  userRole: 'MSME', // Explicitly set to MSME since this is utilReq
                   age: parsedAge,
                   sex: surveyData.preliminary.sex || '',
                   CC1: surveyData.preliminary.CC1,
@@ -176,26 +204,35 @@ export async function POST(request: Request) {
         });
       }
 
-      // Handle EVC reservations - just update status for now
-      // Note: EVC surveys aren't fully implemented in schema
+      // Handle EVC reservations (STUDENT)
       if (evcReservation) {
+        // For STUDENT: Survey completion -> Completed
         return prisma.eVCReservation.update({
           where: {
             id: parseInt(reservationId)
           },
           data: {
-            EVCStatus: 'Completed'
+            EVCStatus: 'Completed' // STUDENT always goes to Completed
           }
         });
       }
     });
 
+    // Determine response message based on the final status
+    const finalStatus = updatedReservation.Status || updatedReservation.EVCStatus;
+    const responseMessage = finalStatus === 'Pending Payment'
+      ? "Survey completed successfully. Your reservation is now pending payment."
+      : "Survey completed successfully. Your service has been marked as completed.";
+
     return NextResponse.json({
       success: true,
-      message: "Survey completed successfully",
+      message: responseMessage,
       data: {
         id: updatedReservation.id,
-        Status: updatedReservation.Status || updatedReservation.EVCStatus
+        Status: finalStatus,
+        nextStep: finalStatus === 'Pending Payment' 
+          ? "Please proceed to payment to complete your transaction."
+          : "Your transaction has been completed."
       }
     });
 
