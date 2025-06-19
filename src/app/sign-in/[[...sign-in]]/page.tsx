@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { SignIn, useUser, useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { Loader } from "lucide-react";
 
 export default function Page() {
@@ -99,6 +100,13 @@ export default function Page() {
                                 className="mx-auto mt-8"
                             />
                         </div>
+                    </div>
+                    
+                    <div className="mt-8 text-center">
+                        <p className="text-blue-200 font-poppins1">Don't have an account?</p>
+                        <Link href="/sign-up" className="mt-2 inline-block font-qanelas2 text-white border border-white px-6 py-2 rounded-full hover:bg-white hover:text-[#0b1d41] transition duration-300">
+                            Sign Up
+                        </Link>
                     </div>
                 </div>
                 

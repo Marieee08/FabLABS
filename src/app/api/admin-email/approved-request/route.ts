@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
       // Safely access properties with null checks
       userEmail = reservation.accInfo?.email || "";
       userName = reservation.accInfo?.Name || "";
-      subject = 'Your FabLAB Educational Visit Reservation Has Been Approved';
+      subject = 'Your FabLAB Reservation Has Been Approved';
       
       // Format scheduled dates
       if (reservation.UtilTimes && Array.isArray(reservation.UtilTimes)) {
@@ -200,7 +200,7 @@ export async function POST(request: NextRequest) {
         <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 15px 0;">
           <p><strong>Reservation ID:</strong> ${reservationId}</p>
           <p><strong>Status:</strong> <span style="color: green;">Approved</span></p>
-          ${reservationType === 'evc' ? `<p><strong>Reservation Type:</strong> Educational Visit</p>` : ''}
+          ${reservationType === 'evc' ? `<p><strong>Reservation Type:</strong> Fabrication Laboratory Services</p>` : ''}
         </div>
         
         ${servicesHtml}

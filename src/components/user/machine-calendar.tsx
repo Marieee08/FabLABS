@@ -441,7 +441,7 @@ const MachineCalendar: React.FC<MachineCalendarProps> = ({ machines, onClose, is
       >
         <option value="all">All Machines</option>
         {machines
-          .filter(machine => machine.id !== 'EVC Lab' && machine.Machine !== 'EVC Lab')
+          .filter(machine => machine.id !== 'Fabrication Laboratory Services' && machine.Machine !== 'Fabrication Laboratory Services')
           .map(machine => (
             <option key={machine.id} value={machine.id} disabled={!machine.isAvailable}>
               {machine.Machine} {!machine.isAvailable ? '(Unavailable)' : ''}

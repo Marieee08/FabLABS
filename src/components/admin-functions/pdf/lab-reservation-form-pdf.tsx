@@ -157,7 +157,7 @@ export const convertEVCToLabFormData = (evcData: DetailedEVCReservation): LabRes
     teacherInCharge: evcData.Teacher || '',
     inclusiveTimeOfUse: timeString,
     date: dateString,
-    preferredLabRoom: 'EVC Laboratory', // Default for EVC reservations
+    preferredLabRoom: 'Fabrication Laboratory', // Default for EVC reservations
     requestedBy: evcData.Teacher || evcData.accInfo?.Name || '',
     dateRequested: evcData.DateRequested || '',
     students: students,

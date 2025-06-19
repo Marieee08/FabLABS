@@ -97,7 +97,6 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // Fetch EVCReservation (educational visit center reservations)
     const evcReservations = await prisma.eVCReservation.findMany({
       include: {
         accInfo: true,
@@ -144,7 +143,7 @@ export async function GET(req: NextRequest) {
         status: reservation.EVCStatus,
         role: reservation.accInfo?.Role || "Student",
         service: "Laboratory Reservation",
-        machines: ["EVC Lab"], // Default machine for EVC as array
+        machines: ["Fabrication Laboratory Services"], // Default machine for EVC as array
         totalAmount: null,
         type: 'evc',
         timeSlots: timeSlots,
