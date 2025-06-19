@@ -383,7 +383,7 @@ const SurveyForm = () => {
       if (missingFields) {
         toast({
           title: "Missing Information",
-          description: "Please complete all fields in the employee evaluation section.",
+          description: "Please complete all fields in the customer and employee feedback form.",
           variant: "destructive",
         });
         setIsSubmitting(false);
@@ -690,8 +690,8 @@ const SurveyForm = () => {
             {formType === 'preliminary' 
               ? 'Client Satisfaction Survey' 
               : formType === 'customer' 
-                ? 'Customer Feedback' 
-                : 'Employee Evaluation'}
+                ? 'Service Quality Dimension (SQD)' 
+                : 'Customer and Employee Feedback Form'}
           </CardTitle>
         </CardHeader>
         <CardContent>
