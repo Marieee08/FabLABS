@@ -110,20 +110,18 @@ const HistoryPage = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'Pending':
-        return 'bg-yellow-100 text-yellow-800';
+      case 'Pending Admin Approval':
+        return 'bg-orange-100 text-orange-800';
       case 'Approved':
         return 'bg-blue-100 text-blue-800';
       case 'Completed':
         return 'bg-green-100 text-green-800';
       case 'Cancelled':
         return 'bg-red-100 text-red-800';
-      case 'Rejected':
-        return 'bg-red-100 text-red-800';
+      case 'Pending payment':
+        return 'bg-yellow-100 text-yellow-800';
       case 'Ongoing':
         return 'bg-indigo-100 text-indigo-800';
-      case 'Survey':
-        return 'bg-purple-100 text-purple-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -374,7 +372,7 @@ const HistoryPage = () => {
                         <option value="cancelled">Cancelled</option>
                         <option value="completed">Completed</option>
                         <option value="ongoing">Ongoing</option>
-                        <option value="pending">Pending</option>
+                        <option value="pending admin approval">Pending Admin Approval</option>
                         <option value="rejected">Rejected</option>
                       </select>
                     </div>

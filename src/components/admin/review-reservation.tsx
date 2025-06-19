@@ -118,6 +118,11 @@ interface Machine {
   }[];
 }
 
+interface SurveyStatus {
+  isCompleted: boolean;
+  completedDate?: string;
+}
+
 interface DetailedReservation {
   id: number;
   Status: string;
@@ -126,6 +131,7 @@ interface DetailedReservation {
   Comments?: string | null;
   BulkofCommodity: string | null;
   UserServices: UserService[];
+  SurveyStatus?: SurveyStatus;
   UserTools: UserTool[];
   UtilTimes: UtilTime[];
   MachineUtilizations?: MachineUtilization[];
@@ -228,28 +234,15 @@ const handleMarkAsOngoing = () => {
   );
 };
 
-  const handleMarkAsPendingPayment = () => {
-    if (!localReservation) return;
-    // Check if all UtilTimes are marked as Completed or Cancelled
-    const incompleteTimes = localReservation.UtilTimes.filter(
-      time => time.DateStatus !== "Completed" && time.DateStatus !== "Cancelled"
-    );
-    
-    if (incompleteTimes.length > 0) {
-      toast.error("Cannot proceed to payment", {
-        description: `${incompleteTimes.length} time slot(s) are not yet marked as Completed or Cancelled. 
-        Please review and update all time slots before proceeding.`,
-        duration: 5000
-      });
-      return;
-    }
-    
-    showConfirmation(
-      'Mark as Pending Payment',
-      'Are you sure you want to mark this reservation as Pending Payment? This will notify the client to proceed with payment.',
-      () => handleStatusUpdate(localReservation.id, 'Pending Payment')
-    );
-  };
+const handleMarkAsPendingPayment = () => {
+  if (!localReservation) return;
+  
+  // Show alert that admin cannot directly set to pending payment
+  toast.error("Action not available", {
+    description: "Users must complete the satisfaction survey before payment processing. Direct status change by admin is not permitted.",
+    duration: 5000
+  });
+};
 
   const handleMarkAsCompleted = () => {
     if (!localReservation) return;
@@ -997,6 +990,17 @@ return (
                 </AlertDescription>
               </Alert>
             )}
+
+            {/* Add this new alert for Ongoing status */}
+            {localReservation.Status === 'Ongoing' && (
+              <Alert className="bg-blue-50 border-blue-200">
+                <AlertCircle className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-800">
+                  This reservation is ongoing. To proceed to payment, the user must complete the satisfaction survey. 
+                  Admin cannot directly change status to &quot;Pending Payment&quot;.
+                </AlertDescription>
+              </Alert>
+            )}
             
             <Tabs defaultValue="reservation" className="w-full">
               <TabsList className="grid w-full grid-cols-3">
@@ -1305,12 +1309,12 @@ return (
                   )}
 
                   {localReservation.Status === 'Ongoing' && !editingMachineUtilization && !editingTimes && (
-                    <Button
-                      variant="default"
-                      onClick={handleMarkAsPendingPayment}
-                    >
-                      Mark as Pending Payment
-                    </Button>
+                    <div className="flex items-center">
+                      <AlertCircle className="h-4 w-4 mr-2 text-blue-500" />
+                      <span className="text-sm text-blue-700">
+                        User must complete satisfaction survey to proceed to payment
+                      </span>
+                    </div>
                   )}
                   
                   {localReservation.Status === 'Pending Payment' && (

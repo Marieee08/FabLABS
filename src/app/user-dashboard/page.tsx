@@ -76,10 +76,12 @@ const DashboardUser = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [orderDropdownOpen, setOrderDropdownOpen] = useState(true);
   const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [historyReservations, setHistoryReservations] = useState<Reservation[]>([]);
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isReservationsLoading, setIsReservationsLoading] = useState(true);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(true);
   const [informationDropdownOpen, setInformationDropdownOpen] = useState(true);
 
   const today = new Date();
@@ -88,7 +90,7 @@ const DashboardUser = () => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Pending Admin Approval':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'bg-orange-100 text-orange-800';
       case 'Approved':
         return 'bg-blue-100 text-blue-800';
       case 'Completed':
@@ -96,7 +98,9 @@ const DashboardUser = () => {
       case 'Cancelled':
         return 'bg-red-100 text-red-800';
       case 'Pending payment':
-        return 'bg-orange-100 text-orange-800';
+        return 'bg-yellow-100 text-yellow-800';
+      case 'Ongoing':
+        return 'bg-indigo-100 text-indigo-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -110,6 +114,7 @@ const DashboardUser = () => {
   useEffect(() => {
     const fetchReservations = async () => {
       setIsReservationsLoading(true);
+      setIsHistoryLoading(true);
       try {
         const response = await fetch('/api/user/fetch-reservations');
         if (response.ok) {
@@ -180,12 +185,27 @@ const DashboardUser = () => {
             return reservation;
           });
           
-          setReservations(processedDataWithDowntimes);
+          // Filter into pending and history reservations
+          const pendingReservations = processedDataWithDowntimes.filter((reservation: Reservation) => 
+            reservation.Status.toLowerCase() !== 'completed' && 
+            reservation.Status.toLowerCase() !== 'rejected' && 
+            reservation.Status.toLowerCase() !== 'cancelled'
+          );
+          
+          const completedReservations = processedDataWithDowntimes.filter((reservation: Reservation) => 
+            reservation.Status.toLowerCase() === 'completed' || 
+            reservation.Status.toLowerCase() === 'rejected' || 
+            reservation.Status.toLowerCase() === 'cancelled'
+          );
+          
+          setReservations(pendingReservations);
+          setHistoryReservations(completedReservations);
         }
       } catch (error) {
         console.error('Failed to fetch reservations:', error);
       } finally {
         setIsReservationsLoading(false);
+        setIsHistoryLoading(false);
       }
     };
 
@@ -305,6 +325,103 @@ const DashboardUser = () => {
       </table>
     </div>
   );
+
+  const renderReservationTable = (reservationList: Reservation[], isLoadingState: boolean, emptyMessage: string, createNewLink?: string) => {
+    if (isLoadingState) {
+      return <ReservationSkeleton />;
+    }
+
+    if (reservationList.length === 0) {
+      return (
+        <div className="bg-blue-50 p-6 rounded-lg text-center">
+          <p className="text-blue-800">{emptyMessage}</p>
+          {createNewLink && (
+            <a 
+              href={createNewLink}
+              onClick={(e) => {
+                e.preventDefault();
+                handleNavigation(createNewLink);
+              }}
+              className="mt-4 inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            >
+              Create a New Order
+            </a>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <table className="min-w-full divide-y divide-gray-200 rounded-xl">
+        <thead className="bg-gray-50">
+          <tr>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Services</th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Equipment/Machines</th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+          </tr>
+        </thead>
+        <tbody className="bg-white divide-y divide-gray-200">
+          {reservationList.map((reservation) => (
+            <tr key={reservation.id}>
+              <td className="px-6 py-4 whitespace-nowrap">
+                <div className="flex items-center">
+                  <div>
+                    <div className="text-sm font-medium text-gray-500">
+                      {new Date(reservation.RequestDate).toLocaleDateString()}
+                    </div>
+                  </div>
+                </div>
+              </td>
+
+              <td className="px-4 py-4 whitespace-nowrap">
+                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(reservation.Status)}`}>
+                  {reservation.Status}
+                </span>
+              </td>
+
+              <td className="px-4 py-4 whitespace-nowrap">
+                <div className="text-sm text-gray-900">
+                  {getUniqueItems(reservation.UserServices.map(service => service.ServiceAvail))}
+                </div>
+              </td>
+
+              <td className="px-6 py-4 whitespace-nowrap">
+                {reservation.MachineUtilizations && reservation.MachineUtilizations.length > 0 ? (
+                  <div className="text-sm font-medium text-gray-900">
+                    {getUniqueItems(reservation.MachineUtilizations.map(machine => machine.Machine))}
+                  </div>
+                ) : (
+                  <div className="text-sm font-medium text-gray-900">
+                    {getUniqueItems(reservation.UserServices.map(service => service.EquipmentAvail))}
+                  </div>
+                )}
+              </td>
+
+              <td className="px-6 py-4 whitespace-nowrap font-medium text-sm text-gray-500">
+                {reservation.accInfo.email}
+              </td>
+
+              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                <a
+                  href="#"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    handleReviewClick(reservation);
+                  }}
+                  className="ml-2 text-blue-600 hover:text-blue-900"
+                >
+                  Review
+                </a>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  };
 
   return (
     <RoleGuard allowedRoles={['MSME']}>
@@ -502,97 +619,29 @@ const DashboardUser = () => {
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3 mb-4">
               </div>
 
-              <div className="bg-white rounded-lg text-blue-800 px-4 py-4 shadow-md border border-[#5e86ca]">
+              {/* Pending Reservations Section */}
+              <div className="bg-white rounded-lg text-blue-800 px-4 py-4 shadow-md border border-[#5e86ca] mb-6">
                 <p className="text-xl font-bold text-[#143370]">Pending Reservations</p>
                 <p className="text-sm text-[#143370] mb-4">Here are your pending reservations!</p>
                 <div className="overflow-x-auto rounded-lg bg-blue-100 shadow-ld">
-                  {isReservationsLoading ? (
-                    <ReservationSkeleton />
-                  ) : (
-                    reservations.length === 0 ? (
-                      <div className="bg-blue-50 p-6 rounded-lg text-center">
-                        <p className="text-blue-800">You don&apos;t have any pending Reservations at the moment.</p>
-                        <a 
-                          href="/services"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleNavigation('/services');
-                          }}
-                          className="mt-4 inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                        >
-                          Create a New Order
-                        </a>
-                      </div>
-                    ) : (
-                      <table className="min-w-full divide-y divide-gray-200 rounded-xl">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Services</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Equipment/Machines</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {reservations.map((reservation) => (
-                            <tr key={reservation.id}>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="flex items-center">
-                                  <div>
-                                    <div className="text-sm font-medium text-gray-500">
-                                      {new Date(reservation.RequestDate).toLocaleDateString()}
-                                    </div>
-                                  </div>
-                                </div>
-                              </td>
+                  {renderReservationTable(
+                    reservations, 
+                    isReservationsLoading, 
+                    "You don't have any pending Reservations at the moment.",
+                    "/services"
+                  )}
+                </div>
+              </div>
 
-                              <td className="px-4 py-4 whitespace-nowrap">
-                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(reservation.Status)}`}>
-                                  {reservation.Status}
-                                </span>
-                              </td>
-
-                              <td className="px-4 py-4 whitespace-nowrap">
-                                <div className="text-sm text-gray-900">
-                                  {getUniqueItems(reservation.UserServices.map(service => service.ServiceAvail))}
-                                </div>
-                              </td>
-
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                {reservation.MachineUtilizations && reservation.MachineUtilizations.length > 0 ? (
-                                  <div className="text-sm font-medium text-gray-900">
-                                    {getUniqueItems(reservation.MachineUtilizations.map(machine => machine.Machine))}
-                                  </div>
-                                ) : (
-                                  <div className="text-sm font-medium text-gray-900">
-                                    {getUniqueItems(reservation.UserServices.map(service => service.EquipmentAvail))}
-                                  </div>
-                                )}
-                              </td>
-
-                              <td className="px-6 py-4 whitespace-nowrap font-medium text-sm text-gray-500">
-                                {reservation.accInfo.email}
-                              </td>
-
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                <a
-                                  href="#"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    handleReviewClick(reservation);
-                                  }}
-                                  className="ml-2 text-blue-600 hover:text-blue-900"
-                                >
-                                  Review
-                                </a>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    )
+              {/* History Section */}
+              <div className="bg-white rounded-lg text-blue-800 px-4 py-4 shadow-md border border-[#5e86ca]">
+                <p className="text-xl font-bold text-[#143370]">History</p>
+                <p className="text-sm text-[#143370] mb-4">Here&apos;s a summary of your previous transactions!</p>
+                <div className="overflow-x-auto rounded-lg bg-blue-100 shadow-ld">
+                  {renderReservationTable(
+                    historyReservations, 
+                    isHistoryLoading, 
+                    "You don't have any completed, rejected, or cancelled reservations yet."
                   )}
                 </div>
               </div>
