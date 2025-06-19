@@ -287,7 +287,6 @@ const ReservationDetailsTab: React.FC<ReservationDetailsTabProps> = ({
 
   const getStatusColor = (status: string) => {
     const colors = {
-      Pending: 'bg-yellow-100 text-yellow-800',
       'Pending Teacher Approval': 'bg-amber-100 text-amber-800',
       'Pending Admin Approval': 'bg-orange-100 text-orange-800',
       Approved: 'bg-blue-100 text-blue-800',

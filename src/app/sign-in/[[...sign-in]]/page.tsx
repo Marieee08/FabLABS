@@ -103,7 +103,7 @@ export default function Page() {
                     </div>
                     
                     <div className="mt-8 text-center">
-                        <p className="text-blue-200 font-poppins1">Don't have an account?</p>
+                        <p className="text-blue-200 font-poppins1">Don&apos;t have an account?</p>
                         <Link href="/sign-up" className="mt-2 inline-block font-qanelas2 text-white border border-white px-6 py-2 rounded-full hover:bg-white hover:text-[#0b1d41] transition duration-300">
                             Sign Up
                         </Link>
