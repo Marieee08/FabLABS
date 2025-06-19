@@ -293,6 +293,9 @@ const DashboardUser = () => {
                         <tr>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Date</th>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Subject</th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Topic</th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Level/Section</th>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Actions</th>
                         </tr>
                       </thead>
@@ -362,6 +365,9 @@ const DashboardUser = () => {
                         <tr>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Date</th>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Status</th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Subject</th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Topic</th>
+                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Level/Section</th>
                           <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">Actions</th>
                         </tr>
                       </thead>
@@ -413,7 +419,7 @@ const DashboardUser = () => {
         </main>
       </div>
 
-      {/* EVC Reservation Review Modal */}
+      {/* EVC Reservation Review Modal - Staff Version */}
       <Dialog open={isEVCModalOpen} onOpenChange={setIsEVCModalOpen}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -446,8 +452,32 @@ const DashboardUser = () => {
                   <h3 className="font-medium text-gray-900">School Year</h3>
                   <p className="text-gray-700">{selectedEVCReservation.SchoolYear || 'Not specified'}</p>
                 </div>
+                <div>
+                  <h3 className="font-medium text-gray-900">Level/Section</h3>
+                  <p className="text-gray-700">{selectedEVCReservation.LvlSec || 'Not specified'}</p>
+                </div>
               </div>
-    
+
+              {/* Class Information - Staff sees basic class info without teacher details */}
+              <div className="border-b pb-4">
+                <h3 className="font-medium text-gray-900 mb-2">Class Information</h3>
+                <div className="bg-gray-50 p-3 rounded">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="font-medium">Subject:</p>
+                      <p className="text-gray-700">{selectedEVCReservation.Subject || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <p className="font-medium">Topic:</p>
+                      <p className="text-gray-700">{selectedEVCReservation.Topic || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <p className="font-medium">Number of Students:</p>
+                      <p className="text-gray-700">{selectedEVCReservation.NoofStudents || 'Not specified'}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               {/* Schedule Information */}
               <div className="border-b pb-4">
@@ -470,8 +500,6 @@ const DashboardUser = () => {
                   )}
                 </div>
               </div>
-
-        
 
               {/* Materials Information */}
               <div>
@@ -506,9 +534,7 @@ const DashboardUser = () => {
                 )}
               </div>
 
-          
-
-              {/* Approval Information */}
+              {/* Approval Information - Staff focuses on admin approval */}
               {selectedEVCReservation.EVCStatus !== 'Pending' && (
                 <div className="border-t pt-4">
                   <h3 className="font-medium text-gray-900 mb-2">Processing Information</h3>

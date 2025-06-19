@@ -398,7 +398,7 @@ const SurveyForm = () => {
       },
       customer: Object.fromEntries(
         Object.entries(customerFormData).map(([key, value]) => {
-          const questionNum = parseInt(key.replace('Q', '')) - 1; // Convert Q1->0, Q2->1, etc.
+          const questionNum = parseInt(key.replace('Q', '')) - 1;
           const sqKey = `SQD${questionNum}`;
           return [sqKey, value];
         })
