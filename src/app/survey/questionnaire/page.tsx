@@ -393,12 +393,13 @@ const SurveyForm = () => {
     
     const surveyData = {
       preliminary: {
-        userRole: 'SURVEY',
+        userRole: demographicData.clientType === 'Government (Employee or another agency)' ? 'STAFF' : 'STUDENT',
         ...demographicData,
       },
       customer: Object.fromEntries(
         Object.entries(customerFormData).map(([key, value]) => {
-          const sqKey = key.replace('Q', 'SQD');
+          const questionNum = parseInt(key.replace('Q', '')) - 1; // Convert Q1->0, Q2->1, etc.
+          const sqKey = `SQD${questionNum}`;
           return [sqKey, value];
         })
       ),
@@ -418,8 +419,11 @@ const SurveyForm = () => {
         })
       });
       
+      // ADD THIS:
       if (!response.ok) {
-        throw new Error('Failed to submit survey');
+        const errorText = await response.text();
+        console.error('API Error:', errorText);
+        throw new Error(`Failed to submit survey: ${errorText}`);
       }
       
       router.push('/survey/thank-you');

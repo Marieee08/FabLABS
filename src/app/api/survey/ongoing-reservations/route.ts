@@ -180,7 +180,7 @@ export async function GET() {
       // Transform EVC data to match UserServices format for consistency
       UserServices: [{
         id: `evc-service-${reservation.id}`,
-        ServiceAvail: 'Educational Visit Center',
+        ServiceAvail: 'Fabrication Laboratory Services',
         EquipmentAvail: 'Laboratory Facilities',
         CostsAvail: null,
         MinsAvail: null,
