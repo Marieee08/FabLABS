@@ -1083,6 +1083,7 @@ const ReservationHistory = () => {
             <TabsTrigger value="all">All</TabsTrigger>
             <TabsTrigger value="msme">MSME</TabsTrigger>
             <TabsTrigger value="student">Student</TabsTrigger>
+            <TabsTrigger value="staff">Staff</TabsTrigger>
           </TabsList>
         </Tabs>
         
@@ -1259,84 +1260,97 @@ const ReservationHistory = () => {
                     res => res.id === selectedReservationId
                   );
                   
-                  // Check if the role is student
-                  const isStudent = currentReservation?.role.toLowerCase() === 'student';
+                    // Check if the role is student or staff (they share same forms)
+                  const isStudentOrStaff = ['student', 'staff'].includes(currentReservation?.role.toLowerCase() || '');
+                  const isMSME = currentReservation?.role.toLowerCase() === 'msme';
+                  const isCompleted = currentReservation?.status.toLowerCase() === 'completed';
                   
                   // Return appropriate table rows based on role
-                  if (isStudent) {
+                  if (isStudentOrStaff) {
                     // Only show Laboratory Request Form for students
                     return (
-                      <>
+                        <>
+                          <TableRow>
+                            <TableCell className="font-medium">Laboratory Request Form</TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => selectedReservationId && handleGeneratePDF(selectedReservationId, 'lab-request')}
+                              >
+                                Generate PDF
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell className="font-medium">Laboratory Reservation Form</TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => selectedReservationId && handleGeneratePDF(selectedReservationId, 'lab-reservation')}
+                              >
+                                Generate PDF
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        </>
+                      );
+                    } else if (isMSME) {
+                      // Show all MSME forms, but Job and Payment Order only for completed
+                      return (
+                        <>
+                          <TableRow>
+                            <TableCell className="font-medium">Registration Form</TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => selectedReservationId && handleGeneratePDF(selectedReservationId, 'registration')}
+                              >
+                                Generate PDF
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                          <TableRow>
+                            <TableCell className="font-medium">Utilization Request Form</TableCell>
+                            <TableCell className="text-right">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => selectedReservationId && handleGeneratePDF(selectedReservationId, 'utilization-request')}
+                              >
+                                Generate PDF
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                          {isCompleted && (
+                            <TableRow>
+                              <TableCell className="font-medium">Job and Payment Order</TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => selectedReservationId && handleGeneratePDF(selectedReservationId, 'job-payment')}
+                                >
+                                  Generate PDF
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          )}
+                        </>
+                      );
+                    } else {
+                      // Fallback for unknown roles
+                      return (
                         <TableRow>
-                          <TableCell className="font-medium">Laboratory Request Form</TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => selectedReservationId && handleGeneratePDF(selectedReservationId, 'lab-request')}
-                            >
-                              Generate PDF
-                            </Button>
+                          <TableCell colSpan={2} className="text-center text-gray-500">
+                            No PDF forms available for this user role
                           </TableCell>
                         </TableRow>
-                        <TableRow>
-                          <TableCell className="font-medium">Laboratory Reservation Form</TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => selectedReservationId && handleGeneratePDF(selectedReservationId, 'lab-reservation')}
-                            >
-                              Generate PDF
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      </>
-                    );
-                  } else {
-                    // Show all other forms for non-students
-                    return (
-                      <>
-                        <TableRow>
-                          <TableCell className="font-medium">Registration Form</TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => selectedReservationId && handleGeneratePDF(selectedReservationId, 'registration')}
-                            >
-                              Generate PDF
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="font-medium">Utilization Request Form</TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => selectedReservationId && handleGeneratePDF(selectedReservationId, 'utilization-request')}
-                            >
-                              Generate PDF
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell className="font-medium">Job and Payment Order</TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => selectedReservationId && handleGeneratePDF(selectedReservationId, 'job-payment')}
-                            >
-                              Generate PDF
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      </>
-                    );
-                  }
-                })()}
+                      );
+                    }
+                  })()}
               </TableBody>
             </Table>
           </div>
