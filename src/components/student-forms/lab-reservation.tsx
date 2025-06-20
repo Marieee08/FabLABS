@@ -113,7 +113,7 @@ export default function LabReservation({
   const newStudentInputRef = useRef<HTMLInputElement>(null);
   const hasInitialized = useRef(false);
   const isStaff = userRole === 'STAFF';
-  
+  const MAX_STUDENTS = 5; // Maximum total students including the user
   // Services and machines handling
   const [services, setServices] = useState<Service[]>([]);
   const [isLoadingServices, setIsLoadingServices] = useState(true);
@@ -221,19 +221,24 @@ export default function LabReservation({
   
   // Student handlers - only for non-staff mode
   const addStudent = useCallback(() => {
-    if (isStaff) return; // Don't allow adding students in staff mode
-    
-    const highestId = students.length > 0 
-      ? Math.max(...students.map(student => student.id))
-      : 0;
-    
-    const newStudent: Student = { id: highestId + 1, name: '' };
-    const updatedStudents = [...students, newStudent];
-    
-    setStudents(updatedStudents);
-    updateFormData('Students', updatedStudents);
-    setNewStudentAdded(true);
-  }, [students, updateFormData, isStaff]);
+  if (isStaff) return; // Don't allow adding students in staff mode
+  
+  // Check if we've reached the maximum limit
+  if (students.length >= MAX_STUDENTS) {
+    return; // Don't add more students if limit is reached
+  }
+  
+  const highestId = students.length > 0 
+    ? Math.max(...students.map(student => student.id))
+    : 0;
+  
+  const newStudent: Student = { id: highestId + 1, name: '' };
+  const updatedStudents = [...students, newStudent];
+  
+  setStudents(updatedStudents);
+  updateFormData('Students', updatedStudents);
+  setNewStudentAdded(true);
+}, [students, updateFormData, isStaff]);
   
   // Fetch services and process machine data
   useEffect(() => {
@@ -753,18 +758,34 @@ export default function LabReservation({
                 </div>
                 <h3 className="text-lg font-semibold text-gray-800">Student Names <span className="text-red-500">*</span></h3>
                 <button
-                  type="button"
-                  onClick={addStudent}
-                  className="ml-auto bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 text-sm font-medium flex items-center transition"
-                  aria-label="Add new student"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                  Add Student
-                </button>
+                type="button"
+                onClick={addStudent}
+                disabled={students.length >= MAX_STUDENTS}
+                className={`ml-auto px-4 py-2 rounded-full text-sm font-medium flex items-center transition ${
+                  students.length >= MAX_STUDENTS 
+                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                }`}
+                aria-label="Add new student"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Add Student {students.length >= MAX_STUDENTS && `(${MAX_STUDENTS} max)`}
+              </button>
               </div>
               
+              {!isStaff && (
+                <div className="mt-2 text-sm text-gray-600">
+                  {students.length} of {MAX_STUDENTS} students added
+                  {students.length >= MAX_STUDENTS && (
+                    <span className="ml-2 text-orange-600 font-medium">
+                      Maximum limit reached
+                    </span>
+                  )}
+                </div>
+              )}
+
               <div className="bg-gray-50 p-6 rounded-lg border border-gray-100">
                 {students.length > 0 ? (
                   <div className="space-y-3 max-h-64 overflow-y-auto rounded-md">
