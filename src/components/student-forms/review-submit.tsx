@@ -153,12 +153,11 @@ export default function ReviewSubmit({
   const [successMessage, setSuccessMessage] = useState('');
   const { user, isLoaded } = useUser();
   const { getToken } = useAuth();
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [accInfo, setAccInfo] = useState<AccInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [submittingReservation, setSubmittingReservation] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
-
-  // Add role check
   const isStaff = userRole === 'STAFF';
 
   useEffect(() => {
@@ -488,16 +487,23 @@ export default function ReviewSubmit({
     }
     };
 
-  const handleSubmitWithBuffer = async () => {
-    try {
-      setSubmittingReservation(true);
-      await handleSubmit();
-    } finally {
-      setTimeout(() => {
-        setSubmittingReservation(false);
-      }, 3000);
-    }
-  };
+    const handleSubmitWithBuffer = async () => {
+      // Show confirmation modal instead of directly submitting
+      setShowConfirmModal(true);
+    };
+
+    // New function to handle confirmed submission
+    const handleConfirmedSubmit = async () => {
+      setShowConfirmModal(false);
+      try {
+        setSubmittingReservation(true);
+        await handleSubmit();
+      } finally {
+        setTimeout(() => {
+          setSubmittingReservation(false);
+        }, 3000);
+      }
+    };
 
   if (loading) {
     return (
@@ -786,6 +792,58 @@ export default function ReviewSubmit({
           </div>
         </CardContent>
       </Card>
-    </div>
+ {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-800">
+              {isStaff ? 'Confirm Equipment Reservation' : 'Confirm Laboratory Reservation'}
+            </h3>
+            
+            <div className="mb-6 space-y-2 text-sm text-gray-600">
+              <p><strong>Dates:</strong> {formData.days.length} day(s) selected</p>
+              <p><strong>Equipment:</strong> {formData.NeededMaterials?.length || 0} item(s)</p>
+              {!isStaff && (
+                <>
+                  <p><strong>Subject:</strong> {formData.Subject}</p>
+                  <p><strong>Students:</strong> {formData.Students?.length || 0} student(s)</p>
+                  <p><strong>Teacher:</strong> {formData.Teacher}</p>
+                </>
+              )}
+              <p><strong>School Year:</strong> {formatSchoolYear(formData.SchoolYear)}</p>
+            </div>
+            
+            <div className="mb-6 p-3 bg-blue-50 rounded-lg">
+              <p className="text-blue-800 text-sm">
+                {isStaff 
+                  ? "Your equipment reservation will be sent directly to admin for approval."
+                  : "Your reservation will be sent to your teacher for approval first, then to admin."
+                }
+              </p>
+            </div>
+            
+            <p className="text-gray-700 mb-6">
+              Are you sure you want to submit this {isStaff ? 'equipment reservation' : 'laboratory reservation'}?
+            </p>
+            
+            <div className="flex gap-3 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setShowConfirmModal(false)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleConfirmedSubmit}
+                className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700"
+              >
+                {isStaff ? 'Submit Equipment Request' : 'Submit Reservation'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div> 
   );
 }

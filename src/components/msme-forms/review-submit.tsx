@@ -127,6 +127,7 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
       ? formData.ProductsManufactured 
       : [formData.ProductsManufactured].filter(Boolean);
   });
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const handlePrevStep = useCallback(() => {
     // Make sure the ProductsManufactured is always an array before going back
@@ -194,6 +195,17 @@ export default function ReviewSubmit({ formData, prevStep, updateFormData, nextS
   const handleServiceCostsCalculated = useCallback((serviceData: GroupedServiceData) => {
     setServiceCostData(serviceData);
   }, []);
+
+  const handleSubmitWithBuffer = async () => {
+    // Show confirmation modal instead of directly submitting
+    setShowConfirmModal(true);
+  };
+
+  // New function to handle confirmed submission
+  const handleConfirmedSubmit = async () => {
+    setShowConfirmModal(false);
+    await handleSubmit();
+  };
 
 const handleSubmit = async () => {
   try {
@@ -689,7 +701,7 @@ const handleSubmit = async () => {
               Previous Step
             </Button>
             <Button
-              onClick={handleSubmit}
+              onClick={handleSubmitWithBuffer}
               disabled={isSubmitting || loading}
               className="bg-blue-600 hover:bg-blue-700 text-white transition-colors disabled:opacity-50"
             >
@@ -703,6 +715,55 @@ const handleSubmit = async () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4 text-gray-800">
+              Confirm Service Reservation
+            </h3>
+            
+            <div className="mb-6 space-y-2 text-sm text-gray-600">
+              <p><strong>Dates:</strong> {formData.days.length} day(s) selected</p>
+              <p><strong>Services:</strong> {selectedServices.join(', ')}</p>
+              {!isStaff && (
+                <p><strong>Total Cost:</strong> ₱{totalCost.toFixed(2)}</p>
+              )}
+              <p><strong>Business:</strong> {accInfo?.BusinessInfo?.CompanyName || 'Not provided'}</p>
+            </div>
+            
+            <div className="mb-6 p-3 bg-blue-50 rounded-lg">
+              <p className="text-blue-800 text-sm">
+                {isStaff 
+                  ? "Your service reservation will be processed without cost calculation."
+                  : "Your service reservation will be submitted for processing and billing."
+                }
+              </p>
+            </div>
+            
+            <p className="text-gray-700 mb-6">
+              Are you sure you want to submit this service reservation?
+            </p>
+            
+            <div className="flex gap-3 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setShowConfirmModal(false)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleConfirmedSubmit}
+                className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700"
+              >
+                Submit Request
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
