@@ -1,4 +1,4 @@
-// /api/survey/completed/route.ts
+// Fixed /api/survey/completed/route.ts
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
@@ -11,6 +11,7 @@ type FormattedSurvey = {
   submittedAt: string;
   customerName: string;
   serviceAvailed: string[];
+  reservationType: 'utilization' | 'evc';
   preliminary: {
     clientType: string;
     sex: string;
@@ -76,86 +77,176 @@ export async function GET() {
       });
     }
 
-    // Find reservations with 'Completed' status
-    const completedReservations = await prisma.utilReq.findMany({
-      where: {
-        Status: 'Completed'
-      },
-      select: {
-        id: true,
-        RequestDate: true,
-        PreliminarySurvey: {
-          select: {
-            id: true,
-            clientType: true,
-            sex: true,
-            age: true,
-            region: true,
-            office: true,
-            CC1: true,
-            CC2: true,
-            CC3: true,
+    // Fetch BOTH utilization requests AND EVC reservations that have completed surveys
+    const [utilReservations, evcReservations] = await Promise.all([
+      // Utilization requests with surveys (including 'Pending Payment' and 'Completed')
+      prisma.utilReq.findMany({
+        where: {
+          // Include both 'Completed' and 'Pending Payment' since MSME goes to 'Pending Payment'
+          Status: { in: ['Completed', 'Pending Payment'] },
+          // Must have at least one survey component
+          OR: [
+            { PreliminarySurvey: { isNot: null } },
+            { CustomerFeedback: { isNot: null } },
+            { EmployeeEvaluation: { isNot: null } }
+          ]
+        },
+        select: {
+          id: true,
+          RequestDate: true,
+          Status: true,
+          PreliminarySurvey: {
+            select: {
+              id: true,
+              clientType: true,
+              sex: true,
+              age: true,
+              region: true,
+              office: true,
+              CC1: true,
+              CC2: true,
+              CC3: true,
+            }
+          },
+          CustomerFeedback: {
+            select: {
+              id: true,
+              SQD0: true,
+              SQD1: true,
+              SQD2: true,
+              SQD3: true,
+              SQD4: true,
+              SQD5: true,
+              SQD6: true,
+              SQD7: true,
+              SQD8: true,
+            }
+          },
+          EmployeeEvaluation: {
+            select: {
+              id: true,
+              E1: true,
+              E2: true,
+              E3: true,
+              E4: true,
+              E5: true,
+              E6: true,
+              E7: true,
+              E8: true,
+              E9: true,
+              E10: true,
+              E11: true,
+              E12: true,
+              E13: true,
+              E14: true,
+              E15: true,
+              E16: true,
+              E17: true,
+            }
+          },
+          ServiceAvailed: {
+            select: {
+              service: true,
+            }
+          },
+          accInfo: {
+            select: {
+              Name: true,
+            }
           }
         },
-        CustomerFeedback: {
-          select: {
-            id: true,
-            SQD0: true,
-            SQD1: true,
-            SQD2: true,
-            SQD3: true,
-            SQD4: true,
-            SQD5: true,
-            SQD6: true,
-            SQD7: true,
-            SQD8: true,
-          }
+        orderBy: {
+          RequestDate: 'desc',
         },
-        EmployeeEvaluation: {
-          select: {
-            id: true,
-            E1: true,
-            E2: true,
-            E3: true,
-            E4: true,
-            E5: true,
-            E6: true,
-            E7: true,
-            E8: true,
-            E9: true,
-            E10: true,
-            E11: true,
-            E12: true,
-            E13: true,
-            E14: true,
-            E15: true,
-            E16: true,
-            E17: true,
-          }
-        },
-        ServiceAvailed: {
-          select: {
-            service: true,
-          }
-        },
-        accInfo: {
-          select: {
-            Name: true,
-          }
-        }
-      },
-      orderBy: {
-        RequestDate: 'desc',
-      },
-    });
+      }),
 
-    // Transform the data to match the expected format in the CompletedSurveysPage component
-    const formattedSurveys: FormattedSurvey[] = completedReservations.map((reservation: any) => ({
-      id: `survey-${reservation.id}`,
+      // EVC reservations with surveys (status 'Completed')
+      prisma.eVCReservation.findMany({
+        where: {
+          EVCStatus: 'Completed',
+          // Must have at least one survey component
+          OR: [
+            { PreliminarySurvey: { isNot: null } },
+            { CustomerFeedback: { isNot: null } },
+            { EmployeeEvaluation: { isNot: null } }
+          ]
+        },
+        select: {
+          id: true,
+          DateRequested: true,
+          EVCStatus: true,
+          PreliminarySurvey: {
+            select: {
+              id: true,
+              clientType: true,
+              sex: true,
+              age: true,
+              region: true,
+              office: true,
+              CC1: true,
+              CC2: true,
+              CC3: true,
+            }
+          },
+          CustomerFeedback: {
+            select: {
+              id: true,
+              SQD0: true,
+              SQD1: true,
+              SQD2: true,
+              SQD3: true,
+              SQD4: true,
+              SQD5: true,
+              SQD6: true,
+              SQD7: true,
+              SQD8: true,
+            }
+          },
+          EmployeeEvaluation: {
+            select: {
+              id: true,
+              E1: true,
+              E2: true,
+              E3: true,
+              E4: true,
+              E5: true,
+              E6: true,
+              E7: true,
+              E8: true,
+              E9: true,
+              E10: true,
+              E11: true,
+              E12: true,
+              E13: true,
+              E14: true,
+              E15: true,
+              E16: true,
+              E17: true,
+            }
+          },
+          accInfo: {
+            select: {
+              Name: true,
+            }
+          }
+        },
+        orderBy: {
+          DateRequested: 'desc',
+        },
+      })
+    ]);
+
+    console.log('Found completed utilization reservations:', utilReservations.length);
+    console.log('Found completed EVC reservations:', evcReservations.length);
+
+    // Transform utilization reservations
+    const formattedUtilSurveys: FormattedSurvey[] = utilReservations.map((reservation: any) => ({
+      id: `util-survey-${reservation.id}`,
       reservationId: reservation.id,
+      reservationType: 'utilization' as const,
       submittedAt: reservation.RequestDate?.toISOString() || new Date().toISOString(),
       customerName: reservation.accInfo?.Name || 'Unknown',
-      serviceAvailed: reservation.ServiceAvailed.map((s: any) => s.service),
+      serviceAvailed: reservation.ServiceAvailed?.map((s: any) => s.service) || ['Fabrication Services'],
       preliminary: {
         clientType: reservation.PreliminarySurvey?.clientType || 'Not specified',
         sex: reservation.PreliminarySurvey?.sex || 'Not specified',
@@ -198,11 +289,67 @@ export async function GET() {
       }
     }));
 
+    // Transform EVC reservations
+    const formattedEvcSurveys: FormattedSurvey[] = evcReservations.map((reservation: any) => ({
+      id: `evc-survey-${reservation.id}`,
+      reservationId: reservation.id,
+      reservationType: 'evc' as const,
+      submittedAt: reservation.DateRequested?.toISOString() || new Date().toISOString(),
+      customerName: reservation.accInfo?.Name || 'Unknown',
+      serviceAvailed: ['Fabrication Laboratory Services'],
+      preliminary: {
+        clientType: reservation.PreliminarySurvey?.clientType || 'Not specified',
+        sex: reservation.PreliminarySurvey?.sex || 'Not specified',
+        age: reservation.PreliminarySurvey?.age?.toString() || 'Not specified',
+        region: reservation.PreliminarySurvey?.region || 'Not specified',
+        office: reservation.PreliminarySurvey?.office || 'Not specified',
+        CC1: reservation.PreliminarySurvey?.CC1 || 'Not specified',
+        CC2: reservation.PreliminarySurvey?.CC2 || 'Not specified',
+        CC3: reservation.PreliminarySurvey?.CC3 || 'Not specified',
+      },
+      customer: {
+        SQD0: reservation.CustomerFeedback?.SQD0 || 'N/A',
+        SQD1: reservation.CustomerFeedback?.SQD1 || 'N/A',
+        SQD2: reservation.CustomerFeedback?.SQD2 || 'N/A',
+        SQD3: reservation.CustomerFeedback?.SQD3 || 'N/A',
+        SQD4: reservation.CustomerFeedback?.SQD4 || 'N/A',
+        SQD5: reservation.CustomerFeedback?.SQD5 || 'N/A',
+        SQD6: reservation.CustomerFeedback?.SQD6 || 'N/A',
+        SQD7: reservation.CustomerFeedback?.SQD7 || 'N/A',
+        SQD8: reservation.CustomerFeedback?.SQD8 || 'N/A',
+      },
+      employee: {
+        E1: reservation.EmployeeEvaluation?.E1 || 'N/A',
+        E2: reservation.EmployeeEvaluation?.E2 || 'N/A',
+        E3: reservation.EmployeeEvaluation?.E3 || 'N/A',
+        E4: reservation.EmployeeEvaluation?.E4 || 'N/A',
+        E5: reservation.EmployeeEvaluation?.E5 || 'N/A',
+        E6: reservation.EmployeeEvaluation?.E6 || 'N/A',
+        E7: reservation.EmployeeEvaluation?.E7 || 'N/A',
+        E8: reservation.EmployeeEvaluation?.E8 || 'N/A',
+        E9: reservation.EmployeeEvaluation?.E9 || 'N/A',
+        E10: reservation.EmployeeEvaluation?.E10 || 'N/A',
+        E11: reservation.EmployeeEvaluation?.E11 || 'N/A',
+        E12: reservation.EmployeeEvaluation?.E12 || 'N/A',
+        E13: reservation.EmployeeEvaluation?.E13 || 'N/A',
+        E14: reservation.EmployeeEvaluation?.E14 || 'N/A',
+        E15: reservation.EmployeeEvaluation?.E15 || 'N/A',
+        E16: reservation.EmployeeEvaluation?.E16 || 'N/A',
+        E17: reservation.EmployeeEvaluation?.E17 || 'N/A',
+      }
+    }));
+
+    // Combine all surveys and sort by submission date
+    const allSurveys = [...formattedUtilSurveys, ...formattedEvcSurveys]
+      .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+
+    console.log('Total formatted surveys:', allSurveys.length);
+
     // Update cache
-    cachedData = formattedSurveys;
+    cachedData = allSurveys;
     cacheTimestamp = now;
 
-    return NextResponse.json(formattedSurveys, {
+    return NextResponse.json(allSurveys, {
       headers: {
         'Cache-Control': 'private, max-age=60',
       },
