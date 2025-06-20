@@ -175,28 +175,33 @@ model BlockedDate {
 }
 
 model EVCReservation {
-  id              Int              @id @default(autoincrement())
-  EVCStatus       String           @default("Pending")
-  ControlNo       Int?
-  LvlSec          String?
-  NoofStudents    Int?
-  Subject         String?
-  Teacher         String?
-  Topic           String?
-  DateRequested   DateTime?        @default(now())
-  ApprovedBy      String?
-  SchoolYear      Int?
-  ReceivedBy      String?
-  ReceivedDate    DateTime?
-  InspectedBy     String?
-  InspectedDate   DateTime?
-  accInfoId       Int?
-  TeacherEmail    String?
-  accInfo         AccInfo?         @relation("AccInfoToEVCReservation", fields: [accInfoId], references: [id])
-  EVCStudents     EVCStudent[]     @relation("EVCReservationtoEVCStudent")
-  NeededMaterials NeededMaterial[] @relation("EVCReservationtoNeededMaterial")
-  userService     UserService[]    @relation("EVCReservationToUserService")
-  UtilTimes       UtilTime[]       @relation("EVCReservationtoUtilTime")
+  id                  Int                  @id @default(autoincrement())
+  EVCStatus           String               @default("Pending")
+  ControlNo           Int?
+  LvlSec              String?
+  NoofStudents        Int?
+  Subject             String?
+  Teacher             String?
+  Topic               String?
+  DateRequested       DateTime?            @default(now())
+  ApprovedBy          String?
+  SchoolYear          Int?
+  ReceivedBy          String?
+  ReceivedDate        DateTime?
+  InspectedBy         String?
+  InspectedDate       DateTime?
+  accInfoId           Int?
+  TeacherEmail        String?
+  accInfo             AccInfo?             @relation("AccInfoToEVCReservation", fields: [accInfoId], references: [id])
+  EVCStudents         EVCStudent[]         @relation("EVCReservationtoEVCStudent")
+  NeededMaterials     NeededMaterial[]     @relation("EVCReservationtoNeededMaterial")
+  userService         UserService[]        @relation("EVCReservationToUserService")
+  UtilTimes           UtilTime[]           @relation("EVCReservationtoUtilTime")
+  // ADD THESE NEW RELATIONS:
+  PreliminarySurvey   PreliminarySurvey?   @relation("EVCReservationToPreliminarySurvey")
+  CustomerFeedback    CustomerFeedback?    @relation("EVCReservationToCustomerFeedback")
+  EmployeeEvaluation  EmployeeEvaluation?  @relation("EVCReservationToEmployeeEvaluation")
+  SatisfactionSurvey  SatisfactionSurvey?  @relation("EVCReservationToSatisfactionSurvey")
 }
 
 model EVCStudent {
@@ -266,7 +271,7 @@ model RepairCheck {
 }
 
 model PreliminarySurvey {
-  id           Int      @id @default(autoincrement())
+  id           Int             @id @default(autoincrement())
   userRole     String
   age          Int
   sex          String
@@ -277,11 +282,14 @@ model PreliminarySurvey {
   region       String?
   office       String?
   otherService String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  utilReqId    Int      @unique
-  utilReq      UtilReq  @relation("UtilReqToPreliminarySurvey", fields: [utilReqId], references: [id])
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  utilReqId    Int?            @unique  // Made optional
+  evcId        Int?            @unique  // Added for EVCReservation
+  utilReq      UtilReq?        @relation("UtilReqToPreliminarySurvey", fields: [utilReqId], references: [id])
+  evc          EVCReservation? @relation("EVCReservationToPreliminarySurvey", fields: [evcId], references: [id])
 }
+
 
 model ServiceAvailed {
   id        Int     @id @default(autoincrement())
@@ -293,8 +301,8 @@ model ServiceAvailed {
 }
 
 model CustomerFeedback {
-  id          Int      @id @default(autoincrement())
-  submittedAt DateTime @default(now())
+  id          Int             @id @default(autoincrement())
+  submittedAt DateTime        @default(now())
   SQD0        String?
   SQD1        String?
   SQD2        String?
@@ -304,13 +312,15 @@ model CustomerFeedback {
   SQD6        String?
   SQD7        String?
   SQD8        String?
-  utilReqId   Int      @unique
-  utilReq     UtilReq  @relation("UtilReqToCustomerFeedback", fields: [utilReqId], references: [id])
+  utilReqId   Int?            @unique  // Made optional
+  evcId       Int?            @unique  // Added for EVCReservation
+  utilReq     UtilReq?        @relation("UtilReqToCustomerFeedback", fields: [utilReqId], references: [id])
+  evc         EVCReservation? @relation("EVCReservationToCustomerFeedback", fields: [evcId], references: [id])
 }
 
 model EmployeeEvaluation {
-  id          Int      @id @default(autoincrement())
-  submittedAt DateTime @default(now())
+  id          Int             @id @default(autoincrement())
+  submittedAt DateTime        @default(now())
   E1          String?
   E2          String?
   E3          String?
@@ -328,12 +338,14 @@ model EmployeeEvaluation {
   E15         String?
   E16         String?
   E17         String?
-  utilReqId   Int      @unique
-  utilReq     UtilReq  @relation("UtilReqToEmployeeEvaluation", fields: [utilReqId], references: [id])
+  utilReqId   Int?            @unique  // Made optional
+  evcId       Int?            @unique  // Added for EVCReservation
+  utilReq     UtilReq?        @relation("UtilReqToEmployeeEvaluation", fields: [utilReqId], references: [id])
+  evc         EVCReservation? @relation("EVCReservationToEmployeeEvaluation", fields: [evcId], references: [id])
 }
 
 model SatisfactionSurvey {
-  id          Int      @id @default(autoincrement())
+  id          Int             @id @default(autoincrement())
   userRole    String
   sex         String?
   age         Int?
@@ -350,12 +362,13 @@ model SatisfactionSurvey {
   SQD7        String?
   SQD8        String?
   suggestions String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  utilReqId   Int      @unique
-  utilReq     UtilReq  @relation("UtilReqToSatisfactionSurvey", fields: [utilReqId], references: [id])
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  utilReqId   Int?            @unique  // Made optional
+  evcId       Int?            @unique  // Added for EVCReservation
+  utilReq     UtilReq?        @relation("UtilReqToSatisfactionSurvey", fields: [utilReqId], references: [id])
+  evc         EVCReservation? @relation("EVCReservationToSatisfactionSurvey", fields: [evcId], references: [id])
 }
-
 model JobandPayment {
   id             Int       @id @default(autoincrement())
   Date           DateTime?

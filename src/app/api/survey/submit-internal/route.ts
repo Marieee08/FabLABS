@@ -1,4 +1,4 @@
-// /api/survey/submit-internal/route.ts
+// src/app/api/survey/submit-internal/route.ts
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
@@ -19,138 +19,101 @@ export async function POST(request: Request) {
       return new NextResponse("Missing required fields", { status: 400 });
     }
 
-    // Convert reservationId to number
-    const resId = parseInt(reservationId);
-    if (isNaN(resId)) {
+    // Parse reservationId as integer
+    const evcId = parseInt(reservationId);
+    if (isNaN(evcId)) {
       return new NextResponse("Invalid reservation ID", { status: 400 });
     }
 
-    // First, determine if this is a UtilReq or EVCReservation
-    // Check UtilReq first (for STAFF using utilization services)
-    const utilReservation = await prisma.utilReq.findUnique({
-      where: { id: resId },
+    // Check if EVCReservation exists and is "Ongoing"
+    const evcReservation = await prisma.eVCReservation.findUnique({
+      where: { id: evcId },
       include: {
         accInfo: true
       }
     });
 
-    let isEvcReservation = false;
-    let reservation: any = null;
-    
-    if (utilReservation) {
-      reservation = utilReservation;
-      isEvcReservation = false;
-    } else {
-      // If not found in UtilReq, check EVCReservation (for STAFF using EVC services)
-      const evcReservation = await prisma.eVCReservation.findUnique({
-        where: { id: resId },
-        include: {
-          accInfo: true
-        }
-      });
-      
-      if (evcReservation) {
-        isEvcReservation = true;
-        reservation = evcReservation;
-      }
-    }
-
-    if (!reservation) {
+    if (!evcReservation) {
       return new NextResponse("Reservation not found", { status: 404 });
     }
 
+    if (evcReservation.EVCStatus !== 'Ongoing') {
+      return new NextResponse("Reservation is not in Ongoing status", { status: 400 });
+    }
+
     // Verify this is a STAFF reservation
-    if (reservation.accInfo?.Role !== 'STAFF') {
-      return new NextResponse("This survey is only for STAFF reservations", { status: 403 });
+    if (evcReservation.accInfo?.Role !== 'STAFF') {
+      return new NextResponse("This API is only for STAFF reservations", { status: 403 });
     }
 
-    // Check if reservation is in "Ongoing" status
-    const status = isEvcReservation ? (reservation as any).EVCStatus : reservation.Status;
-    if (status !== 'Ongoing') {
-      return new NextResponse("Survey can only be completed for ongoing reservations", { status: 400 });
-    }
-
-    // Start a transaction to ensure data consistency
+    // Use transaction to ensure data consistency
     const result = await prisma.$transaction(async (tx) => {
-      // 1. Save preliminary survey data (only for UtilReq reservations)
-      let preliminaryData = null;
-      if (!isEvcReservation) {
-        preliminaryData = await tx.preliminarySurvey.create({
-          data: {
-            userRole: surveyData.preliminary.userRole || 'STAFF',
-            age: parseInt(surveyData.preliminary.age) || 0,
-            sex: surveyData.preliminary.sex || '',
-            CC1: surveyData.preliminary.CC1,
-            CC2: surveyData.preliminary.CC2,
-            CC3: surveyData.preliminary.CC3,
-            clientType: surveyData.preliminary.clientType,
-            region: 'VIII', // Fixed for Eastern Visayas
-            office: 'SRA OFFICE', // Fixed for this office
-            otherService: surveyData.preliminary.otherService,
-            utilReqId: resId,
-          }
-        });
-      }
-
-      // 2. Save customer feedback (only for UtilReq reservations)
-      let customerData = null;
-      if (!isEvcReservation) {
-        customerData = await tx.customerFeedback.create({
-          data: {
-            SQD0: surveyData.customer.SQD0,
-            SQD1: surveyData.customer.SQD1,
-            SQD2: surveyData.customer.SQD2,
-            SQD3: surveyData.customer.SQD3,
-            SQD4: surveyData.customer.SQD4,
-            SQD5: surveyData.customer.SQD5,
-            SQD6: surveyData.customer.SQD6,
-            SQD7: surveyData.customer.SQD7,
-            SQD8: surveyData.customer.SQD8,
-            utilReqId: resId,
-          }
-        });
-      }
-
-      // 3. Save services availed (only for UtilReq reservations)
-      if (!isEvcReservation && surveyData.serviceAvailed && surveyData.serviceAvailed.length > 0) {
-        for (const service of surveyData.serviceAvailed) {
-          await tx.serviceAvailed.create({
-            data: {
-              service: service,
-              utilReqId: resId,
-            }
-          });
+      // 1. Save Preliminary Survey
+      const preliminarySurvey = await tx.preliminarySurvey.create({
+        data: {
+          evcId: evcId,
+          userRole: surveyData.preliminary.userRole || 'STAFF',
+          age: parseInt(surveyData.preliminary.age),
+          sex: surveyData.preliminary.sex,
+          clientType: surveyData.preliminary.clientType,
+          region: surveyData.preliminary.region || 'VIII',
+          office: surveyData.preliminary.office || 'SRA OFFICE',
+          CC1: surveyData.preliminary.CC1,
+          CC2: surveyData.preliminary.CC2,
+          CC3: surveyData.preliminary.CC3,
+          otherService: surveyData.preliminary.otherService
         }
-      }
+      });
 
-      // 4. Update reservation status to "Completed"
-      if (isEvcReservation) {
-        await tx.eVCReservation.update({
-          where: { id: resId },
-          data: {
-            EVCStatus: 'Completed'
-          }
-        });
-      } else {
-        await tx.utilReq.update({
-          where: { id: resId },
-          data: {
-            Status: 'Completed'
-          }
-        });
-      }
+      // 2. Save Customer Feedback (SQD questions)
+      const customerFeedback = await tx.customerFeedback.create({
+        data: {
+          evcId: evcId,
+          SQD0: surveyData.customer.SQD0,
+          SQD1: surveyData.customer.SQD1,
+          SQD2: surveyData.customer.SQD2,
+          SQD3: surveyData.customer.SQD3,
+          SQD4: surveyData.customer.SQD4,
+          SQD5: surveyData.customer.SQD5,
+          SQD6: surveyData.customer.SQD6,
+          SQD7: surveyData.customer.SQD7,
+          SQD8: surveyData.customer.SQD8
+        }
+      });
+
+      // 3. Update EVCReservation status to "Completed"
+      const updatedReservation = await tx.eVCReservation.update({
+        where: { id: evcId },
+        data: {
+          EVCStatus: 'Completed'
+        }
+      });
 
       return {
-        preliminaryData,
-        customerData,
-        reservationUpdated: true
+        preliminarySurvey,
+        customerFeedback,
+        updatedReservation
       };
     });
 
-    return NextResponse.json({ 
-      success: true, 
+    console.log('Internal survey submitted successfully:', {
+      evcId,
+      preliminarySurveyId: result.preliminarySurvey.id,
+      customerFeedbackId: result.customerFeedback.id,
+      newStatus: result.updatedReservation.EVCStatus
+    });
+
+    return NextResponse.json({
+      success: true,
       message: "Internal survey submitted successfully",
-      data: result 
+      data: {
+        reservationId: evcId,
+        status: "Completed",
+        surveyIds: {
+          preliminary: result.preliminarySurvey.id,
+          customer: result.customerFeedback.id
+        }
+      }
     });
 
   } catch (error) {
@@ -163,6 +126,6 @@ export async function POST(request: Request) {
       }
     }
     
-    return new NextResponse("Internal Error", { status: 500 });
+    return new NextResponse("Internal Server Error", { status: 500 });
   }
 }
