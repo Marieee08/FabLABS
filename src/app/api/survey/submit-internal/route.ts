@@ -4,216 +4,165 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@clerk/nextjs/server';
 
-// Helper function to validate required fields in the survey data
-function validateInternalSurveyData(surveyData: { 
-  preliminary: { 
-    clientType: any; 
-    sex: any; 
-    age: any; 
-    officeAvailed: any; // Changed from 'office' to 'officeAvailed'
-    serviceAvailed: any[];
-    CC1: any; 
-  }; 
-  customer: {}; 
-}) {
-  console.log('Validating survey data:', JSON.stringify(surveyData, null, 2));
-  
-  if (!surveyData) {
-    console.log('No survey data provided');
-    return false;
-  }
-  
-  // Validate preliminary data
-  if (!surveyData.preliminary) {
-    console.log('No preliminary data');
-    return false;
-  }
-
-  const { preliminary } = surveyData;
-  
-  // Check required fields (removed region and office checks, updated office field name)
-  if (!preliminary.clientType) {
-    console.log('Missing clientType');
-    return false;
-  }
-  
-  if (!preliminary.sex) {
-    console.log('Missing sex');
-    return false;
-  }
-  
-  if (!preliminary.age) {
-    console.log('Missing age');
-    return false;
-  }
-  
-  if (!preliminary.officeAvailed) { // Changed from 'office' to 'officeAvailed'
-    console.log('Missing officeAvailed');
-    return false;
-  }
-  
-  if (!preliminary.serviceAvailed || !Array.isArray(preliminary.serviceAvailed) || preliminary.serviceAvailed.length === 0) {
-    console.log('Missing or invalid serviceAvailed');
-    return false;
-  }
-  
-  if (!preliminary.CC1) {
-    console.log('Missing CC1');
-    return false;
-  }
-  
-  // Validate customer feedback data (at least basic check)
-  if (!surveyData.customer || Object.keys(surveyData.customer).length === 0) {
-    console.log('Missing or empty customer data');
-    return false;
-  }
-  
-  console.log('Validation passed');
-  return true;
-}
-
 export async function POST(request: Request) {
   try {
-    const { userId } = await auth(); // Fixed: Added await
+    const { userId } = auth();
 
     if (!userId) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    // Parse request data
     const body = await request.json();
     const { reservationId, surveyData } = body;
 
-    console.log('Received submission:', { reservationId, surveyData });
-
-    // Validation checks
-    if (!reservationId) {
-      console.log('Missing reservationId');
-      return new NextResponse("Reservation ID is required", { status: 400 });
-    }
-    
-    if (!validateInternalSurveyData(surveyData)) {
-      console.log('Survey data validation failed');
-      return new NextResponse("Invalid survey data format", { status: 400 });
+    if (!reservationId || !surveyData) {
+      return new NextResponse("Missing required fields", { status: 400 });
     }
 
-    // Parse numeric values safely
-    const parsedAge = surveyData.preliminary.age ? parseInt(surveyData.preliminary.age) : 0;
-    
-    // Use Prisma transactions to ensure atomicity
-    const updatedReservation = await prisma.$transaction(async (prisma: any) => {
-      // Check both utilReq and evcReservation tables (same as main submit API)
-      const [utilReservation, evcReservation] = await Promise.all([
-        prisma.utilReq.findFirst({
-          where: {
-            id: parseInt(reservationId),
-            Status: 'Ongoing'
-          },
-          select: { id: true }
-        }),
-        prisma.eVCReservation.findFirst({
-          where: {
-            id: parseInt(reservationId),
-            EVCStatus: 'Ongoing'
-          },
-          select: { id: true }
-        })
-      ]);
+    // Convert reservationId to number
+    const resId = parseInt(reservationId);
+    if (isNaN(resId)) {
+      return new NextResponse("Invalid reservation ID", { status: 400 });
+    }
 
-      console.log('Found utilReservation:', utilReservation);
-      console.log('Found evcReservation:', evcReservation);
-
-      if (!utilReservation && !evcReservation) {
-        throw new Error('Reservation not found or not in ongoing status');
+    // First, determine if this is a UtilReq or EVCReservation
+    // Check UtilReq first (for STAFF using utilization services)
+    const utilReservation = await prisma.utilReq.findUnique({
+      where: { id: resId },
+      include: {
+        accInfo: true
       }
+    });
 
-      // Handle utilReq reservations
-      if (utilReservation) {
-        return prisma.utilReq.update({
-          where: {
-            id: parseInt(reservationId)
-          },
+    let isEvcReservation = false;
+    let reservation: any = null;
+    
+    if (utilReservation) {
+      reservation = utilReservation;
+      isEvcReservation = false;
+    } else {
+      // If not found in UtilReq, check EVCReservation (for STAFF using EVC services)
+      const evcReservation = await prisma.eVCReservation.findUnique({
+        where: { id: resId },
+        include: {
+          accInfo: true
+        }
+      });
+      
+      if (evcReservation) {
+        isEvcReservation = true;
+        reservation = evcReservation;
+      }
+    }
+
+    if (!reservation) {
+      return new NextResponse("Reservation not found", { status: 404 });
+    }
+
+    // Verify this is a STAFF reservation
+    if (reservation.accInfo?.Role !== 'STAFF') {
+      return new NextResponse("This survey is only for STAFF reservations", { status: 403 });
+    }
+
+    // Check if reservation is in "Ongoing" status
+    const status = isEvcReservation ? (reservation as any).EVCStatus : reservation.Status;
+    if (status !== 'Ongoing') {
+      return new NextResponse("Survey can only be completed for ongoing reservations", { status: 400 });
+    }
+
+    // Start a transaction to ensure data consistency
+    const result = await prisma.$transaction(async (tx) => {
+      // 1. Save preliminary survey data (only for UtilReq reservations)
+      let preliminaryData = null;
+      if (!isEvcReservation) {
+        preliminaryData = await tx.preliminarySurvey.create({
           data: {
-            Status: 'Completed',
-            // Store the survey data
-            ...(surveyData?.preliminary && {
-              PreliminarySurvey: {
-                create: {
-                  userRole: 'STAFF', // Set to STAFF for internal surveys
-                  age: parsedAge,
-                  sex: surveyData.preliminary.sex || '',
-                  CC1: surveyData.preliminary.CC1,
-                  CC2: surveyData.preliminary.CC2,
-                  CC3: surveyData.preliminary.CC3,
-                  clientType: surveyData.preliminary.clientType,
-                  region: 'VIII', // Set default region for internal surveys
-                  office: surveyData.preliminary.officeAvailed, // Map officeAvailed to office
-                  otherService: surveyData.preliminary.otherService
-                }
-              }
-            }),
-            ...(surveyData?.customer && {
-              CustomerFeedback: {
-                create: {
-                  SQD0: surveyData.customer.SQD0,
-                  SQD1: surveyData.customer.SQD1,
-                  SQD2: surveyData.customer.SQD2,
-                  SQD3: surveyData.customer.SQD3,
-                  SQD4: surveyData.customer.SQD4,
-                  SQD5: surveyData.customer.SQD5,
-                  SQD6: surveyData.customer.SQD6,
-                  SQD7: surveyData.customer.SQD7,
-                  SQD8: surveyData.customer.SQD8
-                }
-              }
-            }),
-            // Note: Internal surveys don't have employee evaluation
-            ...(surveyData?.serviceAvailed && surveyData.serviceAvailed.length > 0 && {
-              ServiceAvailed: {
-                createMany: {
-                  data: surveyData.serviceAvailed.map((service: string) => ({
-                    service
-                  }))
-                }
-              }
-            })
+            userRole: surveyData.preliminary.userRole || 'STAFF',
+            age: parseInt(surveyData.preliminary.age) || 0,
+            sex: surveyData.preliminary.sex || '',
+            CC1: surveyData.preliminary.CC1,
+            CC2: surveyData.preliminary.CC2,
+            CC3: surveyData.preliminary.CC3,
+            clientType: surveyData.preliminary.clientType,
+            region: 'VIII', // Fixed for Eastern Visayas
+            office: 'SRA OFFICE', // Fixed for this office
+            otherService: surveyData.preliminary.otherService,
+            utilReqId: resId,
           }
         });
       }
 
-      // Handle EVC reservations - just update status for now
-      // Note: EVC surveys aren't fully implemented in schema for internal surveys
-      if (evcReservation) {
-        return prisma.eVCReservation.update({
-          where: {
-            id: parseInt(reservationId)
-          },
+      // 2. Save customer feedback (only for UtilReq reservations)
+      let customerData = null;
+      if (!isEvcReservation) {
+        customerData = await tx.customerFeedback.create({
+          data: {
+            SQD0: surveyData.customer.SQD0,
+            SQD1: surveyData.customer.SQD1,
+            SQD2: surveyData.customer.SQD2,
+            SQD3: surveyData.customer.SQD3,
+            SQD4: surveyData.customer.SQD4,
+            SQD5: surveyData.customer.SQD5,
+            SQD6: surveyData.customer.SQD6,
+            SQD7: surveyData.customer.SQD7,
+            SQD8: surveyData.customer.SQD8,
+            utilReqId: resId,
+          }
+        });
+      }
+
+      // 3. Save services availed (only for UtilReq reservations)
+      if (!isEvcReservation && surveyData.serviceAvailed && surveyData.serviceAvailed.length > 0) {
+        for (const service of surveyData.serviceAvailed) {
+          await tx.serviceAvailed.create({
+            data: {
+              service: service,
+              utilReqId: resId,
+            }
+          });
+        }
+      }
+
+      // 4. Update reservation status to "Completed"
+      if (isEvcReservation) {
+        await tx.eVCReservation.update({
+          where: { id: resId },
           data: {
             EVCStatus: 'Completed'
           }
         });
+      } else {
+        await tx.utilReq.update({
+          where: { id: resId },
+          data: {
+            Status: 'Completed'
+          }
+        });
       }
+
+      return {
+        preliminaryData,
+        customerData,
+        reservationUpdated: true
+      };
     });
 
-    console.log('Survey submitted successfully');
-
-    return NextResponse.json({
-      success: true,
-      message: "Internal survey completed successfully",
-      data: {
-        id: updatedReservation.id,
-        Status: updatedReservation.Status || updatedReservation.EVCStatus
-      }
+    return NextResponse.json({ 
+      success: true, 
+      message: "Internal survey submitted successfully",
+      data: result 
     });
 
   } catch (error) {
-    console.error('[INTERNAL_SURVEY_POST]', error);
+    console.error('[INTERNAL_SURVEY_SUBMIT]', error);
     
-    // Check for specific error types to give better feedback
-    if (error instanceof Error && error.message === 'Reservation not found or not in ongoing status') {
-      return new NextResponse(error.message, { status: 404 });
+    // Handle specific Prisma errors
+    if (error instanceof Error) {
+      if (error.message.includes('Unique constraint')) {
+        return new NextResponse("Survey already submitted for this reservation", { status: 409 });
+      }
     }
     
-    return new NextResponse(`Internal Error: ${error instanceof Error ? error.message : 'Unknown error'}`, { status: 500 });
+    return new NextResponse("Internal Error", { status: 500 });
   }
 }

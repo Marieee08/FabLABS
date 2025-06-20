@@ -263,7 +263,7 @@ const SurveyDashboard = () => {
                   <p><strong>Note:</strong> Survey type will be determined based on your role:</p>
                   <ul className="list-disc list-inside mt-2 space-y-1">
                     <li><Badge className="bg-purple-100 text-purple-800 border-purple-200 text-xs">STAFF</Badge> - Internal Survey</li>
-                    <li><Badge className="bg-orange-100 text-orange-800 border-orange-200 text-xs">MSME</Badge>, <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">STUDENT</Badge> - Standard Questionnaire</li>
+                    <li><Badge className="bg-orange-100 text-orange-800 border-orange-200 text-xs">MSME</Badge>, <Badge className="bg-green-100 text-green-800 border-green-200 text-xs">STUDENT</Badge> - External Survey</li>
                   </ul>
                 </div>
               </div>
